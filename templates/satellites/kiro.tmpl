@@ -1,0 +1,30 @@
+---
+inclusion: always
+---
+# Kiro Steering — Project Context
+Apply the conventions defined in `AGENTS.md` in all your responses.
+
+## Mandatory gate before implementing
+
+This project uses packaged protocols. **Do not implement without running the corresponding
+protocol first**. The protocol files are in `.agents/protocols/` and `.kiro/skills/`.
+
+1. **Always** — before classifying or implementing any task, run the
+   **Decision Ladder + Preflight**:
+   - If the agent supports skills: the protocol is in `.kiro/skills/decision-ladder/SKILL.md`
+   - Otherwise: read `.agents/protocols/decision-ladder.md`
+   - Follow the 7 rungs, run the decision tree, and classify Route A/B/C.
+   - Without completing Preflight you do not start coding.
+
+2. **If there are active tests** — before writing production code, run the
+   **TDD Protocol**:
+   - Skill: `.kiro/skills/tdd/SKILL.md`
+   - Flat: `.agents/protocols/tdd.md`
+
+3. **If SDD applies** — before delegating to `sdd-apply`, read the SDD protocol:
+   - Skill: `.kiro/skills/sdd/SKILL.md`
+   - Flat: `.agents/protocols/sdd.md`
+
+**Universal order**: 🪜 Decision Ladder → 🔍 Preflight → (by route) 🧪 TDD → implementation.
+
+This is not optional. If you did not run the gate, do not implement.

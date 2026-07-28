@@ -1,0 +1,142 @@
+#!/bin/bash
+# Workflow drift detector v3 — AI Workflow
+# Source: github.com/hugoafj/ai-workflow-wizard/blob/main/post-commit
+#
+# Detecta dos categorías de drift en cada commit:
+#   1. AGENTS.md drift  → amerita correr /wf-refresh
+#   2. SDD drift        → amerita correr /sdd-init refresh
+#
+# El hook SOLO notifica — nunca ejecuta acciones automáticamente.
+# El usuario decide cuándo actuar sobre las notificaciones.
+#
+# Instalación manual (si no usas el wizard):
+#   cp post-commit .git/hooks/post-commit
+#   chmod +x .git/hooks/post-commit
+#
+# El wizard /wf-init lo instala automáticamente en Fase 8.
+
+# ─── Archivos que ameritan /wf-refresh ─────────────────────────────────────
+# Cambios en estos archivos pueden dejar el AGENTS.md desactualizado respecto
+# al stack, scripts, o convenciones del proyecto.
+REFRESH_FILES="package.json composer.json pyproject.toml Cargo.toml \
+  tsconfig.json vite.config.ts vite.config.js \
+  next.config.ts next.config.js \
+  tailwind.config.ts tailwind.config.js"
+
+# ─── Archivos que ameritan /sdd-init refresh ────────────────────────────────
+# Cambios en estos archivos pueden afectar las "capacidades del proyecto" que
+# /sdd-init detecta: frameworks de test, herramientas de build, config de SDD.
+# package.json está en ambas listas porque afecta tanto AGENTS.md (scripts)
+# como sdd-init (dependencias de test detectadas).
+#
+# IMPORTANTE: openspec/config.yaml está excluido intencionalmente.
+# Es el artefacto de salida de /sdd-init — incluirlo causaría un loop:
+# /sdd-init escribe el archivo → commit → hook detecta el cambio → notifica
+# "re-corre /sdd-init" → que es exactamente lo que acaba de correr.
+# Los triggers reales de re-init son cambios en dependencias y herramientas,
+# no en el config que sdd-init mismo genera.
+SDD_FILES="package.json \
+  vitest.config.ts vitest.config.js \
+  jest.config.ts jest.config.js \
+  playwright.config.ts playwright.config.js"
+
+# ─── Detectar archivos cambiados en este commit ─────────────────────────────
+CHANGED_REFRESH=""
+CHANGED_SDD=""
+
+# git diff HEAD~1 HEAD falla en el primer commit (no hay HEAD~1).
+# Fallback: git diff --cached --name-only para el primer commit.
+if git rev-parse HEAD~1 > /dev/null 2>&1; then
+  CHANGED=$(git diff HEAD~1 HEAD --name-only 2>/dev/null)
+else
+  CHANGED=$(git diff --cached --name-only 2>/dev/null)
+fi
+
+for f in $REFRESH_FILES; do
+  if echo "$CHANGED" | grep -q "^$f$"; then
+    CHANGED_REFRESH="$CHANGED_REFRESH $f"
+  fi
+done
+
+for f in $SDD_FILES; do
+  if echo "$CHANGED" | grep -q "^$f$"; then
+    CHANGED_SDD="$CHANGED_SDD $f"
+  fi
+done
+
+# ─── Salir limpio si no hay drift ───────────────────────────────────────────
+if [ -z "$CHANGED_REFRESH" ] && [ -z "$CHANGED_SDD" ]; then
+  exit 0
+fi
+
+# ─── 1. Print a stderr ──────────────────────────────────────────────────────
+printf '\n┌─────────────────────────────────────────────────────┐\n' >&2
+printf '│  ⚠  Workflow context may need refresh              │\n' >&2
+printf '└─────────────────────────────────────────────────────┘\n' >&2
+
+if [ -n "$CHANGED_REFRESH" ]; then
+  printf '  AGENTS.md drift:%s\n' "$CHANGED_REFRESH" >&2
+  printf '  → Run /wf-refresh in your IDE/CLI\n' >&2
+fi
+
+if [ -n "$CHANGED_SDD" ]; then
+  printf '  SDD drift:%s\n' "$CHANGED_SDD" >&2
+  printf '  → Run /sdd-init in your IDE/CLI to refresh SDD capabilities\n' >&2
+fi
+
+printf '\n' >&2
+
+# ─── 2. Crear .wf-status persistente ────────────────────────────────────────
+# Este archivo persiste entre sesiones de IDE y es visible en cualquier editor.
+# Bórralo con `rm .wf-status` una vez que hayas actuado (o si los cambios
+# no afectan el contexto de IA).
+COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+COMMIT_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date)
+
+{
+  echo "# ⚠ Workflow drift detected"
+  echo ""
+  echo "**Commit**: $COMMIT_HASH"
+  echo "**Date**: $COMMIT_DATE"
+  echo ""
+
+  if [ -n "$CHANGED_REFRESH" ]; then
+    echo "## AGENTS.md drift"
+    echo ""
+    echo "The following files changed and may leave AGENTS.md out of date:"
+    echo ""
+    for f in $CHANGED_REFRESH; do echo "- \`$f\`"; done
+    echo ""
+    echo "**Action**: run \`/wf-refresh\` in your IDE/CLI to update AGENTS.md,"
+    echo "or \`rm .wf-status\` if these changes don't affect AI context."
+    echo ""
+  fi
+
+  if [ -n "$CHANGED_SDD" ]; then
+    echo "## SDD drift"
+    echo ""
+    echo "The following files changed and may affect SDD project capabilities"
+    echo "(test frameworks, build config, dependencies, SDD config):"
+    echo ""
+    for f in $CHANGED_SDD; do echo "- \`$f\`"; done
+    echo ""
+    echo "**Action**: run \`/sdd-init\` in your IDE/CLI to refresh SDD context,"
+    echo "or \`rm .wf-status\` if these changes don't affect SDD."
+    echo ""
+  fi
+
+  echo "---"
+  echo "_This file persists across IDE sessions until you act on it._"
+  echo "_Delete it with \`rm .wf-status\` once resolved._"
+} > .wf-status
+
+# ─── 3. Notificación nativa macOS ───────────────────────────────────────────
+# Falla silenciosamente en Linux y Windows — sin impacto en el hook.
+if command -v osascript > /dev/null 2>&1; then
+  NOTIF_TEXT=""
+  [ -n "$CHANGED_REFRESH" ] && NOTIF_TEXT="Run /wf-refresh"
+  [ -n "$CHANGED_SDD" ] && NOTIF_TEXT="${NOTIF_TEXT:+$NOTIF_TEXT · }/sdd-init"
+  osascript -e "display notification \"$NOTIF_TEXT\" with title \"⚠ Workflow drift detected\"" 2>/dev/null || true
+fi
+
+exit 0
