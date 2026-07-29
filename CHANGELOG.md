@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.1.2-beta.1...v0.1.3-beta.1) (2026-07-29)
+
+
+### Bug Fixes
+
+* **phase47:** add structured input guard for 5-option AI reviewer question ([#9](https://github.com/hugoafj/ai-workflow-wizard/issues/9)) ([6d71da1](https://github.com/hugoafj/ai-workflow-wizard/commit/6d71da1e3c4fd17654fbe60e5bc1239ef6b1a98a))
+
 ## [0.1.2-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.1.1-beta.1...v0.1.2-beta.1) (2026-07-29)
 
 
