@@ -177,7 +177,7 @@ If the user switches to hybrid, use that option.
 
 ### Running `/sdd-init` (gentle-ai skill)
 
-`/sdd-init` is a **gentle-ai skill**, not a terminal command. `gentle-ai sdd-init` does not exist as a CLI subcommand. In most IDEs/CLIs, skills are invoked by natural name (e.g. "initialize the sdd-init skill") rather than as a `/sdd-init` slash command. The wizard **does not install** `/sdd-init` as a command — it is a native gentle-ai skill.
+`/sdd-init` is a **gentle-ai skill**, not a terminal command. `gentle-ai sdd-init` does not exist as a CLI subcommand. The wizard **does not install** `/sdd-init` as a command — it is a native gentle-ai skill.
 
 > **⛔ BLOCKING RULE (read the full `sdd` protocol)**:
 > it is **FORBIDDEN** to read `SKILL.md` from sdd-init to replicate its steps manually, and forbidden to create `openspec/config.yaml`, `openspec/specs/`, `openspec/changes/` or any SDD artifact. Creating them manually silently corrupts the initialization (it fails only at `sdd-apply`/`sdd-verify`). At the slightest doubt about whether it worked → apply this rule, don't improvise.
@@ -196,6 +196,27 @@ fi
 ```
 
 If `testing.tdd_mode` is not in the state (phase 46 hasn't run yet), the prompt assumes "standard" = Strict TDD disabled, which is the wizard default.
+
+---
+
+**Path A — Automatic delegation (preferred)**
+
+Try to load the sdd-init skill using the `skill()` tool:
+
+1. If the skill loads successfully, read its ORCHESTRATOR GATE.
+   Note: `disable-model-invocation: true`, `delegate_only: true` — you MUST
+   delegate, not execute inline.
+2. Delegate to a sub-agent executor with this exact instruction:
+   "Initialize gentle-ai sdd-init in ${SDD_BACKEND} mode with
+    Strict TDD ${STRICT_TDD}"
+3. Wait for the sub-agent to complete.
+4. If successful, proceed to verification below.
+5. If the skill is NOT in available_skills, the `skill()` tool returns no
+   result, or the sub-agent delegation fails → fall back to Path B.
+
+---
+
+**Path B — Manual fallback (if Path A fails)**
 
 Generate the message to the user with this template:
 
@@ -216,13 +237,13 @@ openspec/specs/ were created, reply **continue** here so I can verify and procee
 MESSAGE
 ```
 
-**Important**: both values (`SDD_BACKEND` and `STRICT_TDD`) are resolved from the wizard state. The user receives the exact prompt with their actual values, nothing hardcoded.
-
 **Do NOT tell the user to run `/sdd-init` as a slash command** — it is not installed as such. The user must give that exact instruction to their agent in natural language, not write a slash command.
 
 **Wait for explicit confirmation from the user** that `/sdd-init` ran in another session and finished. Do not continue, do not verify files, and do not run `gentle-ai sdd-init` or `gentle-ai sdd-init --backend X` (that subcommand does not exist in the gentle-ai CLI) — wait for the user's confirmation without taking any alternative action.
 
-Then verify:
+---
+
+### Verification (runs after Path A or Path B)
 
 ```bash
 ls openspec/config.yaml openspec/changes openspec/specs 2>/dev/null
