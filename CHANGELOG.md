@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.1.3-beta.1...v0.1.4-beta.1) (2026-07-29)
+
+
+### Bug Fixes
+
+* **phase5:** reconnect orphaned metadata phase into wizard flow ([#11](https://github.com/hugoafj/ai-workflow-wizard/issues/11)) ([30d5d17](https://github.com/hugoafj/ai-workflow-wizard/commit/30d5d17f0a1ac7439410e8fb9cec8826af2c7ce1))
+
 ## [0.1.3-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.1.2-beta.1...v0.1.3-beta.1) (2026-07-29)
 
 
