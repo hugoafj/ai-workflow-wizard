@@ -180,7 +180,12 @@ If the user switches to hybrid, use that option.
 `/sdd-init` is a **gentle-ai skill**, not a terminal command. `gentle-ai sdd-init` does not exist as a CLI subcommand. The wizard **does not install** `/sdd-init` as a command — it is a native gentle-ai skill.
 
 > **⛔ BLOCKING RULE (read the full `sdd` protocol)**:
-> it is **FORBIDDEN** to read `SKILL.md` from sdd-init to replicate its steps manually, and forbidden to create `openspec/config.yaml`, `openspec/specs/`, `openspec/changes/` or any SDD artifact. Creating them manually silently corrupts the initialization (it fails only at `sdd-apply`/`sdd-verify`). At the slightest doubt about whether it worked → apply this rule, don't improvise.
+> it is **FORBIDDEN** to read `SKILL.md` from sdd-init to replicate its steps manually, or to create `openspec/config.yaml`, `openspec/specs/`, `openspec/changes/` or any SDD artifact yourself. Creating them manually silently corrupts the initialization (it fails only at `sdd-apply`/`sdd-verify`).
+>
+> **Exception**: reading the SKILL.md file to delegate execution to a sub-agent
+> executor is permitted — this is necessary for Path A to work.
+>
+> At the slightest doubt about whether it worked → apply this rule, don't improvise.
 
 Read from the current state to build the exact prompt with resolved values:
 
@@ -201,18 +206,32 @@ If `testing.tdd_mode` is not in the state (phase 46 hasn't run yet), the prompt 
 
 **Path A — Automatic delegation (preferred)**
 
-Try to load the sdd-init skill using the `skill()` tool:
+Try to load the sdd-init skill, in this order:
 
-1. If the skill loads successfully, read its ORCHESTRATOR GATE.
+1. **via `skill()` tool** — if sdd-init is in available_skills, load it.
+
+2. **via direct file read** — if `skill()` is unavailable or returns no result,
+   find the SKILL.md at any of these paths:
+   - `~/.claude/skills/sdd-init/SKILL.md`
+   - `~/.config/opencode/skills/sdd-init/SKILL.md`
+   - `~/.codeium/windsurf/skills/sdd-init/SKILL.md`
+
+> Reading the SKILL.md for delegation is permitted (the BLOCKING RULE above
+> forbids replicating its steps manually — reading to delegate is NOT replicating).
+
+3. Once loaded (via either method), read its ORCHESTRATOR GATE.
    Note: `disable-model-invocation: true`, `delegate_only: true` — you MUST
    delegate, not execute inline.
-2. Delegate to a sub-agent executor with this exact instruction:
+
+4. Delegate to a sub-agent executor with this exact instruction:
    "Initialize gentle-ai sdd-init in ${SDD_BACKEND} mode with
     Strict TDD ${STRICT_TDD}"
-3. Wait for the sub-agent to complete.
-4. If successful, proceed to verification below.
-5. If the skill is NOT in available_skills, the `skill()` tool returns no
-   result, or the sub-agent delegation fails → fall back to Path B.
+
+5. Wait for the sub-agent to complete.
+
+6. If successful → verification below.
+   If the skill cannot be loaded (neither via `skill()` nor file read),
+   or the sub-agent delegation fails → fall back to Path B.
 
 ---
 
