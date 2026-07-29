@@ -10,7 +10,7 @@ if [ "$FEATURES_TDD" != "true" ]; then
   if [ "$(jq -r '.features.ci // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.cd // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.release_please // false' .wizard-state.json)" = "true" ]; then
     NEXT="phase47-cicd"
   else
-    NEXT="phase6a-agents"
+    NEXT="phase5"
   fi
   wf_phase_done phase46b "$NEXT"
   exit 0
@@ -365,7 +365,7 @@ Testing stack configured (in memory — everything is written in Phase 8):
 > if jq -e '.features.ci == true or .features.cd == true or .features.release_please == true' .wizard-state.json >/dev/null; then
 >   echo "phase47-cicd"
 > else
->   echo "phase6a-agents"
+>   echo "phase5"
 > fi
 > ```
 > Tell the user: *"Testing stack configured. Reply **continue** to continue."*

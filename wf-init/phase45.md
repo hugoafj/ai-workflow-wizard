@@ -12,7 +12,7 @@ if [ "$FEATURES_ROUTING" != "true" ] && [ "$FEATURES_TDD" != "true" ]; then
   if [ "$(jq -r '.features.ci // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.cd // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.release_please // false' .wizard-state.json)" = "true" ]; then
     NEXT="phase47-cicd"
   else
-    NEXT="phase6a-agents"
+    NEXT="phase5"
   fi
   wf_phase_done phase45 "$NEXT"
   exit 0
@@ -321,7 +321,7 @@ Continuing with project questions...
 > elif jq -e '.features.ci == true or .features.cd == true or .features.release_please == true' .wizard-state.json >/dev/null; then
 >   echo "phase47-cicd"
 > else
->   echo "phase6a-agents"
+>   echo "phase5"
 > fi
 > ```
 > Tell the user: *"SDD initialized. Reply **continue** when you are ready to proceed."*
