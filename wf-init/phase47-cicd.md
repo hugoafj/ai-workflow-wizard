@@ -263,6 +263,6 @@ On your server make sure you have:
 > - `ci` (all CI decisions + `github_remote`)
 > - `cd` (all CD decisions)
 > - `features.ci`, `features.cd`, `features.release_please` (toggles)
-> Mark `wf_phase_done phase47 phase6a-agents`.
+> Mark `wf_phase_done phase47 phase5`.
 > Tell the user: *"CI/CD configured. Reply **continue** so I can assemble the artifacts (Builder → staging on disk, not in memory)."*
-> Wait for the response. Only when they confirm, run in bash: `cat "$WF_DIR/phase6a-agents.md"`
+> Wait for the response. Only when they confirm, run in bash: `cat "$WF_DIR/phase5.md"`

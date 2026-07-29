@@ -10,7 +10,7 @@
   model judgment).
 -->
 
-# AGENTS.md — {{answers.project_name}}
+# AGENTS.md — {{answers.project_name}} — {{answers.stack_versions}}
 
 ## Commands
 
