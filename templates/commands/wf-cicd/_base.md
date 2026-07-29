@@ -56,7 +56,10 @@ overwriting.
 ## PHASE 1 — AI Reviewer in Pull Requests
 
 Ask which AI reviewer to activate (only one, or none — they are not combined
-because they would comment duplicate on the same PR):
+because they would comment duplicate on the same PR).
+
+Try the structured input tool (`ask_user_question` or equivalent) with all 5
+options. If the tool doesn't support 5 options, display:
 
 ```
 Which AI reviewer do you want to activate on your Pull Requests?
@@ -106,7 +109,7 @@ GGA-CI with Claude/Gemini action because they would comment duplicate on the PR.
 Which one do you choose? [1 / 2 / 3 / 4 / 5]
 ```
 
-**Wait for user response.**
+**Wait for user response** (via structured input tool or plain text fallback).
 
 **If they choose 1 (GGA)**: ask which mode(s) they want (local, CI, or both) and which
 provider they use (claude/gemini/codex/opencode/ollama/...).
