@@ -17,6 +17,10 @@ fi
 
 ### Question — Feature selection
 
+Try the IDE's structured input tool (`question`, `ask_user_question`,
+`AskQuestion`, or equivalent) with all 6 options plus "none". If the
+tool is unavailable or doesn't support that many options, display:
+
 ```
 What features do you want to configure in this project? Choose the numbers
 separated by commas, or "none":
@@ -52,7 +56,8 @@ Examples:
   "none"   → Only .gitignore + wf-refresh + maintenance commands
 ```
 
-**Wait for user response.**
+**Wait for user response** (via structured input tool or plain text fallback).
+Parse the selected features and proceed.
 
 ### Combination validations
 
