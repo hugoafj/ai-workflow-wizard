@@ -42,12 +42,12 @@ jobs:
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}" \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
-              --arg text "Resumí estos cambios para humanos, en español, resaltando beneficios para el usuario final. Mantené el formato Markdown.\n\n${PR_BODY}" \
+              --arg text "Summarize these changes for humans in English, highlighting benefits for the end user. Keep the Markdown format.\n\n${PR_BODY}" \
               '{contents:[{parts:[{text:$text}]}]}')" \
             | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['candidates'][0]['content']['parts'][0]['text'])" 2>/dev/null \
-            || echo "_No se pudo generar el resumen automático._")
+            || echo "_Could not generate automatic summary._")
 
-          if [ -n "$SUMMARY" ] && [ "$SUMMARY" != "_No se pudo generar el resumen automático._" ]; then
-            COMMENT=$(printf "## 🤖 Resumen sugerido por IA\n\n%s\n\n---\n*Revisá este texto antes de mergear. Lo que quede acá va a ser parte del release oficial.*" "${SUMMARY}")
+          if [ -n "$SUMMARY" ] && [ "$SUMMARY" != "_Could not generate automatic summary._" ]; then
+            COMMENT=$(printf "## 🤖 AI Suggested Summary\n\n%s\n\n---\n*Review this text before merging. What remains here will be part of the official release.*" "${SUMMARY}")
             gh pr comment "${PR_NUMBER}" --body "$COMMENT"
           fi
