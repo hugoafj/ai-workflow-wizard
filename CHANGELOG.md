@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.8-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.1.7-beta.1...v0.1.8-beta.1) (2026-08-03)
+
+
+### Bug Fixes
+
+* **phase8:** install testing dependencies before commit (stack-aware) ([#20](https://github.com/hugoafj/ai-workflow-wizard/issues/20)) ([2e1843a](https://github.com/hugoafj/ai-workflow-wizard/commit/2e1843ac881330b24ffc152d862065fdaab0d311))
+
 ## [0.1.7-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.1.6-beta.1...v0.1.7-beta.1) (2026-08-03)
 
 
