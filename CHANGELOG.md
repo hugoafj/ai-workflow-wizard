@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.1.4-beta.1...v0.1.5-beta.1) (2026-08-03)
+
+
+### Bug Fixes
+
+* **wf-init:** reconnect phase5 and fix ci/cd state fields ([#13](https://github.com/hugoafj/ai-workflow-wizard/issues/13)) ([400f3e0](https://github.com/hugoafj/ai-workflow-wizard/commit/400f3e0b8d5f673087acdc88d00c8491d2604afa))
+
 ## [0.1.4-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.1.3-beta.1...v0.1.4-beta.1) (2026-07-29)
 
 
