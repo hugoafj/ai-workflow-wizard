@@ -33,7 +33,7 @@ activation command (run AFTER the files exist):
 
 ```bash
 # Conventional commits: initialize Husky if configured (core.hooksPath → .husky)
-if [ "$(jq -r '.cicd.conventional_commits' .wizard-state.json)" = "true" ]; then
+if [ "$(jq -r '.ci.conventional_commits' .wizard-state.json)" = "true" ]; then
   command -v npx >/dev/null 2>&1 && npx husky init 2>/dev/null || true
   [ -f .husky/commit-msg ] && chmod +x .husky/commit-msg
   [ -f .husky/post-commit ] && chmod +x .husky/post-commit
@@ -42,8 +42,8 @@ if [ "$(jq -r '.cicd.conventional_commits' .wizard-state.json)" = "true" ]; then
 fi
 
 # GGA local mode: the pre-commit hook (uses .gga + AGENTS.md, already written)
-if echo "$(jq -r '.cicd.gga_modes[]?' .wizard-state.json)" | grep -q local; then
-  CONVCOMMITS=$(jq -r '.cicd.conventional_commits' .wizard-state.json)
+if echo "$(jq -r '.ci.gga_modes[]?' .wizard-state.json)" | grep -q local; then
+  CONVCOMMITS=$(jq -r '.ci.conventional_commits' .wizard-state.json)
   if [ "$CONVCOMMITS" = "true" ]; then
     # Husky active (core.hooksPath=.husky): GGA runs via .husky/pre-commit (already written with
     # 'gga run'). Do NOT use 'gga install' — it would write to .git/hooks/ and get shadowed.
@@ -139,14 +139,14 @@ Next steps:
   3. To validate: ask the agent "read AGENTS.md and tell me its main sections".
   4. For your first SDD feature, describe the task in natural language.
 
-<if state.cicd.missing_secrets is non-empty>:
+<if state.cd.missing_secrets is non-empty>:
   ⚠ MISSING SECRETS — these workflows will fail until you configure them:
-  <for each entry in state.cicd.missing_secrets>:
+  <for each entry in state.cd.missing_secrets>:
     • {{workflow}} requires the secret {{secret_name}}
       → github.com/<owner>/<repo>/settings/secrets/actions → "New repository secret"
   Without these secrets, the workflow runs but the AI reviewer fails with "API key not valid".
 
-<if state.cicd.release_please == true>:
+<if state.ci.release_please == true>:
   ⚠ RELEASE-PLEASE: the workflow already declares the necessary permissions, but the repo ALSO
   must allow Actions to create PRs. Go to:
     Settings → Actions → General → Workflow permissions

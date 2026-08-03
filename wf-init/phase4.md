@@ -38,7 +38,7 @@ Is this correct? Fix any errors before continuing.
 > elif [ "$(jq -r '.features.ci // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.cd // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.release_please // false' .wizard-state.json)" = "true" ]; then
 >   echo "phase47-cicd"
 > else
->   echo "phase6a-agents"
+>   echo "phase5"
 > fi
 > ```
 > Wait for the response. Only when the user confirms with "yes", run in bash: `cat "$WF_DIR/$NEXT.md"`

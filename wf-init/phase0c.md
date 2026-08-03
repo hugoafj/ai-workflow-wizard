@@ -7,7 +7,7 @@
 Read the current state (in case of resumption):
 
 ```bash
-if [ -f .wizard-state.json ] && [ "$(jq -r '.phases.phase0c // "pending"' .wizard-state.json)" = "done" ]; then
+if [ -f .wizard-state.json ] && [ "$(jq -r '.phases.phase0c.status // "pending"' .wizard-state.json)" = "done" ]; then
   echo "Phase 0c already completed — skipping to Phase 1."
   wf_phase_done phase0c phase1
   cat "$WF_DIR/phase1.md"

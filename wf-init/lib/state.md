@@ -103,8 +103,9 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
     "runner_detected": null,
     "layers": [],
     "tdd_mode": null,
-    "extras": [],
-    "coverage_threshold": null
+    "coverage_threshold": null,
+    "visual_regression": false,
+    "page_object_model": false
   },
 
   "mcps": [],
