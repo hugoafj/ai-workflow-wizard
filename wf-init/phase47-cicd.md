@@ -42,9 +42,9 @@ option text). Collect in `state.ci`:
 1. **AI reviewer** (`wf-cicd.md` PHASE 1) → `state.ci.ai_reviewer` ∈
    `{gga, copilot, claude, gemini, none}` (recommended: **gga**).
 
-   Try the structured input tool with all 5 options. If the tool doesn't
+   Try the structured input tool with all 5 options. If the tool is unavailable or doesn't
    support 5, display the `wf-cicd.md` PHASE 1 options as plain text and
-   wait for typed response.
+   wait for typed response. Parse the user's choice (1, 2, 3, 4, or 5).
 
    - If `gga`: ask `state.ci.gga_provider` (claude/gemini/codex/opencode/ollama/...)
      and `state.ci.gga_modes` ⊆ `{local, ci}` (recommended: both).
