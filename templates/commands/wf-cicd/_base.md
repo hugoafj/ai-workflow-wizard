@@ -58,8 +58,7 @@ overwriting.
 Ask which AI reviewer to activate (only one, or none — they are not combined
 because they would comment duplicate on the same PR).
 
-Try the structured input tool (`ask_user_question` or equivalent) with all 5
-options. If the tool doesn't support 5 options, display:
+Try the IDE's structured input tool (`ask_user_question`, `AskQuestion`, or equivalent) with all 5 options. If the tool is unavailable or doesn't support that many options, display:
 
 ```
 Which AI reviewer do you want to activate on your Pull Requests?
@@ -109,7 +108,7 @@ GGA-CI with Claude/Gemini action because they would comment duplicate on the PR.
 Which one do you choose? [1 / 2 / 3 / 4 / 5]
 ```
 
-**Wait for user response** (via structured input tool or plain text fallback).
+**Wait for user response** (via structured input tool or plain text fallback). Parse the user's choice (1, 2, 3, 4, or 5).
 
 **If they choose 1 (GGA)**: ask which mode(s) they want (local, CI, or both) and which
 provider they use (claude/gemini/codex/opencode/ollama/...).
