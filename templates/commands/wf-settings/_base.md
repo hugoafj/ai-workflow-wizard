@@ -334,6 +334,11 @@ Confirm:
 ✓ TDD mode changed to: <new mode>
 ```
 
+**State update**:
+```bash
+jq '.testing.tdd_mode = "<standard|strict>"' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+```
+
 ---
 
 ### 4 — Coverage targets
@@ -560,7 +565,7 @@ Do you want to keep or change?
 
 **Case A — release-please standalone is OFF** (no CI active):
 Full CI. Ask if they want E2E in CI (sub-option 10).
-Set `state.ci = true`. Run `phase47-cicd.md` to configure.
+Set `state.features.ci = true`. Run `phase47-cicd.md` to configure.
 
 **Case B — release-please standalone is ON** (already has conventional
 commits + release-please):
@@ -573,7 +578,7 @@ SUBSUMES your current setup:
 
 Enable full CI over your current setup? [yes / no]
 
-If yes: set `state.ci = true`, `state.release_please = true`
+If yes: set `state.features.ci = true`, `state.release_please = true`
 (stays). Run `phase47-cicd.md`. Ask about E2E in CI.
 
 **If they want to change (disable)**:
@@ -889,7 +894,7 @@ Confirm:
 
 **State update**:
 ```bash
-jq '.features.release_please = <value>' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+jq '.features.release_please = <value> | .ci.release_please = <value>' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
 ```
 
 ---
@@ -944,7 +949,7 @@ Confirm:
 
 **State update**:
 ```bash
-jq '.features.cd = <value>' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+jq '.features.cd = <value> | .cd.enabled = <value>' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
 ```
 
 ---
