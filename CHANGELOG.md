@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.7-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.1.6-beta.1...v0.1.7-beta.1) (2026-08-03)
+
+
+### Bug Fixes
+
+* **phase1:** ensure wf_phase_done executes before phase2 to update state correctly ([#18](https://github.com/hugoafj/ai-workflow-wizard/issues/18)) ([9869728](https://github.com/hugoafj/ai-workflow-wizard/commit/9869728243cead4765dfe95f4e1499fd9eb29878))
+
 ## [0.1.6-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.1.5-beta.1...v0.1.6-beta.1) (2026-08-03)
 
 
