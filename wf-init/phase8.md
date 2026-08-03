@@ -60,6 +60,68 @@ if echo "$(jq -r '.ci.gga_modes[]?' .wizard-state.json)" | grep -q local; then
 fi
 ```
 
+### 8.1c Testing stack installation (stack-aware, only if testing configured)
+
+Install testing dependencies and generate test dummy before commit. Husky hooks
+will fail if these don't exist. This section is stack-aware: Node installs npm packages,
+PHP would install composer packages, etc.
+
+```bash
+STACK_KEY=$(jq -r '.discovery.stack_key // "unknown"' .wizard-state.json)
+HAS_TESTING=$(jq -r '.testing.layers[]?' .wizard-state.json 2>/dev/null | wc -l)
+HAS_CONVENTIONAL=$(jq -r '.ci.conventional_commits // false' .wizard-state.json)
+
+# Install dependencies by stack — only if testing or conventional commits are active
+if [ "$HAS_TESTING" -gt 0 ] || [ "$HAS_CONVENTIONAL" = "true" ]; then
+  case "$STACK_KEY" in
+    node-*|*-react|*-vue|*-nextjs|*-node)
+      # Node-based stacks: npm install for vitest, playwright, testing-library, commitlint
+      if [ "$HAS_TESTING" -gt 0 ]; then
+        # Check for unit/integration layers
+        if jq -e '.testing.layers[] | select(. == "unit" or . == "integration")' .wizard-state.json >/dev/null 2>&1; then
+          npm install --save-dev vitest @testing-library/react @testing-library/user-event @testing-library/jest-dom @testing-library/dom jsdom @vitest/ui @vitest/coverage-v8 2>/dev/null || true
+        fi
+        # Check for e2e layer
+        if jq -e '.testing.layers[] | select(. == "e2e")' .wizard-state.json >/dev/null 2>&1; then
+          npm install --save-dev @playwright/test 2>/dev/null || true
+        fi
+      fi
+      # commitlint for conventional commits (needed by Husky commit-msg hook)
+      if [ "$HAS_CONVENTIONAL" = "true" ]; then
+        npm install --save-dev commitlint 2>/dev/null || true
+      fi
+      ;;
+    php-*|laravel|symfony)
+      # PHP stacks: composer require for phpunit
+      if [ "$HAS_TESTING" -gt 0 ]; then
+        composer require --dev phpunit/phpunit 2>/dev/null || true
+      fi
+      ;;
+    # Add more stacks as needed
+  esac
+fi
+
+# Generate test dummy for Node if unit tests are enabled but no test files exist
+if [[ "$STACK_KEY" == node-* || "$STACK_KEY" == *-react || "$STACK_KEY" == *-vue || "$STACK_KEY" == *-nextjs || "$STACK_KEY" == *-node ]]; then
+  if jq -e '.testing.layers[] | select(. == "unit" or . == "integration")' .wizard-state.json >/dev/null 2>&1; then
+    TEST_FILE="src/__tests__/example.test.ts"
+    if [ ! -f "$TEST_FILE" ]; then
+      mkdir -p "$(dirname "$TEST_FILE")"
+      cat > "$TEST_FILE" << 'TESTEOF'
+import { describe, it, expect } from 'vitest'
+
+describe('Example test', () => {
+  it('should pass', () => {
+    expect(true).toBe(true)
+  })
+})
+TESTEOF
+      git add "$TEST_FILE"
+    fi
+  fi
+fi
+```
+
 > Use heredocs for any file you manually rewrite (avoid variable
 > expansion). The hook already comes VERBATIM from the template; don't edit it when copying.
 
