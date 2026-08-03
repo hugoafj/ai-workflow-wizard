@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.6-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.1.5-beta.1...v0.1.6-beta.1) (2026-08-03)
+
+
+### Bug Fixes
+
+* **wf-cicd & phase47:** ensure all 5 AI reviewer options always shown ([#17](https://github.com/hugoafj/ai-workflow-wizard/issues/17)) ([d23351f](https://github.com/hugoafj/ai-workflow-wizard/commit/d23351f033b421604d9236579c47fc1e5875fd97))
+* **wf-cicd:** ensure all 5 AI reviewer options always presented with fallback ([#15](https://github.com/hugoafj/ai-workflow-wizard/issues/15)) ([c576e07](https://github.com/hugoafj/ai-workflow-wizard/commit/c576e07fa9e3daeaafdd5c9fe5dad92d40ee6770))
+
 ## [0.1.5-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.1.4-beta.1...v0.1.5-beta.1) (2026-08-03)
 
 
