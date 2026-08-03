@@ -10,7 +10,7 @@ if [ "$FEATURES_TDD" != "true" ]; then
   if [ "$(jq -r '.features.ci // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.cd // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.release_please // false' .wizard-state.json)" = "true" ]; then
     NEXT="phase47-cicd"
   else
-    NEXT="phase6a-agents"
+    NEXT="phase5"
   fi
   wf_phase_done phase46 "$NEXT"
   exit 0
