@@ -49,16 +49,16 @@ The sub-agent already saved the data in `.wizard-state.json`. Just verify it exi
 cat .wizard-state.json | jq '.discovery, .migration, .phases'
 ```
 
-If something is missing, complete it manually. Then mark:
-
-```bash
-source "$WF_DIR/lib/state.md"
-wf_phase_done phase1 phase2
-```
+If something is missing, complete it manually.
 
 Tell the user: *"Discovery completed. Reply **continue** to review any previous artifacts to migrate."*
 
 Wait for the response. Only when confirmed, run in bash:
+
 ```bash
+source "$WF_DIR/lib/state.md"
+wf_phase_done phase1 phase2
 cat "$WF_DIR/phase2.md"
 ```
+
+> **CRITICAL**: `wf_phase_done` MUST execute before `cat phase2.md`. Do not skip this step — it marks phase1 as done and advances the pointer. Without it, phase1 stays pending.
