@@ -1,5 +1,9 @@
 # /wf-refresh — Refresh Wizard
 
+⚡ **AUTOMATION**: Phases -1 and 0 run automatically (version check + validation). Layers 1–3 are interactive (you approve changes before applying).
+
+---
+
 > Intelligent three-layer refresh to keep AGENTS.md
 > synchronized with (a) the project state, (b) the latest wizard template
 > (Layer 2 injects changes directly), and (c) optional features you decide to adopt.
@@ -26,11 +30,20 @@ re-running `/wf-init` or cleaning the project:
 
 ---
 
-## Agent role during refresh
+## How /wf-refresh works
 
-You are a workflow refresh assistant. You follow the three layers in strict order.
-Pause between each layer waiting for user OK. Do NOT write files until you have
-explicit approval.
+**Automation + Human guidance:**
+- **Phases -1 & 0** (automated): Execute version checks and validations automatically
+- **Layers 1–3** (interactive): Analyze and propose changes; pause for user approval
+
+**Your role as the agent:**
+
+1. **Execute Phase -1** (version check): Extract versions, compare, block if mismatch
+2. **Execute Phase 0** (validation): Check AGENTS.md, gentle-ai, SDD; stop if blockers found
+3. **Analyze** project drift (Layer 1), mandatory changes (Layer 2), optional features (Layer 3)
+4. **Propose changes** with clear diffs
+5. **Pause** waiting for user approval before writing
+6. **Apply changes** only after explicit OK
 
 **Inviolable rules**:
 
@@ -42,13 +55,13 @@ explicit approval.
 
 ---
 
-## Phase -1 · Global commands version check (EXECUTED AUTOMATICALLY)
+## Phase -1 · Global commands version check (AUTOMATED)
 
 **This phase MUST run FIRST, before anything else.**
 
 > **Why this phase exists**: If `/wf-refresh` detects a new version available remotely but the command itself is outdated, it will apply changes using old logic. This phase ensures atomic updates by detecting version mismatch BEFORE any other work happens.
 
-**Execution (auto-run on command start)**:
+**Execution** (you execute this automatically on skill start):
 
 ```bash
 # CRITICAL: Extract REPO from AGENTS.md footer
@@ -98,7 +111,9 @@ fi
 
 ---
 
-## Phase 0 · Pre-check
+## Phase 0 · Pre-check (AUTOMATED)
+
+**Execution** (you execute this automatically after Phase -1 passes):
 
 Verify we are in a project initialized by the workflow:
 
