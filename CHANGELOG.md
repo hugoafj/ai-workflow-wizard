@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.3-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.3.2-beta.1...v0.3.3-beta.1) (2026-08-04)
+
+
+### Bug Fixes
+
+* /wf-refresh Layer 2 must always update footer and state ([#41](https://github.com/hugoafj/ai-workflow-wizard/issues/41)) ([bfefa16](https://github.com/hugoafj/ai-workflow-wizard/commit/bfefa16819f1b62c86f435343bf3360f8a50863c))
+* release-please manifest commit path must include .wizard-manifests/ folder ([#43](https://github.com/hugoafj/ai-workflow-wizard/issues/43)) ([c6e27bf](https://github.com/hugoafj/ai-workflow-wizard/commit/c6e27bfc3f228fdb1cd9626e6c7f387ed9f37acd))
+
 ## [0.3.2-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.3.1-beta.1...v0.3.2-beta.1) (2026-08-04)
 
 
