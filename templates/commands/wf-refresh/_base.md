@@ -503,7 +503,23 @@ Apply these changes? [yes / no / show me the full AGENTS.md after]
 
 **PAUSE**. Wait for response.
 
-- `yes`: apply all mandatory changes to buffer. Advance to Layer 3.
+- `yes`: apply all mandatory changes to buffer. **CRITICAL: Always update footer and state:**
+  
+  ```bash
+  # Extract remote version
+  REMOTE_VERSION=$(echo "$MANIFEST" | jq -r '.version')
+  
+  # 1. Update AGENTS.md footer with new wf-version (ALWAYS, even if no other changes)
+  sed -i "s/wf-version: [^ ]*/wf-version: $REMOTE_VERSION/" AGENTS.md
+  
+  # 2. Update .wizard-state.json to sync version
+  if [ -f ".wizard-state.json" ]; then
+    jq ".version = \"$REMOTE_VERSION\"" .wizard-state.json > /tmp/ws.json
+    mv /tmp/ws.json .wizard-state.json
+  fi
+  ```
+  
+  Then advance to Layer 3.
 - `no`: record that the user rejected the mandatory changes. Advance to Layer 3
   anyway (rejected mandatory changes will be proposed again on the
   next refresh). The footer is NOT updated (so the next refresh detects them).
