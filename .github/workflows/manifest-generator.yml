@@ -206,7 +206,9 @@ jobs:
           if ! git diff --quiet --cached; then
             COMMIT_MSG=$(printf 'chore: generate WIZARD_MANIFEST-%s.json\n\n- Versioned manifest for precise change tracking\n- Includes content hashes for detecting real changes\n- Lists deleted files to inform cleanup decisions\n- Maps state variables for /wf-refresh regeneration' "$CURRENT_VERSION")
             git commit -m "$COMMIT_MSG"
-            git push origin main
+            CURRENT_BRANCH=${{ github.ref_name }}
+            git push origin "$CURRENT_BRANCH"
+            echo "✓ Manifest committed and pushed to branch: $CURRENT_BRANCH"
           else
             echo "No manifest changes detected (files already up to date)"
           fi
