@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.2-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.3.1-beta.1...v0.3.2-beta.1) (2026-08-04)
+
+
+### Bug Fixes
+
+* avoid literal newlines inside YAML block scalar (fixes invalid workflow syntax) ([#35](https://github.com/hugoafj/ai-workflow-wizard/issues/35)) ([b322f03](https://github.com/hugoafj/ai-workflow-wizard/commit/b322f03e5ba6796feae3be1b9cce010a57680326))
+* integrate manifest regeneration into release-please workflow ([#37](https://github.com/hugoafj/ai-workflow-wizard/issues/37)) ([46a52cd](https://github.com/hugoafj/ai-workflow-wizard/commit/46a52cde3915ef905cd21b57e1f07c9a06f39fd1))
+* release-please manifest integration - use gh to get PR branch and fix Python ([#38](https://github.com/hugoafj/ai-workflow-wizard/issues/38)) ([83d2450](https://github.com/hugoafj/ai-workflow-wizard/commit/83d245080627e2253aaf4bbd42427c5cb6c5eebd))
+* yaml syntax error in manifest-generator workflow ([#32](https://github.com/hugoafj/ai-workflow-wizard/issues/32)) ([5770ae0](https://github.com/hugoafj/ai-workflow-wizard/commit/5770ae0efd07431b81471a2a408444cd6df922a8))
+
 ## [0.3.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.3.0-beta.1...v0.3.1-beta.1) (2026-08-04)
 
 
