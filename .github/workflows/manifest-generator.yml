@@ -26,132 +26,111 @@ jobs:
 
       - name: Generate manifest
         run: |
-          CURRENT_VERSION=$(cat VERSION)
-          GENERATED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-          # Start manifest
-          cat > WIZARD_MANIFEST.json <<EOF
-          {
-            "version": "$CURRENT_VERSION",
-            "description": "Wizard manifest: auto-generated list of all files, their templates, regeneration requirements, and state variables",
-            "generated_at": "$GENERATED_AT",
-            "files": {
-          EOF
-
-          # Detect changed files
           PREV_TAG=${{ steps.prev_version.outputs.tag }}
+          python3 << 'PYTHON_SCRIPT'
+          import json
+          import subprocess
+          import os
+          from pathlib import Path
 
-          # Get list of all potential wizard files
-          FILES=$(git ls-files | grep -E '(templates/|wf-init/|post-commit|VERSION)' | sort)
+          CURRENT_VERSION = open("VERSION").read().strip()
+          GENERATED_AT = subprocess.check_output(["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"]).decode().strip()
+          PREV_TAG = "${{ steps.prev_version.outputs.tag }}"
 
-          FIRST=true
-          while IFS= read -r FILE; do
-            # Skip directories
-            [ -d "$FILE" ] && continue
-
-            # Determine if file changed
-            if git diff "$PREV_TAG..HEAD" --name-only | grep -q "^$FILE$"; then
-              STATUS="changed"
-            else
-              STATUS="unchanged"
-            fi
-
-            # Determine file type and regeneration needs
-            REGENERATE="false"
-            TEMPLATE="null"
-            STATE_VARS="[]"
-            OUTPUT="null"
-            FILE_TYPE="static"
-
-            if [[ "$FILE" == "templates/protocols/"* ]]; then
-              FILE_TYPE="protocol"
-              TEMPLATE="\"$FILE\""
-              if [[ "$STATUS" == "changed" ]]; then
-                REGENERATE="true"
-              fi
-            elif [[ "$FILE" == "templates/commands/"* ]]; then
-              FILE_TYPE="command"
-              TEMPLATE="\"$FILE\""
-              # Commands may or may not need regeneration - check if they have {{variables}}
-              if grep -q '{{' "$FILE" 2>/dev/null; then
-                REGENERATE="true"
-                # Extract state variables from template comments
-                STATE_VARS=$(grep -oP '{{[^}]*}}' "$FILE" 2>/dev/null | sort -u | sed 's/{{//g; s/}}//g' | jq -R -s -c 'split("\n") | map(select(length > 0))')
-              else
-                REGENERATE="false"
-                STATE_VARS="[]"
-              fi
-              OUTPUT="\"$(echo $FILE | sed 's|templates/commands/\([^/]*\)/.*|\1|')/.claude/commands/\1.md\""
-            elif [[ "$FILE" == ".github/workflows/"* ]]; then
-              FILE_TYPE="workflow"
-              # Workflows need regeneration if they have {{variables}}
-              if grep -q '{{' "$FILE" 2>/dev/null; then
-                REGENERATE="true"
-              else
-                REGENERATE="false"
-              fi
-              # Extract state variables from template
-              case "$FILE" in
-                *release-please.yml)
-                  TEMPLATE="\"templates/protocols/cicd/variants/release-please.yml.md\""
-                  if [ "$REGENERATE" = "true" ]; then
-                    STATE_VARS="[\"ci.release_please\", \"ci.conventional_commits\", \"ci.release_ai_summary\", \"ci.release_ai_provider\", \"answers.project_name\"]"
-                  else
-                    STATE_VARS="[]"
-                  fi
-                  ;;
-                *ci.yml)
-                  TEMPLATE="\"templates/protocols/cicd/variants/ci.yml.md\""
-                  if [ "$REGENERATE" = "true" ]; then
-                    STATE_VARS="[\"ci.quality_guard\", \"ci.ai_review\", \"ci.security_scan\", \"discovery.stack_key\"]"
-                  else
-                    STATE_VARS="[]"
-                  fi
-                  ;;
-                *)
-                  TEMPLATE="null"
-                  STATE_VARS="[]"
-                  ;;
-              esac
-              OUTPUT="\"$FILE\""
-            elif [[ "$FILE" == "post-commit" ]]; then
-              FILE_TYPE="hook"
-              OUTPUT="\".git/hooks/post-commit\""
-              REGENERATE="false"
-            elif [[ "$FILE" == "VERSION" ]]; then
-              FILE_TYPE="metadata"
-              REGENERATE="false"
-            fi
-
-            # Build JSON entry
-            if [ "$FIRST" = true ]; then
-              FIRST=false
-            else
-              echo "," >> WIZARD_MANIFEST.json
-            fi
-
-            cat >> WIZARD_MANIFEST.json <<EOF
-              "$(basename $FILE)": {
-                "version": "$CURRENT_VERSION",
-                "type": "$FILE_TYPE",
-                "path": "$FILE",
-                "output": $OUTPUT,
-                "status": "$STATUS",
-                "regenerate": $REGENERATE,
-                "template": $TEMPLATE,
-                "state_vars": $STATE_VARS
-              }
-          EOF
-          done <<< "$FILES"
-
-          # Close manifest
-          cat >> WIZARD_MANIFEST.json <<'EOF'
-            }
+          # Build manifest
+          manifest = {
+              "version": CURRENT_VERSION,
+              "description": "Wizard manifest: auto-generated list of all files, their templates, regeneration requirements, and state variables",
+              "generated_at": GENERATED_AT,
+              "files": {}
           }
-          EOF
 
-          # Format JSON
-          python3 -m json.tool WIZARD_MANIFEST.json > /tmp/manifest.tmp && mv /tmp/manifest.tmp WIZARD_MANIFEST.json
+          # Get all wizard files
+          result = subprocess.check_output(["git", "ls-files"]).decode()
+          all_files = [f for f in result.split('\n') if f and any(x in f for x in ['templates/', 'wf-init/', 'post-commit', 'VERSION'])]
+
+          # Get changed files
+          try:
+              changed_result = subprocess.check_output(["git", "diff", f"{PREV_TAG}..HEAD", "--name-only"], stderr=subprocess.DEVNULL).decode()
+              changed_files = set(changed_result.split('\n'))
+          except:
+              changed_files = set()
+
+          for file_path in sorted(all_files):
+              if not file_path or os.path.isdir(file_path):
+                  continue
+
+              status = "changed" if file_path in changed_files else "unchanged"
+
+              regenerate = False
+              template = None
+              state_vars = []
+              output = None
+              file_type = "static"
+
+              if file_path.startswith("templates/protocols/"):
+                  file_type = "protocol"
+                  template = file_path
+                  regenerate = status == "changed"
+
+              elif file_path.startswith("templates/commands/"):
+                  file_type = "command"
+                  template = file_path
+                  try:
+                      with open(file_path) as f:
+                          content = f.read()
+                          if "{{" in content:
+                              regenerate = True
+                              import re
+                              vars_found = re.findall(r'\{\{([^}]+)\}\}', content)
+                              state_vars = sorted(set(v for v in vars_found if v and not v.startswith('/') and len(v) < 50))
+                  except:
+                      pass
+                  cmd_name = file_path.split('/')[2]
+                  output = f".claude/commands/{cmd_name}.md"
+
+              elif file_path.startswith(".github/workflows/"):
+                  file_type = "workflow"
+                  output = file_path
+                  try:
+                      with open(file_path) as f:
+                          if "{{" in f.read():
+                              regenerate = True
+                  except:
+                      pass
+
+                  if "release-please.yml" in file_path:
+                      template = "templates/protocols/cicd/variants/release-please.yml.md"
+                      state_vars = ["ci.release_please", "ci.conventional_commits", "ci.release_ai_summary", "ci.release_ai_provider", "answers.project_name"]
+                  elif "ci.yml" in file_path:
+                      template = "templates/protocols/cicd/variants/ci.yml.md"
+                      state_vars = ["ci.quality_guard", "ci.ai_review", "ci.security_scan", "discovery.stack_key"]
+
+              elif file_path == "post-commit":
+                  file_type = "hook"
+                  output = ".git/hooks/post-commit"
+
+              elif file_path == "VERSION":
+                  file_type = "metadata"
+
+              key = Path(file_path).name
+              manifest["files"][key] = {
+                  "version": CURRENT_VERSION,
+                  "type": file_type,
+                  "path": file_path,
+                  "output": output,
+                  "status": status,
+                  "regenerate": regenerate,
+                  "template": template,
+                  "state_vars": state_vars
+              }
+
+          # Write manifest
+          with open("WIZARD_MANIFEST.json", "w") as f:
+              json.dump(manifest, f, indent=2)
+
+          print(f"✓ Generated WIZARD_MANIFEST.json ({len(manifest['files'])} files)")
+          PYTHON_SCRIPT
 
       - name: Commit manifest
         run: |
