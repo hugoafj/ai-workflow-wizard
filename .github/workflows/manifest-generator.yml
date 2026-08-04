@@ -1,4 +1,4 @@
-name: Generate Wizard Manifest
+name: Generate Wizard Manifest (Versioned)
 
 on:
   push:
@@ -18,30 +18,40 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get previous version tag
-        id: prev_version
+      - name: Get current and previous version
+        id: versions
         run: |
+          CURRENT_VERSION=$(cat VERSION)
           PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.1.0-beta.1")
-          echo "tag=$PREV_TAG" >> $GITHUB_OUTPUT
+          echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
 
-      - name: Generate manifest
+      - name: Generate versioned manifest
         run: |
-          PREV_TAG=${{ steps.prev_version.outputs.tag }}
+          CURRENT_VERSION=${{ steps.versions.outputs.current }}
+          PREV_TAG=${{ steps.versions.outputs.prev_tag }}
+
           python3 << 'PYTHON_SCRIPT'
           import json
           import subprocess
           import os
+          import hashlib
           from pathlib import Path
 
-          CURRENT_VERSION = open("VERSION").read().strip()
+          CURRENT_VERSION = "${{ steps.versions.outputs.current }}"
+          PREV_TAG = "${{ steps.versions.outputs.prev_tag }}"
           GENERATED_AT = subprocess.check_output(["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"]).decode().strip()
-          PREV_TAG = "${{ steps.prev_version.outputs.tag }}"
 
           # Build manifest
           manifest = {
               "version": CURRENT_VERSION,
-              "description": "Wizard manifest: auto-generated list of all files, their templates, regeneration requirements, and state variables",
+              "description": "Wizard manifest (versioned): files, changes, templates, and regeneration requirements",
               "generated_at": GENERATED_AT,
+              "schema": {
+                  "content_hash": "SHA256 of file content for change detection",
+                  "deleted": "Mark files that existed in previous version but not in current",
+                  "state_mappings": "Maps simple placeholder names to full .wizard-state.json paths"
+              },
               "files": {}
           }
 
@@ -49,22 +59,39 @@ jobs:
           result = subprocess.check_output(["git", "ls-files"]).decode()
           all_files = [f for f in result.split('\n') if f and any(x in f for x in ['templates/', 'wf-init/', 'post-commit', 'VERSION'])]
 
-          # Get changed files
+          # Get changed files between previous tag and HEAD
           try:
               changed_result = subprocess.check_output(["git", "diff", f"{PREV_TAG}..HEAD", "--name-only"], stderr=subprocess.DEVNULL).decode()
               changed_files = set(changed_result.split('\n'))
           except:
               changed_files = set()
 
+          # Get deleted files (existed in PREV_TAG but not in HEAD)
+          try:
+              deleted_result = subprocess.check_output(["git", "diff", f"{PREV_TAG}..HEAD", "--name-only", "--diff-filter=D"], stderr=subprocess.DEVNULL).decode()
+              deleted_files = set(deleted_result.split('\n'))
+          except:
+              deleted_files = set()
+
           for file_path in sorted(all_files):
               if not file_path or os.path.isdir(file_path):
                   continue
 
+              # Determine status
               status = "changed" if file_path in changed_files else "unchanged"
+
+              # Calculate content hash (SHA256) for detecting real changes
+              try:
+                  with open(file_path, 'rb') as f:
+                      content = f.read()
+                      content_hash = hashlib.sha256(content).hexdigest()
+              except:
+                  content_hash = None
 
               regenerate = False
               template = None
               state_vars = []
+              state_mappings = {}
               output = None
               file_type = "static"
 
@@ -102,6 +129,11 @@ jobs:
                   if "release-please.yml" in file_path:
                       template = "templates/protocols/cicd/variants/release-please.yml.md"
                       state_vars = ["ci.release_please", "ci.conventional_commits", "ci.release_ai_summary", "ci.release_ai_provider", "answers.project_name"]
+                      state_mappings = {
+                          "trigger_event": "cd.trigger",
+                          "release_ai_summary": "ci.release_ai_summary",
+                          "release_ai_provider": "ci.release_ai_provider"
+                      }
                   elif "ci.yml" in file_path:
                       template = "templates/protocols/cicd/variants/ci.yml.md"
                       state_vars = ["ci.quality_guard", "ci.ai_review", "ci.security_scan", "discovery.stack_key"]
@@ -122,25 +154,51 @@ jobs:
                   "status": status,
                   "regenerate": regenerate,
                   "template": template,
-                  "state_vars": state_vars
+                  "state_vars": state_vars,
+                  "state_mappings": state_mappings if state_mappings else None,
+                  "content_hash": content_hash
               }
 
-          # Write manifest
+          # Add deleted files info
+          if deleted_files:
+              manifest["_deleted_files"] = {
+                  "note": "Files that existed in the previous release but were removed",
+                  "files": sorted([f for f in deleted_files if f])
+              }
+
+          # Write manifest to versioned file
+          manifest_filename = f"WIZARD_MANIFEST-{CURRENT_VERSION}.json"
+          with open(manifest_filename, "w") as f:
+              json.dump(manifest, f, indent=2)
+
+          # Also write to current manifest for compatibility
           with open("WIZARD_MANIFEST.json", "w") as f:
               json.dump(manifest, f, indent=2)
 
-          print(f"✓ Generated WIZARD_MANIFEST.json ({len(manifest['files'])} files)")
+          print(f"✓ Generated {manifest_filename} ({len(manifest['files'])} files)")
+          if deleted_files:
+              print(f"  Note: {len(deleted_files)} files were deleted in this release")
           PYTHON_SCRIPT
 
-      - name: Commit manifest
+      - name: Commit manifests
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          if git diff --quiet WIZARD_MANIFEST.json; then
-            echo "No manifest changes"
-          else
-            git add WIZARD_MANIFEST.json
-            git commit -m "chore: update WIZARD_MANIFEST.json"
+          CURRENT_VERSION=$(cat VERSION)
+          MANIFEST_FILE="WIZARD_MANIFEST-${CURRENT_VERSION}.json"
+
+          # Add both versioned and current manifest
+          git add "$MANIFEST_FILE" WIZARD_MANIFEST.json 2>/dev/null || true
+
+          if ! git diff --quiet --cached; then
+            git commit -m "chore: generate WIZARD_MANIFEST-${CURRENT_VERSION}.json
+
+- Versioned manifest for precise change tracking
+- Includes content hashes for detecting real changes
+- Lists deleted files to inform cleanup decisions
+- Maps state variables for /wf-refresh regeneration"
             git push origin main
+          else
+            echo "No manifest changes"
           fi

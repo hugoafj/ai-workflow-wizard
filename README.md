@@ -82,6 +82,26 @@ Once set up, here's what working with the AI Workflow looks like:
 | `/wf-worktree` | Project | Git worktree management with automatic port assignment ([learn more](AI_DEV_WORKFLOW.md#84-worktrees--wf-worktree-built-in-this-block)) |
 | `/wf-cicd` | Project | CI/CD pipeline configuration ([learn more](AI_DEV_WORKFLOW.md#10-block-6--cicd-pipeline--gga)) |
 
+## When to Use /wf-cleanup + /wf-init Instead of /wf-refresh
+
+In most cases, `/wf-refresh` handles updates gracefully. But if any of these apply, a clean reinstall is safer:
+
+- **Disruptive release** — Many files changed simultaneously (5+ regenerations)
+- **Deleted files** — The manifest shows files were removed and you're unsure which
+- **Corrupted state** — File integrity check fails (content hash mismatch)
+- **Multiple releases behind** — Jumping 3+ versions risks orphaned files
+- **Broken .wizard-state.json** — State is missing or incomplete
+
+**Recovery path:**
+```bash
+/wf-cleanup    # Removes wizard artifacts (safe — preserves your code)
+/wf-init       # Fresh install with current stack and state
+```
+
+`/wf-cleanup` is designed to be completely safe: it removes only wizard-generated files and asks for confirmation before each deletion. Your project code, team policies (marked with `<!-- WF: DO NOT REGENERATE -->`), and gentle-ai installations are always preserved.
+
+See [WF_REFRESH_TROUBLESHOOTING.md](WF_REFRESH_TROUBLESHOOTING.md) for detailed decision tree and troubleshooting.
+
 ## Optional Modules
 
 Enable via `/wf-settings` after initial setup:
