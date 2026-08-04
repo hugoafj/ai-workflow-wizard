@@ -171,8 +171,22 @@ WF_RAW="https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main"
 
 # Get wizard version from the repo's VERSION file
 wf_fetch_version() {
-  curl -fsSL "${WF_RAW}/VERSION" 2>/dev/null && return 0
-  echo "0.0.0"
+  # Try to get the latest tag from GitHub API
+  local version
+  version=$(curl -fsSL "https://api.github.com/repos/${WIZARD_REPO}/releases/latest" 2>/dev/null | jq -r '.tag_name // empty' 2>/dev/null)
+  
+  # If no release found, try the latest tag
+  if [ -z "$version" ]; then
+    version=$(curl -fsSL "https://api.github.com/repos/${WIZARD_REPO}/tags?per_page=1" 2>/dev/null | jq -r '.[0].name // empty' 2>/dev/null)
+  fi
+  
+  # If still no version, fall back to VERSION file
+  if [ -z "$version" ]; then
+    version=$(curl -fsSL "${WF_RAW}/VERSION" 2>/dev/null | head -1)
+  fi
+  
+  # Final fallback
+  [ -n "$version" ] && echo "$version" || echo "v0.1.0-beta.1"
 }
 
 # Initialize state if it doesn't exist (phase0 creates it on first run)

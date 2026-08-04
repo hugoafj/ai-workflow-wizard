@@ -18,6 +18,34 @@ Detects your IDE and installs global slash commands. Supports: Claude Code, Curs
 
 That's it. The wizard discovers your stack, installs [gentle-ai](https://github.com/hugoafj/ai-workflow-wizard) (the foundation ecosystem), generates `AGENTS.md`, configures satellites per IDE, sets up git hooks, and prepares CI/CD templates.
 
+## Protecting Custom Content
+
+If you add team-specific rules, policies, or custom configurations to `AGENTS.md`, wrap them with markers so the wizard never overwrites them:
+
+```markdown
+<!-- WF: DO NOT REGENERATE -->
+## Our Team Rules
+
+- Code review: 2 approvals minimum
+- Release window: Tuesdays only
+- Documentation: Always in English
+<!-- /WF: DO NOT REGENERATE -->
+```
+
+When you run `/wf-refresh`, the wizard will update everything EXCEPT these marked sections. Your customizations are preserved forever.
+
+**Why this matters**: Your team's policies, constraints, and decisions are yours to maintain. The wizard adapts around them, never replaces them.
+
+## Updating Global Commands
+
+If you install new IDEs or want to update to a newer wizard version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/install.sh | bash
+```
+
+This updates `/wf-init`, `/wf-refresh`, and `/wf-cleanup` globally, and installs them in any new IDEs detected on your machine.
+
 ## What You Get
 
 After `/wf-init`, your repo has:

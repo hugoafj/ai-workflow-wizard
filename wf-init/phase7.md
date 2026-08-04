@@ -40,9 +40,29 @@ Changes to .gitignore:
     .wf-status          (ignored — it's local)
     .wizard-state.json  (ignored — it's local)
     .wizard-staging/    (ignored — it's temporary)
+```
+
+If custom content was migrated from a previous AGENTS.md:
+
+```
+CUSTOM CONTENT — Automatically protected
+=========================================================
+
+The following sections from your previous AGENTS.md are wrapped 
+with protection markers so /wf-refresh will never overwrite them:
+
+<!-- WF: DO NOT REGENERATE -->
+## Your Custom Section Name
+[content preview...]
+<!-- /WF: DO NOT REGENERATE -->
+
+The markers mean: even when you run /wf-refresh in the future,
+these sections will remain exactly as you wrote them.
 
 Do you approve? [yes / edit first: <describe the change>]
 ```
+
+If no custom content: skip this section.
 
 **PAUSE — Wait for explicit approval.**
 

@@ -16,6 +16,37 @@ What should I do with them?
 
 If no previous artifacts with own content exist: tell the user and continue to Phase 3 directly.
 
+### Step 2.2 — Mark custom content for automatic protection
+
+**Only if the user chose "migrate":**
+
+If `.wizard-state.json` has `migration.prior_content_action = "migrate"`:
+
+```bash
+# Mark in state that custom content will be wrapped with protection markers
+jq '.migration.wrap_custom_in_markers = true' .wizard-state.json > /tmp/state.tmp
+mv /tmp/state.tmp .wizard-state.json
+```
+
+Inform the user:
+
+```
+✓ Migration plan saved.
+
+Your custom content will be automatically wrapped with protection markers:
+
+<!-- WF: DO NOT REGENERATE -->
+[your custom content]
+<!-- /WF: DO NOT REGENERATE -->
+
+This ensures your customizations are preserved when you run /wf-refresh in the future.
+The markers tell the wizard: "Never touch this section, it's user-maintained."
+
+You will see the protected content in Phase 7 before I write any files.
+```
+
+---
+
 ### Step 2.1 — Missing commands verification (mandatory in upgrades)
 
 > **Why this step exists**: Phase 2 detects artifacts with *custom* content to

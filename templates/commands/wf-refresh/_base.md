@@ -42,6 +42,50 @@ explicit approval.
 
 ---
 
+## Phase -1 · Global commands version check
+
+**Only if a new remote version is detected:**
+
+After Phase 0 pre-check passes, before Phase 1:
+
+```bash
+LOCAL_VER=$(grep -oP 'wf-version: \K[v0-9a-z.-]+' AGENTS.md | tail -1)
+REMOTE_VER=$(curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/VERSION" 2>/dev/null | head -1)
+
+# If VERSION file fails, try GitHub API
+if [ -z "$REMOTE_VER" ]; then
+  REMOTE_VER=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null | jq -r '.tag_name // empty' 2>/dev/null)
+fi
+
+if [ -n "$REMOTE_VER" ] && [ "$REMOTE_VER" != "$LOCAL_VER" ]; then
+  echo "⚠ New wizard version available: $REMOTE_VER (you have $LOCAL_VER)"
+  echo ""
+  echo "The /wf-refresh command you are running is version $LOCAL_VER."
+  echo "To apply all updates correctly, you should upgrade the global commands first."
+  echo ""
+  read -p "Upgrade global commands now? [yes / no / continue anyway] " response
+  
+  if [ "$response" = "yes" ]; then
+    echo "Upgrading global commands from $LOCAL_VER to $REMOTE_VER..."
+    curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/install.sh" | bash
+    echo ""
+    echo "✓ Global commands upgraded to $REMOTE_VER."
+    echo ""
+    echo "⚠ IMPORTANT: Restart your IDE completely (quit and reopen) to load the new /wf-refresh."
+    echo "   After restart, run /wf-refresh AGAIN in a NEW chat session."
+    echo "   This ensures the updated command applies all changes with current logic."
+    exit 0
+  elif [ "$response" = "continue anyway" ]; then
+    echo "⚠ Continuing with version $LOCAL_VER. Updates may be incomplete."
+    echo "   It is recommended to restart your IDE and run /wf-refresh with the new version."
+  fi
+fi
+```
+
+**Why this phase exists**: If `/wf-refresh` detects a new version available remotely but the command itself is outdated, it will apply changes using old logic. This phase ensures atomic updates: either the user updates everything, or continues knowing the risks.
+
+---
+
 ## Phase 0 · Pre-check
 
 Verify we are in a project initialized by the workflow:
@@ -194,21 +238,26 @@ Compare the local version against the current wizard version.
 ### Remote auto-download
 
 Before using hardcoded knowledge, try to get the latest version
-of `wf-refresh.md` from the remote repo:
+of the wizard from the remote repo:
 
 ```bash
 # Extract repo from source URL (e.g. github.com/hugoafj/ai-workflow-wizard)
 SOURCE_URL=$(grep "source:" AGENTS.md | tail -1 | sed 's/.*source: //')
 REPO=$(echo "$SOURCE_URL" | sed 's|github.com/||')
 
-# Try to download the latest wf-refresh.md from the repo
-REMOTE_WF_REFRESH=$(curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/wf-refresh.md" 2>/dev/null)
+# Try to download the latest VERSION file or tag from the repo
+REMOTE_VERSION=$(curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/VERSION" 2>/dev/null | head -1)
 
-if [ -n "$REMOTE_WF_REFRESH" ]; then
-  REMOTE_VERSION=$(echo "$REMOTE_WF_REFRESH" | grep -oP 'Current wizard version: \K[0-9.]+' | head -1)
-  LOCAL_VERSION=$(grep "wf-version:" AGENTS.md | tail -1 | grep -oP 'wf-version: \K[0-9.]+')
+# If VERSION file fails, try GitHub API for latest tag
+if [ -z "$REMOTE_VERSION" ]; then
+  REMOTE_VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null | jq -r '.tag_name // empty' 2>/dev/null)
+fi
 
-  if [ -n "$REMOTE_VERSION" ] && [ "$REMOTE_VERSION" != "$LOCAL_VERSION" ]; then
+# Extract local version from AGENTS.md footer
+LOCAL_VERSION=$(grep -oP 'wf-version: \K[v0-9a-z.-]+' AGENTS.md | tail -1)
+
+if [ -n "$REMOTE_VERSION" ] && [ -n "$LOCAL_VERSION" ]; then
+  if [ "$REMOTE_VERSION" != "$LOCAL_VERSION" ]; then
     echo "New remote version available: ${REMOTE_VERSION} (local: ${LOCAL_VERSION})"
     echo "Using remote knowledge to apply changes."
     KNOWLEDGE_SOURCE="remote"
@@ -553,9 +602,31 @@ Next steps:
 
 ## Additional technical rules
 
-- **`<!-- WF: DO NOT REGENERATE -->`**: if a section of AGENTS.md contains this
-  marker, the refresh will NOT overwrite it in layers 1, 2, or 3.
-- **User custom content**: if in any section you detect content that does not
+### Protecting custom content with `<!-- WF: DO NOT REGENERATE -->`
+
+If the user has edited AGENTS.md to add custom rules, policies, or team-specific configurations:
+
+**Syntax**:
+```markdown
+<!-- WF: DO NOT REGENERATE -->
+## Your Custom Section
+
+Your content here. The wizard will never touch this.
+<!-- /WF: DO NOT REGENERATE -->
+```
+
+**How refresh handles it**:
+1. Layer 1 (project drift): skips sections inside markers
+2. Layer 2 (mandatory changes): skips sections inside markers
+3. Layer 3 (optional features): skips sections inside markers
+
+**Result**: custom content is NEVER overwritten, even across major wizard versions.
+
+This is the recommended way to maintain team-specific rules without having them erased by updates.
+
+---
+
+- **User custom content detection**: if in any section you detect content that does not
   match the standard template but appears intentional, ask the user
   before modifying it instead of overwriting.
 - **If the user has a wf-version higher than the hardcoded one**: stop and report "your

@@ -40,6 +40,13 @@ SDD_FILES="package.json \
   jest.config.ts jest.config.js \
   playwright.config.ts playwright.config.js"
 
+# ─── Archivos de configuración que ameritan /wf-refresh ──────────────────────
+# Cambios en AGENTS.md, settings de IDEs, o satellites que se editaron a mano
+CONFIG_FILES="AGENTS.md \
+  .claude/settings.json .cursor/settings.json .windsurf/settings.json .kiro/settings.json .opencode/config.json \
+  .claude/commands .cursor/commands .windsurf/workflows .kiro/steering .github/copilot-instructions.md \
+  .agents/protocols .agents/skills"
+
 # ─── Detectar archivos cambiados en este commit ─────────────────────────────
 CHANGED_REFRESH=""
 CHANGED_SDD=""
@@ -64,8 +71,20 @@ for f in $SDD_FILES; do
   fi
 done
 
+# Detectar cambios en config files (AGENTS.md, settings, satellites, commands)
+CHANGED_CONFIG=""
+for pattern in $CONFIG_FILES; do
+  # Check exact file matches
+  if echo "$CHANGED" | grep -qE "^${pattern}$"; then
+    CHANGED_CONFIG="$CHANGED_CONFIG $pattern"
+  # Check directory/wildcard matches (e.g., .claude/commands/* or .agents/protocols/*)
+  elif echo "$CHANGED" | grep -qE "^${pattern}/"; then
+    CHANGED_CONFIG="$CHANGED_CONFIG $pattern/"
+  fi
+done
+
 # ─── Salir limpio si no hay drift ───────────────────────────────────────────
-if [ -z "$CHANGED_REFRESH" ] && [ -z "$CHANGED_SDD" ]; then
+if [ -z "$CHANGED_REFRESH" ] && [ -z "$CHANGED_SDD" ] && [ -z "$CHANGED_CONFIG" ]; then
   exit 0
 fi
 
@@ -82,6 +101,11 @@ fi
 if [ -n "$CHANGED_SDD" ]; then
   printf '  SDD drift:%s\n' "$CHANGED_SDD" >&2
   printf '  → Run /sdd-init in your IDE/CLI to refresh SDD capabilities\n' >&2
+fi
+
+if [ -n "$CHANGED_CONFIG" ]; then
+  printf '  Config/IDE files changed:%s\n' "$CHANGED_CONFIG" >&2
+  printf '  → Run /wf-refresh to sync AGENTS.md and protocols\n' >&2
 fi
 
 printf '\n' >&2
