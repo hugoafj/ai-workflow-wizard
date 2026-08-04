@@ -335,7 +335,7 @@ render_template() {
 SOURCE_URL=$(grep "source:" AGENTS.md | tail -1 | sed 's/.*source: //')
 REPO=$(echo "$SOURCE_URL" | sed 's|github.com/||')
 
-# Download WIZARD_MANIFEST.json from remote
+# Download WIZARD_MANIFEST.json from remote (from .wizard-manifests/ folder)
 MANIFEST=$(curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/WIZARD_MANIFEST.json" 2>/dev/null)
 
 if [ -z "$MANIFEST" ]; then

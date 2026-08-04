@@ -171,7 +171,8 @@ jobs:
                   "files": sorted([f for f in deleted_files if f])
               }
 
-          manifest_filename = f"WIZARD_MANIFEST-{CURRENT_VERSION}.json"
+          manifest_filename = f".wizard-manifests/WIZARD_MANIFEST-{CURRENT_VERSION}.json"
+          os.makedirs(".wizard-manifests", exist_ok=True)
           with open(manifest_filename, "w") as f:
               json.dump(manifest, f, indent=2)
 

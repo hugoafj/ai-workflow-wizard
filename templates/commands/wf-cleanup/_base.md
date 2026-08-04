@@ -30,8 +30,8 @@ Before detection, check if there's a manifest with deleted files that the user s
 
 ```bash
 # Check if there's a WIZARD_MANIFEST in the project
-if [ -f "WIZARD_MANIFEST.json" ] || [ -f "WIZARD_MANIFEST-*.json" ]; then
-  MANIFEST=$(find . -name "WIZARD_MANIFEST-*.json" -o -name "WIZARD_MANIFEST.json" | head -1)
+if [ -f "WIZARD_MANIFEST.json" ] || [ -f ".wizard-manifests/WIZARD_MANIFEST-*.json" ]; then
+  MANIFEST=$(find .wizard-manifests -name "WIZARD_MANIFEST-*.json" 2>/dev/null | head -1 || find . -name "WIZARD_MANIFEST.json" | head -1)
   
   if jq -e '._deleted_files' "$MANIFEST" 2>/dev/null > /dev/null; then
     echo "⚠️  WARNING: Some wizard files were deleted in recent releases:"
