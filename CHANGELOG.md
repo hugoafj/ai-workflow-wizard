@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.3.0-beta.1...v0.3.1-beta.1) (2026-08-04)
+
+
+### Bug Fixes
+
+* clean VERSION newline in manifest-generator to prevent invalid filenames ([1f881e7](https://github.com/hugoafj/ai-workflow-wizard/commit/1f881e7fec2ddf7468ce594b851f003b2b590658))
+
 ## [0.3.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.2.1-beta.1...v0.3.0-beta.1) (2026-08-04)
 
 
