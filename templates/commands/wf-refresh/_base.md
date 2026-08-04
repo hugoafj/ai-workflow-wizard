@@ -243,6 +243,83 @@ advance to Phase 2 without pausing.
 
 **This phase downloads ALL files from the new wizard version and regenerates any files that changed.**
 
+### Helper: render_template function
+
+```bash
+render_template() {
+  local template_content="$1"
+  local state_file="$2"
+  
+  if [ ! -f "$state_file" ]; then
+    echo "$template_content"
+    return 0
+  fi
+  
+  local output="$template_content"
+  local in_if_block=0
+  local condition_var=""
+  local condition_value=""
+  local block_content=""
+  local line_num=0
+  local processed=""
+  
+  # First pass: handle {{if var}} ... {{/if}} conditional blocks
+  # Read state file once into variables for performance
+  local state_json=$(cat "$state_file")
+  
+  while IFS= read -r line; do
+    ((line_num++))
+    
+    if [[ "$line" =~ \{\{if\ ([a-zA-Z0-9_.]+)\}\} ]]; then
+      # Start of conditional block
+      condition_var="${BASH_REMATCH[1]}"
+      condition_value=$(echo "$state_json" | jq -r ".${condition_var} // empty" 2>/dev/null)
+      in_if_block=1
+      block_content=""
+    elif [[ "$line" =~ \{\{/if\}\} ]]; then
+      # End of conditional block
+      if [ "$in_if_block" = 1 ]; then
+        # Only include block content if condition is true
+        if [ -n "$condition_value" ] && [ "$condition_value" != "false" ] && [ "$condition_value" != "null" ]; then
+          processed="${processed}${block_content}"
+        fi
+        in_if_block=0
+        block_content=""
+        condition_var=""
+        condition_value=""
+      fi
+    elif [ "$in_if_block" = 1 ]; then
+      block_content="${block_content}${line}"$'\n'
+    else
+      processed="${processed}${line}"$'\n'
+    fi
+  done <<< "$output"
+  
+  output="$processed"
+  
+  # Second pass: replace {{variable}} placeholders
+  # Loop through all placeholders in the output
+  local max_iterations=100
+  local iteration=0
+  while [[ "$output" =~ \{\{([a-zA-Z0-9_.]+)\}\} ]] && [ $iteration -lt $max_iterations ]; do
+    ((iteration++))
+    local var_path="${BASH_REMATCH[1]}"
+    local var_value=$(echo "$state_json" | jq -r ".${var_path} // empty" 2>/dev/null)
+    
+    if [ -z "$var_value" ]; then
+      var_value="(undefined: $var_path)"
+    fi
+    
+    # Escape special regex characters in var_value
+    var_value=$(printf '%s\n' "$var_value" | sed -e 's/[\/&]/\\&/g')
+    
+    output=$(printf '%s\n' "$output" | sed "s/{{${var_path}}}/${var_value}/g")
+  done
+  
+  echo "$output"
+}
+```
+
 ### Download and apply WIZARD_MANIFEST.json
 
 ```bash
@@ -298,19 +375,34 @@ echo "$MANIFEST" | jq -r '.files | keys[]' | while read FILE_KEY; do
     # Get template from remote
     TEMPLATE_CONTENT=$(curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/${TEMPLATE}" 2>/dev/null)
     
+    if [ -z "$TEMPLATE_CONTENT" ]; then
+      echo "  ⚠ Could not download template: $TEMPLATE"
+      continue
+    fi
+    
     # Get state variables from .wizard-state.json
+    if [ ! -f ".wizard-state.json" ]; then
+      echo "  ⚠ .wizard-state.json not found, skipping regeneration"
+      continue
+    fi
+    
+    echo "    State variables:"
     for VAR in $STATE_VARS; do
-      VAR_VALUE=$(jq -r ".${VAR}" .wizard-state.json 2>/dev/null)
-      echo "    - ${VAR}: ${VAR_VALUE}"
+      VAR_VALUE=$(jq -r ".${VAR} // \"(not set)\"" .wizard-state.json 2>/dev/null)
+      echo "      ${VAR}: ${VAR_VALUE}"
     done
     
     # Regenerate file with template + state variables
-    # (Builder logic handles template rendering with state vars)
     REGENERATED=$(render_template "$TEMPLATE_CONTENT" ".wizard-state.json")
     
-    # Show diff
-    echo "    Diff:"
-    diff -u "$OUTPUT" <(echo "$REGENERATED") | head -20
+    # Show diff if file exists
+    if [ -f "$OUTPUT" ]; then
+      echo "    Diff:"
+      diff -u "$OUTPUT" <(echo "$REGENERATED") 2>/dev/null | head -20 || true
+    fi
+    
+    # Create parent directory if needed
+    mkdir -p "$(dirname "$OUTPUT")"
     
     # Write regenerated file
     echo "$REGENERATED" > "$OUTPUT"
@@ -318,6 +410,7 @@ echo "$MANIFEST" | jq -r '.files | keys[]' | while read FILE_KEY; do
   else
     # Static file, just download and write
     if [ -n "$OUTPUT" ] && [ "$OUTPUT" != "null" ]; then
+      mkdir -p "$(dirname "$OUTPUT")"
       echo "$FILE_CONTENT" > "$OUTPUT"
       echo "  ✓ Written: $OUTPUT"
     fi

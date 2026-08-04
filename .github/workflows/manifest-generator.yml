@@ -72,21 +72,45 @@ jobs:
             elif [[ "$FILE" == "templates/commands/"* ]]; then
               FILE_TYPE="command"
               TEMPLATE="\"$FILE\""
-              REGENERATE="true"
-              STATE_VARS="[\"answers.ides\"]"
+              # Commands may or may not need regeneration - check if they have {{variables}}
+              if grep -q '{{' "$FILE" 2>/dev/null; then
+                REGENERATE="true"
+                # Extract state variables from template comments
+                STATE_VARS=$(grep -oP '{{[^}]*}}' "$FILE" 2>/dev/null | sort -u | sed 's/{{//g; s/}}//g' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+              else
+                REGENERATE="false"
+                STATE_VARS="[]"
+              fi
               OUTPUT="\"$(echo $FILE | sed 's|templates/commands/\([^/]*\)/.*|\1|')/.claude/commands/\1.md\""
             elif [[ "$FILE" == ".github/workflows/"* ]]; then
               FILE_TYPE="workflow"
-              REGENERATE="true"
-              # Determine which workflow and its template
+              # Workflows need regeneration if they have {{variables}}
+              if grep -q '{{' "$FILE" 2>/dev/null; then
+                REGENERATE="true"
+              else
+                REGENERATE="false"
+              fi
+              # Extract state variables from template
               case "$FILE" in
                 *release-please.yml)
-                  TEMPLATE="\"templates/protocols/cicd/variants/release-please.yml\""
-                  STATE_VARS="[\"ci.release_please\", \"ci.conventional_commits\", \"discovery.stack_key\", \"answers.project_name\"]"
+                  TEMPLATE="\"templates/protocols/cicd/variants/release-please.yml.md\""
+                  if [ "$REGENERATE" = "true" ]; then
+                    STATE_VARS="[\"ci.release_please\", \"ci.conventional_commits\", \"ci.release_ai_summary\", \"ci.release_ai_provider\", \"answers.project_name\"]"
+                  else
+                    STATE_VARS="[]"
+                  fi
                   ;;
                 *ci.yml)
-                  TEMPLATE="\"templates/protocols/cicd/variants/ci.yml\""
-                  STATE_VARS="[\"ci.quality_guard\", \"ci.ai_review\", \"ci.security_scan\", \"discovery.stack_key\"]"
+                  TEMPLATE="\"templates/protocols/cicd/variants/ci.yml.md\""
+                  if [ "$REGENERATE" = "true" ]; then
+                    STATE_VARS="[\"ci.quality_guard\", \"ci.ai_review\", \"ci.security_scan\", \"discovery.stack_key\"]"
+                  else
+                    STATE_VARS="[]"
+                  fi
+                  ;;
+                *)
+                  TEMPLATE="null"
+                  STATE_VARS="[]"
                   ;;
               esac
               OUTPUT="\"$FILE\""

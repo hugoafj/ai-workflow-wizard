@@ -1,5 +1,11 @@
 # release-please.yml — Release Please workflow
 #
+# Template variables:
+#   {{conventional_commits}} — true if using conventional commits
+#   {{release_ai_summary}} — true if AI summary is enabled
+#   {{release_ai_provider}} — claude, openai, or gemini (provider for AI summary)
+#   {{project_name}} — project name for release branch naming
+#
 # Notes:
 #   - release-type: node assumes package.json. For markdown-only, use release-type: simple
 #   - The repo must allow GitHub Actions to create PRs (Settings → Actions → General → Workflow permissions)
@@ -24,5 +30,18 @@ jobs:
         id: release
         with:
           release-type: node
+{{if release_ai_summary}}
 
-# {{AI_SUMMARY_JOB}} — injected here if release_ai_summary == true
+  ai-summary:
+    needs: release-please
+    if: needs.release-please.outputs.pr
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate AI summary for release PR
+        run: |
+          echo "AI summary job enabled (provider: {{release_ai_provider}})"
+          # AI summary implementation for {{release_ai_provider}} will be injected here
+{{/if}}
