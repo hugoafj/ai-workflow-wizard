@@ -1,0 +1,143 @@
+name: Generate Wizard Manifest
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'templates/**'
+      - 'wf-init/**'
+      - 'VERSION'
+      - 'post-commit'
+      - '.github/workflows/**'
+
+jobs:
+  generate-manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get previous version tag
+        id: prev_version
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.1.0-beta.1")
+          echo "tag=$PREV_TAG" >> $GITHUB_OUTPUT
+
+      - name: Generate manifest
+        run: |
+          CURRENT_VERSION=$(cat VERSION)
+          GENERATED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          # Start manifest
+          cat > WIZARD_MANIFEST.json <<EOF
+          {
+            "version": "$CURRENT_VERSION",
+            "description": "Wizard manifest: auto-generated list of all files, their templates, regeneration requirements, and state variables",
+            "generated_at": "$GENERATED_AT",
+            "files": {
+          EOF
+
+          # Detect changed files
+          PREV_TAG=${{ steps.prev_version.outputs.tag }}
+
+          # Get list of all potential wizard files
+          FILES=$(git ls-files | grep -E '(templates/|wf-init/|post-commit|VERSION)' | sort)
+
+          FIRST=true
+          while IFS= read -r FILE; do
+            # Skip directories
+            [ -d "$FILE" ] && continue
+
+            # Determine if file changed
+            if git diff "$PREV_TAG..HEAD" --name-only | grep -q "^$FILE$"; then
+              STATUS="changed"
+            else
+              STATUS="unchanged"
+            fi
+
+            # Determine file type and regeneration needs
+            REGENERATE="false"
+            TEMPLATE="null"
+            STATE_VARS="[]"
+            OUTPUT="null"
+            FILE_TYPE="static"
+
+            if [[ "$FILE" == "templates/protocols/"* ]]; then
+              FILE_TYPE="protocol"
+              TEMPLATE="\"$FILE\""
+              if [[ "$STATUS" == "changed" ]]; then
+                REGENERATE="true"
+              fi
+            elif [[ "$FILE" == "templates/commands/"* ]]; then
+              FILE_TYPE="command"
+              TEMPLATE="\"$FILE\""
+              REGENERATE="true"
+              STATE_VARS="[\"answers.ides\"]"
+              OUTPUT="\"$(echo $FILE | sed 's|templates/commands/\([^/]*\)/.*|\1|')/.claude/commands/\1.md\""
+            elif [[ "$FILE" == ".github/workflows/"* ]]; then
+              FILE_TYPE="workflow"
+              REGENERATE="true"
+              # Determine which workflow and its template
+              case "$FILE" in
+                *release-please.yml)
+                  TEMPLATE="\"templates/protocols/cicd/variants/release-please.yml\""
+                  STATE_VARS="[\"ci.release_please\", \"ci.conventional_commits\", \"discovery.stack_key\", \"answers.project_name\"]"
+                  ;;
+                *ci.yml)
+                  TEMPLATE="\"templates/protocols/cicd/variants/ci.yml\""
+                  STATE_VARS="[\"ci.quality_guard\", \"ci.ai_review\", \"ci.security_scan\", \"discovery.stack_key\"]"
+                  ;;
+              esac
+              OUTPUT="\"$FILE\""
+            elif [[ "$FILE" == "post-commit" ]]; then
+              FILE_TYPE="hook"
+              OUTPUT="\".git/hooks/post-commit\""
+              REGENERATE="false"
+            elif [[ "$FILE" == "VERSION" ]]; then
+              FILE_TYPE="metadata"
+              REGENERATE="false"
+            fi
+
+            # Build JSON entry
+            if [ "$FIRST" = true ]; then
+              FIRST=false
+            else
+              echo "," >> WIZARD_MANIFEST.json
+            fi
+
+            cat >> WIZARD_MANIFEST.json <<EOF
+              "$(basename $FILE)": {
+                "version": "$CURRENT_VERSION",
+                "type": "$FILE_TYPE",
+                "path": "$FILE",
+                "output": $OUTPUT,
+                "status": "$STATUS",
+                "regenerate": $REGENERATE,
+                "template": $TEMPLATE,
+                "state_vars": $STATE_VARS
+              }
+          EOF
+          done <<< "$FILES"
+
+          # Close manifest
+          cat >> WIZARD_MANIFEST.json <<'EOF'
+            }
+          }
+          EOF
+
+          # Format JSON
+          python3 -m json.tool WIZARD_MANIFEST.json > /tmp/manifest.tmp && mv /tmp/manifest.tmp WIZARD_MANIFEST.json
+
+      - name: Commit manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet WIZARD_MANIFEST.json; then
+            echo "No manifest changes"
+          else
+            git add WIZARD_MANIFEST.json
+            git commit -m "chore: update WIZARD_MANIFEST.json"
+            git push origin main
+          fi
