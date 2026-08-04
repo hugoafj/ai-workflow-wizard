@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.4.0-beta.1...v0.4.1-beta.1) (2026-08-04)
+
+
+### Bug Fixes
+
+* **phase6:** add inline fallback + validation for Builder when delegation unavailable ([#46](https://github.com/hugoafj/ai-workflow-wizard/issues/46)) ([f4859b4](https://github.com/hugoafj/ai-workflow-wizard/commit/f4859b44060f17b4cd69f428f4a8fd132642a3e7))
+
 ## [0.4.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.3.3-beta.1...v0.4.0-beta.1) (2026-08-04)
 
 
