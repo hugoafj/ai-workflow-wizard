@@ -188,8 +188,20 @@ jobs:
           CURRENT_VERSION=$(cat VERSION | xargs)
           MANIFEST_FILE="WIZARD_MANIFEST-${CURRENT_VERSION}.json"
 
+          # Verify manifest files were created
+          if [ ! -f "$MANIFEST_FILE" ]; then
+            echo "ERROR: $MANIFEST_FILE was not generated!"
+            ls -la WIZARD_MANIFEST* 2>/dev/null || echo "No manifest files found"
+            exit 1
+          fi
+
+          if [ ! -f "WIZARD_MANIFEST.json" ]; then
+            echo "ERROR: WIZARD_MANIFEST.json was not generated!"
+            exit 1
+          fi
+
           # Add both versioned and current manifest
-          git add "$MANIFEST_FILE" WIZARD_MANIFEST.json 2>/dev/null || true
+          git add "$MANIFEST_FILE" WIZARD_MANIFEST.json
 
           if ! git diff --quiet --cached; then
             git commit -m "chore: generate WIZARD_MANIFEST-${CURRENT_VERSION}.json
@@ -200,5 +212,5 @@ jobs:
 - Maps state variables for /wf-refresh regeneration"
             git push origin main
           else
-            echo "No manifest changes"
+            echo "No manifest changes detected (files already up to date)"
           fi
