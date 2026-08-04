@@ -188,7 +188,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           CURRENT_VERSION=$(cat VERSION | xargs)
-          MANIFEST_FILE="WIZARD_MANIFEST-${CURRENT_VERSION}.json"
+          MANIFEST_FILE=".wizard-manifests/WIZARD_MANIFEST-${CURRENT_VERSION}.json"
 
           git add "$MANIFEST_FILE" WIZARD_MANIFEST.json
 
