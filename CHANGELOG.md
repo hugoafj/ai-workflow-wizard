@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.1.8-beta.1...v0.2.0-beta.1) (2026-08-04)
+
+
+### Features
+
+* atomic wf-refresh versioning and custom content protection ([#22](https://github.com/hugoafj/ai-workflow-wizard/issues/22)) ([a1c72c2](https://github.com/hugoafj/ai-workflow-wizard/commit/a1c72c25e435a1b061965b364cc8616a60192e54))
+
 ## [0.1.8-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.1.7-beta.1...v0.1.8-beta.1) (2026-08-03)
 
 
