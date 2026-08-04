@@ -204,12 +204,15 @@ jobs:
           git add "$MANIFEST_FILE" WIZARD_MANIFEST.json
 
           if ! git diff --quiet --cached; then
-            git commit -m "chore: generate WIZARD_MANIFEST-${CURRENT_VERSION}.json
+            git commit -m "$(cat <<EOF
+chore: generate WIZARD_MANIFEST-${CURRENT_VERSION}.json
 
 - Versioned manifest for precise change tracking
 - Includes content hashes for detecting real changes
 - Lists deleted files to inform cleanup decisions
-- Maps state variables for /wf-refresh regeneration"
+- Maps state variables for /wf-refresh regeneration
+EOF
+)"
             git push origin main
           else
             echo "No manifest changes detected (files already up to date)"
