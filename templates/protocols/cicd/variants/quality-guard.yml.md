@@ -1,8 +1,8 @@
 # quality-guard.yml — CI Quality Guard workflow
 #
 # Placeholder resolution:
-#   {{node_version}} → project engines.node, or 22 by default
-#   {{npm_major}}    → user's local npm major version (e.g., 11)
+#   {{discovery.node_version}} → project engines.node, or 22 by default
+#   {{discovery.npm_major}}    → user's local npm major version (e.g., 11)
 #
 # Conditional resolution:
 #   <if type-check script or tsconfig.json exists>: → include type-check step
@@ -33,11 +33,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "{{node_version}}"
+          node-version: "{{discovery.node_version}}"
           cache: npm
 
       - name: Pin npm version (match local lockfile)
-        run: npm install -g npm@{{npm_major}}
+        run: npm install -g npm@{{discovery.npm_major}}
 
       - name: Install dependencies
         run: npm ci

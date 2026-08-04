@@ -4,15 +4,15 @@
 # Used by phase6e when stack_detected == 'node_pure' and vps_runtime == 'pm2'.
 #
 # Placeholders:
-#   {{trigger_event}}   — 'tags:\n        - \'v*\'' or 'branches:\n        - main'
-#   {{node_version}}    — e.g. '20' (from .nvmrc or package.json engines)
-#   {{deploy_path}}     — e.g. '/var/www/my-app/current'
+#   {{cd.trigger}}   — 'tags:\n        - \'v*\'' or 'branches:\n        - main'
+#   {{discovery.node_version}}    — e.g. '20' (from .nvmrc or package.json engines)
+#   {{cd.deploy_path}}     — e.g. '/var/www/my-app/current'
 
 name: Deploy to Production
 
 on:
   push:
-    {{trigger_event}}
+    {{cd.trigger}}
 
 jobs:
   deploy:
@@ -24,7 +24,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '{{node_version}}'
+          node-version: '{{discovery.node_version}}'
 
       - name: Install dependencies
         run: npm ci
@@ -39,7 +39,7 @@ jobs:
           username: ${{ '{{' }} secrets.SSH_USER {{ '}}' }}
           key: ${{ '{{' }} secrets.SSH_KEY {{ '}}' }}
           script: |
-            cd {{deploy_path}}
+            cd {{cd.deploy_path}}
             git pull origin main
             npm ci --production
             npm run build
