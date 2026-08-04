@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.3.3-beta.1...v0.4.0-beta.1) (2026-08-04)
+
+
+### Features
+
+* support both .windsurf/ and .devin/ IDE paths for wizard compatibility ([#44](https://github.com/hugoafj/ai-workflow-wizard/issues/44)) ([1e8bb71](https://github.com/hugoafj/ai-workflow-wizard/commit/1e8bb712efae2d3257f29a925735e26c125cac77))
+
 ## [0.3.3-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.3.2-beta.1...v0.3.3-beta.1) (2026-08-04)
 
 
