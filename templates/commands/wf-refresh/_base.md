@@ -42,47 +42,59 @@ explicit approval.
 
 ---
 
-## Phase -1 · Global commands version check
+## Phase -1 · Global commands version check (EXECUTED AUTOMATICALLY)
 
-**Only if a new remote version is detected:**
+**This phase MUST run FIRST, before anything else.**
 
-After Phase 0 pre-check passes, before Phase 1:
+> **Why this phase exists**: If `/wf-refresh` detects a new version available remotely but the command itself is outdated, it will apply changes using old logic. This phase ensures atomic updates by detecting version mismatch BEFORE any other work happens.
+
+**Execution (auto-run on command start)**:
 
 ```bash
-LOCAL_VER=$(grep -oP 'wf-version: \K[v0-9a-z.-]+' AGENTS.md | tail -1)
-REMOTE_VER=$(curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/VERSION" 2>/dev/null | head -1)
+# CRITICAL: Extract REPO from AGENTS.md footer
+SOURCE_URL=$(grep "source:" AGENTS.md 2>/dev/null | tail -1 | sed 's/.*source: //')
+REPO=$(echo "$SOURCE_URL" | sed 's|github.com/||' || echo "hugoafj/ai-workflow-wizard")
 
-# If VERSION file fails, try GitHub API
+# Get local version from AGENTS.md footer
+LOCAL_VER=$(grep -oP 'wf-version: \K[v0-9a-z.-]+' AGENTS.md | tail -1)
+
+# Get remote version from VERSION file or GitHub API
+REMOTE_VER=$(curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/VERSION" 2>/dev/null | head -1)
 if [ -z "$REMOTE_VER" ]; then
   REMOTE_VER=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null | jq -r '.tag_name // empty' 2>/dev/null)
 fi
 
-if [ -n "$REMOTE_VER" ] && [ "$REMOTE_VER" != "$LOCAL_VER" ]; then
-  echo "⚠ New wizard version available: $REMOTE_VER (you have $LOCAL_VER)"
-  echo ""
-  echo "The /wf-refresh command you are running is version $LOCAL_VER."
-  echo "To apply all updates correctly, you should upgrade the global commands first."
-  echo ""
-  read -p "Upgrade global commands now? [yes / no / continue anyway] " response
+# BLOCK if versions don't match
+if [ -n "$REMOTE_VER" ] && [ -n "$LOCAL_VER" ] && [ "$REMOTE_VER" != "$LOCAL_VER" ]; then
+  printf '\n┌────────────────────────────────────────────────────────┐\n' >&2
+  printf '│  ⚠  WIZARD VERSION MISMATCH — UPGRADE REQUIRED         │\n' >&2
+  printf '└────────────────────────────────────────────────────────┘\n' >&2
+  printf '\n  Remote version: %s\n' "$REMOTE_VER" >&2
+  printf '  Your version:   %s\n' "$LOCAL_VER" >&2
+  printf '\n  The /wf-refresh command you are running is version %s.\n' "$LOCAL_VER" >&2
+  printf '  To apply all updates correctly, upgrade the global commands first.\n\n' >&2
+  printf '  UPGRADE REQUIRED:\n' >&2
+  printf '    1. Run: curl -fsSL https://raw.githubusercontent.com/%s/main/install.sh | bash\n' "$REPO" >&2
+  printf '    2. Restart your IDE completely (quit and reopen)\n' >&2
+  printf '    3. Run /wf-refresh AGAIN in a NEW chat session\n\n' >&2
+  printf '  Do you want to upgrade now?\n' >&2
+  printf '  [Type "upgrade" to proceed, or "skip" to continue anyway]\n\n' >&2
   
-  if [ "$response" = "yes" ]; then
+  read -p "  Your choice: " upgrade_choice
+  
+  if [ "$upgrade_choice" = "upgrade" ]; then
     echo "Upgrading global commands from $LOCAL_VER to $REMOTE_VER..."
     curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/install.sh" | bash
     echo ""
-    echo "✓ Global commands upgraded to $REMOTE_VER."
+    echo "✓ Global commands upgraded."
     echo ""
-    echo "⚠ IMPORTANT: Restart your IDE completely (quit and reopen) to load the new /wf-refresh."
-    echo "   After restart, run /wf-refresh AGAIN in a NEW chat session."
-    echo "   This ensures the updated command applies all changes with current logic."
+    echo "⚠ RESTART YOUR IDE AND RUN /wf-refresh AGAIN IN A NEW CHAT SESSION"
     exit 0
-  elif [ "$response" = "continue anyway" ]; then
-    echo "⚠ Continuing with version $LOCAL_VER. Updates may be incomplete."
-    echo "   It is recommended to restart your IDE and run /wf-refresh with the new version."
   fi
+  
+  printf '\n⚠  Continuing with version %s. Some updates may be incomplete.\n\n' "$LOCAL_VER" >&2
 fi
 ```
-
-**Why this phase exists**: If `/wf-refresh` detects a new version available remotely but the command itself is outdated, it will apply changes using old logic. This phase ensures atomic updates: either the user updates everything, or continues knowing the risks.
 
 ---
 
