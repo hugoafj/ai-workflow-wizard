@@ -1,182 +1,299 @@
 {
     "version": "0.2.1-beta.1",
     "description": "Wizard manifest: auto-generated list of all files, their templates, regeneration requirements, and state variables",
-    "generated_at": "2026-08-04T09:30:00Z",
+    "generated_at": "2026-08-04T08:54:40Z",
     "files": {
+        "VERSION": {
+            "version": "0.2.1-beta.1",
+            "type": "metadata",
+            "path": "VERSION",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
         "post-commit": {
             "version": "0.2.1-beta.1",
             "type": "hook",
             "path": "post-commit",
             "output": ".git/hooks/post-commit",
-            "status": "changed",
+            "status": "unchanged",
             "regenerate": false,
             "template": null,
             "state_vars": []
         },
-        "wf-refresh": {
+        "AGENTS.router.md": {
             "version": "0.2.1-beta.1",
-            "type": "command",
-            "path": "templates/commands/wf-refresh/_base.md",
-            "output": ".claude/commands/wf-refresh.md",
-            "status": "changed",
+            "type": "static",
+            "path": "templates/AGENTS.router.md",
+            "output": null,
+            "status": "unchanged",
             "regenerate": false,
-            "template": "templates/commands/wf-refresh/_base.md",
+            "template": null,
             "state_vars": []
         },
-        "release-please": {
+        "_base.md": {
             "version": "0.2.1-beta.1",
-            "type": "workflow",
-            "path": ".github/workflows/release-please.yml",
-            "output": ".github/workflows/release-please.yml",
+            "type": "protocol",
+            "path": "templates/protocols/workflow/_base.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/workflow/_base.md",
+            "state_vars": []
+        },
+        "meta.md": {
+            "version": "0.2.1-beta.1",
+            "type": "command",
+            "path": "templates/commands/meta.md",
+            "output": ".claude/commands/meta.md.md",
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/commands/meta.md",
+            "state_vars": []
+        },
+        "SKILL.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/workflow/skill/SKILL.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/workflow/skill/SKILL.md",
+            "state_vars": []
+        },
+        "hook.post-commit.tmpl.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/cicd/hook.post-commit.tmpl.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/cicd/hook.post-commit.tmpl.md",
+            "state_vars": []
+        },
+        "husky-post-commit.tmpl.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/cicd/husky-post-commit.tmpl.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/cicd/husky-post-commit.tmpl.md",
+            "state_vars": []
+        },
+        "husky-pre-commit.tmpl.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/cicd/husky-pre-commit.tmpl.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/cicd/husky-pre-commit.tmpl.md",
+            "state_vars": []
+        },
+        "ai-summary-job.claude.yml.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/cicd/variants/ai-summary-job.claude.yml.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/cicd/variants/ai-summary-job.claude.yml.md",
+            "state_vars": []
+        },
+        "ai-summary-job.gemini.yml.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/cicd/variants/ai-summary-job.gemini.yml.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/cicd/variants/ai-summary-job.gemini.yml.md",
+            "state_vars": []
+        },
+        "ai-summary-job.openai.yml.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/cicd/variants/ai-summary-job.openai.yml.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/cicd/variants/ai-summary-job.openai.yml.md",
+            "state_vars": []
+        },
+        "claude-review.yml.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/cicd/variants/claude-review.yml.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/cicd/variants/claude-review.yml.md",
+            "state_vars": []
+        },
+        "commitlintrc.json.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/cicd/variants/commitlintrc.json.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/cicd/variants/commitlintrc.json.md",
+            "state_vars": []
+        },
+        "deploy-apache-phpfpm.laravel.yml.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/cicd/variants/deploy-apache-phpfpm.laravel.yml.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/cicd/variants/deploy-apache-phpfpm.laravel.yml.md",
+            "state_vars": []
+        },
+        "deploy-docker.yml.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/cicd/variants/deploy-docker.yml.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/cicd/variants/deploy-docker.yml.md",
+            "state_vars": []
+        },
+        "deploy-nginx-phpfpm.laravel.yml.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/cicd/variants/deploy-nginx-phpfpm.laravel.yml.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/cicd/variants/deploy-nginx-phpfpm.laravel.yml.md",
+            "state_vars": []
+        },
+        "deploy-pm2.node.yml.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/cicd/variants/deploy-pm2.node.yml.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/cicd/variants/deploy-pm2.node.yml.md",
+            "state_vars": []
+        },
+        "gemini-review.yml.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/cicd/variants/gemini-review.yml.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/cicd/variants/gemini-review.yml.md",
+            "state_vars": []
+        },
+        "gga-config.tmpl.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/cicd/variants/gga-config.tmpl.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/cicd/variants/gga-config.tmpl.md",
+            "state_vars": []
+        },
+        "gga-review.yml.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/cicd/variants/gga-review.yml.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/cicd/variants/gga-review.yml.md",
+            "state_vars": []
+        },
+        "husky-commit-msg.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/cicd/variants/husky-commit-msg.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/cicd/variants/husky-commit-msg.md",
+            "state_vars": []
+        },
+        "pr-agent-config.toml.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/cicd/variants/pr-agent-config.toml.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/cicd/variants/pr-agent-config.toml.md",
+            "state_vars": []
+        },
+        "quality-guard.yml.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/cicd/variants/quality-guard.yml.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/cicd/variants/quality-guard.yml.md",
+            "state_vars": []
+        },
+        "release-please-config.json.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/cicd/variants/release-please-config.json.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/cicd/variants/release-please-config.json.md",
+            "state_vars": []
+        },
+        "release-please-manifest.json.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/cicd/variants/release-please-manifest.json.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/cicd/variants/release-please-manifest.json.md",
+            "state_vars": []
+        },
+        "release-please.yml.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/cicd/variants/release-please.yml.md",
+            "output": null,
             "status": "changed",
             "regenerate": true,
             "template": "templates/protocols/cicd/variants/release-please.yml.md",
-            "state_vars": [
-                "ci.release_please",
-                "ci.conventional_commits",
-                "ci.release_ai_summary",
-                "ci.release_ai_provider",
-                "answers.project_name"
-            ]
+            "state_vars": []
         },
-        "deploy-docker": {
+        "security-review.claude.yml.md": {
             "version": "0.2.1-beta.1",
-            "type": "workflow",
-            "path": ".github/workflows/deploy-docker.yml",
-            "output": ".github/workflows/deploy-docker.yml",
-            "status": "changed",
-            "regenerate": true,
-            "template": "templates/protocols/cicd/variants/deploy-docker.yml.md",
-            "state_vars": [
-                "trigger_event",
-                "deploy_path",
-                "compose_file"
-            ],
-            "state_mappings": {
-                "trigger_event": "cd.trigger",
-                "deploy_path": "cd.deploy_path",
-                "compose_file": "cd.deploy_docker_compose"
-            }
+            "type": "protocol",
+            "path": "templates/protocols/cicd/variants/security-review.claude.yml.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/cicd/variants/security-review.claude.yml.md",
+            "state_vars": []
         },
-        "deploy-nginx-phpfpm-laravel": {
+        "security-review.gemini.yml.md": {
             "version": "0.2.1-beta.1",
-            "type": "workflow",
-            "path": ".github/workflows/deploy-nginx-phpfpm-laravel.yml",
-            "output": ".github/workflows/deploy-nginx-phpfpm-laravel.yml",
-            "status": "changed",
-            "regenerate": true,
-            "template": "templates/protocols/cicd/variants/deploy-nginx-phpfpm.laravel.yml.md",
-            "state_vars": [
-                "trigger_event",
-                "php_version",
-                "node_version",
-                "has_node_assets",
-                "deploy_path"
-            ],
-            "state_mappings": {
-                "trigger_event": "cd.trigger",
-                "php_version": "discovery.php_version",
-                "node_version": "discovery.node_version",
-                "has_node_assets": "discovery.has_node_assets",
-                "deploy_path": "cd.deploy_path"
-            }
+            "type": "protocol",
+            "path": "templates/protocols/cicd/variants/security-review.gemini.yml.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/cicd/variants/security-review.gemini.yml.md",
+            "state_vars": []
         },
-        "deploy-apache-phpfpm-laravel": {
-            "version": "0.2.1-beta.1",
-            "type": "workflow",
-            "path": ".github/workflows/deploy-apache-phpfpm-laravel.yml",
-            "output": ".github/workflows/deploy-apache-phpfpm-laravel.yml",
-            "status": "changed",
-            "regenerate": true,
-            "template": "templates/protocols/cicd/variants/deploy-apache-phpfpm.laravel.yml.md",
-            "state_vars": [
-                "trigger_event",
-                "php_version",
-                "node_version",
-                "has_node_assets",
-                "deploy_path"
-            ],
-            "state_mappings": {
-                "trigger_event": "cd.trigger",
-                "php_version": "discovery.php_version",
-                "node_version": "discovery.node_version",
-                "has_node_assets": "discovery.has_node_assets",
-                "deploy_path": "cd.deploy_path"
-            }
-        },
-        "deploy-pm2-node": {
-            "version": "0.2.1-beta.1",
-            "type": "workflow",
-            "path": ".github/workflows/deploy-pm2-node.yml",
-            "output": ".github/workflows/deploy-pm2-node.yml",
-            "status": "changed",
-            "regenerate": true,
-            "template": "templates/protocols/cicd/variants/deploy-pm2.node.yml.md",
-            "state_vars": [
-                "trigger_event",
-                "node_version",
-                "deploy_path"
-            ],
-            "state_mappings": {
-                "trigger_event": "cd.trigger",
-                "node_version": "discovery.node_version",
-                "deploy_path": "cd.deploy_path"
-            }
-        },
-        "quality-guard": {
-            "version": "0.2.1-beta.1",
-            "type": "workflow",
-            "path": ".github/workflows/quality-guard.yml",
-            "output": ".github/workflows/quality-guard.yml",
-            "status": "changed",
-            "regenerate": true,
-            "template": "templates/protocols/cicd/variants/quality-guard.yml.md",
-            "state_vars": [
-                "node_version",
-                "npm_major"
-            ],
-            "state_mappings": {
-                "node_version": "discovery.node_engine",
-                "npm_major": "discovery.npm_major"
-            }
-        },
-        "release-please-manifest": {
-            "version": "0.2.1-beta.1",
-            "type": "config",
-            "path": "release-please-manifest.json",
-            "output": "release-please-manifest.json",
-            "status": "changed",
-            "regenerate": true,
-            "template": "templates/protocols/cicd/variants/release-please-manifest.json.md",
-            "state_vars": [
-                "version"
-            ],
-            "state_mappings": {
-                "version": "wizard_version"
-            }
-        },
-        "gga-config": {
-            "version": "0.2.1-beta.1",
-            "type": "config",
-            "path": ".gga",
-            "output": ".gga",
-            "status": "changed",
-            "regenerate": true,
-            "template": "templates/protocols/cicd/variants/gga-config.tmpl.md",
-            "state_vars": [
-                "provider",
-                "file_patterns",
-                "exclude_patterns",
-                "pr_base_branch"
-            ],
-            "state_mappings": {
-                "provider": "ci.gga_provider",
-                "file_patterns": "discovery.gga_file_patterns",
-                "exclude_patterns": "discovery.gga_exclude_patterns",
-                "pr_base_branch": "discovery.default_branch"
-            }
-        },
-        "decision-ladder": {
+        "ladder.md": {
             "version": "0.2.1-beta.1",
             "type": "protocol",
             "path": "templates/protocols/decision-ladder/ladder.md",
@@ -185,13 +302,496 @@
             "regenerate": false,
             "template": "templates/protocols/decision-ladder/ladder.md",
             "state_vars": []
+        },
+        "local-orchestration.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/decision-ladder/local-orchestration.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/decision-ladder/local-orchestration.md",
+            "state_vars": []
+        },
+        "base-paths-table.section.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/ides/base-paths-table.section.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/ides/base-paths-table.section.md",
+            "state_vars": []
+        },
+        "routing-table.section.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/ides/routing-table.section.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/ides/routing-table.section.md",
+            "state_vars": []
+        },
+        "config.yaml.tmpl.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/sdd/config.yaml.tmpl.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/sdd/config.yaml.tmpl.md",
+            "state_vars": []
+        },
+        "standard.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/tdd/variants/standard.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/tdd/variants/standard.md",
+            "state_vars": []
+        },
+        "strict.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/tdd/variants/strict.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/tdd/variants/strict.md",
+            "state_vars": []
+        },
+        "checks.section.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/testing/checks.section.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/testing/checks.section.md",
+            "state_vars": []
+        },
+        "coverage-thresholds.tmpl.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/testing/coverage-thresholds.tmpl.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/testing/coverage-thresholds.tmpl.md",
+            "state_vars": []
+        },
+        "data-testid.section.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/testing/data-testid.section.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/testing/data-testid.section.md",
+            "state_vars": []
+        },
+        "e2e-example.tmpl.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/testing/e2e-example.tmpl.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/testing/e2e-example.tmpl.md",
+            "state_vars": []
+        },
+        "e2e-scripts.tmpl.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/testing/e2e-scripts.tmpl.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/testing/e2e-scripts.tmpl.md",
+            "state_vars": []
+        },
+        "install-browsers.tmpl.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/testing/install-browsers.tmpl.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/testing/install-browsers.tmpl.md",
+            "state_vars": []
+        },
+        "playwright-mcp.settings.tmpl.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/testing/playwright-mcp.settings.tmpl.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/testing/playwright-mcp.settings.tmpl.md",
+            "state_vars": []
+        },
+        "playwright.config.tmpl.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/testing/playwright.config.tmpl.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/testing/playwright.config.tmpl.md",
+            "state_vars": []
+        },
+        "setup.tmpl.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/testing/setup.tmpl.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/testing/setup.tmpl.md",
+            "state_vars": []
+        },
+        "test-scripts.tmpl.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/testing/test-scripts.tmpl.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/testing/test-scripts.tmpl.md",
+            "state_vars": []
+        },
+        "testing-approach.section.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/testing/testing-approach.section.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/testing/testing-approach.section.md",
+            "state_vars": []
+        },
+        "visual-snapshots.tmpl.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/testing/visual-snapshots.tmpl.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/testing/visual-snapshots.tmpl.md",
+            "state_vars": []
+        },
+        "vitest.config.tmpl.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/testing/vitest.config.tmpl.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/testing/vitest.config.tmpl.md",
+            "state_vars": []
+        },
+        "changelog.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/workflow/changelog.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/workflow/changelog.md",
+            "state_vars": []
+        },
+        "wf-warning.tmpl.md": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/workflow/wf-warning.tmpl.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/workflow/wf-warning.tmpl.md",
+            "state_vars": []
+        },
+        "antigravity.tmpl": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "templates/satellites/antigravity.tmpl",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "claude.tmpl": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "templates/satellites/claude.tmpl",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "copilot.tmpl": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "templates/satellites/copilot.tmpl",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "cursor.tmpl": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "templates/satellites/cursor.tmpl",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "gemini.tmpl": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "templates/satellites/gemini.tmpl",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "kiro.tmpl": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "templates/satellites/kiro.tmpl",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "windsurf.tmpl": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "templates/satellites/windsurf.tmpl",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "builder.md": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "wf-init/lib/builder.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "state.md": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "wf-init/lib/state.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "phase0.md": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "wf-init/phase0.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "phase0b.md": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "wf-init/phase0b.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "phase0c.md": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "wf-init/phase0c.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "phase1.md": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "wf-init/phase1.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "phase2.md": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "wf-init/phase2.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "phase3.md": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "wf-init/phase3.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "phase4.md": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "wf-init/phase4.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "phase45.md": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "wf-init/phase45.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "phase46.md": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "wf-init/phase46.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "phase46b.md": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "wf-init/phase46b.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "phase47-cicd.md": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "wf-init/phase47-cicd.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "phase5.md": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "wf-init/phase5.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "phase6a-agents.md": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "wf-init/phase6a-agents.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "phase6b-build-heavy.md": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "wf-init/phase6b-build-heavy.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "phase7.md": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "wf-init/phase7.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "phase8.md": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "wf-init/phase8.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "subagent-builder-core.md": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "wf-init/subagent-builder-core.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "subagent-builder-heavy.md": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "wf-init/subagent-builder-heavy.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "subagent-discovery.md": {
+            "version": "0.2.1-beta.1",
+            "type": "static",
+            "path": "wf-init/subagent-discovery.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
         }
-    },
-    "schema_version": 1,
-    "notes": [
-        "This file is auto-generated by CI/CD. Do not edit manually.",
-        "state_vars: simple placeholder names used in templates (e.g., {{node_version}})",
-        "state_mappings: maps simple names to full .wizard-state.json paths for render_template()",
-        "regenerate: true if file needs to be rebuilt from template with current state variables"
-    ]
+    }
 }
