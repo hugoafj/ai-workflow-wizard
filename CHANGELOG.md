@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.2.0-beta.1...v0.2.1-beta.1) (2026-08-04)
+
+
+### Bug Fixes
+
+* make Phase -1 auto-execute at wf-refresh start ([#24](https://github.com/hugoafj/ai-workflow-wizard/issues/24)) ([4b70ff0](https://github.com/hugoafj/ai-workflow-wizard/commit/4b70ff07a00eb02bf616ad52b3a0c986777aa5a0))
+
 ## [0.2.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.1.8-beta.1...v0.2.0-beta.1) (2026-08-04)
 
 
