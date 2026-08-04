@@ -658,7 +658,7 @@ with all optional features" and advance to Phase 3.5.
 Derive the active IDEs from the existing satellites:
 
 ```bash
-ls .claude/ .cursor/ .windsurf/ .kiro/ .github/copilot-instructions.md .opencode/ 2>/dev/null
+ls .claude/ .cursor/ .windsurf/ .devin/ .kiro/ .github/copilot-instructions.md .opencode/ 2>/dev/null
 ```
 
 For each active IDE, verify file by file against the list of expected
@@ -752,7 +752,7 @@ Only if Phase 4 closed with `yes`:
 4. `git add` the modified files, including new commands:
    ```bash
    git add AGENTS.md
-   git add -f .claude/ .cursor/ .windsurf/ .kiro/ .opencode/ 2>/dev/null || true
+   git add -f .claude/ .cursor/ .windsurf/ .devin/ .kiro/ .opencode/ 2>/dev/null || true
    git add -f .github/copilot-instructions.md .github/prompts/ 2>/dev/null || true
    ```
 5. `git commit -m "chore: refresh workflow to v<X.Y>

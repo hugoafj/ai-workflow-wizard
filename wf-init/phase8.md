@@ -12,9 +12,9 @@ Only run because the user explicitly approved in Phase 7.
 STAGING=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' .wizard-state.json)
 
 # Create necessary destination directories (satellites, protocols, commands)
-mkdir -p .github .cursor/rules .windsurf/rules .kiro/steering
+mkdir -p .github .cursor/rules .windsurf/rules .devin/rules .kiro/steering
 mkdir -p .agents/protocols .claude/skills
-mkdir -p .claude/commands .cursor/commands .windsurf/workflows .opencode/commands .github/prompts
+mkdir -p .claude/commands .cursor/commands .windsurf/workflows .devin/skills .opencode/commands .github/prompts
 
 # Copy the entire staging tree to the project root, preserving relative paths
 ( cd "$STAGING" && find . -type f -print0 | while IFS= read -r -d '' f; do
@@ -135,6 +135,7 @@ echo '.wizard-staging/' >> .gitignore
 # Exceptions for satellites that must be versioned (only generated ones, single quotes)
 echo '!.cursor/' >> .gitignore        # if applicable
 echo '!.windsurf/' >> .gitignore      # if applicable
+echo '!.devin/' >> .gitignore         # if applicable
 echo '!.kiro/' >> .gitignore          # if applicable
 echo '!.github/copilot-instructions.md' >> .gitignore   # if applicable
 ```
@@ -147,6 +148,7 @@ git add -f .agents/ 2>/dev/null || true
 git add -f .claude/ 2>/dev/null || true
 git add -f .cursor/ 2>/dev/null || true
 git add -f .windsurf/ 2>/dev/null || true
+git add -f .devin/ 2>/dev/null || true
 git add -f .kiro/ 2>/dev/null || true
 git add -f .opencode/ 2>/dev/null || true
 git add -f .github/copilot-instructions.md .github/prompts/ 2>/dev/null || true
