@@ -1,0 +1,197 @@
+{
+    "version": "0.2.1-beta.1",
+    "description": "Wizard manifest: auto-generated list of all files, their templates, regeneration requirements, and state variables",
+    "generated_at": "2026-08-04T09:30:00Z",
+    "files": {
+        "post-commit": {
+            "version": "0.2.1-beta.1",
+            "type": "hook",
+            "path": "post-commit",
+            "output": ".git/hooks/post-commit",
+            "status": "changed",
+            "regenerate": false,
+            "template": null,
+            "state_vars": []
+        },
+        "wf-refresh": {
+            "version": "0.2.1-beta.1",
+            "type": "command",
+            "path": "templates/commands/wf-refresh/_base.md",
+            "output": ".claude/commands/wf-refresh.md",
+            "status": "changed",
+            "regenerate": false,
+            "template": "templates/commands/wf-refresh/_base.md",
+            "state_vars": []
+        },
+        "release-please": {
+            "version": "0.2.1-beta.1",
+            "type": "workflow",
+            "path": ".github/workflows/release-please.yml",
+            "output": ".github/workflows/release-please.yml",
+            "status": "changed",
+            "regenerate": true,
+            "template": "templates/protocols/cicd/variants/release-please.yml.md",
+            "state_vars": [
+                "ci.release_please",
+                "ci.conventional_commits",
+                "ci.release_ai_summary",
+                "ci.release_ai_provider",
+                "answers.project_name"
+            ]
+        },
+        "deploy-docker": {
+            "version": "0.2.1-beta.1",
+            "type": "workflow",
+            "path": ".github/workflows/deploy-docker.yml",
+            "output": ".github/workflows/deploy-docker.yml",
+            "status": "changed",
+            "regenerate": true,
+            "template": "templates/protocols/cicd/variants/deploy-docker.yml.md",
+            "state_vars": [
+                "trigger_event",
+                "deploy_path",
+                "compose_file"
+            ],
+            "state_mappings": {
+                "trigger_event": "cd.trigger",
+                "deploy_path": "cd.deploy_path",
+                "compose_file": "cd.deploy_docker_compose"
+            }
+        },
+        "deploy-nginx-phpfpm-laravel": {
+            "version": "0.2.1-beta.1",
+            "type": "workflow",
+            "path": ".github/workflows/deploy-nginx-phpfpm-laravel.yml",
+            "output": ".github/workflows/deploy-nginx-phpfpm-laravel.yml",
+            "status": "changed",
+            "regenerate": true,
+            "template": "templates/protocols/cicd/variants/deploy-nginx-phpfpm.laravel.yml.md",
+            "state_vars": [
+                "trigger_event",
+                "php_version",
+                "node_version",
+                "has_node_assets",
+                "deploy_path"
+            ],
+            "state_mappings": {
+                "trigger_event": "cd.trigger",
+                "php_version": "discovery.php_version",
+                "node_version": "discovery.node_version",
+                "has_node_assets": "discovery.has_node_assets",
+                "deploy_path": "cd.deploy_path"
+            }
+        },
+        "deploy-apache-phpfpm-laravel": {
+            "version": "0.2.1-beta.1",
+            "type": "workflow",
+            "path": ".github/workflows/deploy-apache-phpfpm-laravel.yml",
+            "output": ".github/workflows/deploy-apache-phpfpm-laravel.yml",
+            "status": "changed",
+            "regenerate": true,
+            "template": "templates/protocols/cicd/variants/deploy-apache-phpfpm.laravel.yml.md",
+            "state_vars": [
+                "trigger_event",
+                "php_version",
+                "node_version",
+                "has_node_assets",
+                "deploy_path"
+            ],
+            "state_mappings": {
+                "trigger_event": "cd.trigger",
+                "php_version": "discovery.php_version",
+                "node_version": "discovery.node_version",
+                "has_node_assets": "discovery.has_node_assets",
+                "deploy_path": "cd.deploy_path"
+            }
+        },
+        "deploy-pm2-node": {
+            "version": "0.2.1-beta.1",
+            "type": "workflow",
+            "path": ".github/workflows/deploy-pm2-node.yml",
+            "output": ".github/workflows/deploy-pm2-node.yml",
+            "status": "changed",
+            "regenerate": true,
+            "template": "templates/protocols/cicd/variants/deploy-pm2.node.yml.md",
+            "state_vars": [
+                "trigger_event",
+                "node_version",
+                "deploy_path"
+            ],
+            "state_mappings": {
+                "trigger_event": "cd.trigger",
+                "node_version": "discovery.node_version",
+                "deploy_path": "cd.deploy_path"
+            }
+        },
+        "quality-guard": {
+            "version": "0.2.1-beta.1",
+            "type": "workflow",
+            "path": ".github/workflows/quality-guard.yml",
+            "output": ".github/workflows/quality-guard.yml",
+            "status": "changed",
+            "regenerate": true,
+            "template": "templates/protocols/cicd/variants/quality-guard.yml.md",
+            "state_vars": [
+                "node_version",
+                "npm_major"
+            ],
+            "state_mappings": {
+                "node_version": "discovery.node_engine",
+                "npm_major": "discovery.npm_major"
+            }
+        },
+        "release-please-manifest": {
+            "version": "0.2.1-beta.1",
+            "type": "config",
+            "path": "release-please-manifest.json",
+            "output": "release-please-manifest.json",
+            "status": "changed",
+            "regenerate": true,
+            "template": "templates/protocols/cicd/variants/release-please-manifest.json.md",
+            "state_vars": [
+                "version"
+            ],
+            "state_mappings": {
+                "version": "wizard_version"
+            }
+        },
+        "gga-config": {
+            "version": "0.2.1-beta.1",
+            "type": "config",
+            "path": ".gga",
+            "output": ".gga",
+            "status": "changed",
+            "regenerate": true,
+            "template": "templates/protocols/cicd/variants/gga-config.tmpl.md",
+            "state_vars": [
+                "provider",
+                "file_patterns",
+                "exclude_patterns",
+                "pr_base_branch"
+            ],
+            "state_mappings": {
+                "provider": "ci.gga_provider",
+                "file_patterns": "discovery.gga_file_patterns",
+                "exclude_patterns": "discovery.gga_exclude_patterns",
+                "pr_base_branch": "discovery.default_branch"
+            }
+        },
+        "decision-ladder": {
+            "version": "0.2.1-beta.1",
+            "type": "protocol",
+            "path": "templates/protocols/decision-ladder/ladder.md",
+            "output": null,
+            "status": "unchanged",
+            "regenerate": false,
+            "template": "templates/protocols/decision-ladder/ladder.md",
+            "state_vars": []
+        }
+    },
+    "schema_version": 1,
+    "notes": [
+        "This file is auto-generated by CI/CD. Do not edit manually.",
+        "state_vars: simple placeholder names used in templates (e.g., {{node_version}})",
+        "state_mappings: maps simple names to full .wizard-state.json paths for render_template()",
+        "regenerate: true if file needs to be rebuilt from template with current state variables"
+    ]
+}

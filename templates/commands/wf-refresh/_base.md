@@ -241,62 +241,198 @@ advance to Phase 2 without pausing.
 
 ## Phase 2 · Layer 2 — Template drift (mandatory changes)
 
-Read the AGENTS.md footer to extract:
-- `wf-version`: local template version
-- `source`: remote wizard URL
+**This phase downloads ALL files from the new wizard version and regenerates any files that changed.**
 
-Compare the local version against the current wizard version.
-
-### Remote auto-download
-
-Before using hardcoded knowledge, try to get the latest version
-of the wizard from the remote repo:
+### Helper: render_template function
 
 ```bash
-# Extract repo from source URL (e.g. github.com/hugoafj/ai-workflow-wizard)
+render_template() {
+  local template_content="$1"
+  local state_file="$2"
+  
+  if [ ! -f "$state_file" ]; then
+    echo "$template_content"
+    return 0
+  fi
+  
+  local output="$template_content"
+  local in_if_block=0
+  local condition_var=""
+  local condition_value=""
+  local block_content=""
+  local line_num=0
+  local processed=""
+  
+  # First pass: handle {{if var}} ... {{/if}} conditional blocks
+  # Read state file once into variables for performance
+  local state_json=$(cat "$state_file")
+  
+  while IFS= read -r line; do
+    ((line_num++))
+    
+    if [[ "$line" =~ \{\{if\ ([a-zA-Z0-9_.]+)\}\} ]]; then
+      # Start of conditional block
+      condition_var="${BASH_REMATCH[1]}"
+      condition_value=$(echo "$state_json" | jq -r ".${condition_var} // empty" 2>/dev/null)
+      in_if_block=1
+      block_content=""
+    elif [[ "$line" =~ \{\{/if\}\} ]]; then
+      # End of conditional block
+      if [ "$in_if_block" = 1 ]; then
+        # Only include block content if condition is true
+        if [ -n "$condition_value" ] && [ "$condition_value" != "false" ] && [ "$condition_value" != "null" ]; then
+          processed="${processed}${block_content}"
+        fi
+        in_if_block=0
+        block_content=""
+        condition_var=""
+        condition_value=""
+      fi
+    elif [ "$in_if_block" = 1 ]; then
+      block_content="${block_content}${line}"$'\n'
+    else
+      processed="${processed}${line}"$'\n'
+    fi
+  done <<< "$output"
+  
+  output="$processed"
+  
+  # Second pass: replace {{variable}} placeholders
+  # Only process variables that look like state paths (contain at least one dot)
+  # This avoids replacing GitHub Actions syntax like {{ steps.release.outputs.pr }}
+  local max_iterations=100
+  local iteration=0
+  while [[ "$output" =~ \{\{([a-zA-Z0-9_.]+)\}\} ]] && [ $iteration -lt $max_iterations ]; do
+    ((iteration++))
+    local var_path="${BASH_REMATCH[1]}"
+    
+    # Only process if it looks like a state path (contains a dot)
+    if [[ "$var_path" == *.* ]]; then
+      local var_value=$(echo "$state_json" | jq -r ".${var_path} // empty" 2>/dev/null)
+      
+      if [ -z "$var_value" ]; then
+        var_value="(undefined: $var_path)"
+      fi
+      
+      # Escape special regex characters in var_value
+      var_value=$(printf '%s\n' "$var_value" | sed -e 's/[\/&]/\\&/g')
+      
+      output=$(printf '%s\n' "$output" | sed "s/{{${var_path}}}/${var_value}/g")
+    else
+      # Don't process variables without dots - they're likely GitHub Actions syntax
+      break
+    fi
+  done
+  
+  echo "$output"
+}
+```
+
+### Download and apply WIZARD_MANIFEST.json
+
+```bash
+# Extract repo from AGENTS.md footer
 SOURCE_URL=$(grep "source:" AGENTS.md | tail -1 | sed 's/.*source: //')
 REPO=$(echo "$SOURCE_URL" | sed 's|github.com/||')
 
-# Try to download the latest VERSION file or tag from the repo
-REMOTE_VERSION=$(curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/VERSION" 2>/dev/null | head -1)
+# Download WIZARD_MANIFEST.json from remote
+MANIFEST=$(curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/WIZARD_MANIFEST.json" 2>/dev/null)
 
-# If VERSION file fails, try GitHub API for latest tag
-if [ -z "$REMOTE_VERSION" ]; then
-  REMOTE_VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null | jq -r '.tag_name // empty' 2>/dev/null)
+if [ -z "$MANIFEST" ]; then
+  echo "ERROR: Could not download WIZARD_MANIFEST.json from ${REPO}"
+  exit 1
 fi
 
-# Extract local version from AGENTS.md footer
+REMOTE_VERSION=$(echo "$MANIFEST" | jq -r '.version')
 LOCAL_VERSION=$(grep -oP 'wf-version: \K[v0-9a-z.-]+' AGENTS.md | tail -1)
 
-if [ -n "$REMOTE_VERSION" ] && [ -n "$LOCAL_VERSION" ]; then
-  if [ "$REMOTE_VERSION" != "$LOCAL_VERSION" ]; then
-    echo "New remote version available: ${REMOTE_VERSION} (local: ${LOCAL_VERSION})"
-    echo "Using remote knowledge to apply changes."
-    KNOWLEDGE_SOURCE="remote"
-  else
-    echo "Remote version matches local (${LOCAL_VERSION}). Using hardcoded knowledge."
-    KNOWLEDGE_SOURCE="hardcoded"
-  fi
-else
-  echo "Could not connect to remote repo. Using hardcoded knowledge."
-  KNOWLEDGE_SOURCE="hardcoded"
-fi
+echo "Wizard version check:"
+echo "  Remote: $REMOTE_VERSION"
+echo "  Local:  $LOCAL_VERSION"
+echo ""
 ```
 
-If `KNOWLEDGE_SOURCE="remote"`, use the downloaded content to extract the
-mandatory changes and the feature catalog. If `KNOWLEDGE_SOURCE="hardcoded"`,
-use the block below.
+### Download and regenerate all files
 
-### How the refresh applies mandatory changes
+```bash
+# For each file in manifest
+echo "$MANIFEST" | jq -r '.files | keys[]' | while read FILE_KEY; do
+  FILE=$(echo "$MANIFEST" | jq -r ".files.\"$FILE_KEY\"")
+  
+  FILE_PATH=$(echo "$FILE" | jq -r '.path')
+  OUTPUT=$(echo "$FILE" | jq -r '.output')
+  REGENERATE=$(echo "$FILE" | jq -r '.regenerate')
+  TEMPLATE=$(echo "$FILE" | jq -r '.template')
+  STATE_VARS=$(echo "$FILE" | jq -r '.state_vars | @csv' | tr -d '"')
+  STATUS=$(echo "$FILE" | jq -r '.status')
+  
+  echo "Downloading: $FILE_KEY ($STATUS)"
+  
+  # Download file from remote
+  FILE_CONTENT=$(curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/${FILE_PATH}" 2>/dev/null)
+  
+  if [ -z "$FILE_CONTENT" ]; then
+    echo "  ⚠ Could not download $FILE_PATH"
+    continue
+  fi
+  
+  # If file needs regeneration from template
+  if [ "$REGENERATE" = "true" ] && [ "$TEMPLATE" != "null" ]; then
+    echo "  ▶ Regenerating from template: $TEMPLATE"
+    
+    # Get template from remote
+    TEMPLATE_CONTENT=$(curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/${TEMPLATE}" 2>/dev/null)
+    
+    if [ -z "$TEMPLATE_CONTENT" ]; then
+      echo "  ⚠ Could not download template: $TEMPLATE"
+      continue
+    fi
+    
+    # Get state variables from .wizard-state.json
+    if [ ! -f ".wizard-state.json" ]; then
+      echo "  ⚠ .wizard-state.json not found, skipping regeneration"
+      continue
+    fi
+    
+    echo "    State variables:"
+    for VAR in $STATE_VARS; do
+      VAR_VALUE=$(jq -r ".${VAR} // \"(not set)\"" .wizard-state.json 2>/dev/null)
+      echo "      ${VAR}: ${VAR_VALUE}"
+    done
+    
+    # Regenerate file with template + state variables
+    REGENERATED=$(render_template "$TEMPLATE_CONTENT" ".wizard-state.json")
+    
+    # Show diff if file exists
+    if [ -f "$OUTPUT" ]; then
+      echo "    Diff:"
+      diff -u "$OUTPUT" <(echo "$REGENERATED") 2>/dev/null | head -20 || true
+    fi
+    
+    # Create parent directory if needed
+    mkdir -p "$(dirname "$OUTPUT")"
+    
+    # Write regenerated file
+    echo "$REGENERATED" > "$OUTPUT"
+    echo "  ✓ Regenerated: $OUTPUT"
+  else
+    # Static file, just download and write
+    if [ -n "$OUTPUT" ] && [ "$OUTPUT" != "null" ]; then
+      mkdir -p "$(dirname "$OUTPUT")"
+      echo "$FILE_CONTENT" > "$OUTPUT"
+      echo "  ✓ Written: $OUTPUT"
+    fi
+  fi
+done
+```
 
-**The refresh builds and applies the changes itself — it does not ask the user
-to do them by hand.** The flow for each pending mandatory change:
+### Summary
 
-1. Read the current AGENTS.md (or affected satellite).
-2. Build the updated file in memory with the change applied.
-3. Generate a clear diff between the current state and the proposed one.
-4. Show the diff to the user and wait for OK.
-5. With OK: write the file. Without OK: cancel that operation and log the reason.
+All files from manifest have been downloaded and regenerated:
+- ✅ Static files: downloaded and written
+- ✅ Generated files: rebuilt from templates with current state
+- ✅ New files: available in project
+- ℹ️ New features: available in `/wf-settings` (not auto-enabled)
 
 **Content to inject for the "Local Orchestration" section**:
 
