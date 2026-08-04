@@ -84,6 +84,25 @@ Active protocols (conditional by features):
 - ROUTING==false AND LADDER==true: only `ladder.md`
 - Both false: don't build this protocol
 
+### B3b — Preserve custom content with markers (if migrating)
+
+**Only if `.migration.wrap_custom_in_markers = true`**:
+
+If Phase 2 detected custom content to migrate:
+
+1. Read the migrated custom content from `.wizard-state.json` (field: `migration.prior_artifacts_content`)
+2. When writing to AGENTS.md, wrap preserved sections:
+   ```markdown
+   <!-- WF: DO NOT REGENERATE -->
+   [custom content here]
+   <!-- /WF: DO NOT REGENERATE -->
+   ```
+3. Update `.wizard-state.json`: `migration.custom_content_protected = true`
+
+This ensures custom sections from the previous AGENTS.md are never accidentally overwritten by future /wf-refresh runs.
+
+---
+
 ### B4 — Pack protocols per IDE
 
 For each active protocol (body already built):

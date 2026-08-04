@@ -176,6 +176,69 @@ Powered by wf-init v$WF_VER | gentle-ai $GA_VER"
 
 **Does NOT `git push` — that's for the user to decide.**
 
+### 8.3b Post-init instructions
+
+Show the user:
+
+```
+✓ AI Workflow Wizard initialized successfully!
+
+Next steps:
+
+1. Open AGENTS.md and review the generated content.
+
+2. If you want to add custom rules or policies to AGENTS.md:
+   
+   Wrap them with protection markers so /wf-refresh will never touch them:
+
+   <!-- WF: DO NOT REGENERATE -->
+   ## Your Custom Section
+   Your content here
+   <!-- /WF: DO NOT REGENERATE -->
+
+3. Commit your custom changes (if any):
+   git add AGENTS.md
+   git commit -m "feat: add team-specific rules and policies"
+
+4. Open the project in your preferred AI IDE.
+   The agent will read AGENTS.md automatically on the next session.
+
+5. To validate: ask the agent "read AGENTS.md and tell me its main sections".
+
+6. For your first task, describe it in natural language.
+   The agent will classify into Route A (direct), B (SDD Lite), or C (Full SDD).
+
+7. When the project evolves (new dependencies, new test frameworks, etc.),
+   run /wf-refresh to keep AGENTS.md synchronized.
+```
+
+<if state.cd.missing_secrets is non-empty>:
+  ```
+  ⚠ MISSING SECRETS — these workflows will fail until you configure them:
+  <for each entry in state.cd.missing_secrets>:
+    • {{workflow}} requires the secret {{secret_name}}
+      → github.com/<owner>/<repo>/settings/secrets/actions → "New repository secret"
+  Without these secrets, the workflow runs but the AI reviewer fails with "API key not valid".
+  ```
+
+<if state.ci.release_please == true>:
+  ```
+  ⚠ RELEASE-PLEASE: the workflow already declares the necessary permissions, but the repo ALSO
+  must allow Actions to create PRs. Go to:
+    Settings → Actions → General → Workflow permissions
+  and enable "Allow GitHub Actions to create and approve pull requests".
+  Without that, release-please fails with "Resource not accessible by integration".
+  ```
+
+<if state.gentle_ai.warning_incomplete == true>:
+  ```
+  ⚠ REMINDER: gentle-ai was not installed. The workflow is incomplete.
+  Install with: brew install gentle-ai && gentle-ai install
+  Then run /wf-refresh to complete the configuration.
+  ```
+
+---
+
 ### 8.4 Closing
 
 ```bash
