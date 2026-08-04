@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.2.1-beta.1...v0.3.0-beta.1) (2026-08-04)
+
+
+### Features
+
+* implement auto-generated WIZARD_MANIFEST.json ([#26](https://github.com/hugoafj/ai-workflow-wizard/issues/26)) ([0063415](https://github.com/hugoafj/ai-workflow-wizard/commit/0063415dbae3f525c6dd862daa867135e15afa79))
+* manifest versioning with checksums and recovery guide ([#29](https://github.com/hugoafj/ai-workflow-wizard/issues/29)) ([ba3800e](https://github.com/hugoafj/ai-workflow-wizard/commit/ba3800e40fd4fbb61b876f7e8571c030bf736521))
+
+
+### Bug Fixes
+
+* rewrite manifest-generator.yml to use Python for valid JSON generation ([#28](https://github.com/hugoafj/ai-workflow-wizard/issues/28)) ([2f76491](https://github.com/hugoafj/ai-workflow-wizard/commit/2f76491301b5c10559587971054f694c19b43989))
+
 ## [0.2.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.2.0-beta.1...v0.2.1-beta.1) (2026-08-04)
 
 
