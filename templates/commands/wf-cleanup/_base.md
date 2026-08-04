@@ -101,6 +101,18 @@ for dir in .claude/commands .cursor/commands .windsurf/workflows .kiro/steering 
   fi
 done
 
+# Check .windsurf/skills and .devin/skills (structured with SKILL.md)
+for skills_dir in .windsurf/skills .devin/skills; do
+  if [ -d "$skills_dir" ]; then
+    for skill in "$skills_dir"/*/SKILL.md; do
+      if [ -f "$skill" ]; then
+        skill_name=$(basename "$(dirname "$skill")")
+        echo "  🗑 $skills_dir/$skill_name (wizard)"
+      fi
+    done
+  fi
+done
+
 # 3. Wizard satellites
 echo ""
 echo "📡 Wizard satellites:"
