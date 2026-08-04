@@ -1,23 +1,23 @@
 # .gga — Gentleman Guardian Angel config
 #
-# Template variables (from .wizard-state.json):
-#   ci.gga_provider — claude | gemini | openai | ollama
-#   discovery.gga_file_patterns — file patterns based on stack
-#   discovery.gga_exclude_patterns — exclusions (tests, generated, builds)
-#   discovery.default_branch — detected main branch
+# Placeholder resolution:
+#   {{provider}}       → claude | gemini | codex | opencode | ollama:<model> | lmstudio[:model] | github:<model>
+#   {{file_patterns}}  → file patterns based on stack (e.g., *.ts,*.tsx,*.js,*.jsx)
+#   {{exclude_patterns}} → exclusions (e.g., *.test.ts,*.spec.ts,*.d.ts,dist/*,build/*)
+#   {{pr_base_branch}} → detected main branch (e.g., main)
 #
 # Notes:
 #   - GGA uses AGENTS.md as RULES_FILE by default
 #   - PR_BASE_BRANCH is necessary because auto-detection fails in CI
 
 # AI Provider (required)
-PROVIDER="{{ci.gga_provider}}"
+PROVIDER="{{provider}}"
 
 # File patterns to review (by stack)
-FILE_PATTERNS="{{discovery.gga_file_patterns}}"
+FILE_PATTERNS="{{file_patterns}}"
 
 # Patterns to exclude (tests, generated, builds)
-EXCLUDE_PATTERNS="{{discovery.gga_exclude_patterns}}"
+EXCLUDE_PATTERNS="{{exclude_patterns}}"
 
 # File with the review rules
 RULES_FILE="AGENTS.md"
@@ -29,4 +29,4 @@ STRICT_MODE="true"
 TIMEOUT="300"
 
 # Base branch for --pr-mode
-PR_BASE_BRANCH="{{discovery.default_branch}}"
+PR_BASE_BRANCH="{{pr_base_branch}}"

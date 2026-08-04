@@ -1,18 +1,18 @@
 # deploy-docker.yml.md
 #
 # Template: GitHub Actions deploy workflow using Docker Compose for any stack.
-# Used when cd.vps_runtime == 'docker'.
+# Used by phase6e when vps_runtime == 'docker'.
 #
-# Template variables (from .wizard-state.json):
-#   cd.trigger — 'tags:\n        - \'v*\'' or 'branches:\n        - main'
-#   cd.deploy_path — e.g. '/var/www/my-app/current'
-#   cd.deploy_docker_compose — e.g. 'docker-compose.prod.yml'
+# Placeholders:
+#   {{trigger_event}}   — 'tags:\n        - \'v*\'' or 'branches:\n        - main'
+#   {{deploy_path}}     — e.g. '/var/www/my-app/current'
+#   {{compose_file}}    — e.g. 'docker-compose.prod.yml' (user-specified or default)
 
 name: Deploy to Production
 
 on:
   push:
-    {{cd.trigger}}
+    {{trigger_event}}
 
 jobs:
   deploy:
@@ -24,21 +24,21 @@ jobs:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
+          host: ${{ '{{' }} secrets.SERVER_IP {{ '}}' }}
+          username: ${{ '{{' }} secrets.SSH_USER {{ '}}' }}
+          key: ${{ '{{' }} secrets.SSH_KEY {{ '}}' }}
           script: |
             set -e
-            cd {{cd.deploy_path}}
+            cd {{deploy_path}}
 
             # Pull latest code
             git pull origin main
 
             # Pull latest images and rebuild
-            docker compose -f {{cd.deploy_docker_compose}} pull
-            docker compose -f {{cd.deploy_docker_compose}} up -d --build
+            docker compose -f {{compose_file}} pull
+            docker compose -f {{compose_file}} up -d --build
 
             # Verify containers are running
-            docker compose -f {{cd.deploy_docker_compose}} ps
+            docker compose -f {{compose_file}} ps
 
             echo "✅ Deploy complete"

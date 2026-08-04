@@ -1,7 +1,7 @@
 {
     "version": "0.2.1-beta.1",
     "description": "Wizard manifest: auto-generated list of all files, their templates, regeneration requirements, and state variables",
-    "generated_at": "2026-08-04T09:15:00Z",
+    "generated_at": "2026-08-04T08:33:08Z",
     "files": {
         "post-commit": {
             "version": "0.2.1-beta.1",
@@ -37,108 +37,6 @@
                 "ci.release_ai_summary",
                 "ci.release_ai_provider",
                 "answers.project_name"
-            ]
-        },
-        "deploy-docker": {
-            "version": "0.2.1-beta.1",
-            "type": "workflow",
-            "path": ".github/workflows/deploy-docker.yml",
-            "output": ".github/workflows/deploy-docker.yml",
-            "status": "changed",
-            "regenerate": true,
-            "template": "templates/protocols/cicd/variants/deploy-docker.yml.md",
-            "state_vars": [
-                "cd.trigger",
-                "cd.deploy_path",
-                "cd.deploy_docker_compose"
-            ]
-        },
-        "deploy-nginx-phpfpm-laravel": {
-            "version": "0.2.1-beta.1",
-            "type": "workflow",
-            "path": ".github/workflows/deploy-nginx-phpfpm-laravel.yml",
-            "output": ".github/workflows/deploy-nginx-phpfpm-laravel.yml",
-            "status": "changed",
-            "regenerate": true,
-            "template": "templates/protocols/cicd/variants/deploy-nginx-phpfpm.laravel.yml.md",
-            "state_vars": [
-                "cd.trigger",
-                "discovery.php_version",
-                "discovery.node_version",
-                "discovery.has_node_assets",
-                "cd.deploy_path",
-                "answers.project_name"
-            ]
-        },
-        "deploy-apache-phpfpm-laravel": {
-            "version": "0.2.1-beta.1",
-            "type": "workflow",
-            "path": ".github/workflows/deploy-apache-phpfpm-laravel.yml",
-            "output": ".github/workflows/deploy-apache-phpfpm-laravel.yml",
-            "status": "changed",
-            "regenerate": true,
-            "template": "templates/protocols/cicd/variants/deploy-apache-phpfpm.laravel.yml.md",
-            "state_vars": [
-                "cd.trigger",
-                "discovery.php_version",
-                "discovery.node_version",
-                "discovery.has_node_assets",
-                "cd.deploy_path"
-            ]
-        },
-        "deploy-pm2-node": {
-            "version": "0.2.1-beta.1",
-            "type": "workflow",
-            "path": ".github/workflows/deploy-pm2-node.yml",
-            "output": ".github/workflows/deploy-pm2-node.yml",
-            "status": "changed",
-            "regenerate": true,
-            "template": "templates/protocols/cicd/variants/deploy-pm2.node.yml.md",
-            "state_vars": [
-                "cd.trigger",
-                "discovery.node_version",
-                "cd.deploy_path"
-            ]
-        },
-        "quality-guard": {
-            "version": "0.2.1-beta.1",
-            "type": "workflow",
-            "path": ".github/workflows/quality-guard.yml",
-            "output": ".github/workflows/quality-guard.yml",
-            "status": "changed",
-            "regenerate": true,
-            "template": "templates/protocols/cicd/variants/quality-guard.yml.md",
-            "state_vars": [
-                "discovery.node_version",
-                "discovery.npm_major"
-            ]
-        },
-        "release-please-manifest": {
-            "version": "0.2.1-beta.1",
-            "type": "config",
-            "path": "release-please-manifest.json",
-            "output": "release-please-manifest.json",
-            "status": "changed",
-            "regenerate": true,
-            "template": "templates/protocols/cicd/variants/release-please-manifest.json.md",
-            "state_vars": [
-                "wizard_version",
-                "answers.project_name"
-            ]
-        },
-        "gga-config": {
-            "version": "0.2.1-beta.1",
-            "type": "config",
-            "path": ".gga",
-            "output": ".gga",
-            "status": "changed",
-            "regenerate": true,
-            "template": "templates/protocols/cicd/variants/gga-config.tmpl.md",
-            "state_vars": [
-                "ci.gga_provider",
-                "discovery.gga_file_patterns",
-                "discovery.gga_exclude_patterns",
-                "discovery.default_branch"
             ]
         },
         "decision-ladder": {

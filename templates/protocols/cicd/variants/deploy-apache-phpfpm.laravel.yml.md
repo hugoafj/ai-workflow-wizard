@@ -1,20 +1,20 @@
 # deploy-apache-phpfpm.laravel.yml.md
 #
 # Template: GitHub Actions deploy workflow for Laravel apps with Apache + PHP-FPM.
-# Used when stack_detected in ('laravel', 'laravel_node') and cd.vps_runtime == 'apache_php_fpm'.
+# Used by phase6e when stack_detected in ('laravel', 'laravel_node') and vps_runtime == 'apache_php_fpm'.
 #
-# Template variables (from .wizard-state.json):
-#   cd.trigger — 'tags:\n        - \'v*\'' or 'branches:\n        - main'
-#   discovery.php_version — e.g. '8.3'
-#   discovery.node_version — e.g. '20'
-#   discovery.has_node_assets — 'true' if stack includes Node
-#   {{cd.deploy_path}}     — e.g. '/var/www/my-app/current'
+# Placeholders:
+#   {{trigger_event}}   — 'tags:\n        - \'v*\'' or 'branches:\n        - main'
+#   {{php_version}}     — e.g. '8.3' (from composer.json require.php)
+#   {{node_version}}    — e.g. '20' (from .nvmrc or package.json engines)
+#   {{has_node_assets}} — 'true' or 'false' (true when stack_detected == 'laravel_node')
+#   {{deploy_path}}     — e.g. '/var/www/my-app/current'
 
 name: Deploy to Production
 
 on:
   push:
-    {{cd.trigger}}
+    {{trigger_event}}
 
 jobs:
   deploy:
@@ -26,21 +26,21 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '{{discovery.php_version}}'
+          php-version: '{{php_version}}'
           extensions: mbstring, xml, curl, mysql, zip, gd, bcmath, dom, fileinfo
           coverage: none
 
-      {{if discovery.has_node_assets}}
+      {{if has_node_assets}}
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '{{discovery.node_version}}'
+          node-version: '{{node_version}}'
       {{/if}}
 
       - name: Install Composer dependencies
         run: composer install --no-dev --optimize-autoloader --no-interaction
 
-      {{if discovery.has_node_assets}}
+      {{if has_node_assets}}
       - name: Install NPM dependencies
         run: npm ci
 
@@ -56,7 +56,7 @@ jobs:
           key: ${{ '{{' }} secrets.SSH_KEY {{ '}}' }}
           script: |
             set -e
-            cd {{cd.deploy_path}}
+            cd {{deploy_path}}
 
             # Backup current .env (never overwrite)
             cp .env .env.backup 2>/dev/null || true
@@ -67,7 +67,7 @@ jobs:
             # Install PHP dependencies
             composer install --no-dev --optimize-autoloader --no-interaction
 
-            {{if discovery.has_node_assets}}
+            {{if has_node_assets}}
             # Install and build frontend assets
             npm ci
             npm run build
@@ -89,7 +89,7 @@ jobs:
             php artisan queue:restart
 
             # Restart Apache + PHP-FPM
-            sudo systemctl restart php{{discovery.php_version}}-fpm
+            sudo systemctl restart php{{php_version}}-fpm
             sudo systemctl restart apache2
 
             echo "✅ Deploy complete"

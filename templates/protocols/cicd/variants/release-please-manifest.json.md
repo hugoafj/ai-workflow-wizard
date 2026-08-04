@@ -1,3 +1,3 @@
 {
-  ".": "{{wizard_version}}"
+  ".": "{{version}}"
 }
