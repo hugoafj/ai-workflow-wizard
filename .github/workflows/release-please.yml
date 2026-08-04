@@ -35,17 +35,16 @@ jobs:
       - name: Checkout release-please PR branch
         env:
           PR_JSON: ${{ needs.release-please.outputs.pr }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PR_NUMBER=$(echo "$PR_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['number'])")
-          PR_HEAD_REF=$(echo "$PR_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['headRefName'])")
+          PR_HEAD_REF=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName')
           git fetch origin "$PR_HEAD_REF"
           git checkout "$PR_HEAD_REF"
+          echo "Checked out PR #$PR_NUMBER on branch: $PR_HEAD_REF"
 
       - name: Regenerate manifest
         run: |
-          CURRENT_VERSION=$(cat VERSION | xargs)
-          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.1.0-beta.1")
-
           python3 << 'PYTHON_SCRIPT'
           import json
           import subprocess
@@ -53,8 +52,11 @@ jobs:
           import hashlib
           from pathlib import Path
 
-          CURRENT_VERSION = "$(cat VERSION | xargs)"
-          PREV_TAG = "$(git describe --tags --abbrev=0 2>/dev/null || echo 'v0.1.0-beta.1')"
+          CURRENT_VERSION = subprocess.check_output(["cat", "VERSION"]).decode().strip()
+          try:
+              PREV_TAG = subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"], stderr=subprocess.DEVNULL).decode().strip()
+          except:
+              PREV_TAG = "v0.1.0-beta.1"
           GENERATED_AT = subprocess.check_output(["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"]).decode().strip()
 
           manifest = {
