@@ -298,22 +298,30 @@ render_template() {
   output="$processed"
   
   # Second pass: replace {{variable}} placeholders
-  # Loop through all placeholders in the output
+  # Only process variables that look like state paths (contain at least one dot)
+  # This avoids replacing GitHub Actions syntax like {{ steps.release.outputs.pr }}
   local max_iterations=100
   local iteration=0
   while [[ "$output" =~ \{\{([a-zA-Z0-9_.]+)\}\} ]] && [ $iteration -lt $max_iterations ]; do
     ((iteration++))
     local var_path="${BASH_REMATCH[1]}"
-    local var_value=$(echo "$state_json" | jq -r ".${var_path} // empty" 2>/dev/null)
     
-    if [ -z "$var_value" ]; then
-      var_value="(undefined: $var_path)"
+    # Only process if it looks like a state path (contains a dot)
+    if [[ "$var_path" == *.* ]]; then
+      local var_value=$(echo "$state_json" | jq -r ".${var_path} // empty" 2>/dev/null)
+      
+      if [ -z "$var_value" ]; then
+        var_value="(undefined: $var_path)"
+      fi
+      
+      # Escape special regex characters in var_value
+      var_value=$(printf '%s\n' "$var_value" | sed -e 's/[\/&]/\\&/g')
+      
+      output=$(printf '%s\n' "$output" | sed "s/{{${var_path}}}/${var_value}/g")
+    else
+      # Don't process variables without dots - they're likely GitHub Actions syntax
+      break
     fi
-    
-    # Escape special regex characters in var_value
-    var_value=$(printf '%s\n' "$var_value" | sed -e 's/[\/&]/\\&/g')
-    
-    output=$(printf '%s\n' "$output" | sed "s/{{${var_path}}}/${var_value}/g")
   done
   
   echo "$output"

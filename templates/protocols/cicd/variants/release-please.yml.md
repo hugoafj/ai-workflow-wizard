@@ -1,10 +1,10 @@
 # release-please.yml — Release Please workflow
 #
-# Template variables:
-#   {{conventional_commits}} — true if using conventional commits
-#   {{release_ai_summary}} — true if AI summary is enabled
-#   {{release_ai_provider}} — claude, openai, or gemini (provider for AI summary)
-#   {{project_name}} — project name for release branch naming
+# Template variables (from .wizard-state.json):
+#   ci.conventional_commits — true if using conventional commits
+#   ci.release_ai_summary — true if AI summary is enabled
+#   ci.release_ai_provider — claude, openai, or gemini (provider for AI summary)
+#   answers.project_name — project name for release branch naming
 #
 # Notes:
 #   - release-type: node assumes package.json. For markdown-only, use release-type: simple
@@ -30,7 +30,7 @@ jobs:
         id: release
         with:
           release-type: node
-{{if release_ai_summary}}
+{{if ci.release_ai_summary}}
 
   ai-summary:
     needs: release-please
@@ -42,6 +42,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Generate AI summary for release PR
         run: |
-          echo "AI summary job enabled (provider: {{release_ai_provider}})"
-          # AI summary implementation for {{release_ai_provider}} will be injected here
+          echo "AI summary job enabled (provider: {{ci.release_ai_provider}})"
+          # AI summary implementation for {{ci.release_ai_provider}} will be injected here
+          echo "Project: {{answers.project_name}}"
 {{/if}}
