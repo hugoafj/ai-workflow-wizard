@@ -21,7 +21,7 @@ jobs:
       - name: Get current and previous version
         id: versions
         run: |
-          CURRENT_VERSION=$(cat VERSION)
+          CURRENT_VERSION=$(cat VERSION | xargs)
           PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.1.0-beta.1")
           echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
@@ -185,7 +185,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          CURRENT_VERSION=$(cat VERSION)
+          CURRENT_VERSION=$(cat VERSION | xargs)
           MANIFEST_FILE="WIZARD_MANIFEST-${CURRENT_VERSION}.json"
 
           # Add both versioned and current manifest
