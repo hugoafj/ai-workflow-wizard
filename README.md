@@ -4,19 +4,27 @@ Sets up a complete AI development workflow in any repo — context layers, testi
 
 ## Install
 
+**One time in your terminal:**
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/install.sh | bash
 ```
 
-Detects your IDE and installs global slash commands. Supports: Claude Code, Cursor, Windsurf, Kiro, Codex, Copilot, Antigravity, OpenCode.
+This installs global slash commands (`/wf-init`, `/wf-refresh`, `/wf-cleanup`) that work in any IDE. Supports: Claude Code, Cursor, Windsurf, Kiro, Codex, Copilot, Antigravity, OpenCode.
 
 ## Quick Start
 
+**Inside your project (legacy or greenfield with git + stack initialized):**
+
+In your IDE or CLI agent, run:
+
 ```bash
-/wf-init    # Run once per repo — sets up everything
+/wf-init    # Or just say "run wf-init" to your agent
 ```
 
-That's it. The wizard discovers your stack, installs [gentle-ai](https://github.com/hugoafj/ai-workflow-wizard) (the foundation ecosystem), generates `AGENTS.md`, configures satellites per IDE, sets up git hooks, and prepares CI/CD templates.
+> **IMPORTANT**: This wizard requires [gentle-ai](https://github.com/Gentleman-Programming/gentle-ai), the foundation ecosystem that powers SDD, Engram (persistent memory), skills, and multi-IDE routing. If gentle-ai is not installed, the wizard will guide you through installation automatically. **Before running `/wf-init`, take 5 minutes to read the [gentle-ai documentation](https://github.com/Gentleman-Programming/gentle-ai#readme)** — understanding how gentle-ai works is essential to getting the most out of this workflow. Skipping this step means missing critical features like the SDD orchestrator and persistent memory between sessions.
+
+The wizard discovers your stack, installs [gentle-ai](https://github.com/Gentleman-Programming/gentle-ai) (the foundation ecosystem), generates `AGENTS.md`, configures satellites per IDE, sets up git hooks, and prepares CI/CD templates.
 
 ## Protecting Custom Content
 
@@ -114,7 +122,7 @@ Enable via `/wf-settings` after initial setup:
 
 Two layers that complement each other:
 
-- **Foundation Layer** ([gentle-ai](https://github.com/hugoafj/ai-workflow-wizard)) — global ecosystem: Engram (persistent memory), SDD orchestrator, skills, MCPs, persona, permissions. Installed once, serves all projects.
+- **Foundation Layer** ([gentle-ai](https://github.com/Gentleman-Programming/gentle-ai)) — global ecosystem: Engram (persistent memory), SDD orchestrator, skills, MCPs, persona, permissions. Installed once, serves all projects.
 - **Custom Layer** (this wizard) — project-specific: `AGENTS.md`, satellites, hooks, CI/CD. Lives in your repo.
 
 They write to different locations and coexist without conflict. ([full architecture details](AI_DEV_WORKFLOW.md#2-the-architecture-two-layers))

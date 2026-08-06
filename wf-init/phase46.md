@@ -200,16 +200,29 @@ engram save "sdd/{project}/testing-capabilities" "## Testing Capabilities
 
 > Use `--type config`, not `--type convention` as earlier versions of this wizard said — confirmed against `init-details.md`, the correct type for this observation is `config`. The project name is auto-detected from the git remote (normalized to lowercase) from Engram v1.11.0 — use `git remote get-url origin 2>/dev/null` to confirm it.
 
-Additionally, if the detected backend is `openspec` or `hybrid`, write
-also in `openspec/config.yaml`:
+Additionally, if the detected backend is `openspec` or `hybrid`, update
+`openspec/config.yaml` using `yq` to ensure atomic, safe YAML modification:
 
-```yaml
-testing:
-  strict_tdd: true
+```bash
+# Install yq if not present
+if ! command -v yq &> /dev/null; then
+  echo "Installing yq for safe YAML editing..."
+  brew install yq  # macOS/Linux
+  # or for Windows: scoop install yq
+fi
+
+# Update testing.strict_tdd safely — preserves all other keys
+yq eval '.testing.strict_tdd = true' -i openspec/config.yaml
 ```
 
 If the backend is pure `engram`, the Engram step above is already
 sufficient — there's no `openspec/config.yaml` to edit.
+
+**Important**: Always use `yq eval ... -i` (in-place) to modify YAML, never echo/cat fragments. This ensures:
+- Existing keys under `testing:` are preserved
+- No formatting/indentation errors
+- Idempotent: running multiple times produces the same result
+- If `testing:` doesn't exist, it is created automatically
 
 Additionally, for Claude Code and Windsurf specifically, gentle-ai
 also exposes a sync flag that reflects this choice in their
