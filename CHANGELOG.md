@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.4.1-beta.1...v0.4.2-beta.1) (2026-08-06)
+
+
+### Bug Fixes
+
+* phase8 unconditional IDE mkdir + complete Windsurf/Devin dual-path support ([#48](https://github.com/hugoafj/ai-workflow-wizard/issues/48)) ([7eff226](https://github.com/hugoafj/ai-workflow-wizard/commit/7eff226b2ec9fa327f2ad074616beb6bfb3222c9))
+
 ## [0.4.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.4.0-beta.1...v0.4.1-beta.1) (2026-08-04)
 
 
