@@ -117,10 +117,11 @@ For each active protocol (body already built):
 | `claude-code` | `{WF_STAGING}/.claude/skills/<name>/SKILL.md` |
 | `kiro` | `{WF_STAGING}/.kiro/skills/<name>/SKILL.md` |
 | `codex` | `{WF_STAGING}/.codex/skills/<name>/SKILL.md` |
+| `windsurf` | `{WF_STAGING}/.windsurf/skills/<name>/SKILL.md`, `{WF_STAGING}/.devin/skills/<name>/SKILL.md` (both written for Windsurf/Devin compatibility) |
 | `antigravity` | `{WF_STAGING}/.agents/skills/<name>/SKILL.md` |
 
 For each native skill: download `$WF_RAW/templates/protocols/<name>/skill/SKILL.md`,
-  replace `{{PROTOCOL_BODY: ...}}` with the body, write to the corresponding path.
+  replace `{{PROTOCOL_BODY: ...}}` with the body, write to the corresponding path (or paths for `windsurf`).
 
 Record each file. Don't ask — write everything directly to staging.
 

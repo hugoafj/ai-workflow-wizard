@@ -30,7 +30,7 @@ cat "{PROJECT_PATH}/package.json" 2>/dev/null || cat "{PROJECT_PATH}/composer.js
 
 # Previous workflow artifacts
 ls "{PROJECT_PATH}/AGENTS.md" "{PROJECT_PATH}/CLAUDE.md" "{PROJECT_PATH}/GEMINI.md" 2>/dev/null
-ls -d "{PROJECT_PATH}/.cursor" "{PROJECT_PATH}/.windsurf" "{PROJECT_PATH}/.kiro" "{PROJECT_PATH}/openspec" 2>/dev/null
+ls -d "{PROJECT_PATH}/.cursor" "{PROJECT_PATH}/.windsurf" "{PROJECT_PATH}/.devin" "{PROJECT_PATH}/.kiro" "{PROJECT_PATH}/openspec" 2>/dev/null
 ls "{PROJECT_PATH}/.github/copilot-instructions.md" 2>/dev/null
 ls "{PROJECT_PATH}/.git/hooks/post-commit" 2>/dev/null
 
@@ -94,7 +94,7 @@ EXPECTED_COMMANDS="decision-ladder sdd-lite wf-onboard wf-refresh wf-worktree wf
 Determine which IDEs are active:
 - If `.claude/` exists → claude-code active
 - If `.cursor/` exists → cursor active
-- If `.windsurf/` exists → windsurf active
+- If `.windsurf/` OR `.devin/` exists → windsurf active (Windsurf and Devin are the same IDE, dual paths for compatibility)
 - If `.kiro/` exists → kiro active
 - If `.opencode/` exists → opencode active
 - If `.codex/` exists → codex active

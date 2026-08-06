@@ -122,6 +122,7 @@ From the SAME `build_protocol_body(name)`:
    | `claude-code` | `STAGING/.claude/skills/<name>/SKILL.md` |
    | `kiro` | `STAGING/.kiro/skills/<name>/SKILL.md` |
    | `codex` | `STAGING/.codex/skills/<name>/SKILL.md` |
+   | `windsurf` | `STAGING/.windsurf/skills/<name>/SKILL.md`, `STAGING/.devin/skills/<name>/SKILL.md` (both for Windsurf/Devin compatibility) |
    | `antigravity` | `STAGING/.agents/skills/<name>/SKILL.md` |
 
    If the IDE is not in the table, no native skills are emitted (uses the flat file fallback).

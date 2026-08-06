@@ -70,7 +70,7 @@ bloating the context. They are NOT written in full here — they live in dedicat
 | Claude Code | `~/.claude/skills/` | `.claude/skills/` |
 | OpenCode | `~/.config/opencode/skills/` | `.opencode/skills/`, `.claude/skills/`, `.agents/skills/` |
 | Cursor | `~/.cursor/skills/` | `.cursor/skills/` |
-| Windsurf | `~/.codeium/windsurf/skills/` | `.windsurf/skills/` |
+| Windsurf/Devin | `~/.codeium/windsurf/skills/`, `~/.config/devin/skills/` | `.windsurf/skills/`, `.devin/skills/` |
 | Codex CLI | `~/.codex/skills/` | `.codex/skills/` |
 | Copilot | `~/.copilot/skills/` | `.github/skills/` |
 | Kiro | `~/.kiro/skills/`, `~/.kiro/steering/` | `.kiro/skills/`, `.kiro/steering/` |
