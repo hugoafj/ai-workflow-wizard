@@ -625,7 +625,8 @@ trigger: always_on
 Apply the conventions defined in `AGENTS.md` in all your responses.
 @file ../AGENTS.md
 
-<!-- MIGRATION NOTE: Windsurf acquired by Devin. Preferred location: .devin/rules/. -->
+<!-- Windsurf/Devin compatibility: Devin reads AGENTS.md natively, so no separate .devin/rules/ is needed.
+     Project-level SDD skills are written to both .windsurf/skills/ and .devin/skills/ for dual IDE support. -->
 ```
 
 **`.kiro/steering/project-context.md`**:
