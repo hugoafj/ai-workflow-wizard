@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.3-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.4.2-beta.1...v0.4.3-beta.1) (2026-08-06)
+
+
+### Bug Fixes
+
+* correct gentle-ai links, clarify install vs usage flow, enforce YAML atomicity ([b9df2dd](https://github.com/hugoafj/ai-workflow-wizard/commit/b9df2ddcca2172cb780dd218b02bf0ddce2ee217))
+
 ## [0.4.2-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.4.1-beta.1...v0.4.2-beta.1) (2026-08-06)
 
 
