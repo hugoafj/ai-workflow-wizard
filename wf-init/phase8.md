@@ -11,10 +11,8 @@ Only run because the user explicitly approved in Phase 7.
 ```bash
 STAGING=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' .wizard-state.json)
 
-# Create necessary destination directories (satellites, protocols, commands)
-mkdir -p .github .cursor/rules .windsurf/rules .devin/rules .kiro/steering
+# Create universal directories (not IDE-specific; those are created on demand by the copy loop below)
 mkdir -p .agents/protocols .claude/skills
-mkdir -p .claude/commands .cursor/commands .windsurf/workflows .devin/skills .opencode/commands .github/prompts
 
 # Copy the entire staging tree to the project root, preserving relative paths
 ( cd "$STAGING" && find . -type f -print0 | while IFS= read -r -d '' f; do

@@ -18,7 +18,7 @@ Apply the same pattern to each active IDE, adjusting path and extension.
 | Claude Code | `~/.claude/skills/` | `.claude/skills/` | native auto-discovery |
 | OpenCode | `~/.config/opencode/skills/` | `.opencode/skills/`, `.claude/skills/`, `.agents/skills/` | also reads compatible paths |
 | Cursor | `~/.cursor/skills/` | `.cursor/skills/` | compatible with `~/.codex/skills` and `~/.claude/skills` |
-| Windsurf | `~/.codeium/windsurf/skills/` | `.windsurf/skills/` | gentle-ai sync |
+| Windsurf/Devin | `~/.codeium/windsurf/skills/`, `~/.config/devin/skills/` | `.windsurf/skills/`, `.devin/skills/` | gentle-ai sync; Devin uses XDG path |
 | Codex CLI | `~/.codex/skills/` | `.codex/skills/` | also recognizes `~/.agents/skills/` |
 | Copilot | `~/.copilot/skills/` | `.github/skills/` | — |
 | Kiro | `~/.kiro/skills/`, `~/.kiro/steering/` | `.kiro/skills/`, `.kiro/steering/` | native auto-discovery |

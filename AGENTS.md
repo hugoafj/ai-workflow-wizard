@@ -55,6 +55,20 @@ wf-init/          — wizard phases
 - If you detect that the code contradicts something in this AGENTS.md, report it at the end of
   your response with the tag `[AGENTS.md drift detected: <description>]`. Do NOT fix AGENTS.md yourself.
 
+## Critical: AI_DEV_WORKFLOW.md Synchronization
+
+**BEFORE every commit**, if your changes affect ANY of these topics, verify and update AI_DEV_WORKFLOW.md:
+- IDE paths, detection logic, routing tables, or satellite generation
+- Builder phases (B1–B8), sub-agent roles, or staging workflow
+- Phase numbering, phase logic, or resumption contracts
+- State machine structure (`.wizard-state.json` shape)
+- Commands (list, location per IDE, or behavior)
+- Protocol packaging or delivery mechanism
+- Testing, CI/CD, or release strategy
+- Documentation structure, glossary, or major sections
+
+**Rule**: If it's implemented in code/templates, it must be documented in AI_DEV_WORKFLOW.md. If you change the code, audit that section in the doc and update it if stale. Do not commit code changes without ensuring the doc reflects them accurately.
+
 ---
 
 <!-- No agent protocols: the project does not use Ladder, Routes ABC, or TDD. -->

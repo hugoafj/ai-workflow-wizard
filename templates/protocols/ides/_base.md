@@ -27,7 +27,7 @@ referenced from the AGENTS.md router.
 | Codex | ✅ | `.codex/skills/<n>/SKILL.md` | `.agents/protocols/<n>.md` |
 | OpenCode | global `~/.config/opencode/skills/` | — (managed by gentle-ai) | `.agents/protocols/<n>.md` |
 | Cursor | ❌ | — | `.agents/protocols/<n>.md` |
-| Windsurf | ❌ | — | `.agents/protocols/<n>.md` |
+| Windsurf/Devin | ✅ | `.windsurf/skills/<n>/SKILL.md`, `.devin/skills/<n>/SKILL.md` | `.agents/protocols/<n>.md` |
 | Copilot | ❌ | — | `.agents/protocols/<n>.md` |
 | Gemini CLI | ❌ | — | `.agents/protocols/<n>.md` |
 | Antigravity CLI | ✅ | `.agents/skills/<n>/SKILL.md` | `.agents/protocols/<n>.md` |
