@@ -526,8 +526,28 @@ Apply these changes? [yes / no / show me the full AGENTS.md after]
 - `show me the full AGENTS.md after`: show the full AGENTS.md with all
   changes applied, repeat the question.
 
-If the local version is already current and there are no pending changes, report
-"Layer 2: no mandatory changes" and advance to Phase 3 without pausing.
+**If `LOCAL_VERSION` equals `REMOTE_VERSION` and there are no pending changes**, report
+"Layer 2: no mandatory changes" and advance to Phase 3 without pausing (footer is already
+in sync, nothing to do).
+
+**If `LOCAL_VERSION` differs from `REMOTE_VERSION` but none of the downloaded/compared
+files produce a content change to propose in `AGENTS.md`** (e.g. the manifest only changed
+metadata files like `VERSION` or internal wizard logic like a `phaseNN.md` that does not
+affect this project's `AGENTS.md`): do **NOT** silently skip the footer. There is nothing
+to pause for or ask approval on (no diff to show), but the footer must still reflect that
+this project was checked against the new version. Silently apply the same footer/state sync
+as the `yes` branch above, then report:
+
+```
+Layer 2 · Template drift — mandatory changes
+
+No content changes required for AGENTS.md.
+✓ Synced wf-version footer: <LOCAL_VERSION> → <REMOTE_VERSION>
+```
+
+Then advance to Phase 3 without pausing. **Never leave the footer pointing at a stale
+version just because nothing in `AGENTS.md`'s content needed to change** — the footer
+tracks "last version checked", not "last version that changed something".
 
 ---
 
