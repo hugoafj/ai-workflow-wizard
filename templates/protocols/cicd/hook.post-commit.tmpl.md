@@ -78,5 +78,18 @@ if [ -n "$CHANGED_REFRESH" ] || [ -n "$CHANGED_SDD" ]; then
   fi
 fi
 
+# 4. Opportunistically refresh gentle-ai's skill registry so its own Skill Resolver
+#    Protocol picks up this wizard's wf-* skills (wf-orchestrator, wf-ladder,
+#    wf-sdd-trigger, wf-tdd, wf-sdd-config) without the user having to remember to run
+#    it manually. Helps Claude Code/OpenCode/Cursor/Kiro/Codex (orchestrators that read
+#    .atl/skill-registry.md before delegating). Harmless no-op for Windsurf/Devin — confirmed
+#    against gentle-ai's own source that it never scans .windsurf/skills/ or .devin/skills/;
+#    those discover project skills natively from the filesystem instead. Cheap no-op
+#    (cache-hit) when nothing under skills/ changed. Silent and non-blocking: never fail the
+#    commit.
+if command -v gentle-ai &>/dev/null; then
+  gentle-ai skill-registry refresh --quiet >/dev/null 2>&1 || true
+fi
+
 exit 0
 ```

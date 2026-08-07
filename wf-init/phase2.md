@@ -62,7 +62,7 @@ check file by file — not just whether the directory exists:
 ```bash
 # List of commands expected by this wizard version (update every
 # version that adds new commands)
-EXPECTED_COMMANDS="decision-ladder sdd-lite wf-onboard wf-refresh wf-worktree wf-settings wf-cicd wf-cleanup"
+EXPECTED_COMMANDS="wf-ladder wf-onboard wf-refresh wf-worktree wf-settings wf-cicd wf-cleanup"
 
 # Example verification for Claude Code — repeat the pattern for each
 # active IDE, adjusting directory and extension based on its format:
@@ -90,8 +90,7 @@ detected version had (for example, an upgrade that added `wf-onboard` and
 
 ```
 Command verification — <IDE>:
-  ✓ decision-ladder.md
-  ✓ sdd-lite.md
+  ✓ wf-ladder.md
   ✗ wf-onboard.md   ← missing (new in this wizard version)
   ✗ wf-refresh.md   ← missing (new in this wizard version)
 

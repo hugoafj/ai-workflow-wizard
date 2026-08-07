@@ -68,9 +68,11 @@ build_protocol_body(name):
 Active protocols (conditional by features):
 | Protocol | Active if |
 |-----------|-----------|
-| `decision-ladder` | LADDER==true or ROUTING==true (composition rules below) |
-| `tdd` | TDD==true AND LAYERS not empty |
-| `sdd` | BACKEND != null |
+| `wf-orchestrator` | LADDER==true or ROUTING==true (single entry point, never duplicates the other two) |
+| `wf-ladder` | LADDER==true |
+| `wf-sdd-trigger` | ROUTING==true |
+| `tdd` (skill `wf-tdd`) | TDD==true AND LAYERS not empty |
+| `sdd` (skill `wf-sdd-config`) | BACKEND != null |
 | `architecture` | **always** |
 | `testing` | **always** |
 | `cicd` | **always** |
@@ -78,11 +80,11 @@ Active protocols (conditional by features):
 | `commands` | **always** |
 | `workflow` | **always** |
 
-**Special case decision-ladder** (three possible compositions):
-- ROUTING==true AND LADDER==true: `ladder.md` + `local-orchestration.md` unified
-- ROUTING==true AND LADDER==false: only `local-orchestration.md`
-- ROUTING==false AND LADDER==true: only `ladder.md`
-- Both false: don't build this protocol
+**Note**: `wf-ladder`, `wf-sdd-trigger`, and `wf-orchestrator` replace the old, retired
+`decision-ladder` bundle (`ladder.md` + `local-orchestration.md`) — three independent protocol
+bodies now, each built only when its own feature flag is active; `wf-orchestrator` is built
+whenever either of the other two is, since it is only a sequencing pointer between them (plus
+`wf-tdd`), never a duplicate of their content.
 
 ### B3b — Preserve custom content with markers (if migrating)
 
@@ -110,18 +112,26 @@ For each active protocol (body already built):
 **1. Flat file** (universal fallback):
 `{WF_STAGING}/.agents/protocols/<name>.md` = cuerpo
 
-**2. Native skills per IDE** (only IDEs that support SKILL.md):
+**2. Native skills per IDE** (only IDEs that support SKILL.md). `<skill-name>` is the skill's
+`name:` frontmatter field (from `skill/SKILL.md`) — NOT necessarily the protocol's source folder
+`<name>` (e.g. protocol `tdd` packages as skill folder `wf-tdd/`, protocol `sdd` as
+`wf-sdd-config/`), so every user/model-facing skill stays `wf-`-prefixed and unambiguous:
 
 | IDE | Skills path |
 |-----|-------------|
-| `claude-code` | `{WF_STAGING}/.claude/skills/<name>/SKILL.md` |
-| `kiro` | `{WF_STAGING}/.kiro/skills/<name>/SKILL.md` |
-| `codex` | `{WF_STAGING}/.codex/skills/<name>/SKILL.md` |
-| `windsurf` | `{WF_STAGING}/.windsurf/skills/<name>/SKILL.md`, `{WF_STAGING}/.devin/skills/<name>/SKILL.md` (both written for Windsurf/Devin compatibility) |
-| `antigravity` | `{WF_STAGING}/.agents/skills/<name>/SKILL.md` |
+| `claude-code` | `{WF_STAGING}/.claude/skills/<skill-name>/SKILL.md` |
+| `kiro` | `{WF_STAGING}/.kiro/skills/<skill-name>/SKILL.md` |
+| `codex` | `{WF_STAGING}/.codex/skills/<skill-name>/SKILL.md` |
+| `windsurf` | `{WF_STAGING}/.windsurf/skills/<skill-name>/SKILL.md`, `{WF_STAGING}/.devin/skills/<skill-name>/SKILL.md` (both written for Windsurf/Devin compatibility) |
+| `antigravity` | `{WF_STAGING}/.agents/skills/<skill-name>/SKILL.md` |
 
-For each native skill: download `$WF_RAW/templates/protocols/<name>/skill/SKILL.md`,
-  replace `{{PROTOCOL_BODY: ...}}` with the body, write to the corresponding path (or paths for `windsurf`).
+For each native skill: download `$WF_RAW/templates/protocols/<name>/skill/SKILL.md`, read its
+`name:` frontmatter field to get `<skill-name>`, replace `{{PROTOCOL_BODY: ...}}` with the body,
+write to the corresponding path (or paths for `windsurf`).
+
+**3. Reference files**: if `$WF_RAW/templates/protocols/<name>/reference/` exists (currently only
+`wf-sdd-trigger`), download it verbatim and place it at `<same-directory-as-SKILL.md>/reference/`
+for every emitted skill copy — not inlined into the body, only linked from `## References`.
 
 Record each file. Don't ask — write everything directly to staging.
 

@@ -115,7 +115,7 @@ See [WF_REFRESH_TROUBLESHOOTING.md](WF_REFRESH_TROUBLESHOOTING.md) for detailed 
 Enable via `/wf-settings` after initial setup:
 
 - **TDD** — test-first development with strict or standard mode ([learn more](AI_DEV_WORKFLOW.md#9-block-5--tdd-pro--playwright-integrated))
-- **Decision Ladder** — structured decision-making protocol for complex architectural choices ([learn more](AI_DEV_WORKFLOW.md#58-optional-behavior-improvements--decision-ladder))
+- **wf-ladder (Decision Ladder)** — structured decision-making protocol for complex architectural choices ([learn more](AI_DEV_WORKFLOW.md#58-optional-behavior-improvements--decision-ladder))
 - **CI/CD extras** — GGA review, security scanning, AI summary jobs ([learn more](AI_DEV_WORKFLOW.md#10-block-6--cicd-pipeline--gga))
 
 ## Architecture

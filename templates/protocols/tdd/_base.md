@@ -30,27 +30,31 @@ based on the type of change and presents a proposal before writing any code.
 > in standard mode; the RED→GREEN evidence in strict) and, in standard, having received the user's
 > choice. **BUT the timing and place depend on the route — don't do it "just in case"
 > right after finishing Preflight**:
-> - **Route A**: do it after Preflight and before implementing (at the local task level).
-> - **Route B/C (SDD)**: **DON'T do it in the local pre-pipeline flow** — in B/C there is no
->   direct local implementation. **BUT be careful with the mechanism (real fixed bug)**: the
->   `🧪 TDD PROPOSAL` is **interactive** (proposes coverage and waits for your choice) and `sdd-apply`
->   is a **headless sub-agent** (`user-invocable: false`: it executes and returns, cannot
->   ask you). Therefore, the proposal **CANNOT occur "inside" `sdd-apply`**. Correct flow:
->     1. Run `sdd-propose` and `sdd-tasks` first (so the tasks already exist).
->     2. In B, show the Route B lock menu (`decision-ladder`, Section 4) and its approval.
->     3. **The ORCHESTRATOR issues the `🧪 TDD PROPOSAL`** covering the tasks from `tasks.md` (in
->        batch, or grouped by phase in large changes) and **waits for your coverage choice**.
->     4. Only then delegate to `sdd-apply` with the decision **baked in the prompt** (e.g.,
->        "coverage: unit + integration + e2e") and **inject this skill (`tdd-protocol`)** under
->        `## Skills to load before work` so the sub-agent executes the RED→GREEN cycle and
->        respects the mandatory `--headed` output if it generates E2E specs.
->     5. The sub-agent executes headless and returns the summary (including the `--headed` command),
->        which the orchestrator shows you.
->   In `strict` mode **there is NO interactive proposal**: you delegate directly and `sdd-apply` loads
->   `strict-tdd.md` from `openspec/config.yaml → strict_tdd: true` (RED→GREEN enforcement headless).
+> - **`wf-no-sdd`**: do it after `wf-preflight` and before implementing (at the local task level).
+> - **`wf-force-sdd`**: **DON'T do it in the local pre-request flow** — there is no direct local
+>   implementation once SDD was explicitly requested. **BUT be careful with the mechanism (real
+>   fixed bug)**: the `🧪 TDD PROPOSAL` is **interactive** (proposes coverage and waits for your
+>   choice) and gentle-ai's `sdd-apply` is a **headless** phase (`user-invocable: false`: it
+>   executes and returns, cannot ask you). Therefore, the proposal **CANNOT occur "inside"
+>   `sdd-apply`**. Correct flow:
+>     1. Request `sdd-propose` and `sdd-tasks` first from gentle-ai (so the tasks already exist).
+>     2. After user confirms `wf-force-sdd`, issue the `🧪 TDD PROPOSAL` covering the tasks from `tasks.md`
+>        (in batch, or grouped by phase in large changes) and **wait for the user's coverage
+>        choice**.
+>     4. Only then make the `sdd-apply` request with the decision **baked into the prompt** (e.g.,
+>        "coverage: unit + integration + e2e") and **reference this skill (`wf-tdd`)** so
+>        gentle-ai's phase executes the RED→GREEN cycle and respects the mandatory `--headed`
+>        output if it generates E2E specs. How gentle-ai executes/delegates that request is its
+>        own native decision for this adapter — never specify a mechanism here.
+>     5. gentle-ai's phase executes headless and returns the summary (including the `--headed`
+>        command), which you show the user.
+>   In `strict` mode **there is NO interactive proposal**: request `sdd-apply` directly and it
+>   loads `strict-tdd.md` from `openspec/config.yaml → strict_tdd: true` (RED→GREEN enforcement
+>   headless).
 >
-> Summary: "mandatory" = the TDD ritual ALWAYS occurs at some point based on the route; it does NOT
-> mean "always do it here and now". In Route C, here and now it is NOT issued.
+> Summary: "mandatory" = the TDD ritual ALWAYS occurs at some point based on the outcome; it does
+> NOT mean "always do it here and now". At `wf-force-sdd`, here and now it is NOT issued (it
+> occurs later, as part of the `sdd-apply` request after `sdd-tasks` is ready).
 >
 > **What is the ritual according to the project MODE** (`state.testing.tdd_mode`):
 > - **Standard mode** → the ritual IS the `🧪 TDD PROPOSAL`: the agent proposes the test
@@ -126,12 +130,12 @@ It is mandatory output, not optional: it is easy to omit due to momentum toward 
 you declare "done" or commit without having shown this command (having generated E2E specs),
 it is a protocol violation. It also appears as an item in `checks_before_done`.
 
-#### SDD and Local Orchestration Integration
+#### wf-sdd-trigger Integration
 
-- **Route A**: the `🧪 TDD PROPOSAL` appears after `🔍 PREFLIGHT`, before implementing.
-- **Route B/C (SDD)**: the `🧪 TDD PROPOSAL` is issued inside `sdd-apply`, per task from `tasks.md` — not to the full pipeline.
-- `🧪` always comes after `🪜 DECISION LADDER` and after `🔍 PREFLIGHT`.
+- **`wf-no-sdd`**: the `🧪 TDD PROPOSAL` appears after user confirms the `wf-preflight`, before implementing.
+- **`wf-force-sdd`**: the `🧪 TDD PROPOSAL` is issued as part of the `sdd-apply` request, per task from `tasks.md` — not to the full pipeline, and not before `sdd-tasks` is ready.
+- `🧪` always comes after `🪜 wf-ladder` (if active) and after `🔍 wf-preflight`.
 
-Full order in Route A: 🪜 Ladder → 🔍 Preflight → 🧪 TDD Proposal → implementation.
-Order in sdd-apply (Routes B/C): 🪜 Ladder (per task) → 🧪 TDD Proposal (per task) → implementation.
+Full order for `wf-no-sdd`: 🪜 wf-ladder → 🔍 wf-preflight → 🧪 TDD Proposal → implementation.
+Order for `wf-force-sdd` (once delegated by gentle-ai): 🪜 wf-ladder (per task) → 🧪 TDD Proposal (per task) → implementation.
 

@@ -43,6 +43,51 @@ If everything is `ok` or non-critical `[!!]`, show a clean summary:
 
 ---
 
+### Step 0.4b — Check gentle-ai sync freshness (hard stop, non-ignorable)
+
+> **Why this step exists**: gentle-ai's own native SDD orchestrator/routing content (installed
+> per adapter — e.g. `~/.codeium/windsurf/memories/global_rules.md` for Windsurf/Devin) is only
+> updated by `gentle-ai sync`. If the user upgraded the `gentle-ai` binary but never ran `sync`,
+> that native content can be stale relative to the current binary — a documented, reproducible
+> source of agents skipping or inventing SDD phases (a stale orchestrator prompt). This check is
+> NOT optional and its result is NOT something the agent may silently decide to ignore.
+
+```bash
+gentle-ai sync --dry-run 2>&1
+```
+
+**If the output reports NO pending changes** (sync is current): continue silently to Step 0.5, no
+message needed.
+
+**If the output reports ANY pending changes**: this is a **hard stop**. Present the FULL output to
+the user verbatim (do not summarize or paraphrase what would change), then STOP and wait — the
+agent must NOT decide on the user's behalf to continue or to sync:
+
+```
+⚠ gentle-ai's native content for your IDE(s) is out of sync with the installed gentle-ai version.
+
+<paste the full `gentle-ai sync --dry-run` output here, verbatim>
+
+This matters because gentle-ai's own SDD orchestrator/routing rules — which this wizard's own
+protocols (wf-orchestrator, wf-sdd-trigger, wf-ladder, wf-tdd) explicitly defer to for all
+routing and delegation — may be stale until you sync. Continuing with stale native content is a
+known source of the agent skipping or inventing SDD phases.
+
+What do you want to do?
+  [sync now]         — run `gentle-ai sync` before continuing this wizard.
+  [continue anyway]  — proceed without syncing. You explicitly accept the risk described above.
+```
+
+**PAUSE — wait for the user's explicit response.** Do not infer a choice, do not default to
+either option, and do not continue silently under any circumstance.
+
+- If `sync now`: run `gentle-ai sync`, show its output, then re-run `gentle-ai sync --dry-run` to
+  confirm it now reports no pending changes before continuing to Step 0.5.
+- If `continue anyway`: record this decision in `.wizard-state.json` (`gentle_ai.sync_stale_accepted
+  = true`) so `wf-refresh` can surface it again later, and continue to Step 0.5.
+
+---
+
 ### Step 0.5 — Confirm active agents
 
 Show the list of agents that `gentle-ai doctor` / `gentle-ai status` reported as configured. Ask:
