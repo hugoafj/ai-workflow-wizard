@@ -44,6 +44,19 @@ When you run `/wf-refresh`, the wizard will update everything EXCEPT these marke
 
 **Why this matters**: Your team's policies, constraints, and decisions are yours to maintain. The wizard adapts around them, never replaces them.
 
+## Known Issues & Workarounds
+
+### Windsurf / Devin: Legacy Path Bridge
+
+If you use **Windsurf** or **Devin**, `wf-init` automatically applies a compatibility workaround during Phase 4.5 (SDD initialization):
+
+- **The issue**: gentle-ai installs SDD skills into Windsurf's legacy paths (`~/.codeium/windsurf/skills/`), but doesn't scan them natively. Without a bridge rule in `AGENTS.md`, the agent can't find the skills.
+- **The fix**: The wizard injects a rule into `AGENTS.md` that tells your agent where to look. It also creates `.windsurf/workflows/sdd-new.md` to replace the outdated legacy workflow.
+- **When it applies**: During `/wf-init` Phase 4.5, automatically, if Windsurf is detected as an active IDE.
+- **If it needs reapplying**: Run `/wf-settings` → option **"Fix Windsurf gentle-ai"** — useful after manually running `gentle-ai sync`, which may overwrite the workflow file.
+
+No user action needed; the wizard handles it.
+
 ## Updating Global Commands
 
 If you install new IDEs or want to update to a newer wizard version:
