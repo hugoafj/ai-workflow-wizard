@@ -50,9 +50,8 @@ requesting** gentle-ai's SDD? See `reference/edge-cases.md` for the full rationa
 
 | Condition | Outcome |
 |---|---|
-| Leaves functional/UX/design decisions unresolved by convention, AND max 3 files, no new reusable abstractions, no public-contract change, fully revertible, single recommended approach | `wf-force-sdd` |
-| Project configured with an "always force SDD" override (`.wizard-state.json`) | `wf-force-sdd` |
-| None of the above | `wf-no-sdd` |
+| SIMPLE/STRAIGHTFORWARD change: typo, dependency patch, color/spacing, mechanical refactor, simple bug fix (cause & solution clear), or small new feature that is direct (max 3 files, no new abstractions, behavior is obvious from requirements) | `wf-no-sdd` |
+| Any change NOT matching the above criteria (default fallback) | `wf-force-sdd` |
 
 ## Execution Steps
 

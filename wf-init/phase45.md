@@ -19,6 +19,54 @@ if [ "$FEATURES_ROUTING" != "true" ] && [ "$FEATURES_TDD" != "true" ]; then
 fi
 ```
 
+---
+
+### Windsurf-specific fix (if applicable)
+
+**Before SDD initialization**, check if Windsurf (or Devin) is in the project's active IDEs and apply
+the gentle-ai compatibility workaround:
+
+```bash
+IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
+if echo "$IDES" | grep -q "windsurf"; then
+  WINDSURF_ACTIVE=true
+else
+  WINDSURF_ACTIVE=false
+fi
+```
+
+**If Windsurf is active** (`WINDSURF_ACTIVE=true`):
+
+1. **Merge the AGENTS.md rule** (read temp-files/AGENTS.md and fuse into the project's AGENTS.md):
+   - Open `AGENTS.md` (already generated in Phase 6).
+   - Read the rule from `/Users/user/Documents/DevProjects/ai-workflow-wizard/temp-files/AGENTS.md` (the **Gentle AI — Legacy Path Bridge for Windsurf/Devin** section).
+   - Insert this rule at the top of AGENTS.md (after the title and before other content) so it loads first.
+   - Save AGENTS.md.
+
+   **Why**: gentle-ai installs SDD skills into Windsurf's legacy paths (`~/.codeium/windsurf/skills/`), not the Devin paths. This rule tells the agent where to find them. Without it, sdd-init will not load the skills correctly in Windsurf.
+
+2. **Create `.windsurf/workflows/sdd-new.md`** (to replace the legacy version):
+   - If `.windsurf/workflows/` does not exist, create it.
+   - Write the content from `/Users/user/Documents/DevProjects/ai-workflow-wizard/temp-files/sdd-new.md` to `.windsurf/workflows/sdd-new.md`.
+   - Adapt the file to use the actual SDD backend chosen by the user (read from `state.sdd.backend`).
+
+Tell the user:
+
+```
+⚙️ Windsurf compatibility setup:
+  ✓ Updated AGENTS.md with gentle-ai Windsurf paths rule
+  ✓ Created .windsurf/workflows/sdd-new.md (modern SDD workflow)
+
+This is a temporary workaround for a gentle-ai bug with Windsurf. The agent will now
+be able to find and run SDD skills correctly.
+
+Note: After /sdd-init runs, gentle-ai sync may overwrite .windsurf/workflows/sdd-new.md
+with the legacy version. If that happens, run /wf-settings → "Fix Windsurf gentle-ai" 
+to reapply this fix.
+```
+
+---
+
 This phase runs here — after reverse engineering (Phase 4) — because the wizard already knows the project: whether it's greenfield or legacy, how many committers it has, what stack it uses. With that context it can make a well-founded persistence backend recommendation instead of a generic question.
 
 > **Note**: the official gentle-ai documentation states that the SDD orchestrator runs `/sdd-init` automatically if it doesn't detect SDD context in the project. This means that if the user starts SDD without having run `/sdd-init` manually, the orchestrator does it on its own — but it will use its defaults (likely engram). Wizard Phase 4.5 ensures the backend choice is deliberate, not a silent default.
