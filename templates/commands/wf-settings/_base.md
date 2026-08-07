@@ -110,6 +110,9 @@ Workflow settings — current state:
 14. release-please standalone — <ON/OFF>
 15. CD (automatic deploy) — <ON/OFF>
 16. Release strategy — <tag v* / push a main>
+<if Windsurf is in active IDEs>
+17. Fix Windsurf gentle-ai — <Reapply workaround>
+</if>
 
 Which number do you want to adjust?
 
@@ -1020,6 +1023,44 @@ Confirm:
 **State update**:
 ```bash
 jq '.cd.trigger = "<new_trigger>"' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+```
+
+---
+
+### 17 — Fix Windsurf gentle-ai (conditional, only if Windsurf is active)
+
+**Gate**: Only show this option if Windsurf or Devin is in `state.answers.ides`.
+
+```
+Fix Windsurf gentle-ai — Reapply the workaround for gentle-ai's legacy path bug
+
+This reapplies the AGENTS.md rule and .windsurf/workflows/sdd-new.md
+in case they were overwritten by a manual "gentle-ai sync".
+
+Do you want to reapply the Windsurf fix now? [yes / no, skip]
+```
+
+**If they choose "no, skip"**: move to Phase 4.
+
+**If they choose "yes"**:
+
+1. **Merge AGENTS.md rule** — same as phase45 did:
+   - Read the rule from temp-files/AGENTS.md (Gentle AI — Legacy Path Bridge section).
+   - Check if it already exists in the project's AGENTS.md.
+   - If not present, insert it at the top (after title, before other content).
+   - If already present, skip (do not duplicate).
+
+2. **Rewrite .windsurf/workflows/sdd-new.md**:
+   - Read `.windsurf/workflows/sdd-new.md` if it exists.
+   - If it matches the legacy version (check for "legacy" string or old content), replace it.
+   - Write the modern version from temp-files/sdd-new.md.
+   - Adapt the backend reference to match `state.sdd.backend`.
+
+Confirm:
+```
+✓ Windsurf gentle-ai fix reapplied
+✓ AGENTS.md rule: in place
+✓ .windsurf/workflows/sdd-new.md: updated to modern version
 ```
 
 ---
