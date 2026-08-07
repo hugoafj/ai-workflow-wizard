@@ -206,20 +206,26 @@ For each selected additional MCP, register it in the MCPs table of AGENTS.md
 MCPs that require credentials are marked as "API key in `.env.local`" —
 wf-onboard will guide the new developer through that step.
 
-**Concrete instructions for Phase 8** (what the wizard explicitly writes, with instructions on how) — edit `openspec/config.yaml` with the actual values:
+**Concrete instructions for Phase 8** — targeted, agent-driven edit of `openspec/config.yaml` (this file was created by gentle-ai's `/sdd-init` in Phase 4.5; the wizard is never allowed to regenerate or stamp it wholesale — see protocol `sdd`, "Wizard-Allowed Field Edits"):
 
 ```bash
-# Read current config
+# Read the CURRENT, real file — its exact shape can vary (gentle-ai itself documents
+# that the schema is not fully uniform across its own skills, e.g. `testing` may live
+# at the top level or nested under `context.testing` depending on how /sdd-init wrote it).
 cat openspec/config.yaml
 ```
 
-Generate the updated version in memory with these fields modified according to the activated layers:
+**Do NOT overwrite the file.** Locate, inside the real file you just read, wherever the following
+keys already live (top-level `testing`/`layers`/`checks_before_done`, or nested under `context.*`
+— match whatever the file actually has) and update **only those specific leaf values**, preserving
+every other key byte-for-byte (`artifact_store`/`schema`, `project`, `context.stack`/`pattern`/etc.,
+`sdd.*`, `notes`, `rules.*`, and anything else present):
 
 ```yaml
+# strict_tdd — REAL FIELD, the source gentle-ai's sdd-apply queries directly
+# (confirmed against the actual installed skill source)
+strict_tdd: false        # true if they chose option 2
 testing:
-  strict_tdd: false        # true if they chose option 2 — REAL FIELD, it's the source
-                            # that gentle-ai's sdd-apply queries directly
-                            # (confirmed against the actual installed skill source)
   configured: true
   runner: vitest          # or "playwright" if only e2e, or "vitest+playwright" if both
   planned: null           # no longer "planned", it's configured
@@ -243,7 +249,11 @@ checks_before_done:
   - npm run test:e2e      # add if e2e was activated
 ```
 
-Write the complete `openspec/config.yaml` with those values (not just the changed fields — rewrite the entire file to avoid malformed YAML).
+If a key from this list does not exist yet in the real file, add it at the same nesting level as
+its siblings (e.g. if the file has a top-level `testing:` block, add `layers` there too — do not
+invent a new top-level shape). If in doubt about where a key belongs, ask the user to confirm
+before writing rather than guessing a structure that could break what `/sdd-init`, `sdd-apply`, or
+`sdd-verify` expect to read.
 
 **Update the Testing section of `AGENTS.md`** — find the `## Testing` (or `## Testing Approach`) section and replace it with:
 

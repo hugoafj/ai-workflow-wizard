@@ -12,7 +12,7 @@
 > - **State** (user responses + discovery) → `.wizard-state.json` at the project root
 >   (contract: `wf-init/lib/state.md`). The process is resumable even if the
 >   conversation is lost between phases.
-> - **Permanent knowledge** (Decision Ladder, Local Orchestration, TDD, SDD, CI/CD,
+> - **Permanent knowledge** (wf-ladder, wf-sdd-trigger, wf-tdd, SDD, CI/CD,
 >   Testing, IDEs, Commands, Architecture) → `templates/protocols/<module/>` as **single
 >   source of truth**, packaged as skills for each IDE (installed via `install.sh`).
 > - **Assembly** → Deterministic Builder (`wf-init/lib/builder.md`) that assembles artifacts
@@ -69,7 +69,7 @@ Terms that appear constantly. No need to memorize them; come back to this sectio
 
 **Worktree** — Isolated git folder that shares the same repo. Useful for having multiple agents working in parallel without stepping on each other, each in their own worktree.
 
-**Wizard `/wf-init`** — Global slash command for this workflow that initializes a project: installs and verifies gentle-ai automatically (Phase 0), discovers the project (Phases 1-4), runs `/sdd-init` with backend choice showing all three modes (Phase 4.5), generates `AGENTS.md` with "📋 Local Orchestration" section (Phase 6), configures post-commit hook that detects AGENTS.md and SDD drift. Installed with `install.sh` as a global slash command. Architecture: orchestrator (`wf-init.md`) + phase files in `wf-init/` (read on-demand from disk).
+**Wizard `/wf-init`** — Global slash command for this workflow that initializes a project: installs and verifies gentle-ai automatically (Phase 0), discovers the project (Phases 1-4), runs `/sdd-init` with backend choice showing all three modes (Phase 4.5), generates `AGENTS.md` with "📋 wf-sdd-trigger" section (Phase 6), configures post-commit hook that detects AGENTS.md and SDD drift. Installed with `install.sh` as a global slash command. Architecture: orchestrator (`wf-init.md`) + phase files in `wf-init/` (read on-demand from disk).
 
 **Hook (git hook)** — Script that git executes automatically on certain events (commit, push). Runs only on your local machine, not on GitHub. We use it to detect drift in AGENTS.md.
 
@@ -104,7 +104,7 @@ Terms that appear constantly. No need to memorize them; come back to this sectio
    - 5.5 [Context auto-update](#55-context-auto-update)
    - 5.6 [Step-by-step tutorial · Test the wizard on a clean project](#56-step-by-step-tutorial--test-the-wizard-on-a-clean-project)
    - 5.7 [Ensuring multi-IDE fidelity · Strategy and specific fixes](#57-ensuring-multi-ide-fidelity--strategy-and-specific-fixes)
-   - 5.8 [Optional behavior improvements · Decision Ladder](#58-optional-behavior-improvements--decision-ladder)
+   - 5.8 [Optional behavior improvements · wf-ladder](#58-optional-behavior-improvements--wf-ladder)
 6. [Block 2 · Specification Layer (SDD)](#6-block-2--specification-layer-sdd)
    - 6.1 [SDD Philosophy](#61-sdd-philosophy)
    - 6.2 [How gentle-ai handles SDD for you](#62-how-gentle-ai-handles-sdd-for-you)
@@ -528,7 +528,7 @@ The wizard phases:
 - **Phase 4** — Reverse engineering (legacy only).
 - **Phase 4.5** — SDD initialization. With the context already discovered (committers, stack, greenfield vs legacy), the wizard explains the three backends (engram / openspec / hybrid), makes a grounded recommendation, and runs `/sdd-init` with the user's choice. The wizard always shows all three modes — the user decides.
 - **Phase 5** — Minimum questions (4-5 depending on path).
-- **Phase 6** — File generation in memory (does not write yet). The AGENTS.md includes the "📋 Local Orchestration" section as part of the base template.
+- **Phase 6** — File generation in memory (does not write yet). The AGENTS.md includes the "📋 wf-sdd-trigger" section as part of the base template.
 - **Phase 7** — Human review gate (preview, approval).
 - **Phase 8** — Write, handle `.gitignore`, install post-commit hook (detects AGENTS.md and SDD drift in the same hook), commit.
 
@@ -1031,7 +1031,7 @@ This file persists across IDE sessions until you act on it.
 | Hidden hooks in any IDE | Persistent `.wf-status` file. |
 | Absolutely critical rules | Treat as hard contract: AI review on PR, custom lint, tests. AGENTS.md does not guarantee fidelity. |
 
-### 5.8 Optional behavior improvements · Decision Ladder
+### 5.8 Optional behavior improvements · wf-ladder
 
 This section documents an optional but highly recommended improvement: integrating the **Decision Ladder** pattern into the project's AGENTS.md, or as a global gentle-ai skill.
 
@@ -1073,8 +1073,8 @@ audit it. Stop at the first rung where the answer is "yes" and use it.
 
 The Ladder applies **always before Preflight**, in all paths. This is
 intentional: the Ladder can simplify a task before classifying it — if
-it detects that "it already exists in the code" (rung 2), the task can go from Path C
-to Path A. Preflight uses the Ladder result as input for classification.
+it detects that "it already exists in the code" (rung 2), the task can go from `wf-force-sdd`
+to `wf-no-sdd`. `wf-preflight` uses the Ladder result as input for classification.
 
 Universal order: 🪜 **Ladder → 🔍 Preflight → flow by path**.
 
@@ -1101,10 +1101,10 @@ Mandatory output format:
 7. Only if none of the above apply: write the minimum necessary code that works.
 
 Only the rungs evaluated up to the ✓ are declared.
-In Path B/C, the Ladder applies once per task — not to the full pipeline.
+Under `wf-force-sdd`, the Ladder applies once per task — not to the full pipeline.
 ```
 
-**Option B · As a project-specific command** (generated in Block 3, section 7.5). The `/decision-ladder` command allows the user to force it explicitly and see the agent's reasoning rung by rung. The ladder rules stay in `AGENTS.md`; the command is the shortcut to invoke it consciously.
+**Option B · As a project-specific command** (generated in Block 3, section 7.5). The `/wf-ladder` command allows the user to force it explicitly and see the agent's reasoning rung by rung. The ladder rules stay in `AGENTS.md`; the command is the shortcut to invoke it consciously.
 
 Recommendation: use Option A (AGENTS.md) as the base — the agent always follows it. The Block 3 command adds the ability to force and audit it explicitly.
 
@@ -1169,7 +1169,8 @@ gentle-ai adapts how phases run depending on the IDE:
 - **Claude Code and Cursor**: each phase is delegated to a **native sub-agent** of the IDE, with fresh context window. Benefit: no context contamination between phases, different model per phase if you configured model routing.
 - **OpenCode**: uses the native task subagent system (post v0.13).
 - **Pi**: global agents in `~/.pi/agents/sdd-*.md`.
-- **Windsurf**: uses `run_subagent()` for delegation; native Plan Mode to save artifacts.
+- **Windsurf Cascade**: gentle-ai's own installed content classifies it as solo-agent — *"there are no sub-agents. Every SDD phase runs inline in the same conversation"*. Native Plan Mode is used to save/persist artifacts across sessions.
+- **Devin (fork of Windsurf, shares its file paths)**: gentle-ai has **no dedicated adapter for Devin** — it isn't in gentle-ai's capability manifest at all, so gentle-ai's "Windsurf" content (including the "no sub-agents" claim above) gets applied to Devin by accident, not by design. In practice Devin does support real subagent delegation (a working `run_subagent`-style tool). Don't trust the IDE-name label alone — check whether a real subagent tool is actually available in the current session before assuming either capability.
 - **Kiro**: 10 native files in `~/.kiro/agents/sdd-*.md`, auto-delegate by YAML description.
 - **Others**: SDD runs **inline** in the same session. The orchestrator is the executor. Engram provides persistence between phases.
 
@@ -1240,46 +1241,46 @@ The goal of gentle-ai's orchestrator is that you don't need to know which phase 
 
 gentle-ai has its own **global Delegation Stop Rules** (4+ file rule to understand a flow, 2+ non-trivial file rule to modify, etc.). These always apply — they belong to the orchestrator and are not overridden.
 
-What this workflow adds on top is **Local Orchestration**, a three-path matrix (A/B/C) that the agent applies to each local change before touching the workspace. It's a different axis: Delegation Stop Rules decide when to delegate to sub-agents or force fresh review; Local Orchestration decides which SDD phases to run (none, lite, or full). They don't conflict; they are complementary axes.
+What this workflow adds on top is **`wf-sdd-trigger`**, a two-outcome decision (`wf-no-sdd` / `wf-force-sdd`, with `wf-sdd-lite` as a lighter severity) that the agent applies to each local change before touching the workspace. It's a different axis: gentle-ai's own native routing decides Direct inline vs Delegated direct and owns all delegation mechanics; `wf-sdd-trigger` decides only WHEN this project's own rules require explicitly requesting gentle-ai's SDD. They don't conflict; they are complementary axes, and `wf-sdd-trigger` never re-specifies HOW gentle-ai then routes or delegates.
 
-#### The three paths of Local Orchestration
+#### wf-sdd-trigger: the two outcomes
 
-The AGENTS.md generated by the wizard includes a "📋 Local Orchestration: Complexity Flow" section that defines the complete decision tree in detail. Summary:
+The AGENTS.md generated by the wizard includes a "📋 wf-sdd-trigger" section that defines the complete decision tree in detail. It decides ONE thing: does this change meet this project's own rules for explicitly requesting gentle-ai's SDD? It never decides HOW gentle-ai then routes or delegates — that remains gentle-ai's own native authority, already installed for the active adapter(s). Summary:
 
-- **🟢 Path A — Direct Inline Work**: deterministic changes where there is an obvious implementation and design risk is minimal. Direct implementation, no planning or SDD.
-- **🟡 Path B — SDD Lite**: the change requires validating a design decision with the user because there are several reasonable approaches that produce different functional behaviors. It must meet five constraints (max 3 files, no new abstractions, no altering public contracts, fully reversible, single approach after analysis). If any fails, it automatically escalates to Path C.
-- **🔴 Path C — Full gentle-ai SDD**: the change modifies architecture, public contracts, data model, or breaches any Path B constraint. Starts the full gentle-ai SDD pipeline. No options to skip the harness.
+- **🟢 `wf-no-sdd`**: deterministic changes where there is an obvious implementation and design risk is minimal. Direct implementation; gentle-ai's own native routing (Direct inline / Delegated direct) decides the rest.
+- **🔴 `wf-force-sdd`**: the change meets this project's own SDD-forcing rules. Two severities:
+  - **`wf-sdd-lite` severity**: the change requires validating a design decision with the user because there are several reasonable approaches that produce different functional behaviors. It must meet five constraints (max 3 files, no new abstractions, no altering public contracts, fully reversible, single approach after analysis). If any fails, it automatically escalates to full severity.
+  - **Full severity**: the change modifies architecture, public contracts, data model, or breaches any `wf-sdd-lite` constraint. The agent explicitly requests gentle-ai's full indexed SDD pipeline. No options to skip the harness.
 
-#### The mandatory Preflight
+#### The mandatory wf-preflight
 
-Before writing code, planning, or delegating, the agent issues a **single definitive diagnosis** called Preflight with: determined path (A/B/C), impact analysis, and for Path B a 5-item checklist marked ✓/✗ without semantic interpretation. A single ✗ invalidates Path B and automatically escalates to Path C. This closes the gap where the agent might "forget" to declare its path — the declaration is auditable, and if it later contradicts itself (says Path A but modifies props), you catch it on the spot.
+Before writing code, planning, or requesting SDD, the agent issues a **single definitive diagnosis** called `wf-preflight` with: determined outcome (`wf-no-sdd`/`wf-force-sdd`), severity if forcing, impact analysis, and for `wf-sdd-lite` severity a 5-item checklist marked ✓/✗ without semantic interpretation. A single ✗ escalates to full severity. This closes the gap where the agent might "forget" to declare its outcome — the declaration is auditable, and if it later contradicts itself (says `wf-no-sdd` but modifies public contracts), you catch it on the spot.
 
-#### The blocking protocol in Path B
+#### The blocking protocol at wf-sdd-lite severity
 
-When Preflight determines Path B (SDD Lite), the agent stops and shows a menu of four options:
+When `wf-preflight` determines `wf-force-sdd` at `wf-sdd-lite` severity, the agent stops and shows a menu of three options:
 
-1. **Run Standard SDD Lite** → runs `sdd-propose` → `sdd-tasks`, then `sdd-apply`. In standard mode, after `sdd-tasks` **the orchestrator issues the 🧪 TDD PROPOSAL and waits for the user's choice BEFORE delegating** to `sdd-apply` (which is headless), then delegates with the *baked* decision + `tdd-protocol` injected for execution (see "How TDD enters `sdd-apply`" in the SDD integration section). When finished with tests/checks green, suggests `sdd-archive` as cleanup (does not run it alone).
-2. **Run Custom SDD Lite** → the agent proposes 4-6 specific phases from the gentle-ai pipeline adapted to the change, listing them with justification.
-3. **Force Full SDD** → ignores the Path B shortcut and starts the full pipeline.
-4. **Ignore SDD (Direct)** → skips harnesses, jumps to code under the user's risk.
+1. **Execute wf-sdd-lite** → explicitly requests gentle-ai's `sdd-propose` → `sdd-tasks` → `sdd-apply` (this wizard's own name for the request, never a gentle-ai command). In standard mode, after `sdd-tasks` **the orchestrator issues the 🧪 TDD PROPOSAL and waits for the user's choice BEFORE requesting** `sdd-apply` (which is headless), then makes the request with the *baked* decision + a reference to `wf-tdd` (see "How TDD enters `sdd-apply`" in the SDD integration section). How gentle-ai delegates/executes these phases is its own native decision per adapter — never specified here. When finished with tests/checks green, suggests `sdd-archive` as cleanup (does not run it alone).
+2. **Escalate to full severity** → ignores the `wf-sdd-lite` shortcut and explicitly requests gentle-ai's full indexed SDD pipeline instead.
+3. **Ignore SDD (Direct)** → skips harnesses, jumps to code under the user's risk.
 
 The agent cannot write code or detail technical tasks until it receives the option number.
 
 #### How to correct the flow manually
 
-If the agent determined Path A (direct) and you prefer SDD:
+If the agent determined `wf-no-sdd` and you prefer SDD:
 
 ```
 Before implementing, I want the full SDD flow: exploration, proposal, specs, design, tasks. Do not implement until I approve each artifact.
 ```
 
-If the agent determined Path C and you confirm it's trivial:
+If the agent determined `wf-force-sdd` and you confirm it's trivial:
 
 ```
-This task is simpler than what you classified in the Preflight. Reclassify as Path A and implement directly. The AGENTS.md constraints still apply.
+This task is simpler than what you classified in the wf-preflight. Reclassify as wf-no-sdd and implement directly. The AGENTS.md constraints still apply.
 ```
 
-> The exact text of the "📋 Local Orchestration" section lives in each project's AGENTS.md (the wizard injects it in Phase 6, and `wf-refresh` syncs it in Layer 2). This section 6.3 is only the conceptual summary.
+> The exact text of the "📋 wf-sdd-trigger" section lives in each project's AGENTS.md (the wizard injects it in Phase 6, and `wf-refresh` syncs it in Layer 2). This section 6.3 is only the conceptual summary.
 
 #### The human gate in each phase
 
@@ -1413,44 +1414,44 @@ Advantage of the delta approach: **the history is readable**. You can see in `op
 
 ### 6.5 When SDD yes, when NO
 
-The "📋 Local Orchestration" section in each AGENTS.md (see 6.3) is the source of truth for classifying any change. This section 6.5 is the reference heuristic for understanding when to expect each path and why.
+The "📋 wf-sdd-trigger" section in each AGENTS.md (see 6.3) is the source of truth for classifying any change. This section 6.5 is the reference heuristic for understanding when to expect each outcome and why.
 
 #### The 15-minute rule (quick calibration)
 
-If an experienced human can implement the complete change, including tests, in less than 15 minutes without facing design decisions, it likely falls in Path A. If it would take longer due to volume but the approach is clear, likely Path A as well (mechanical refactors across many files are still Path A). If there are functional or UX decisions the user didn't specify but the change is bounded, Path B. If it touches architecture, public contracts, data model, or any element that violates the five Path B constraints, automatic Path C.
+If an experienced human can implement the complete change, including tests, in less than 15 minutes without facing design decisions, it likely falls under `wf-no-sdd`. If it would take longer due to volume but the approach is clear, likely `wf-no-sdd` as well (mechanical refactors across many files still don't need forced SDD). If there are functional or UX decisions the user didn't specify but the change is bounded, `wf-force-sdd` at `wf-sdd-lite` severity. If it touches architecture, public contracts, data model, or any element that violates the five `wf-sdd-lite` constraints, automatic `wf-force-sdd` at full severity.
 
-#### Reference table (when to expect each path)
+#### Reference table (when to expect each outcome)
 
-| Type of change | Expected path | Why |
+| Type of change | Expected outcome | Why |
 |---|---|---|---|
-| Typo, label, copy fix | A | Deterministic, no design |
-| Dependency bump (patch/minor) | A | No design decision |
-| Color, size, spacing change | A | Obvious implementation |
-| Adding `console.log` for debug | A | Temporary, no impact |
-| Mechanical name refactor (few or many files) | A | Mechanical even if touching many files |
-| Documentation, comments, READMEs | A | No production code |
-| Isolated tests, fixtures | A | No system behavior change |
-| Extend existing flow with unspecified UX decision | B | Multiple valid behaviors, within Path B limits |
-| New validation with decidible business rule | B | Needs to validate the what with the user |
-| Non-trivial bug with two reasonable architectures after analysis | B (or C if a constraint fails) | Design decision albeit bounded |
-| Feature with new global state or new shared hook | C | Modifies contracts / adds reusable abstractions |
-| Feature with new API or endpoint | C | Public contract |
-| Feature with new user-visible routing | C | Modifies system navigation model |
-| Significant refactor (complete module) | C | Touches architecture |
-| Dependency migration (major) | C | Breaking changes, real tradeoffs |
-| Data model / schema change | C | Fundamental contract |
-| Replace main library | C | Architecture |
-| Convert synchronous APIs to async | C | Deep tradeoffs |
+| Typo, label, copy fix | wf-no-sdd | Deterministic, no design |
+| Dependency bump (patch/minor) | wf-no-sdd | No design decision |
+| Color, size, spacing change | wf-no-sdd | Obvious implementation |
+| Adding `console.log` for debug | wf-no-sdd | Temporary, no impact |
+| Mechanical name refactor (few or many files) | wf-no-sdd | Mechanical even if touching many files |
+| Documentation, comments, READMEs | wf-no-sdd | No production code |
+| Isolated tests, fixtures | wf-no-sdd | No system behavior change |
+| Extend existing flow with unspecified UX decision | wf-force-sdd (wf-sdd-lite) | Multiple valid behaviors, within wf-sdd-lite limits |
+| New validation with decidible business rule | wf-force-sdd (wf-sdd-lite) | Needs to validate the what with the user |
+| Non-trivial bug with two reasonable architectures after analysis | wf-force-sdd (wf-sdd-lite, escalates to full if a constraint fails) | Design decision albeit bounded |
+| Feature with new global state or new shared hook | wf-force-sdd (full) | Modifies contracts / adds reusable abstractions |
+| Feature with new API or endpoint | wf-force-sdd (full) | Public contract |
+| Feature with new user-visible routing | wf-force-sdd (full) | Modifies system navigation model |
+| Significant refactor (complete module) | wf-force-sdd (full) | Touches architecture |
+| Dependency migration (major) | wf-force-sdd (full) | Breaking changes, real tradeoffs |
+| Data model / schema change | wf-force-sdd (full) | Fundamental contract |
+| Replace main library | wf-force-sdd (full) | Architecture |
+| Convert synchronous APIs to async | wf-force-sdd (full) | Deep tradeoffs |
 
-#### When the Preflight seems wrong
+#### When the wf-preflight seems wrong
 
-The Preflight is auditable by design. If it declared Path B but the checklist marks all 5 items ✓ without visible justification, or if it declared Path A and started creating new files that contradict that classification, you have immediate evidence to request reclassification:
+`wf-preflight` is auditable by design. If it declared `wf-force-sdd` at `wf-sdd-lite` severity but the checklist marks all 5 items ✓ without visible justification, or if it declared `wf-no-sdd` and started creating new files that contradict that classification, you have immediate evidence to request reclassification:
 
 ```
-The Preflight declared Path A but you are creating a new file (TaskFilter.tsx) that is a reusable abstraction. Reclassify.
+The wf-preflight declared wf-no-sdd but you are creating a new file (TaskFilter.tsx) that is a reusable abstraction. Reclassify.
 ```
 
-The agent should not defend itself — it should re-emit a corrected Preflight and proceed according to the new path.
+The agent should not defend itself — it should re-emit a corrected `wf-preflight` and proceed according to the new outcome.
 
 ### 6.6 SDD persistence backends
 
@@ -1556,7 +1557,7 @@ The `config.yaml` is not something you normally edit by hand — `/sdd-init` gen
 
 gentle-ai's SDD sub-agents read the project's `AGENTS.md` in every phase — it's not an optional integration, it's part of the pipeline. This means the conventions, Critical Constraints, and Behavior Preferences you defined in `AGENTS.md` are respected during `sdd-propose`, `sdd-spec`, `sdd-design`, `sdd-tasks`, and `sdd-apply`.
 
-The "📋 Local Orchestration" section that the wizard injects into `AGENTS.md` is especially relevant here because SDD sub-agents use it to classify sub-tasks within a large change. Example: if in the `sdd-tasks` phase a task is generated that technically falls into Path A (mechanical change), the sub-agent can execute it directly without declaring a formal Preflight — but if it generates a task that falls into Path B, it applies the blocking protocol before touching code.
+The "📋 wf-sdd-trigger" section that the wizard injects into `AGENTS.md` is especially relevant here because gentle-ai's SDD phases use it to classify sub-tasks within a large change. Example: if in the `sdd-tasks` phase a task is generated that technically falls under `wf-no-sdd` (mechanical change), it can be executed directly without declaring a formal `wf-preflight` — but if it generates a task that falls under `wf-force-sdd` at `wf-sdd-lite` severity, it applies the blocking protocol before touching code.
 
 The native `sdd-apply` skill resolves TDD mode by reading `openspec/config.yaml → strict_tdd`. With `strict_tdd: true` it loads `strict-tdd.md` and requires RED→GREEN evidence per task (headless, no interaction). With `strict_tdd: false` it falls into native standard mode. Since `sdd-apply` is a headless sub-agent (`user-invocable: false`) — it executes and returns, cannot ask the user anything — the `🧪 TDD PROPOSAL` happens **before** delegation: the orchestrator issues the proposal (task coverage, in batch), waits for the user's choice, and **only then** delegates to `sdd-apply` with the decision baked into the prompt.
 
@@ -1709,12 +1710,12 @@ Complete output order before implementing: 🪜 Ladder → 🔍 Preflight → �
 
 Commands the wizard generates in Phase 6 and writes in Phase 8. They are project-specific markdown files — live in the repo, not globally. They are used as slash commands in the IDE (correct format per IDE).
 
-**`/decision-ladder`** — forces explicit Decision Ladder with visible `🪜` output per rung.
-**`/sdd-lite`** — forces SDD Lite flow (sdd-propose → sdd-tasks → sdd-apply). In standard mode, the orchestrator emits the 🧪 TDD PROPOSAL before delegating to apply (headless) then delegates with baked decision + injected `tdd-protocol`. No spec or design; suggests sdd-archive at the end.
+**`/wf-ladder`** — forces explicit wf-ladder with visible `🪜` output per rung.
+**`/wf-sdd-lite`** — explicitly requests gentle-ai's SDD at wf-sdd-lite severity (sdd-propose → sdd-tasks → sdd-apply). In standard mode, the orchestrator emits the 🧪 TDD PROPOSAL before requesting apply (headless) then makes the request with baked decision + a reference to `wf-tdd`. No spec or design; suggests sdd-archive at the end. `wf-sdd-lite` is this wizard's own name — never a gentle-ai command.
 **`/wf-onboard`** — stub that points to `wf-onboard.md` for new developer onboarding.
 **`/wf-refresh`** — stub that invokes the AGENTS.md refresh wizard.
 
-**Global vs project-specific commands**: `wf-init`, `wf-refresh`, and `wf-cleanup` are installed globally with `install.sh`. `wf-onboard`, `wf-settings`, `wf-worktree`, and `wf-cicd` are generated per project in Phase 6. `decision-ladder` and `sdd-lite` are project-specific — they have project context in their content.
+**Global vs project-specific commands**: `wf-init`, `wf-refresh`, and `wf-cleanup` are installed globally with `install.sh`. `wf-onboard`, `wf-settings`, `wf-worktree`, and `wf-cicd` are generated per project in Phase 6. `wf-ladder` and `wf-sdd-lite` are project-specific — they have project context in their content.
 
 **Correct paths and formats per IDE** (verified against official documentation):
 
@@ -1731,19 +1732,19 @@ Commands the wizard generates in Phase 6 and writes in Phase 8. They are project
 
 The wizard detects active IDEs: on new projects it uses the Phase 5 list; on upgrades it reads existing satellites in the repo.
 
-### 7.6 How to test that Decision Ladder works
+### 7.6 How to test that wf-ladder works
 
-Three concrete tests. The Ladder must always appear **before Preflight** — that is the correct and validated order: 🪜 Ladder → 🔍 Preflight → flow.
+Three concrete tests. The Ladder must always appear **before `wf-preflight`** — that is the correct and validated order: 🪜 wf-ladder → 🔍 wf-preflight → flow.
 
-**Test 1 — Path A, Ladder should propose reusing existing:**
+**Test 1 — wf-no-sdd, Ladder should propose reusing existing:**
 
 ```
 I need to show the number of completed tasks in the app header.
 ```
 
-Expected: `🪜 DECISION LADDER` appears before `🔍 PREFLIGHT`. Stops at rung 2 because `useTasks` already exposes `tasks.filter(t => t.completed).length`. Success signal: `✓ Rung 2 — use tasks.filter(t => t.completed).length from useTasks`. No new hooks or state.
+Expected: `🪜 WF-LADDER` appears before `🔍 WF-PREFLIGHT`. Stops at rung 2 because `useTasks` already exposes `tasks.filter(t => t.completed).length`. Success signal: `✓ Rung 2 — use tasks.filter(t => t.completed).length from useTasks`. No new hooks or state.
 
-**Test 2 — Path A, Ladder should reach rung 7:**
+**Test 2 — wf-no-sdd, Ladder should reach rung 7:**
 
 ```
 I need to validate that a task title doesn't have special characters like <, >, &.
@@ -1751,7 +1752,7 @@ I need to validate that a task title doesn't have special characters like <, >, 
 
 Expected: `🪜` evaluates rungs 1-6 and none apply. `✓ Rung 7 — minimum validation function`. If it proposes installing a validation library, it did not apply rung 5 correctly.
 
-**Test 3 — Path C, Ladder in two moments (validated in production):**
+**Test 3 — wf-force-sdd (full), Ladder in two moments (validated in production):**
 
 ```
 Add a priority system to tasks (high, medium, low) with visual badge and ability to sort by priority.
@@ -1759,10 +1760,10 @@ Add a priority system to tasks (high, medium, low) with visual badge and ability
 
 Success signals:
 
-- `🪜 DECISION LADDER` appears first, before `🔍 PREFLIGHT`. The Ladder informs Preflight — detecting rung 7 with 5+ coordinated files directly feeds Path C classification.
-- Two `🔍 PREFLIGHT` may appear if the agent tried Path B and escalated to C after the checklist — that's correct, shows the full reasoning.
-- SDD pipeline runs with gates at each phase.
-- Inside `sdd-apply`, the Ladder appears again per task confirming minimum implementation.
+- `🪜 WF-LADDER` appears first, before `🔍 WF-PREFLIGHT`. The Ladder informs `wf-preflight` — detecting rung 7 with 5+ coordinated files directly feeds full `wf-force-sdd` classification.
+- Two `🔍 WF-PREFLIGHT` may appear if the agent tried `wf-sdd-lite` severity and escalated to full after the checklist — that's correct, shows the full reasoning.
+- SDD pipeline runs with gates at each phase, once explicitly requested from gentle-ai.
+- Inside `sdd-apply` (gentle-ai's own phase), the Ladder appears again per task confirming minimum implementation.
 
 ### 7.7 `/wf-onboard` — new developer cloning the repo
 
@@ -1806,7 +1807,8 @@ When the orchestrator agent (the one in your main session) delegates work to a s
 | OpenCode | Native sub-agent system — each phase is a dedicated agent with its own model, tools and permissions defined in `opencode.json` |
 | Cursor | Native sub-agents, 10 SDD agents in `~/.cursor/agents/` |
 | Kiro | Native sub-agents in `~/.kiro/agents/` with orchestration via steering |
-| Windsurf | Sub-agents via `run_subagent()` — launches specialized agents from the orchestrator context |
+| Windsurf Cascade | No sub-agents (solo-agent, per gentle-ai's own installed content) — inline for every phase |
+| Devin (fork of Windsurf) | gentle-ai has no dedicated adapter for Devin, so it inherits Windsurf's "no sub-agents" content by accident. In practice Devin does support real subagent delegation (`run_subagent()`-style tool) — check your actual session toolset rather than trusting the inherited label |
 | Codex | Native sub-agents in `~/.codex/agents/` with phase routing |
 | Copilot | SDD runs inline in a single session — without spawning separate processes |
 | Gemini CLI | SDD runs inline in a single session — without spawning separate processes |
@@ -2032,13 +2034,13 @@ Should I run cleanup now (/wf-worktree clean) or would you prefer to leave them 
 
 #### 8.4.7 Natural language recognition — where it lives
 
-The mapping of natural language phrases to the four operations (`new`, `list`, `clean`, `parallel`) lives **inside `wf-worktree.md`**, as internal instructions of the file itself — it is not added to `AGENTS.md`. This maintains the convention already established in Block 3 with `decision-ladder` and `sdd-lite`: those commands also live as standalone files briefly referenced from `AGENTS.md`, not duplicated there. Putting the full mapping in `AGENTS.md` inflates its target size (150-200 lines, see Appendix D) unnecessarily — `AGENTS.md` is a lightweight index, not the source of truth for every feature.
+The mapping of natural language phrases to the four operations (`new`, `list`, `clean`, `parallel`) lives **inside `wf-worktree.md`**, as internal instructions of the file itself — it is not added to `AGENTS.md`. This maintains the convention already established in Block 3 with `wf-ladder` and `wf-sdd-lite`: those commands also live as standalone files briefly referenced from `AGENTS.md`, not duplicated there. Putting the full mapping in `AGENTS.md` inflates its target size (150-200 lines, see Appendix D) unnecessarily — `AGENTS.md` is a lightweight index, not the source of truth for every feature.
 
 The command stub in `AGENTS.md` (or in the IDE's commands directory) simply indicates: "if the user asks for something equivalent to create/list/clean/merge worktrees in parallel in natural language, follow the instructions in `wf-worktree.md`". The file itself contains the example phrases and decision logic.
 
 #### 8.4.8 Installation as command (same pattern as Block 3)
 
-Same as `decision-ladder`, `sdd-lite`, `wf-onboard`, and `wf-refresh`, `/wf-worktree` is generated in Phase 6 of `wf-init` (or added via `/wf-refresh` if the project is already initialized) for each active IDE, with the same path table and formats from section 7.5:
+Same as `wf-ladder`, `wf-sdd-lite`, `wf-onboard`, and `wf-refresh`, `/wf-worktree` is generated in Phase 6 of `wf-init` (or added via `/wf-refresh` if the project is already initialized) for each active IDE, with the same path table and formats from section 7.5:
 
 | IDE | Path | Format |
 |---|---|---|
@@ -2049,7 +2051,7 @@ Same as `decision-ladder`, `sdd-lite`, `wf-onboard`, and `wf-refresh`, `/wf-work
 | OpenCode | `.opencode/commands/wf-worktree.md` | Plain markdown, no frontmatter |
 | Copilot | `.github/prompts/wf-worktree.prompt.md` | Suffix `.prompt.md` + frontmatter `mode: agent` |
 
-It is a **project-specific** command (like `decision-ladder` and `sdd-lite`), not global — depends on the repo you're in, although its internal logic is generic.
+It is a **project-specific** command (like `wf-ladder` and `wf-sdd-lite`), not global — depends on the repo you're in, although its internal logic is generic.
 
 The complete `wf-worktree.md` file is already built as a standalone file (same format as `wf-onboard.md`): three operations (`new`, `list`, `clean`), free port detection per worktree, internal natural language mapping, and inviolable rules to never push or delete without explicit confirmation. It is included in the `EXPECTED_COMMANDS` and in the per-IDE command generation — a project running `/wf-init` from scratch receives it right away, and one already initialized receives it via `/wf-refresh` (Phase 3.5, check for missing commands).
 
@@ -2254,7 +2256,7 @@ curl -fsSL https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/ins
 | **Global** | `/wf-init`, `/wf-refresh` | `install.sh` → `~/.<ide>/commands/` |
 | **Project-specific** | `/wf-onboard`, `/wf-settings`, `/wf-worktree`, `/wf-cicd` | `/wf-init` Phase 6 → repo |
 | **Global** | `/wf-cleanup` | `install.sh` → `~/.<ide>/commands/` |
-| **Project-specific** | `/decision-ladder`, `/sdd-lite` | `/wf-init` Phase 6 → repo |
+| **Project-specific** | `/wf-ladder`, `/wf-sdd-lite` | `/wf-init` Phase 6 → repo |
 
 ### What the block includes
 

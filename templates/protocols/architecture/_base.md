@@ -26,9 +26,9 @@ The AGENTS.md no longer contains the heavy embedded mechanism. It contains ONLY:
   for Claude Code; `.agents/protocols/<n>.md` referenced for the rest).
 - **Footer `wf-version`** (last line, mandatory — read by /wf-settings and /wf-refresh).
 
-> The flow control mechanism (Decision Ladder, Local Orchestration, TDD Protocol)
+> The flow control mechanism (`wf-ladder`, `wf-sdd-trigger`, `wf-orchestrator`, `wf-tdd`)
 > **no longer lives inside AGENTS.md**: it lives in
-> `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/` (decision-ladder, tdd)
+> `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/` (`wf-ladder`, `wf-sdd-trigger`, `wf-orchestrator`, `tdd`)
 > and is packaged as a skill + flat file. The router points to them. This eliminates the
 > accumulation of 350-450 lines of mechanism in AGENTS.md.
 

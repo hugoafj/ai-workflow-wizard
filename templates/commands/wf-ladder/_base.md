@@ -1,17 +1,21 @@
-# decision-ladder
+# wf-ladder
 
-Explicitly apply the Decision Ladder for the next implementation.
+Explicitly apply this wizard's own `wf-ladder` (Decision Ladder) for the next implementation.
 
-The Ladder always applies before Preflight on any route.
-Universal order: 🪜 Ladder → 🔍 Preflight → flow by route.
-In Routes B/C it also applies within sdd-apply for each individual task.
+This is a wizard-owned command (prefix `wf-`), independent from gentle-ai. It never decides
+whether to use gentle-ai's SDD, nor how gentle-ai delegates — see `wf-sdd-trigger` for that axis.
+
+The Ladder always applies before `wf-preflight` (see `wf-sdd-trigger`), regardless of the outcome.
+Universal order: 🪜 wf-ladder → 🔍 wf-preflight → flow per the wf-sdd-trigger outcome.
+When SDD is forced (`wf-force-sdd`), it also applies within gentle-ai's `sdd-apply` for each
+individual task once delegated.
 
 Walk through each rung in order, declare the question and your answer out loud,
 and stop at the first one where the answer is "yes".
 
 Required output format:
 
-🪜 DECISION LADDER
+🪜 WF-LADDER
   1. Does it need to exist? → <answer and brief reason>
   2. Does it already exist in the code? → <answer and brief reason>
   ...

@@ -5,24 +5,30 @@ trigger: always_on
 Apply the conventions defined in `AGENTS.md` in all your responses.
 @file ../AGENTS.md
 
-## Skills globales de gentle-ai
+## Namespace note
 
-SDD skills live in your home, NOT in the project. When you need
-sdd-propose, sdd-tasks, sdd-apply, tdd-protocol or sdd-archive, check both:
+Everything prefixed `wf-` below (`wf-orchestrator`, `wf-ladder`, `wf-sdd-trigger`, `wf-tdd`,
+`wf-sdd-config`) is owned by THIS wizard, packaged in this project (`.windsurf/skills/`). Anything
+named `sdd-*` (no `wf-` prefix) is gentle-ai's own — global, in your home, not this project. Never
+attribute one to the other.
+
+## gentle-ai's global skills
+
+gentle-ai's own SDD skills live in your home, NOT in the project. When gentle-ai's SDD was
+explicitly requested (via this project's `wf-sdd-trigger`), check both:
 
 **Windsurf/Windsurf-Next/Windsurf-Insiders:**
 ~/.codeium/windsurf/skills/sdd-propose/SKILL.md
 ~/.codeium/windsurf/skills/sdd-tasks/SKILL.md
 ~/.codeium/windsurf/skills/sdd-apply/SKILL.md
-~/.codeium/windsurf/skills/tdd-protocol/SKILL.md
 ~/.codeium/windsurf/skills/sdd-archive/SKILL.md
 
 **Devin (fork of Windsurf):**
 ~/.config/devin/skills/sdd-propose/SKILL.md
 ~/.config/devin/skills/sdd-tasks/SKILL.md
 ~/.config/devin/skills/sdd-apply/SKILL.md
-~/.config/devin/skills/tdd-protocol/SKILL.md
 ~/.config/devin/skills/sdd-archive/SKILL.md
 
 If you do not find them there, use find or glob to search for **/sdd-propose/SKILL.md
-in your home. Do NOT search in the project directory.
+in your home. Do NOT search in the project directory — how gentle-ai delegates/executes these
+phases for this adapter is entirely its own native decision; this wizard never re-specifies it.

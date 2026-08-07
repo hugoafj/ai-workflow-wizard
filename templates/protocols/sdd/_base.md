@@ -66,14 +66,42 @@ were properly created. At the SLIGHTEST doubt → apply this rule (new session),
 
 ## When SDD applies (routing)
 
-The direct/Lite/full decision is resolved by **Local Orchestration** (see `decision-ladder`
-protocol), not this file. Reference rule: the "15-minute rule" and
+Whether this project's own rules force an explicit SDD request is resolved by **`wf-sdd-trigger`**
+(this wizard's own protocol), not this file. gentle-ai's own routing/delegation mechanics are its
+exclusive authority once that explicit request is made. Reference rule: the "15-minute rule" and
 the *delta* greenfield/legacy concept are documented in `AI_DEV_WORKFLOW.md` §6.4-6.5.
 
 ## config.yaml and Strict TDD
 
-- The complete `openspec/config.yaml` template is in `config.yaml.tmpl.md`.
-- `testing.strict_tdd: true|false` is the source of truth that `sdd-apply` consults
-  (see `tdd` strict variant protocol). When migrating backends, preserve `strict_tdd`.
+- `openspec/config.yaml` is the exclusive artifact of gentle-ai's `/sdd-init`. Per gentle-ai's own
+  documentation (`docs/openspec-config.md`), there is no Go-side parser/validator enforcing a
+  canonical schema for this file — it is prompt-driven, and its exact shape is **not fully uniform**
+  even across gentle-ai's own skills (e.g. `strict_tdd`/`testing`/`layers` may live at the top level
+  or nested under `context.*`, depending on how `/sdd-init` wrote it for this project).
+- `strict_tdd: true|false` is the source of truth that `sdd-apply`/`sdd-verify` consult (see `tdd`
+  strict variant protocol). When migrating backends, preserve `strict_tdd`.
 - `openspec/config.yaml` is **excluded** from the drift hook (it is the output of /sdd-init;
   including it would cause a loop).
+
+### Wizard-Allowed Field Edits (Hard Rule)
+
+The wizard (Phase 4.6b, `wf-settings`) may ask the **current agent** to update a small, fixed set of
+leaf fields inside the EXISTING `openspec/config.yaml` — never regenerate or overwrite the file, and
+never do it via a script/template stamp (`config.yaml.tmpl.md` is documentation of these fields, not
+a file to copy — see its header comment):
+
+| Allowed field | When |
+|---|---|
+| `strict_tdd` | Toggling Strict TDD Mode (Phase 4.6 / `wf-settings`) |
+| `testing.*` (`configured`, `runner`, `planned`) | Testing stack activated/changed |
+| `layers.*` (`unit`, `integration`, `e2e`, `coverage`) | Testing layers activated/changed |
+| `extras.*` (`coverage_threshold`, `visual_regression`, `page_object_model`) | Optional testing extras toggled |
+| `checks_before_done` | Testing/CI scripts added |
+| the backend/artifact-store field (name may vary — read the real file first, never assume) | SDD backend migration (`wf-settings`, section 8) |
+
+**Every edit MUST**: (1) read the real file first, (2) locate these keys wherever they actually live
+in that file's real structure, (3) change only those leaf values, (4) preserve everything else
+verbatim (`artifact_store`/`schema`, `project`, `context.*`, `sdd.*`, `notes`, `rules.*`, and any
+other key present). If a key from this list is missing, add it at the same nesting level as its
+siblings — never invent a new top-level shape. If the correct location is ambiguous, ask the user
+before writing.

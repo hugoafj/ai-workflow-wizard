@@ -4,27 +4,37 @@ inclusion: always
 # Kiro Steering — Project Context
 Apply the conventions defined in `AGENTS.md` in all your responses.
 
+## Namespace note
+
+Everything prefixed `wf-` below is owned by THIS wizard, packaged in this project. Anything named
+`sdd-*` (no `wf-` prefix) is gentle-ai's own — its routing and delegation mechanics are gentle-ai's
+exclusive authority, already installed for this adapter. This wizard never re-specifies them.
+
 ## Mandatory gate before implementing
 
 This project uses packaged protocols. **Do not implement without running the corresponding
 protocol first**. The protocol files are in `.agents/protocols/` and `.kiro/skills/`.
 
-1. **Always** — before classifying or implementing any task, run the
-   **Decision Ladder + Preflight**:
-   - If the agent supports skills: the protocol is in `.kiro/skills/decision-ladder/SKILL.md`
-   - Otherwise: read `.agents/protocols/decision-ladder.md`
-   - Follow the 7 rungs, run the decision tree, and classify Route A/B/C.
-   - Without completing Preflight you do not start coding.
+1. **Always** — before classifying or implementing any task, run
+   **`wf-orchestrator`** (single entry point to this wizard's own protocols):
+   - If the agent supports skills: `.kiro/skills/wf-orchestrator/SKILL.md`
+   - Otherwise: read `.agents/protocols/wf-orchestrator.md`
+   - It sequences `wf-ladder` (7 rungs) and `wf-sdd-trigger` (decision tree, classifies
+     `wf-no-sdd`/`wf-force-sdd`) as applicable, and emits `wf-preflight`.
+   - Without completing `wf-preflight` you do not start coding.
 
-2. **If there are active tests** — before writing production code, run the
-   **TDD Protocol**:
-   - Skill: `.kiro/skills/tdd/SKILL.md`
+2. **If there are active tests** — before writing production code, run
+   **`wf-tdd`**:
+   - Skill: `.kiro/skills/wf-tdd/SKILL.md`
    - Flat: `.agents/protocols/tdd.md`
 
-3. **If SDD applies** — before delegating to `sdd-apply`, read the SDD protocol:
-   - Skill: `.kiro/skills/sdd/SKILL.md`
+3. **If `wf-sdd-trigger` resulted in `wf-force-sdd`** — explicitly request gentle-ai's SDD; read
+   `wf-sdd-config` for the wizard's own persistence/config.yaml rules first:
+   - Skill: `.kiro/skills/wf-sdd-config/SKILL.md`
    - Flat: `.agents/protocols/sdd.md`
+   - How gentle-ai then delegates/executes the requested phases is entirely its own native
+     decision for this adapter — do not invent or assume a mechanism.
 
-**Universal order**: 🪜 Decision Ladder → 🔍 Preflight → (by route) 🧪 TDD → implementation.
+**Universal order**: 🪜 wf-ladder → 🔍 wf-preflight → (by outcome) 🧪 wf-tdd → implementation.
 
 This is not optional. If you did not run the gate, do not implement.
