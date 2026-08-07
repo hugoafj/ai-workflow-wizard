@@ -38,8 +38,11 @@ it accordingly.
 
 | Type of change | Expected outcome | Why |
 |---|---|---|
-| Typo, dependency patch bump, color/spacing change | `wf-no-sdd` | Deterministic, no design |
-| Mechanical refactor across many files | `wf-no-sdd` | Mechanical even if touching many files |
-| Extend existing flow with unspecified UX decision | `wf-force-sdd` | Multiple valid behaviors, unresolved by convention |
-| New global state, new shared hook, new API/endpoint | `wf-force-sdd` | Modifies contracts / adds abstractions |
-| Data model change, dependency migration (major) | `wf-force-sdd` | Breaking changes, real tradeoffs |
+| Typo, dependency patch bump, color/spacing change | `wf-no-sdd` | Cause & solution obvious, no alternatives |
+| Mechanical refactor across many files (no behavior change) | `wf-no-sdd` | Deterministic, no design decisions |
+| Simple bug fix (cause clear, solution direct) | `wf-no-sdd` | One obvious path, no trade-offs |
+| Small new feature (max 3 files, direct implementation, behavior obvious) | `wf-no-sdd` | Simple & straightforward, no alternatives |
+| Extend existing flow with unspecified UX decision | `wf-force-sdd` | Multiple valid approaches, needs validation |
+| New abstraction, shared hook, or architectural pattern | `wf-force-sdd` | Design decision required |
+| New global state, new API/endpoint, public contract change | `wf-force-sdd` | Impacts system design, trade-offs present |
+| Data model change, dependency migration (major) | `wf-force-sdd` | Breaking changes, multiple valid architectures |
