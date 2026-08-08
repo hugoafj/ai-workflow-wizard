@@ -55,6 +55,27 @@ wf-init/          — wizard phases
 - If you detect that the code contradicts something in this AGENTS.md, report it at the end of
   your response with the tag `[AGENTS.md drift detected: <description>]`. Do NOT fix AGENTS.md yourself.
 
+## SDD Workflow — Mandatory Hard Stops (BLOCKING)
+
+**BEFORE any SDD request, gentle-ai skill invocation, or wf-* command:**
+
+1. **READ `.agents/protocols/wf-orchestrator.md` FIRST** — this is not optional.
+   - wf-orchestrator defines the authoritative gate sequence: Ladder → Preflight → Decision → TDD ritual
+   - All SDD routing and skill delegation flow through wf-orchestrator
+   
+2. **IF you skip reading wf-orchestrator**: STOP immediately. Do not proceed with any SDD work.
+   - No proposal drafting
+   - No skill invocation
+   - No code changes
+   - Wait for explicit user confirmation that you have read it.
+
+3. **IF wf-orchestrator says STOP at any gate**: honor it. Stop means stop.
+   - No workarounds
+   - No "I'll do the work anyway"
+   - STOP and ask the user to clarify before proceeding
+
+**Precedence**: wf-orchestrator is the source of truth for ALL SDD decisions. Project AGENTS.md, local protocols, and individual skills are subordinate to it.
+
 ## Critical: AI_DEV_WORKFLOW.md Synchronization
 
 **BEFORE every commit**, if your changes affect ANY of these topics, verify and update AI_DEV_WORKFLOW.md:

@@ -42,6 +42,43 @@ delegation, which remains gentle-ai's exclusive authority.
 - Namespace rule: everything with a `wf-` prefix belongs to THIS wizard, never to gentle-ai.
   Anything named `sdd-*` (no `wf-` prefix) belongs to gentle-ai. Never attribute one to the other.
 
+## Hard Stop Protocol (MANDATORY ENFORCEMENT)
+
+**Hard Stop #1 — Gate Confirmation (before ANY code write)**
+
+Before you write, edit, or generate any file for this project:
+
+```
+GATE CONFIRMATION CHECKLIST:
+  ✓ wf-ladder completed (if active) or skipped (if not)    → [✓/✗]
+  ✓ wf-sdd-trigger shown and user chose outcome           → [✓/✗]
+  ✓ wf-preflight displayed with decision visible          → [✓/✗]
+  ✓ wf-tdd ritual done (if active) or skipped (if not)    → [✓/✗]
+
+IF ALL are ✓: proceed to implementation
+IF ANY is ✗ or not confirmed: STOP. Wait for explicit user confirmation.
+```
+
+**Exception**: None. This applies to wf-no-sdd (trivial/straightforward), wf-force-sdd (complex), all changes, all complexity levels.
+
+**Hard Stop #2 — Skill Protocol Fidelity (if sdd-*)**
+
+If the user invokes any `sdd-*` skill (sdd-new, sdd-explore, sdd-apply, sdd-verify, sdd-archive, etc.):
+
+```
+SKILL PROTOCOL CONTRACT:
+  ✓ Read the skill's SKILL.md completely        → [done/not done]
+  ✓ Execute the skill's steps EXACTLY as written → [following/not following]
+  ✓ Do NOT shortcut, merge, or reorder steps     → [compliant/violating]
+  ✓ Do NOT draft artifacts manually             → [respecting/bypassing]
+
+IF you cannot or will not follow the skill 100%: STOP.
+Say "I cannot run this skill as written because [reason]" and wait for user decision.
+Do NOT run it partially or your own way.
+```
+
+**Enforcement**: Both hard stops must be visibly satisfied in your response BEFORE any file write, edit, or skill invocation. No silent skipping.
+
 ## Decision Gates
 
 | This project has active | Load, in order |
