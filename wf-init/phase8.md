@@ -22,6 +22,21 @@ mkdir -p .agents/protocols .claude/skills
 
 # The hook needs execute permission
 [ -f .git/hooks/post-commit ] && chmod +x .git/hooks/post-commit
+
+# Reinsert Windsurf rule into AGENTS.md (safety net — may have been lost in the copy from staging)
+IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
+if echo "$IDES" | grep -q "windsurf"; then
+  WF_RULE_FILE="$WF_DIR/temp-files/AGENTS.md"
+  if [ -f "$WF_RULE_FILE" ] && [ -f AGENTS.md ]; then
+    # Check if the rule is already present
+    if ! grep -q "Gentle AI — Legacy Path Bridge" AGENTS.md; then
+      # Extract the Windsurf rule (everything after the title line)
+      WINDSURF_RULE=$(tail -n +2 "$WF_RULE_FILE")
+      # Insert after the first line (after "# AGENTS.md — workflow-wizard")
+      sed -i '1a\n'"$WINDSURF_RULE" AGENTS.md
+    fi
+  fi
+fi
 ```
 
 ### 8.1b CI/CD activation (only what requires running commands)
