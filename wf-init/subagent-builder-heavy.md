@@ -105,15 +105,25 @@ If LAYERS includes unit/integration:
 - `$WF_RAW/templates/protocols/testing/setup.tmpl.md`
   → `{WF_STAGING}/src/test/setup.ts` (raw, strip `# prose header` if present)
 
+  **Coverage extra (fragment injection)**: if `state.testing.coverage_threshold` is a number,
+  inject `$WF_RAW/templates/protocols/testing/coverage-thresholds.tmpl.md` inside the
+  `test: { ... }` block of the generated `vitest.config.ts` (before the closing `}`),
+  resolving `{{threshold}}` → `state.testing.coverage_threshold`.
+
 If LAYERS includes e2e:
 - `$WF_RAW/templates/protocols/testing/playwright.config.tmpl.md`
   → `{WF_STAGING}/playwright.config.ts` (typescript block only)
 - `$WF_RAW/templates/protocols/testing/e2e-example.tmpl.md`
   → `{WF_STAGING}/e2e/example.spec.ts`
 
+  **Visual regression extra (fragment injection)**: if `state.testing.visual_regression == true`,
+  inject `$WF_RAW/templates/protocols/testing/visual-snapshots.tmpl.md` inside the
+  `defineConfig({ ... })` block of the generated `playwright.config.ts` (before the closing `})`),
+  no placeholders to resolve.
+
 **`openspec/config.yaml` is NEVER written or overwritten here**, in any backend. It is the
 exclusive artifact of gentle-ai's `/sdd-init` (see protocol `sdd`, BLOCK RULE). Testing/strict_tdd
-values are reflected via a targeted, agent-driven edit in Phase 4.6b (`phase46b.md`) against the
+values are reflected via a targeted, agent-driven edit in Phase 8, step 8.1d (`phase8.md`) against the
 file `/sdd-init` already created — never a mechanical copy from `config.yaml.tmpl.md`, which is a
 field reference, not a file to stamp.
 

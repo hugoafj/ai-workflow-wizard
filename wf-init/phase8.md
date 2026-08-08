@@ -123,6 +123,107 @@ fi
 > Use heredocs for any file you manually rewrite (avoid variable
 > expansion). The hook already comes VERBATIM from the template; don't edit it when copying.
 
+### 8.1d SDD config.yaml targeted edit (openspec/hybrid backend only)
+
+**Gate**: only if `openspec/config.yaml` exists (created by gentle-ai's `/sdd-init` in
+Phase 4.5). Skip entirely if the backend is engram-only — there is no config.yaml to edit.
+
+The wizard NEVER regenerates or stamps `openspec/config.yaml` — it is the exclusive artifact
+of `/sdd-init` (BLOCK RULE, protocol `sdd`, "Wizard-Allowed Field Edits"). This step performs
+the targeted leaf-field edit deferred from Phase 4.6b: it writes the activated testing
+configuration (`testing.configured`, `runner`, `layers.*`, `extras.*`, `conventions`,
+`checks_before_done`) into the EXISTING file.
+
+```bash
+if [ ! -f openspec/config.yaml ]; then
+  echo "8.1d skipped — no openspec/config.yaml (engram backend or /sdd-init not run)."
+  exit 0
+fi
+# Resolve the values from state (flat schema: testing.coverage_threshold, not testing.extras.*)
+UNIT=$(jq -r '.testing.layers | index("unit") != null' .wizard-state.json)
+INTEGRATION=$(jq -r '.testing.layers | index("integration") != null' .wizard-state.json)
+E2E=$(jq -r '.testing.layers | index("e2e") != null' .wizard-state.json)
+if [ "$UNIT" = "true" ] && [ "$E2E" = "true" ]; then RUNNER="vitest+playwright"
+elif [ "$E2E" = "true" ]; then RUNNER="playwright"
+else RUNNER="vitest"; fi
+COVERAGE=$(jq -r '.testing.coverage_threshold != null' .wizard-state.json)
+COVERAGE_THRESHOLD=$(jq -r '.testing.coverage_threshold // null' .wizard-state.json)
+VISUAL=$(jq -r '.testing.visual_regression // false' .wizard-state.json)
+POM=$(jq -r '.testing.page_object_model // false' .wizard-state.json)
+```
+
+Read the CURRENT, real file first — its exact shape can vary (gentle-ai documents the schema
+is not fully uniform; `testing`/`layers`/`checks_before_done` may be top-level or nested under
+`context.*`). Locate the keys wherever they actually live and update ONLY these leaf values,
+preserving every other key byte-for-byte (`artifact_store`/`schema`, `project`,
+`context.stack`/`pattern`/etc., `sdd.*`, `notes`, `rules.*`, and anything else present):
+
+```yaml
+testing:
+  configured: true
+  runner: <RUNNER>                    # vitest | playwright | vitest+playwright
+  planned: null                       # no longer "planned", it's configured
+layers:
+  unit: <UNIT>                        # true if layer 1 was activated
+  integration: <INTEGRATION>          # true if layer 2 was activated
+  e2e: <E2E>                          # true if layer 3 was activated
+  coverage: <COVERAGE>                # true if extra 1 was activated (coverage targets)
+extras:
+  coverage_threshold: <COVERAGE_THRESHOLD>   # number if extra 1 was activated, e.g. 80, else null
+  visual_regression: <VISUAL>         # true if extra 2 was activated
+  page_object_model: <POM>            # true if extra 3 was activated
+conventions:
+  unit: "Component.test.tsx — junto al componente"
+  integration: "*.integration.test.tsx — en src/__tests__/integration/"
+  e2e: "e2e/<feature-name>.spec.ts — one file per user flow, named by flow not by component"
+checks_before_done:
+  - npm run lint
+  - npm run build
+  - npm run test                      # if unit/integration activated
+  - npm run test -- --coverage        # if coverage extra activated
+  - npm run test:e2e                  # if e2e activated
+```
+
+If a key from this list does not exist yet in the real file, add it at the same nesting level as
+its siblings (e.g. if the file has a top-level `testing:` block, add `layers` there too — do not
+invent a new top-level shape). If in doubt about where a key belongs, ask the user to confirm
+before writing rather than guessing a structure that could break what `/sdd-init`, `sdd-apply`, or
+`sdd-verify` expect to read. NEVER copy from `templates/protocols/sdd/config.yaml.tmpl.md` (it is
+a field reference, not a file to stamp). Leave `strict_tdd` alone — Phase 4.6 owns that field.
+
+Verify the edit landed — the file must now contain the threshold:
+
+```bash
+grep -n "coverage_threshold" openspec/config.yaml && echo "8.1d OK — coverage_threshold present"
+```
+
+### 8.1e Testing scripts + Playwright MCP registration (project files, only if testing configured)
+
+The builder only stages NEW files. `package.json` and the IDE MCP settings are real project
+files — they are modified here, after the configs exist (same content as `test-scripts.tmpl.md` /
+`e2e-scripts.tmpl.md`, but applied directly to the project's package.json):
+
+```bash
+HAS_TESTING=$(jq -r '.testing.layers[]?' .wizard-state.json 2>/dev/null | wc -l)
+if [ "$HAS_TESTING" -gt 0 ]; then
+  # unit/integration scripts
+  if jq -e '.testing.layers[] | select(. == "unit" or . == "integration")' .wizard-state.json >/dev/null 2>&1; then
+    npm pkg set scripts.test="vitest" scripts.test:ui="vitest --ui" scripts.test:coverage="vitest run --coverage" 2>/dev/null || true
+  fi
+  # e2e scripts
+  if jq -e '.testing.layers[] | select(. == "e2e")' .wizard-state.json >/dev/null 2>&1; then
+    npm pkg set scripts.test:e2e="playwright test" scripts.test:e2e:ui="playwright test --ui" scripts.test:e2e:report="playwright show-report" 2>/dev/null || true
+  fi
+fi
+```
+
+**Playwright MCP** (only if the e2e layer is active): register `@playwright/mcp` in the active
+IDE's MCP settings. The exact per-IDE format is in `playwright-mcp.settings.tmpl.md` (Claude:
+`.claude/settings.json` or `.claude/settings.local.json` to avoid committing it; Cursor:
+`.cursor/mcp.json`; Windsurf: `.windsurf/mcp.json`). If the format isn't clear for any active IDE,
+tell the user which files to create and with what content, and wait for confirmation before writing.
+`@playwright/mcp` needs no API key — it is reasonable to commit it so the whole team has it.
+
 ### 8.2 Update .gitignore
 
 ```bash
@@ -163,6 +264,8 @@ git add -f .github/copilot-instructions.md .github/prompts/ 2>/dev/null || true
 # CI/CD (Block 6): workflows, conventional commits, husky, release-please, .gga
 git add -f .github/workflows/ 2>/dev/null || true
 git add -f .husky/ .commitlintrc.json .gga release-please-config.json .release-please-manifest.json 2>/dev/null || true
+# SDD artifacts (openspec/): created by /sdd-init in Phase 4.5 + targeted edit in 8.1d
+git add openspec/ 2>/dev/null || true
 git add .gitignore
 
 WF_VER=$(jq -r '.wizard_version // "0.0.0"' .wizard-state.json)

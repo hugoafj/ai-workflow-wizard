@@ -57,9 +57,9 @@ jq -r '.features.ci // false' .wizard-state.json 2>/dev/null
 jq -r '.features.release_please // false' .wizard-state.json 2>/dev/null
 jq -r '.sdd.backend // "unknown"' .wizard-state.json 2>/dev/null
 jq -r '.testing.tdd_mode // "standard"' .wizard-state.json 2>/dev/null
-jq -r '.testing.extras.coverage_threshold // null' .wizard-state.json 2>/dev/null
-jq -r '.testing.extras.visual_regression // false' .wizard-state.json 2>/dev/null
-jq -r '.testing.extras.page_object_model // false' .wizard-state.json 2>/dev/null
+jq -r '.testing.coverage_threshold // null' .wizard-state.json 2>/dev/null
+jq -r '.testing.visual_regression // false' .wizard-state.json 2>/dev/null
+jq -r '.testing.page_object_model // false' .wizard-state.json 2>/dev/null
 jq -r '.ci.e2e_in_ci // false' .wizard-state.json 2>/dev/null
 jq -r '.ci.ai_reviewer // "none"' .wizard-state.json 2>/dev/null
 jq -r '.ci.gga_provider // "none"' .wizard-state.json 2>/dev/null
@@ -370,10 +370,10 @@ Confirm:
 **State update**:
 ```bash
 # If enabling (replace N with the threshold):
-jq '.testing.extras.coverage_threshold = N' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+jq '.testing.coverage_threshold = N' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
 
 # If disabling:
-jq '.testing.extras.coverage_threshold = null' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+jq '.testing.coverage_threshold = null' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
 ```
 
 ---
@@ -402,7 +402,7 @@ Confirm:
 **State update**:
 ```bash
 # Replace <value> with true or false
-jq '.testing.extras.visual_regression = <value>' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+jq '.testing.visual_regression = <value>' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
 ```
 
 ---
@@ -431,7 +431,7 @@ Confirm:
 **State update**:
 ```bash
 # Replace <value> with true or false
-jq '.testing.extras.page_object_model = <value>' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+jq '.testing.page_object_model = <value>' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
 ```
 
 ---
