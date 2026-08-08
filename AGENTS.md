@@ -74,6 +74,8 @@ wf-init/          — wizard phases
    - No "I'll do the work anyway"
    - STOP and ask the user to clarify before proceeding
 
+4. **CRITICAL: TDD + SDD combination**: If wf-tdd is active AND you chose wf-force-sdd, wf-tdd preflight MUST be completed BEFORE running sdd-apply. No exceptions. The TDD ritual is part of the SDD skill workflow.
+
 **Precedence**: wf-orchestrator is the source of truth for ALL SDD decisions. Project AGENTS.md, local protocols, and individual skills are subordinate to it.
 
 ## Critical: AI_DEV_WORKFLOW.md Synchronization

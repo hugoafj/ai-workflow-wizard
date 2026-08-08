@@ -50,13 +50,14 @@ Before you write, edit, or generate any file for this project:
 
 ```
 GATE CONFIRMATION CHECKLIST:
-  ✓ wf-ladder completed (if active) or skipped (if not)    → [✓/✗]
+  ✓ wf-ladder completed (if active)                       → [✓/✗/n/a]
   ✓ wf-sdd-trigger shown and user chose outcome           → [✓/✗]
   ✓ wf-preflight displayed with decision visible          → [✓/✗]
-  ✓ wf-tdd ritual done (if active) or skipped (if not)    → [✓/✗]
+  ✓ wf-tdd ritual DONE (if active) — NO SKIPPING          → [✓/✗/n/a]
 
 IF ALL are ✓: proceed to implementation
 IF ANY is ✗ or not confirmed: STOP. Wait for explicit user confirmation.
+If any feature is active, it MUST be completed (✓) — no exceptions or skipping.
 ```
 
 **Exception**: None. This applies to wf-no-sdd (trivial/straightforward), wf-force-sdd (complex), all changes, all complexity levels.
@@ -71,6 +72,13 @@ SKILL PROTOCOL CONTRACT:
   ✓ Execute the skill's steps EXACTLY as written → [following/not following]
   ✓ Do NOT shortcut, merge, or reorder steps     → [compliant/violating]
   ✓ Do NOT draft artifacts manually             → [respecting/bypassing]
+
+**CRITICAL — if `wf-tdd` is active AND this is SDD (wf-force-sdd route)**:
+  ✓ TDD PREFLIGHT issued and confirmed BEFORE sdd-apply → [✓/✗]
+  
+  If TDD is active and you chose force-SDD, you MUST run wf-tdd BEFORE sdd-apply.
+  The TDD ritual (TDD PROPOSAL in standard mode) is part of the skill workflow.
+  Do NOT skip it or run sdd-apply before completing wf-tdd.
 
 IF you cannot or will not follow the skill 100%: STOP.
 Say "I cannot run this skill as written because [reason]" and wait for user decision.
