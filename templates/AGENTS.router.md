@@ -12,6 +12,16 @@
 
 # AGENTS.md — {{answers.project_name}} — {{answers.stack_versions}}
 
+<if state.features.routing_abc or state.features.decision_ladder>
+> **⛔ HARD STOP RULE — always follow wf-orchestrator skill first.**
+>
+> always follow wf-orchestrator.md skill first. Before classifying, planning, or implementing
+> any task, READ `wf-orchestrator` (the project's packaged skill — see Protocol routing below).
+> It is the single entry point and source of truth for this project's workflow: it decides the
+> gate sequence (Ladder → Preflight → Decision → TDD ritual). If you skipped it, STOP and read
+> it before doing anything else.
+</if>
+
 ## Commands
 
 {{discovery.commands}}  <!-- exact commands with real flags detected from manifest -->
