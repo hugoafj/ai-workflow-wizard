@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.5-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.4.4-beta.1...v0.4.5-beta.1) (2026-08-08)
+
+
+### Bug Fixes
+
+* phase0b sync order + phase45 hardcoded paths ([#55](https://github.com/hugoafj/ai-workflow-wizard/issues/55)) ([e864b09](https://github.com/hugoafj/ai-workflow-wizard/commit/e864b0920d7fc16bb42ac6d3c42330e0ca8e9db5))
+
 ## [0.4.4-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.4.3-beta.1...v0.4.4-beta.1) (2026-08-06)
 
 
