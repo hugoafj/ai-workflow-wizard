@@ -1,72 +1,63 @@
 # openspec/config.yaml — Wizard-Allowed Field Reference (NOT a file to copy)
 #
 # ⚠️ This is NOT a template to stamp into `openspec/config.yaml`. That file is the
-# exclusive artifact of gentle-ai's `/sdd-init` (see protocol `sdd`, BLOCK RULE) —
-# its real shape can vary and is NOT fully uniform even across gentle-ai's own skills
-# (e.g. these keys may live at the top level or nested under `context.*` depending on
-# how `/sdd-init` wrote the file for this project).
+# exclusive artifact of gentle-ai's `/sdd-init` (see protocol `sdd`, BLOCK RULE).
 #
-# This block only documents the SPECIFIC leaf fields the wizard is allowed to ask the
-# agent to add/update inside the EXISTING file (Phase 4.6b, `wf-settings`), always via
-# a targeted, agent-driven edit that preserves everything else byte-for-byte. Never
-# regenerate or overwrite the file from this reference.
+# This block documents the SPECIFIC canonical leaf fields the wizard is allowed to ask the
+# agent to add/update inside the EXISTING file (Phase 8, step 8.1d), always via a targeted,
+# `yq`-based leaf-field edit that preserves everything else byte-for-byte. The schema below
+# is gentle-ai's own (`_shared/openspec-convention.md`, `docs/openspec-config.md`, and the
+# `openspec/config.yaml` in the gentle-ai repo). Never regenerate or overwrite the file from
+# this reference, and never invent new top-level keys (`configured`, `planned`, `extras`,
+# `conventions`, `checks_before_done`) — no gentle-ai consumer reads them.
 #
-# Placeholders (resolve from state):
-#   {{strict_tdd}}          → true/false based on TDD mode
-#   {{runner}}              → vitest | playwright | vitest+playwright
-#   {{unit}}                → true/false
-#   {{integration}}         → true/false
-#   {{e2e}}                 → true/false
+# What gentle-ai actually reads:
+#   - sdd-apply          → strict_tdd + `testing` section (runner detection); overrides in
+#                          `rules.apply.test_command`
+#   - sdd-verify         → `rules.verify.test_command`, `rules.verify.build_command`,
+#                          `rules.verify.coverage_threshold`
+#   - sdd-init           → writes the file; caches capabilities in `testing.*`
+#
+# Wizard-Allowed Field Edits (leaf fields, resolve placeholders from state):
+#   {{strict_tdd}}          → true/false based on TDD mode (Phase 4.6 owns this — leave alone)
+#   {{runner_command}}      → test command, e.g. "npm test"
+#   {{runner_framework}}    → vitest | playwright | vitest+playwright
+#   {{layer_unit}}          → true/false
+#   {{layer_integration}}   → true/false
+#   {{layer_e2e}}           → true/false
+#   {{coverage_available}}  → true/false (extra 1 activated)
+#   {{coverage_command}}    → e.g. "npm run test:coverage"
 #   {{coverage_threshold}}  → number (e.g., 80) from testing.coverage_threshold
-#   {{checks_before_done}}  → list of scripts based on active layers
-#   {{project_context}}     → multi-line text with stack + architecture + testing + style
+#   {{test_command}}        → e.g. "npm test"
+#   {{build_command}}       → e.g. "npm run build"
 #
-schema: spec-driven
+# Canonical shape (only the leaf fields the wizard may touch; omit what isn't activated):
 
-context: |
-  {{project_context}}
+strict_tdd: {{strict_tdd}}
+
+rules:
+  apply:
+    test_command: {{test_command}}
+  verify:
+    test_command: {{test_command}}
+    build_command: {{build_command}}
+    coverage_threshold: {{coverage_threshold}}
 
 testing:
   strict_tdd: {{strict_tdd}}
-  test_runner: {{runner}}
-  test_command: npm test
-  coverage_command: npm run test:coverage
-  e2e_command: npm run test:e2e
+  runner:
+    command: {{runner_command}}
+    framework: {{runner_framework}}
   layers:
-    unit: {{unit}}
-    integration: {{integration}}
-    e2e: {{e2e}}
-  tools:
-    linter: eslint
-    linter_command: npm run lint
-    type_checker: tsc
-    type_checker_command: npx tsc --noEmit
-    formatter: none
-
-rules:
-  proposal:
-    - Include rollback plan for risky changes
-  specs:
-    - Use Given/When/Then for scenarios
-    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
-  design:
-    - Include sequence diagrams for complex flows
-    - Document architecture decisions with rationale
-  tasks:
-    - Group by phase, use hierarchical numbering
-    - Keep tasks completable in one session
-  apply:
-    - Follow existing code patterns
-    tdd: false
-    test_command: npm test
-  verify:
-    test_command: npm test
-    build_command: npm run build
-    coverage_threshold: {{coverage_threshold}}
-  archive:
-    - Warn before merging destructive deltas
-
-checks_before_done:
-  - npm run lint
-  - npm run build
-  {{checks_before_done}}
+    unit:
+      available: {{layer_unit}}
+      tool: vitest
+    integration:
+      available: {{layer_integration}}
+      tool: vitest
+    e2e:
+      available: {{layer_e2e}}
+      tool: playwright
+  coverage:
+    available: {{coverage_available}}
+    command: {{coverage_command}}

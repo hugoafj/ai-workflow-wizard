@@ -85,23 +85,35 @@ the *delta* greenfield/legacy concept are documented in `AI_DEV_WORKFLOW.md` §6
 
 ### Wizard-Allowed Field Edits (Hard Rule)
 
-The wizard (Phase 4.6b, `wf-settings`) may ask the **current agent** to update a small, fixed set of
-leaf fields inside the EXISTING `openspec/config.yaml` — never regenerate or overwrite the file, and
-never do it via a script/template stamp (`config.yaml.tmpl.md` is documentation of these fields, not
-a file to copy — see its header comment):
+The wizard (Phase 4.6b, `wf-settings`, Phase 8 step 8.1d) may ask the **current agent** to update a
+small, fixed set of leaf fields inside the EXISTING `openspec/config.yaml` — never regenerate or
+overwrite the file, and never do it via a script/template stamp (`config.yaml.tmpl.md` is
+documentation of these fields, not a file to copy — see its header comment):
 
 | Allowed field | When |
 |---|---|
 | `strict_tdd` | Toggling Strict TDD Mode (Phase 4.6 / `wf-settings`) |
-| `testing.*` (`configured`, `runner`, `planned`) | Testing stack activated/changed |
-| `layers.*` (`unit`, `integration`, `e2e`, `coverage`) | Testing layers activated/changed |
-| `extras.*` (`coverage_threshold`, `visual_regression`, `page_object_model`) | Optional testing extras toggled |
-| `checks_before_done` | Testing/CI scripts added |
+| `testing.runner.{command,framework}` | Testing stack activated/changed (Phase 8, step 8.1d) |
+| `testing.layers.<layer>.{available,tool}` | Testing layers activated/changed (Phase 8, step 8.1d) |
+| `testing.coverage.{available,command}` | Coverage extra activated (Phase 8, step 8.1d) |
+| `rules.verify.coverage_threshold` | Coverage extra activated (Phase 8, step 8.1d) |
+| `rules.apply.test_command` / `rules.verify.{test_command,build_command}` | Testing/CI scripts added (Phase 8, step 8.1d) |
 | the backend/artifact-store field (name may vary — read the real file first, never assume) | SDD backend migration (`wf-settings`, section 8) |
 
-**Every edit MUST**: (1) read the real file first, (2) locate these keys wherever they actually live
-in that file's real structure, (3) change only those leaf values, (4) preserve everything else
-verbatim (`artifact_store`/`schema`, `project`, `context.*`, `sdd.*`, `notes`, `rules.*`, and any
-other key present). If a key from this list is missing, add it at the same nesting level as its
-siblings — never invent a new top-level shape. If the correct location is ambiguous, ask the user
-before writing.
+These map onto gentle-ai's canonical schema (`_shared/openspec-convention.md`,
+`docs/openspec-config.md`, the `openspec/config.yaml` in the gentle-ai repo): `sdd-apply` reads the
+`testing` section for runner detection and `rules.apply.test_command` as override; `sdd-verify`
+reads `rules.verify.{test_command,build_command,coverage_threshold}`. Do NOT invent top-level keys
+(`configured`, `planned`, `extras`, `conventions`, `checks_before_done`) — no gentle-ai consumer
+reads them. Wizard concepts without a gentle-ai field (`visual_regression`, `page_object_model`)
+stay in `.wizard-state.json`; they surface in the generated `playwright.config.ts` / `e2e/pages/`.
+
+**Every edit MUST**: (1) read the real file first, (2) change only the listed leaf values, (3)
+preserve everything else verbatim (`artifact_store`/`schema`, `project`, `context.*`, `sdd.*`,
+`notes`, `rules.*` beyond the listed keys, and any other key present). The `testing.*`/`rules.*`
+fields are written at the canonical gentle-ai nesting (`rules.verify.coverage_threshold`,
+`testing.runner.{command,framework}`, `testing.layers.<layer>.{available,tool}`) even when
+`/sdd-init` wrote the file at a different nesting — that is where gentle-ai's consumers read them
+(`docs/openspec-config.md` documents the shape is not fully uniform across versions). If the real
+file already carries the same value at a non-canonical nesting, leave the old key in place and
+confirm the canonical one is set. If the correct location is ambiguous, ask the user before writing.

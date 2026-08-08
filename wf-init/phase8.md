@@ -146,70 +146,117 @@ Phase 4.5). Skip entirely if the backend is engram-only — there is no config.y
 The wizard NEVER regenerates or stamps `openspec/config.yaml` — it is the exclusive artifact
 of `/sdd-init` (BLOCK RULE, protocol `sdd`, "Wizard-Allowed Field Edits"). This step performs
 the targeted leaf-field edit deferred from Phase 4.6b: it writes the activated testing
-configuration (`testing.configured`, `runner`, `layers.*`, `extras.*`, `conventions`,
-`checks_before_done`) into the EXISTING file.
+configuration into the EXISTING file using gentle-ai's canonical schema — the exact shape its
+SDD skills read. Do NOT invent new top-level keys (`configured`, `planned`, `extras`,
+`conventions`, `checks_before_done`): no gentle-ai consumer reads them, and they would just
+accumulate dead data in the file.
+
+**Canonical schema (gentle-ai source of truth — `_shared/openspec-convention.md`,
+`docs/openspec-config.md`, the repo's own `openspec/config.yaml`):**
+
+```yaml
+strict_tdd: true              # top-level — Phase 4.6 owns this, leave it alone
+rules:
+  apply:
+    guidelines: [...]         # phase rules; leave as-is
+    tdd: false                # leave as-is
+    test_command: "npm test"  # ← sdd-apply strict-tdd reads rules.apply.test_command (override)
+  verify:
+    test_command: ""          # ← sdd-verify runs this
+    build_command: ""         # ← sdd-verify runs this
+    coverage_threshold: 0     # ← sdd-verify enforces this (docs/openspec-config.md)
+testing:
+  strict_tdd: true            # Phase 4.6 owns this, leave it alone
+  detected: "YYYY-MM-DD"      # leave as-is
+  runner:
+    command: "npm test"       # ← sdd-apply detects the runner here (testing section)
+    framework: "Vitest"
+  layers:
+    unit:        {available: true, tool: "vitest"}       # ← capability cache
+    integration: {available: true, tool: "vitest"}
+    e2e:         {available: true, tool: "playwright"}
+  coverage:
+    available: true           # ← capability cache
+    command: "npm run test:coverage"
+  quality:
+    linter: {...}             # leave as-is — detected by /sdd-init
+    type_checker: {...}
+    formatter: {...}
+```
+
+Map the wizard's activated extras onto THESE fields (not onto invented ones):
+`testing.runner.{command,framework}`, `testing.layers.<layer>.{available,tool}`,
+`testing.coverage.{available,command}` (coverage extra), `rules.verify.coverage_threshold`
+(coverage extra), `rules.apply.test_command` + `rules.verify.{test_command,build_command}`
+(always). `visual_regression` and `page_object_model` stay in `.wizard-state.json` only —
+gentle-ai has no field for them; they surface in the generated `playwright.config.ts` / `e2e/pages/`.
+
+Resolve the values from state (flat schema — `testing.coverage_threshold`, not `testing.extras.*`):
 
 ```bash
 if [ ! -f openspec/config.yaml ]; then
   echo "8.1d skipped — no openspec/config.yaml (engram backend or /sdd-init not run)."
   exit 0
 fi
-# Resolve the values from state (flat schema: testing.coverage_threshold, not testing.extras.*)
 UNIT=$(jq -r '.testing.layers | index("unit") != null' .wizard-state.json)
 INTEGRATION=$(jq -r '.testing.layers | index("integration") != null' .wizard-state.json)
 E2E=$(jq -r '.testing.layers | index("e2e") != null' .wizard-state.json)
-if [ "$UNIT" = "true" ] && [ "$E2E" = "true" ]; then RUNNER="vitest+playwright"
-elif [ "$E2E" = "true" ]; then RUNNER="playwright"
-else RUNNER="vitest"; fi
+if [ "$UNIT" = "true" ] && [ "$E2E" = "true" ]; then FRAMEWORK="Vitest + Playwright"
+elif [ "$E2E" = "true" ]; then FRAMEWORK="Playwright"
+else FRAMEWORK="Vitest"; fi
 COVERAGE=$(jq -r '.testing.coverage_threshold != null' .wizard-state.json)
 COVERAGE_THRESHOLD=$(jq -r '.testing.coverage_threshold // null' .wizard-state.json)
-VISUAL=$(jq -r '.testing.visual_regression // false' .wizard-state.json)
-POM=$(jq -r '.testing.page_object_model // false' .wizard-state.json)
 ```
 
-Read the CURRENT, real file first — its exact shape can vary (gentle-ai documents the schema
-is not fully uniform; `testing`/`layers`/`checks_before_done` may be top-level or nested under
-`context.*`). Locate the keys wherever they actually live and update ONLY these leaf values,
-preserving every other key byte-for-byte (`artifact_store`/`schema`, `project`,
-`context.stack`/`pattern`/etc., `sdd.*`, `notes`, `rules.*`, and anything else present):
-
-```yaml
-testing:
-  configured: true
-  runner: <RUNNER>                    # vitest | playwright | vitest+playwright
-  planned: null                       # no longer "planned", it's configured
-layers:
-  unit: <UNIT>                        # true if layer 1 was activated
-  integration: <INTEGRATION>          # true if layer 2 was activated
-  e2e: <E2E>                          # true if layer 3 was activated
-  coverage: <COVERAGE>                # true if extra 1 was activated (coverage targets)
-extras:
-  coverage_threshold: <COVERAGE_THRESHOLD>   # number if extra 1 was activated, e.g. 80, else null
-  visual_regression: <VISUAL>         # true if extra 2 was activated
-  page_object_model: <POM>            # true if extra 3 was activated
-conventions:
-  unit: "Component.test.tsx — junto al componente"
-  integration: "*.integration.test.tsx — en src/__tests__/integration/"
-  e2e: "e2e/<feature-name>.spec.ts — one file per user flow, named by flow not by component"
-checks_before_done:
-  - npm run lint
-  - npm run build
-  - npm run test                      # if unit/integration activated
-  - npm run test -- --coverage        # if coverage extra activated
-  - npm run test:e2e                  # if e2e activated
-```
-
-If a key from this list does not exist yet in the real file, add it at the same nesting level as
-its siblings (e.g. if the file has a top-level `testing:` block, add `layers` there too — do not
-invent a new top-level shape). If in doubt about where a key belongs, ask the user to confirm
-before writing rather than guessing a structure that could break what `/sdd-init`, `sdd-apply`, or
-`sdd-verify` expect to read. NEVER copy from `templates/protocols/sdd/config.yaml.tmpl.md` (it is
-a field reference, not a file to stamp). Leave `strict_tdd` alone — Phase 4.6 owns that field.
-
-Verify the edit landed — the file must now contain the threshold:
+Apply the edits with `yq` (same tool Phase 4.6 already uses for `strict_tdd`) — atomic,
+idempotent, preserves every other key byte-for-byte. `yq` creates any missing parent keys in the
+canonical location, so this also works when `/sdd-init` wrote a file without a top-level
+`testing:`/`rules:` block:
 
 ```bash
-grep -n "coverage_threshold" openspec/config.yaml && echo "8.1d OK — coverage_threshold present"
+# 1. Runner (sdd-apply detects it from the testing section)
+yq eval ".testing.runner.framework = \"$FRAMEWORK\"" -i openspec/config.yaml
+
+# 2. Layers capability cache (sdd-apply/verify: available + tool per layer)
+if [ "$UNIT" = "true" ] || [ "$INTEGRATION" = "true" ]; then
+  yq eval '.testing.layers.unit.available = true' -i openspec/config.yaml
+  yq eval '.testing.layers.unit.tool = "vitest"' -i openspec/config.yaml
+fi
+if [ "$INTEGRATION" = "true" ]; then
+  yq eval '.testing.layers.integration.available = true' -i openspec/config.yaml
+  yq eval '.testing.layers.integration.tool = "vitest"' -i openspec/config.yaml
+fi
+if [ "$E2E" = "true" ]; then
+  yq eval '.testing.layers.e2e.available = true' -i openspec/config.yaml
+  yq eval '.testing.layers.e2e.tool = "playwright"' -i openspec/config.yaml
+fi
+
+# 3. Coverage (extra 1 — only if activated): capability cache + sdd-verify threshold
+if [ "$COVERAGE" = "true" ]; then
+  yq eval '.testing.coverage.available = true' -i openspec/config.yaml
+  yq eval '.testing.coverage.command = "npm run test:coverage"' -i openspec/config.yaml
+  yq eval ".rules.verify.coverage_threshold = $COVERAGE_THRESHOLD" -i openspec/config.yaml
+fi
+
+# 4. Command overrides (always when testing configured)
+yq eval '.rules.apply.test_command = "npm test"' -i openspec/config.yaml
+yq eval '.rules.verify.test_command = "npm test"' -i openspec/config.yaml
+yq eval '.rules.verify.build_command = "npm run build"' -i openspec/config.yaml
+```
+
+Never copy from `templates/protocols/sdd/config.yaml.tmpl.md` — it is a field reference, not a
+file to stamp. Leave `strict_tdd` alone — Phase 4.6 owns that field. `yq` writes to the canonical
+nesting (`rules.verify.*`, `testing.*`) even when the real file was written by `/sdd-init` at a
+different nesting — that is correct: gentle-ai's consumers read the canonical location. If you
+find the file already carries the same value at a non-canonical nesting (older `/sdd-init`
+output), leave the old key in place and confirm the canonical one is now set; if in doubt, ask
+the user.
+
+Verify the edit landed — if the coverage extra was activated, the file must now contain the
+threshold under `rules.verify`:
+
+```bash
+grep -n "coverage_threshold" openspec/config.yaml && echo "8.1d OK — rules.verify.coverage_threshold present"
 ```
 
 ### 8.1e Testing scripts + Playwright MCP registration (project files, only if testing configured)
