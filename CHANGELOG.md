@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.5.1-beta.1...v0.5.2-beta.1) (2026-08-08)
+
+
+### Bug Fixes
+
+* realign openspec/config.yaml edits to gentle-ai canonical schema ([#62](https://github.com/hugoafj/ai-workflow-wizard/issues/62)) ([337b3b2](https://github.com/hugoafj/ai-workflow-wizard/commit/337b3b29e53ab91ddf3a3dcfe19854b515a08105))
+
 ## [0.5.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.5.0-beta.1...v0.5.1-beta.1) (2026-08-08)
 
 
