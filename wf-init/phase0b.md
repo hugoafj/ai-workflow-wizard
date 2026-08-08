@@ -52,8 +52,10 @@ If everything is `ok` or non-critical `[!!]`, show a clean summary:
 > source of agents skipping or inventing SDD phases (a stale orchestrator prompt). This check is
 > NOT optional and its result is NOT something the agent may silently decide to ignore.
 
+First, capture the dry-run output to a variable:
+
 ```bash
-gentle-ai sync --dry-run 2>&1
+SYNC_OUTPUT=$(gentle-ai sync --dry-run 2>&1)
 ```
 
 **If the output reports NO pending changes** (sync is current): continue silently to Step 0.5, no
@@ -66,7 +68,7 @@ agent must NOT decide on the user's behalf to continue or to sync:
 ```
 ⚠ gentle-ai's native content for your IDE(s) is out of sync with the installed gentle-ai version.
 
-<paste the full `gentle-ai sync --dry-run` output here, verbatim>
+<paste $SYNC_OUTPUT here, verbatim>
 
 This matters because gentle-ai's own SDD orchestrator/routing rules — which this wizard's own
 protocols (wf-orchestrator, wf-sdd-trigger, wf-ladder, wf-tdd) explicitly defer to for all
