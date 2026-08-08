@@ -26,13 +26,13 @@ sub-agents" even when the actual running agent (Devin) genuinely has a working s
 (yours or gentle-ai's) about whether you can delegate. If you have a real subagent-launching tool
 available right now, use it. If you don't, execute inline as the solo executor.
 
-## Slash-command fallback for adapters without slash support
+## Invocation form: `sdd-new` (no slash) is canonical; `/sdd-new` is the fallback
 
-Some adapters (e.g., Codex/ChatGPT, and historically Devin when it lacks subagent tooling) do not
-support slash commands natively. When invoking `/sdd-new <feature or fix>` fails due to unsupported
-syntax, fall back to the literal string `sdd-new <feature or fix>` without the slash — gentle-ai's
-native orchestrator recognizes this as a natural-language trigger or skill invocation and processes
-it accordingly.
+Invoke the skill as the literal string `sdd-new <feature or fix>` WITHOUT the leading slash — that
+is the canonical natural-language trigger that gentle-ai's orchestrator recognizes on every adapter
+(e.g., Codex/ChatGPT, and historically Devin when it lacks subagent tooling). If your adapter only
+supports native slash syntax, use `/sdd-new <feature or fix>` instead — gentle-ai recognizes it as
+a skill invocation either way.
 
 ## Worked examples
 

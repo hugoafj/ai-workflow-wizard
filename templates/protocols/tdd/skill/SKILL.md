@@ -1,6 +1,6 @@
 ---
 name: wf-tdd
-description: "Trigger: writing tests, feature code, TDD, red green refactor. Wizard-owned TDD ritual — coverage matrix, test proposal, Red-Green-Refactor (standard) or Strict via gentle-ai's strict_tdd. Load before writing tests or code."
+description: "Trigger: writing tests, feature code, TDD, red green refactor. OR when sdd-apply is about to execute. Wizard-owned TDD ritual — coverage matrix, test proposal, Red-Green-Refactor (standard) or Strict via gentle-ai's strict_tdd. Auto-activates before sdd-apply to enforce TDD protocol. Load before writing tests or code."
 license: MIT
 metadata:
   author: hugoafj

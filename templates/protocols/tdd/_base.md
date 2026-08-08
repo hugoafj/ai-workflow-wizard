@@ -24,6 +24,24 @@
 Applies when testing is configured. The agent evaluates which layers are needed
 based on the type of change and presents a proposal before writing any code.
 
+## Hard Rules
+
+- **Auto-trigger before any code**: If this skill detects that code implementation is about to happen (sdd-apply OR direct/inline implementation), it MUST automatically emit the TDD PROPOSAL BEFORE any code is written. This is a blocking gate — do not skip it.
+
+- **CREATE TESTS (RED) before code**: After TDD PROPOSAL and user confirms coverage, CREATE TEST FILES FIRST. No production code exists before tests. This applies to both routes:
+  - **force-SDD**: create tests → sdd-apply (implements code to pass tests)
+  - **no-SDD**: create tests → implement code directly/inline
+  
+  Hard rule: Tests MUST exist and be in RED state before implementation proceeds.
+
+- **Validate tests (GREEN) after code**: After code implementation (via sdd-apply or inline), RUN TESTS to validate they pass. GREEN state is required before proceeding. Hard rule: Do NOT declare code done or proceed to next phase without running tests.
+
+- **After GREEN, route-specific continuation**:
+  - **If force-SDD**: GREEN tests → invoke `sdd-verify` (verify against spec) → `sdd-archive`
+  - **If no-SDD**: GREEN tests → done (commit, no sdd-verify/archive)
+  
+  Hard rule: After GREEN, follow the route-specific next step. Do NOT skip sdd-verify when force-SDD. Do NOT run sdd-verify when no-SDD.
+
 > **⛔ HARD GATE — the TDD ritual always occurs, but WHEN/WHERE depends on the route
 > (don't do it out of place)**: with testing configured, no production code is ever written
 > without first performing the TDD ritual corresponding to the mode (the `🧪 TDD PROPOSAL`

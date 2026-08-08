@@ -42,6 +42,51 @@ delegation, which remains gentle-ai's exclusive authority.
 - Namespace rule: everything with a `wf-` prefix belongs to THIS wizard, never to gentle-ai.
   Anything named `sdd-*` (no `wf-` prefix) belongs to gentle-ai. Never attribute one to the other.
 
+## Hard Stop Protocol (MANDATORY ENFORCEMENT)
+
+**Hard Stop #1 — Gate Confirmation (before ANY code write)**
+
+Before you write, edit, or generate any file for this project:
+
+```
+GATE CONFIRMATION CHECKLIST:
+  ✓ wf-ladder completed (if active)                       → [✓/✗/n/a]
+  ✓ wf-sdd-trigger shown and user chose outcome           → [✓/✗]
+  ✓ wf-preflight displayed with decision visible          → [✓/✗]
+  ✓ wf-tdd ritual DONE (if active) — NO SKIPPING          → [✓/✗/n/a]
+
+IF ALL are ✓: proceed to implementation
+IF ANY is ✗ or not confirmed: STOP. Wait for explicit user confirmation.
+If any feature is active, it MUST be completed (✓) — no exceptions or skipping.
+```
+
+**Exception**: None. This applies to wf-no-sdd (trivial/straightforward), wf-force-sdd (complex), all changes, all complexity levels.
+
+**Hard Stop #2 — Skill Protocol Fidelity (if sdd-*)**
+
+If the user invokes any `sdd-*` skill (sdd-new, sdd-explore, sdd-apply, sdd-verify, sdd-archive, etc.):
+
+```
+SKILL PROTOCOL CONTRACT:
+  ✓ Read the skill's SKILL.md completely        → [done/not done]
+  ✓ Execute the skill's steps EXACTLY as written → [following/not following]
+  ✓ Do NOT shortcut, merge, or reorder steps     → [compliant/violating]
+  ✓ Do NOT draft artifacts manually             → [respecting/bypassing]
+
+**CRITICAL — if `wf-tdd` is active AND this is SDD (wf-force-sdd route)**:
+  ✓ TDD PREFLIGHT issued and confirmed BEFORE sdd-apply → [✓/✗]
+  
+  If TDD is active and you chose force-SDD, you MUST run wf-tdd BEFORE sdd-apply.
+  The TDD ritual (TDD PROPOSAL in standard mode) is part of the skill workflow.
+  Do NOT skip it or run sdd-apply before completing wf-tdd.
+
+IF you cannot or will not follow the skill 100%: STOP.
+Say "I cannot run this skill as written because [reason]" and wait for user decision.
+Do NOT run it partially or your own way.
+```
+
+**Enforcement**: Both hard stops must be visibly satisfied in your response BEFORE any file write, edit, or skill invocation. No silent skipping.
+
 ## Decision Gates
 
 | This project has active | Load, in order |
@@ -58,8 +103,9 @@ Skip a step only if its feature is not active for this project.
 2. Walk the Decision Gates table above, in order, loading only the active protocols.
 3. After `wf-ladder` (if active), pause explicitly and wait for the user to review and confirm
    the ladder rungs before continuing to `wf-sdd-trigger`.
-4. After `wf-sdd-trigger`, if the user confirms the outcome, proceed to `wf-tdd` (if active) or
-   directly to implementation.
+4. After `wf-sdd-trigger`, if the user confirms the outcome:
+   - **If `wf-no-sdd`**: proceed to `wf-tdd` (if active) or directly to implementation.
+   - **If `wf-force-sdd`**: invoke the gentle-ai SDD pipeline (sdd-new/propose/spec/design/tasks). After sdd-tasks completes, ALWAYS invoke `wf-tdd` (if active) to emit TDD PROPOSAL BEFORE proceeding to sdd-apply. This is mandatory — do not skip wf-tdd or run sdd-apply without TDD confirmation.
 5. No additional checklist or combined precheck is emitted — the ladder rungs (if active) and the
    `wf-preflight` block are sufficient before proceeding.
 

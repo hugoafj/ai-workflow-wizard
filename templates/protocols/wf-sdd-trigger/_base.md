@@ -65,12 +65,12 @@ requesting** gentle-ai's SDD? See `reference/edge-cases.md` for the full rationa
    - Override it (if gate said `wf-force-sdd`, ask if they prefer `wf-no-sdd`; if gate said
      `wf-no-sdd`, ask if they prefer `wf-force-sdd`). Loop back to step 3 with the new outcome if
      they choose to override.
-5. If confirmed as `wf-force-sdd`: invoke `/sdd-new <feature or fix description>` (foreground, blocking)
+5. If confirmed as `wf-force-sdd`: invoke `sdd-new <feature or fix description>` (foreground, blocking)
    to execute gentle-ai's full SDD pipeline. This satisfies gentle-ai's own
-   `explicit_request_or_accepted_proposal` gate. **Fallback without slash**: if the agent does not
-   support slash commands (e.g., Codex/ChatGPT), invoke literally `sdd-new <feature or fix description>`
-   without the slash — gentle-ai recognizes it as a natural-language trigger or skill invocation.
-   Never describe the delegation mechanism — gentle-ai's native orchestrator handles that.
+   `explicit_request_or_accepted_proposal` gate. 
+   - **Important**: `sdd-new` is NOT a bash terminal command. It is a natural-language skill invocation that YOU (the agent) execute directly in this conversation, not in a shell.
+   - **Slash fallback**: if your adapter only supports native slash syntax to trigger skills, invoke `/sdd-new <feature or fix description>` instead — gentle-ai recognizes it as a skill invocation. Default to the slash-less form.
+   - Never describe the delegation mechanism — gentle-ai's native orchestrator handles that.
 6. If confirmed as `wf-no-sdd`: proceed to implement directly (or to `wf-tdd` if that feature is
    active, per the `wf-orchestrator` sequencing).
 
