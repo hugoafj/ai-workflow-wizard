@@ -1,4 +1,15 @@
-# openspec/config.yaml — SDD project configuration
+# openspec/config.yaml — Wizard-Allowed Field Reference (NOT a file to copy)
+#
+# ⚠️ This is NOT a template to stamp into `openspec/config.yaml`. That file is the
+# exclusive artifact of gentle-ai's `/sdd-init` (see protocol `sdd`, BLOCK RULE) —
+# its real shape can vary and is NOT fully uniform even across gentle-ai's own skills
+# (e.g. these keys may live at the top level or nested under `context.*` depending on
+# how `/sdd-init` wrote the file for this project).
+#
+# This block only documents the SPECIFIC leaf fields the wizard is allowed to ask the
+# agent to add/update inside the EXISTING file (Phase 4.6b, `wf-settings`), always via
+# a targeted, agent-driven edit that preserves everything else byte-for-byte. Never
+# regenerate or overwrite the file from this reference.
 #
 # Placeholders (resolve from state):
 #   {{strict_tdd}}          → true/false based on TDD mode

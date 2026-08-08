@@ -141,6 +141,16 @@ echo '!.github/copilot-instructions.md' >> .gitignore   # if applicable
 ### 8.3 Force track satellites/protocols and commit
 
 ```bash
+# Refresh gentle-ai's skill registry so its own Skill Resolver Protocol picks up
+# this project's wf-* skills (wf-orchestrator, wf-ladder, wf-sdd-trigger, wf-tdd,
+# wf-sdd-config) right away, instead of waiting for the next commit's post-commit hook.
+# Helps adapters whose orchestrator reads .atl/skill-registry.md before delegating (Claude
+# Code, OpenCode, Cursor, Kiro, Codex). Harmless no-op for Windsurf/Devin — confirmed against
+# gentle-ai's own source (internal/skillregistry/registry.go) that it never scans
+# .windsurf/skills/ or .devin/skills/ at all; those two discover project skills natively from
+# the filesystem instead, so running this command costs nothing but helps nothing for them.
+command -v gentle-ai &>/dev/null && gentle-ai skill-registry refresh --quiet 2>/dev/null || true
+
 git add AGENTS.md CLAUDE.md GEMINI.md 2>/dev/null || true
 git add -f .agents/ 2>/dev/null || true
 git add -f .claude/ 2>/dev/null || true
@@ -165,7 +175,7 @@ git commit -m "chore: initialize AI Workflow Wizard
 - Add AGENTS.md router (thin) pointing to packaged protocols
 - Add protocols as Claude skills and flat files (.agents/protocols)
 - Add satellite files for configured IDEs
-- Add project-specific commands (decision-ladder, sdd-lite, wf-onboard)
+- Add project-specific commands (wf-ladder, wf-onboard)
 - Add maintenance commands (wf-refresh, wf-worktree, wf-settings)
 - Add post-commit hook for drift detection
 - Add CI/CD (Block 6): AI review, quality guard, conventional commits
@@ -206,7 +216,8 @@ Next steps:
 5. To validate: ask the agent "read AGENTS.md and tell me its main sections".
 
 6. For your first task, describe it in natural language.
-   The agent will classify into Route A (direct), B (SDD Lite), or C (Full SDD).
+   The agent (via `wf-orchestrator`/`wf-sdd-trigger`) will classify it as `wf-no-sdd` (direct),
+   or confirmed `wf-force-sdd` route.
 
 7. When the project evolves (new dependencies, new test frameworks, etc.),
    run /wf-refresh to keep AGENTS.md synchronized.

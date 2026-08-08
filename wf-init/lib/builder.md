@@ -91,27 +91,32 @@ build_protocol_body(name):
   return body
 ```
 
-Special case `decision-ladder` (two fragments, distinct lifecycles):
-- `local-orchestration.md` is MANDATORY only if `ROUTING == true`. Includes Preflight,
-  Decision Tree, Routes A/B/C, Route B menu, and **Precheck**. NEVER split or summarize.
-- `ladder.md` (Decision Ladder, steps) is OPTIONAL: included only if `LADDER == true`.
-- body `decision-ladder`:
-  - If `ROUTING == true` AND `LADDER == true`: `ladder.md + local-orchestration.md` (unified, same as today).
-  - If `ROUTING == true` AND `LADDER == false`: only `local-orchestration.md`.
-  - If `ROUTING == false` AND `LADDER == true`: only `ladder.md` (without Preflight/Precheck).
-  - If both false: this protocol is not built.
+Special case — this wizard's own protocols (`wf-ladder`, `wf-sdd-trigger`, `wf-orchestrator`;
+replaces the old, retired `decision-ladder` bundle — see `AI_DEV_WORKFLOW.md` §6.3 for the
+naming/scope rationale). Three independent protocols, NEVER split or summarize their bodies:
+- `wf-sdd-trigger` is MANDATORY only if `ROUTING == true` (state field kept as `features.routing_abc`
+  for backward compatibility with existing `.wizard-state.json` files — it now means "this
+  project's own SDD-forcing policy is active", not "Routes A/B/C"). Decides `wf-no-sdd` vs
+  `wf-force-sdd`, emits `wf-preflight`, and waits for user confirmation. It NEVER specifies HOW
+  gentle-ai delegates/routes — that stays gentle-ai's own native content per adapter.
+- `wf-ladder` (7 rungs) is OPTIONAL: included only if `LADDER == true` (state field kept as
+  `features.decision_ladder`).
+- `wf-orchestrator` (single entry point) is built whenever `ROUTING == true` OR `LADDER == true`
+  — it never duplicates their content, it only sequences which of them (plus `wf-tdd`) apply.
+- If both `ROUTING` and `LADDER` are false: none of the three are built.
 
 Protocols to build (conditional by features):
-- `decision-ladder`: if `ROUTING == true` or `LADDER == true` (according to rules above).
-- `tdd`: if `TDD == true` AND `LAYERS` is not empty (variant = `TDD_MODE`).
-- `sdd`: always when `BACKEND != null`.
+- `wf-orchestrator`, `wf-ladder`, `wf-sdd-trigger`: per the rules above.
+- `tdd` (packaged as skill `wf-tdd`): if `TDD == true` AND `LAYERS` is not empty (variant = `TDD_MODE`).
+- `sdd` (packaged as skill `wf-sdd-config`): always when `BACKEND != null`.
 - `architecture`: always.
 - (`testing`, `cicd`, `ides`, `commands`, `workflow`: are packaged as skill/flat
   file as well, so they are available; the router references only the applicable ones.)
 
 ### Step B4 — Package protocols by IDE (native skills + flat file fallback)
 From the SAME `build_protocol_body(name)`:
-1. **Flat file** → `STAGING/.agents/protocols/<name>.md` = body (universal fallback).
+1. **Flat file** → `STAGING/.agents/protocols/<name>.md` = body (universal fallback, `<name>` is
+   the protocol's source folder name under `templates/protocols/`).
 2. **Native skills** per IDE that supports SKILL.md — for each IDE in `IDES` that has
    a native skill path, emit a copy of the frontmatter from
    `$WF_ROOT/templates/protocols/<name>/skill/SKILL.md` (replacing `{{PROTOCOL_BODY: ...}}`
@@ -119,14 +124,27 @@ From the SAME `build_protocol_body(name)`:
 
    | IDE | Skills path |
    |-----|-------------|
-   | `claude-code` | `STAGING/.claude/skills/<name>/SKILL.md` |
-   | `kiro` | `STAGING/.kiro/skills/<name>/SKILL.md` |
-   | `codex` | `STAGING/.codex/skills/<name>/SKILL.md` |
-   | `windsurf` | `STAGING/.windsurf/skills/<name>/SKILL.md`, `STAGING/.devin/skills/<name>/SKILL.md` (both for Windsurf/Devin compatibility) |
-   | `antigravity` | `STAGING/.agents/skills/<name>/SKILL.md` |
+   | `claude-code` | `STAGING/.claude/skills/<skill-name>/SKILL.md` |
+   | `kiro` | `STAGING/.kiro/skills/<skill-name>/SKILL.md` |
+   | `codex` | `STAGING/.codex/skills/<skill-name>/SKILL.md` |
+   | `windsurf` | `STAGING/.windsurf/skills/<skill-name>/SKILL.md`, `STAGING/.devin/skills/<skill-name>/SKILL.md` (both for Windsurf/Devin compatibility) |
+   | `antigravity` | `STAGING/.agents/skills/<skill-name>/SKILL.md` |
+
+   **`<skill-name>` is the skill's `name:` frontmatter field** (read from
+   `skill/SKILL.md` before writing), NOT necessarily the protocol's source folder name — e.g.
+   the `tdd` protocol packages as skill folder `wf-tdd/`, and `sdd` packages as `wf-sdd-config/`,
+   even though their source folders under `templates/protocols/` stay `tdd/`/`sdd/` for internal
+   consistency with existing cross-references. This keeps every user/model-facing skill name
+   `wf-`-prefixed and unambiguous, without requiring a full source-tree rename.
 
    If the IDE is not in the table, no native skills are emitted (uses the flat file fallback).
    Register each file in `state.build_plan.protocols_flat` / `.protocols_skills`.
+3. **Reference files** — if `$WF_ROOT/templates/protocols/<name>/reference/` exists, copy it
+   verbatim (untouched, no `{{PROTOCOL_BODY}}` substitution) alongside every emitted `SKILL.md` for
+   that protocol, at `<same-directory-as-SKILL.md>/reference/`. This follows gentle-ai's own
+   progressive-disclosure convention (`skills/{skill-name}/references/...`): the file is NOT
+   inlined into the skill body, only linked from its `## References` section, so it costs no
+   tokens until the model explicitly reads it. Currently applies to `wf-sdd-trigger`.
 
 ### Step B5 — Assemble AGENTS.md (thin router)
 - Base: `$WF_ROOT/templates/AGENTS.router.md`.
@@ -138,7 +156,10 @@ From the SAME `build_protocol_body(name)`:
   `data-testid.section.md`) according to `LAYERS`.
 - Build the MCPs table based on `STACK` + `LAYERS` (see protocol `architecture`).
 - Resolve `{{features.*_yesno}}` to `yes`/`no` based on each boolean feature.
-- Footer `wf-version` with `STACK` and `features: ladder={{yes/no}}, tdd={{yes/no}}, routing={{yes/no}}, ci={{yes/no}}, cd={{yes/no}}, release={{yes/no}}` (ALWAYS the last line).
+- Footer `wf-version` with `STACK` and `features: ladder={{yes/no}}, tdd={{yes/no}}, routing={{yes/no}}, ci={{yes/no}}, cd={{yes/no}}, release={{yes/no}}` (ALWAYS the last line). Field names in the
+  footer are kept as-is for backward compatibility with existing projects/wf-refresh parsing;
+  `routing=yes` now means "wf-sdd-trigger is active" (this wizard's own SDD-forcing policy, not
+  the retired Route A/B/C model).
 - Write to `STAGING/AGENTS.md`.
 - **The router NEVER embeds the protocols**; it only has the routing table pointing to them.
 
@@ -160,8 +181,7 @@ Commands **always** included (maintenance):
 - `/wf-refresh`, `/wf-worktree`, `/wf-settings`, `/wf-onboard`, `/wf-cicd`, `/wf-cleanup`
 
 Commands **conditional** by feature:
-- `/decision-ladder`: only if `LADDER == true` (the command to invoke the steps).
-- `/sdd-lite`: only if `ROUTING == true` (the Route B shortcut).
+- `/wf-ladder`: only if `LADDER == true` (the command to explicitly invoke the wf-ladder steps).
 
 For each command in the catalog (protocol `commands`) and each IDE ∈ IDES:
 - body = `$WF_ROOT/templates/commands/<cmd>/_base.md`.
@@ -195,9 +215,12 @@ For each command in the catalog (protocol `commands`) and each IDE ∈ IDES:
   `STAGING/playwright.config.ts` (strip `# prose header`). Also
   `$WF_ROOT/templates/protocols/testing/e2e-example.tmpl.md` as
   `STAGING/e2e/example.spec.ts` (raw, already clean). Install browsers.
-- If `BACKEND ∈ {openspec, hybrid}`: from
-  `$WF_ROOT/templates/protocols/sdd/config.yaml.tmpl.md` as
-  `STAGING/openspec/config.yaml` (strip `# prose header`, YAML content is raw).
+- **`openspec/config.yaml` is NEVER written or overwritten by the builder**, in any backend. It is
+  the exclusive artifact of gentle-ai's `/sdd-init` (see protocol `sdd`, BLOCK RULE). If `BACKEND ∈
+  {openspec, hybrid}` and testing/strict_tdd values need to be reflected in it, that happens as a
+  **targeted, agent-driven edit** in Phase 4.6b (`phase46b.md`) against the file `/sdd-init` already
+  created — never here, never from `config.yaml.tmpl.md` as a stamp. `config.yaml.tmpl.md` is a
+  **field reference**, not a file to copy.
 
 ### Step B8b — CI and CD (Block 6, from `state.ci` and `state.cd`)
 Generate CI and CD artifacts to staging according to `state.ci` and `state.cd` (see subagent-builder-heavy.md for

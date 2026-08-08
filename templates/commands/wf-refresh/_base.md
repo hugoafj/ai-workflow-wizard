@@ -449,23 +449,32 @@ All files from manifest have been downloaded and regenerated:
 - ✅ New files: available in project
 - ℹ️ New features: available in `/wf-settings` (not auto-enabled)
 
-**Content to inject for the "Local Orchestration" section**:
+**Content to inject for the "wf-sdd-trigger" section**:
 
 When AGENTS.md does not have this section in "Behavior preferences", the refresh
 inserts it **immediately before the HTML comment footer** (or at the end of "Behavior
 preferences" if there is no footer). The content is always the same:
 
-> The content of the "Local Orchestration" section is read from
-> `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/decision-ladder/local-orchestration.md`
-> (Minimal Exploration, Decision Tree, Routes A/B/C, Preflight, Route B
-> Locking Protocol — the MANDATORY, always-on fragment). Insert that content VERBATIM, character
-> by character, immediately before the HTML `wf-version` footer (or at the end of "Behavior
-> preferences" if there is no footer). Do not paraphrase or omit subsections.
+> The content of the `wf-sdd-trigger` section is read from
+> `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/wf-sdd-trigger/_base.md`
+> (Minimal Exploration, Decision Tree, `wf-no-sdd`/`wf-force-sdd` outcomes, `wf-preflight`,
+> wf-sdd-trigger evaluation fragment). Insert that content
+> VERBATIM, character by character, immediately before the HTML `wf-version` footer (or at the
+> end of "Behavior preferences" if there is no footer). Do not paraphrase or omit subsections.
+> Also ensure `wf-orchestrator`'s content is present (it is built whenever `wf-sdd-trigger` OR
+> `wf-ladder` is active — see `templates/protocols/wf-orchestrator/_base.md`).
 >
-> In projects with Claude Code, the same content is already packaged as a skill in
-> `.claude/skills/decision-ladder/SKILL.md`; for other IDEs, in
-> `.agents/protocols/decision-ladder.md`. When refreshing, also regenerate those packages
-> from the single source (Builder B4) so they do not get out of sync.
+> In projects with Claude Code, the same content is already packaged as skills in
+> `.claude/skills/wf-sdd-trigger/SKILL.md` and `.claude/skills/wf-orchestrator/SKILL.md`; for
+> other IDEs, in `.agents/protocols/wf-sdd-trigger.md` and `.agents/protocols/wf-orchestrator.md`.
+> When refreshing, also regenerate those packages from the single source (Builder B4) so they do
+> not get out of sync. For adapters whose orchestrator reads `.atl/skill-registry.md` before
+> delegating (Claude Code, OpenCode, Cursor, Kiro, Codex), also run `gentle-ai skill-registry
+> refresh` if available so gentle-ai's own Skill Resolver Protocol picks them up. **This step is a
+> no-op for Windsurf/Devin** — confirmed against gentle-ai's own source
+> (`internal/skillregistry/registry.go`), it never scans `.windsurf/skills/` or `.devin/skills/`
+> at all; those two adapters discover project skills natively from the filesystem instead, with
+> no registry step needed or possible.
 
 **Expected output to the user** when entering Layer 2 (example):
 
@@ -476,21 +485,22 @@ Your AGENTS.md is on an older wf-version. Current version: 0.1.0-beta.1.
 
 Pending changes I will apply:
 
-▶ AGENTS.md — add "Local Orchestration: Complexity Flow" section in Behavior preferences
+▶ AGENTS.md — add "wf-sdd-trigger" section in Behavior preferences
 
-  Defines the full decision flow to classify any local change
-  into one of three exclusive routes (A direct / B SDD Lite / C Full SDD).
-  Includes decision tree, criteria for each route, mandatory Preflight with
-  verifiable checklist, and locking protocol with 4 options for Route B.
-  Section validated in production.
+  Defines this project's own policy for when to explicitly request gentle-ai's
+  SDD (wf-no-sdd vs wf-force-sdd) decision logic.
+  Includes decision tree, criteria for each outcome, mandatory wf-preflight with
+  verifiable decision logic with user confirmation.
+  Never re-specifies how gentle-ai itself routes or delegates — that remains
+  gentle-ai's own native authority, per adapter.
 
 --- DIFF AGENTS.md ---
-+ ### 📋 Local Orchestration: Complexity Flow (SDD, SDD Lite or Direct)
++ ### 📋 wf-sdd-trigger: when this project forces gentle-ai's SDD
 +
-+ > This matrix decides only which SDD phases to run for a local change
-+ > (direct / lite / full). It is independent of gentle-ai's global
-+ > Delegation Stop Rules (4-file rule, multi-file write rule, etc.), which
-+ > still apply in parallel for sub-agent delegation and fresh review.
++ > This protocol decides ONE thing: does this change meet this project's own
++ > rules for explicitly requesting gentle-ai's SDD? It never decides HOW
++ > gentle-ai then routes, delegates, or executes — that is gentle-ai's native
++ > orchestrator's exclusive authority, already installed for this adapter.
 + ...
 
 ▶ AGENTS.md — update footer: wf-version 2.1 → 3.23 + new features format
@@ -575,26 +585,30 @@ hardcoded knowledge:
 ```yaml
 - id: ladder
   description: |
-    Decision Ladder. Anti-over-engineering discipline. The agent walks through
-    a priority ladder before writing code and declares each
-    rung out loud with its answer. Always applies before Preflight
-    on all routes, and again per task in sdd-apply (Routes B/C).
-  content-source: https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/decision-ladder/ladder.md
+    wf-ladder (Decision Ladder). Anti-over-engineering discipline, wizard-owned,
+    no gentle-ai equivalent. The agent walks through a priority ladder before
+    writing code and declares each rung out loud with its answer. Always
+    applies before wf-preflight, and again per task once gentle-ai's sdd-apply
+    is requested (wf-force-sdd).
+  content-source: https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/wf-ladder/_base.md
 
 - id: tdd
   description: |
-    TDD Protocol. RED→GREEN cycle implemented as an agent protocol.
+    wf-tdd (TDD Protocol). RED→GREEN cycle implemented as an agent protocol.
     Includes the 🧪 TDD PROPOSAL ritual (standard mode) or direct
-    RED→GREEN evidence (strict mode). Independent of SDD — can be injected
-    per change without openspec/.
+    RED→GREEN evidence (strict mode, via gentle-ai's strict_tdd field).
+    Independent of SDD — can be injected per change without openspec/.
   content-source: https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/tdd/_base.md
 
 - id: routing
   description: |
-    Routes ABC + Preflight/Precheck. Local orchestration with decision tree
-    (Route A direct / B SDD Lite / C Full SDD), mandatory Preflight
-    with checklist, and ✅ PRECHECK block before production code.
-  content-source: https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/decision-ladder/local-orchestration.md
+    wf-sdd-trigger + wf-preflight. This wizard's own policy for when
+    a project's rules require explicitly requesting gentle-ai's SDD
+    (wf-no-sdd vs wf-force-sdd), and mandatory wf-preflight confirmation
+    before proceeding. Never re-specifies how gentle-ai itself routes or
+    delegates once SDD is requested. `wf-orchestrator` (single entry point to
+    this wizard's own protocols) is built alongside it.
+  content-source: https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/wf-sdd-trigger/_base.md
 
 - id: ci
   description: |
@@ -686,7 +700,7 @@ commands for the current wizard version (keep in sync with
 `EXPECTED_COMMANDS` from `wf-init.md`):
 
 ```bash
-EXPECTED_COMMANDS="decision-ladder sdd-lite wf-onboard wf-refresh wf-worktree wf-settings wf-cicd wf-cleanup"
+EXPECTED_COMMANDS="wf-ladder wf-onboard wf-refresh wf-worktree wf-settings wf-cicd wf-cleanup"
 
 # Example for Claude Code — repeat the pattern adjusting path/extension
 # for each active IDE (see route table in wf-init.md Phase 6 section)
@@ -794,7 +808,7 @@ Refresh complete.
 
 Next steps:
 1. Open your AI IDE. The new rules will be active.
-2. Ask the agent for a task to validate that it respects Local Orchestration (classifies into Route A/B/C and emits Preflight).
+2. Ask the agent for a task to validate that it respects `wf-orchestrator` (loads `wf-ladder`/`wf-sdd-trigger` as applicable, classifies into `wf-no-sdd`/`wf-force-sdd`, and emits `wf-preflight`).
 ```
 
 ---

@@ -26,16 +26,17 @@ What features do you want to configure in this project? Choose the numbers
 separated by commas, or "none":
 
 ────────────────────────────────────────────────────────────
-1. 🪜 Decision Ladder (anti-over-engineering — 7 rungs
-   before implementing, without depending on routes or SDD)
+1. 🪜 wf-ladder (anti-over-engineering — 7 rungs
+   before implementing, without depending on wf-sdd-trigger or gentle-ai's SDD)
 
-2. 🧪 TDD Protocol (RED→GREEN per task. Independent from SDD
+2. 🧪 wf-tdd (RED→GREEN per task. Independent from SDD
    — only requires configured tests)
 
-3. 🚦 ABC Routes Protocol + Preflight + Precheck
-   (Full Local Orchestration: decision tree, A/B/C routes,
-   Route B lock menu, Precheck enforcement gate.
-   Includes SDD Lite as a shortcut in Route B)
+3. 🚦 wf-sdd-trigger + wf-preflight + PRECHECK
+   (this wizard's own policy for when to explicitly request gentle-ai's SDD:
+   decision tree, wf-no-sdd/wf-force-sdd outcomes lock menu,
+   PRECHECK enforcement gate. Never redecides how gentle-ai itself routes or
+   delegates — that stays gentle-ai's own native authority)
 
 4. 🔧 CI (Quality Guard + AI review + conventional commits
    + release-please + optional security review + hooks)

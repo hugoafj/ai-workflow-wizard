@@ -49,8 +49,9 @@ Commands always included (maintenance):
 `wf-refresh`, `wf-worktree`, `wf-settings`, `wf-onboard`, `wf-cicd`, `wf-cleanup`
 
 Conditional commands by feature:
-- `decision-ladder`: only if LADDER==true
-- `sdd-lite`: only if ROUTING==true
+- `wf-ladder`: only if LADDER==true
+- `wf-sdd-lite`: ARCHIVED (command no longer generated)
+  severity — this wizard's own name, never a gentle-ai command)
 
 For each active command and each IDE in IDES:
 
@@ -110,9 +111,11 @@ If LAYERS includes e2e:
 - `$WF_RAW/templates/protocols/testing/e2e-example.tmpl.md`
   → `{WF_STAGING}/e2e/example.spec.ts`
 
-If BACKEND ∈ {openspec, hybrid}:
-- `$WF_RAW/templates/protocols/sdd/config.yaml.tmpl.md`
-  → `{WF_STAGING}/openspec/config.yaml` (raw YAML, strip `# prose header`)
+**`openspec/config.yaml` is NEVER written or overwritten here**, in any backend. It is the
+exclusive artifact of gentle-ai's `/sdd-init` (see protocol `sdd`, BLOCK RULE). Testing/strict_tdd
+values are reflected via a targeted, agent-driven edit in Phase 4.6b (`phase46b.md`) against the
+file `/sdd-init` already created — never a mechanical copy from `config.yaml.tmpl.md`, which is a
+field reference, not a file to stamp.
 
 ### B8b — CI/CD (only if CICD==true, RELEASE==true, or CD==true)
 

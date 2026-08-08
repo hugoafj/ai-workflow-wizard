@@ -15,8 +15,7 @@
 | `/wf-init` | global (install.sh) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-init/` |
 | `/wf-refresh` | global (install.sh) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-refresh/` |
 | `/wf-cleanup` | global (install.sh) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-cleanup/` |
-| `/decision-ladder` | project-specific (Phase 6) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/decision-ladder/` |
-| `/sdd-lite` | project-specific (Phase 6) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/sdd-lite/` |
+| `/wf-ladder` | project-specific (Phase 6) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-ladder/` |
 | `/wf-onboard` | project-specific (Phase 6) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-onboard/` |
 | `/wf-worktree` | project-specific (Phase 6) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-worktree/` |
 | `/wf-settings` | project-specific (Phase 6) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-settings/` |

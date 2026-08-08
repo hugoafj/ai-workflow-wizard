@@ -2,7 +2,7 @@
   This is the AGENTS.md template that the Builder (wf-init/lib/builder.md) writes to
   the target project. It is a THIN ROUTER (constraint 7): only global policies,
   project-specific content and routing to packaged protocols. It NEVER contains
-  the full protocols (Decision Ladder, Local Orchestration, TDD) — those live in
+  the full protocols (wf-orchestrator, wf-ladder, wf-sdd-trigger, wf-tdd) — those live in
   .claude/skills/<n>/ and .agents/protocols/<n>.md, and the router points to them.
 
   The {{PLACEHOLDERS}} are filled deterministically from .wizard-state.json.
@@ -79,16 +79,21 @@ bloating the context. They are NOT written in full here — they live in dedicat
 
 ### Available protocols
 
+> **Namespace note**: everything prefixed `wf-` below is owned by THIS wizard, never by
+> gentle-ai. Anything named `sdd-*` (no `wf-` prefix) is gentle-ai's own — its routing and
+> delegation mechanics are gentle-ai's exclusive authority, already installed/synced for your
+> IDE. This wizard's own protocols never re-specify HOW gentle-ai delegates or routes.
+
 | When | Protocol to read |
 <if state.features.routing_abc or state.features.decision_ladder>
-| Before classifying or implementing any task | `decision-ladder` — Decision Ladder<if state.features.routing_abc> + Local Orchestration (Routes A/B/C, Preflight, Route B Lock, Precheck)</if> |
+| Before classifying or implementing any task | `wf-orchestrator` — single entry point to this project's own wf- protocols<if state.features.decision_ladder> (loads `wf-ladder`)</if><if state.features.routing_abc> (loads `wf-sdd-trigger`)</if> |
 </if>
 <if state.features.tdd_protocol>
-| Before writing tests or code for a feature | `tdd` — TDD Protocol |
+| Before writing tests or code for a feature | `wf-tdd` — TDD Protocol (wizard-owned) |
 </if>
 <if state.sdd.backend != null>
-| On Route B or C — SDD pipeline | SDD skills live in your IDE's path (see table above). **READ them before delegating** — do not invent the flow. Available skills: `sdd-propose`, `sdd-spec`, `sdd-design`, `sdd-tasks`, `sdd-apply`, `sdd-verify`, `sdd-archive`, `sdd-explore`, `sdd-init`, `sdd-onboard` |
-| When initializing SDD or migrating backend | `sdd` — SDD Protocol |
+| When gentle-ai's SDD was explicitly requested (via `wf-sdd-trigger`'s `wf-force-sdd` outcome) | SDD skills live in your IDE's path (see table above) — **gentle-ai's own**, not this wizard's. **READ them before relying on them** — do not invent the flow, and do not describe how they delegate; that is gentle-ai's own native content for this adapter. Available skills: `sdd-propose`, `sdd-spec`, `sdd-design`, `sdd-tasks`, `sdd-apply`, `sdd-verify`, `sdd-archive`, `sdd-explore`, `sdd-init`, `sdd-onboard` |
+| When migrating SDD backend or touching `openspec/config.yaml`'s known fields | `wf-sdd-config` — wizard-owned rules (persistence backends, Wizard-Allowed Field Edits) |
 </if>
 | When generating/auditing AGENTS.md | `architecture` — AI context architecture |
 
@@ -98,23 +103,18 @@ bloating the context. They are NOT written in full here — they live in dedicat
 > procedure.
 
 <if state.features.routing_abc>
-> **Universal order**: 🪜 Decision Ladder → 🔍 Preflight → (by route) 🧪 TDD → implementation.
+> **Universal order**: 🪜 `wf-ladder` (if active) → 🔍 `wf-preflight` (user confirms) → (by outcome) 🧪 `wf-tdd` → implementation.
 >
-> **✅ Single gate — paste the PRECHECK before production code**: just before touching
-> any production file (or starting SDD on Route C), paste the **`✅ PRECHECK
-> PRE-IMPLEMENTATION`** block from the `decision-ladder` protocol (Section 5) with each item resolved. If
-> any applicable item is ✗ or not done, STOP. It is an EXTERNAL gate: if you did not paste it,
-> you did not start. Summary of its items (details in the `decision-ladder` protocol):
-> - **Preflight**: mandatory on all routes (including A), with visible Route + Impact Analysis. The decision tree is calculated silently (do not paste it as Q1/Q2/Q3). The Ladder does not replace it.
-> - **Route B**: the SDD Lite Checklist is an external gate (one ✗ → Route C); show the locking menu and STOP to wait for the user's choice before code. The `/sdd-lite` command delegates each phase to the corresponding sub-agent using the IDE's native delegation mechanism (`task()`, `spawn_agent()`, `run_subagent()`, etc.).
-> - **Route C**: you declare the mandatory start of the SDD pipeline and delegate to gentle-ai's SDD skills; no inline proposal, no direct implementation, no TDD Proposal at pipeline level. Delegate using the IDE's native delegation mechanism (`task()`, `spawn_agent()`, `run_subagent()`, etc.).
+> **No combined PRECHECK**: after the user confirms the `wf-preflight`, proceed directly to the chosen route. Summary of the outcome (details in the `wf-sdd-trigger` protocol):
+> - **`wf-no-sdd`**: implement directly (or with 🧪 `wf-tdd` if active). No SDD request needed.
+> - **`wf-force-sdd`**: declare the explicit SDD request to gentle-ai via `/sdd-new <feature or fix>` (or `sdd-new` without slash if your adapter doesn't support slash commands). How gentle-ai delegates/executes is entirely its own decision per adapter — never re-specified by this wizard.
 <if state.features.tdd_protocol>
-> - **TDD**: never production code without the mode's TDD ritual (🧪 TDD PROPOSAL in standard / RED→GREEN evidence in strict). On Route A it goes before implementing. **On B/C the `🧪 TDD PROPOSAL` (standard mode) is issued by the ORCHESTRATOR before delegating to `sdd-apply` — which is headless and cannot ask — and only then delegates with the *baked* decision + injected `tdd-protocol` (see row above).** Real bug fixed: Route C was doing it and TDD ran; Route B/SDD Lite delegated without emitting the proposal.
+> - **`wf-tdd`**: never production code without the mode's TDD ritual (🧪 TDD PROPOSAL in standard / RED→GREEN evidence in strict). On `wf-no-sdd` it goes before implementing. **When `wf-force-sdd` was requested, the `🧪 TDD PROPOSAL` (standard mode) is issued by you (the orchestrator) BEFORE making the `sdd-apply` request — since `sdd-apply` is headless and cannot ask — and only then is the request made with the *baked* decision + a reference to `wf-tdd` (see row above).**
 </if>
 </if>
 </if>
 <if not state.features.routing_abc and not state.features.decision_ladder and not state.features.tdd_protocol>
-<!-- No agent protocols: the project does not use Ladder, Routes ABC or TDD. -->
+<!-- No agent protocols: the project does not use wf-ladder, wf-sdd-trigger, or wf-tdd. -->
 </if>
 
 <!-- The following HTML comment is mandatory and must remain as the LAST LINE of the

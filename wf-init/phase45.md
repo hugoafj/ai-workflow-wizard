@@ -19,6 +19,54 @@ if [ "$FEATURES_ROUTING" != "true" ] && [ "$FEATURES_TDD" != "true" ]; then
 fi
 ```
 
+---
+
+### Windsurf-specific fix (if applicable)
+
+**Before SDD initialization**, check if Windsurf (or Devin) is in the project's active IDEs and apply
+the gentle-ai compatibility workaround:
+
+```bash
+IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
+if echo "$IDES" | grep -q "windsurf"; then
+  WINDSURF_ACTIVE=true
+else
+  WINDSURF_ACTIVE=false
+fi
+```
+
+**If Windsurf is active** (`WINDSURF_ACTIVE=true`):
+
+1. **Merge the AGENTS.md rule** (read temp-files/AGENTS.md and fuse into the project's AGENTS.md):
+   - Open `AGENTS.md` (already generated in Phase 6).
+   - Read the rule from `/Users/user/Documents/DevProjects/ai-workflow-wizard/temp-files/AGENTS.md` (the **Gentle AI — Legacy Path Bridge for Windsurf/Devin** section).
+   - Insert this rule at the top of AGENTS.md (after the title and before other content) so it loads first.
+   - Save AGENTS.md.
+
+   **Why**: gentle-ai installs SDD skills into Windsurf's legacy paths (`~/.codeium/windsurf/skills/`), not the Devin paths. This rule tells the agent where to find them. Without it, sdd-init will not load the skills correctly in Windsurf.
+
+2. **Create `.windsurf/workflows/sdd-new.md`** (to replace the legacy version):
+   - If `.windsurf/workflows/` does not exist, create it.
+   - Write the content from `/Users/user/Documents/DevProjects/ai-workflow-wizard/temp-files/sdd-new.md` to `.windsurf/workflows/sdd-new.md`.
+   - Adapt the file to use the actual SDD backend chosen by the user (read from `state.sdd.backend`).
+
+Tell the user:
+
+```
+⚙️ Windsurf compatibility setup:
+  ✓ Updated AGENTS.md with gentle-ai Windsurf paths rule
+  ✓ Created .windsurf/workflows/sdd-new.md (modern SDD workflow)
+
+This is a temporary workaround for a gentle-ai bug with Windsurf. The agent will now
+be able to find and run SDD skills correctly.
+
+Note: After /sdd-init runs, gentle-ai sync may overwrite .windsurf/workflows/sdd-new.md
+with the legacy version. If that happens, run /wf-settings → "Fix Windsurf gentle-ai" 
+to reapply this fix.
+```
+
+---
+
 This phase runs here — after reverse engineering (Phase 4) — because the wizard already knows the project: whether it's greenfield or legacy, how many committers it has, what stack it uses. With that context it can make a well-founded persistence backend recommendation instead of a generic question.
 
 > **Note**: the official gentle-ai documentation states that the SDD orchestrator runs `/sdd-init` automatically if it doesn't detect SDD context in the project. This means that if the user starts SDD without having run `/sdd-init` manually, the orchestrator does it on its own — but it will use its defaults (likely engram). Wizard Phase 4.5 ensures the backend choice is deliberate, not a silent default.
@@ -204,40 +252,16 @@ If `testing.tdd_mode` is not in the state (phase 46 hasn't run yet), the prompt 
 
 ---
 
-**Path A — Automatic delegation (preferred)**
+**Required: Run `/sdd-init` in a NEW session**
 
-Try to load the sdd-init skill, in this order:
+The wizard has just written the new rules and skills to your IDE's configuration. For those
+to be loaded correctly by gentle-ai's own orchestrator, **sdd-init MUST run in a fresh session**
+where the new context is available. Running it in the current session would use the old (or 
+missing) context.
 
-1. **via `skill()` tool** — if sdd-init is in available_skills, load it.
+Do NOT try to delegate sdd-init inline in this conversation. Instead:
 
-2. **via direct file read** — if `skill()` is unavailable or returns no result,
-   find the SKILL.md at any of these paths:
-   - `~/.claude/skills/sdd-init/SKILL.md`
-   - `~/.config/opencode/skills/sdd-init/SKILL.md`
-   - `~/.codeium/windsurf/skills/sdd-init/SKILL.md`
-
-> Reading the SKILL.md for delegation is permitted (the BLOCKING RULE above
-> forbids replicating its steps manually — reading to delegate is NOT replicating).
-
-3. Once loaded (via either method), read its ORCHESTRATOR GATE.
-   Note: `disable-model-invocation: true`, `delegate_only: true` — you MUST
-   delegate, not execute inline.
-
-4. Delegate to a sub-agent executor with this exact instruction:
-   "Initialize gentle-ai sdd-init in ${SDD_BACKEND} mode with
-    Strict TDD ${STRICT_TDD}"
-
-5. Wait for the sub-agent to complete.
-
-6. If successful → verification below.
-   If the skill cannot be loaded (neither via `skill()` nor file read),
-   or the sub-agent delegation fails → fall back to Path B.
-
----
-
-**Path B — Manual fallback (if Path A fails)**
-
-Generate the message to the user with this template:
+Show the user this message:
 
 ```bash
 SDD_BACKEND=$(jq -r '.sdd.backend // "hybrid"' .wizard-state.json)
@@ -252,13 +276,19 @@ Open your IDE/CLI chat and say exactly:
   Initialize the gentle-ai sdd-init skill in ${SDD_BACKEND} mode with Strict TDD ${STRICT_TDD}
 
 When the skill finishes and you see openspec/config.yaml, openspec/changes/, and
-openspec/specs/ were created, reply **continue** here so I can verify and proceed with the wizard.
+openspec/specs/ were created, reply **continue** here in the wf-init chat so I can verify and proceed.
+
+Important notes:
+- `/sdd-init` is a gentle-ai skill, not a terminal command. If your IDE supports it, you can try
+  `/sdd-init` as a slash command. If not, say exactly: "Initialize the gentle-ai sdd-init skill
+  in ${SDD_BACKEND} mode with Strict TDD ${STRICT_TDD}".
+- Some adapters (e.g., Codex/ChatGPT) may not have slash command support — use the plain 
+  language instruction instead.
 MESSAGE
 ```
 
-**Do NOT tell the user to run `/sdd-init` as a slash command** — it is not installed as such. The user must give that exact instruction to their agent in natural language, not write a slash command.
-
-**Wait for explicit confirmation from the user** that `/sdd-init` ran in another session and finished. Do not continue, do not verify files, and do not run `gentle-ai sdd-init` or `gentle-ai sdd-init --backend X` (that subcommand does not exist in the gentle-ai CLI) — wait for the user's confirmation without taking any alternative action.
+**Wait for explicit confirmation from the user** that `/sdd-init` ran in a new session and finished. 
+Do not continue or verify files until they confirm. When they reply "continue", proceed to verification.
 
 ---
 

@@ -94,13 +94,13 @@ Example of how it should look:
 
 Workflow settings — current state:
 
-1. Decision Ladder — <ON/OFF>
+1. wf-ladder (Decision Ladder) — <ON/OFF>
 2. TDD — <ON/OFF>
 3. TDD Mode — <standard/strict>
 4. Coverage targets — <80%/OFF>
 5. Visual regression — <ON/OFF>
 6. Page Object Model — <ON/OFF>
-7. SDD Routes ABC — <ON/OFF>
+7. wf-sdd-trigger (SDD-forcing policy) — <ON/OFF>
 8. SDD persistence backend — <engram/openspec/hybrid>
 9. CI — <ON/OFF>
 10. AI Reviewer — <GGA (provider: X) / Copilot / Claude Code / Gemini / None>
@@ -110,6 +110,9 @@ Workflow settings — current state:
 14. release-please standalone — <ON/OFF>
 15. CD (automatic deploy) — <ON/OFF>
 16. Release strategy — <tag v* / push a main>
+<if Windsurf is in active IDEs>
+17. Fix Windsurf gentle-ai — <Reapply workaround>
+</if>
 
 Which number do you want to adjust?
 
@@ -140,10 +143,10 @@ field in `.wizard-state.json` after each change.
 
 ---
 
-### Option 1 — Decision Ladder
+### Option 1 — wf-ladder
 
 ```
-Decision Ladder: <ON / OFF>
+wf-ladder (Decision Ladder): <ON / OFF>
 
 Do you want to keep it as is or change it?
   [keep / change]
@@ -151,32 +154,33 @@ Do you want to keep it as is or change it?
 
 **If they choose keep**: move to the next option (if they chose several).
 
-**If they want to change (enable)**: inject the Decision Ladder section into
+**If they want to change (enable)**: inject the `wf-ladder` section into
 `AGENTS.md` (same content that `wf-init.md` documents in its Behavior
-Preferences phase, Question 4) and generate the `decision-ladder` command for
-active IDEs if it does not already exist. **Update the footer** to
-`decision-ladder=yes`:
+Preferences phase, Question 4) and generate the `/wf-ladder` command for
+active IDEs if it does not already exist. **Update the footer**'s `features:`
+line (single line, comma-separated — see `templates/AGENTS.router.md`) so its
+`ladder=` token becomes `ladder=yes`:
 
 ```bash
-sed -i.bak 's/decision-ladder=[a-z]*/decision-ladder=yes/' AGENTS.md && rm AGENTS.md.bak
+sed -i.bak -E 's/(features: [^|]*ladder=)[a-z]*/\1yes/' AGENTS.md && rm AGENTS.md.bak
 ```
 
 **If they want to change (disable)**: ask first, because it is an
 anti-over-engineering heuristic — removing it is not neutral:
 
 ```
-The Decision Ladder helps the agent avoid over-engineering on small
+wf-ladder helps the agent avoid over-engineering on small
 changes. Without it, the agent loses that explicit check before
 implementing. Do you confirm you want to remove it? [yes / no]
 ```
 
 **Wait for explicit confirmation before removing it.** If confirmed, remove the
-section from `AGENTS.md` (do not delete the `decision-ladder.md` command
-file). **Update the footer** to `decision-ladder=no`.
+section from `AGENTS.md` (do not delete the `/wf-ladder` command
+file). **Update the footer**'s `ladder=` token to `no` (same `sed` pattern above with `no`).
 
 Confirm:
 ```
-✓ Decision Ladder: <enabled / disabled>
+✓ wf-ladder: <enabled / disabled>
 ✓ .wizard-state.json: features.decision_ladder = <yes/no>
 ✓ AGENTS.md footer updated
 ```
@@ -317,12 +321,12 @@ mode, regardless of what that block says.
    paraphrase: without the exact `🧪 TDD PROPOSAL` format and its numbered options, the
    executing agent has no real pause point before writing tests or code.
 
-   Also regenerate the `tdd` protocol packaging (skill `.claude/skills/tdd-protocol/`
+   Also regenerate the `tdd` protocol packaging (skill `.claude/skills/wf-tdd/`
    and flat `.agents/protocols/tdd.md`) from the single source (Builder B4), so they
    do not get out of sync.
 
-3. **Do not touch** "Playwright Dual-loop" or "Integration with SDD and
-   Local Orchestration" — those two subsections do not depend on the TDD mode
+3. **Do not touch** "Playwright Dual-loop" or "wf-sdd-trigger Integration"
+   — those two subsections do not depend on the TDD mode
    (they depend on whether the E2E layer is active) and must remain intact
    regardless of which mode is switched to. If you notice they are missing from the current
    `AGENTS.md`, it is a bug in the original `/wf-init` generation (not something
@@ -432,10 +436,10 @@ jq '.testing.extras.page_object_model = <value>' .wizard-state.json > .wizard-st
 
 ---
 
-### 7 — SDD Routes ABC
+### 7 — wf-sdd-trigger
 
 ```
-SDD Routes ABC: <ON / OFF>
+wf-sdd-trigger (this project's own SDD-forcing policy): <ON / OFF>
 
 Do you want to keep or change?
   [keep / change]
@@ -444,21 +448,23 @@ Do you want to keep or change?
 **If they choose keep**: move to the next option.
 
 **If they want to change (enable)**: set `state.routing_abc = true`, inject
-the Local Orchestration + Preflight + Precheck section into `AGENTS.md`
-(from the `wf-init.md` template). Run `phase45.md` to initialize
-SDD if it does not exist. **Update the footer** to `routing=yes`.
+the `wf-sdd-trigger` + `wf-preflight` + PRECHECK section into `AGENTS.md`
+(from the `wf-init.md` template), and ensure `wf-orchestrator` is also present
+(it must be built whenever `wf-ladder` OR `wf-sdd-trigger` is active). Run
+`phase45.md` to initialize gentle-ai's SDD if it does not exist. **Update the
+footer**'s `routing=` token to `yes` (same `sed` pattern as Option 1, targeting
+`routing=` instead of `ladder=`).
 
 **If they want to change (disable)**: set `state.routing_abc = false`. Remove
-the Local Orchestration, Preflight Checklist and Precheck sections from
-`AGENTS.md`. **Important**: the Precheck lives inside
-`local-orchestration.md` — if it was only there because of Routes ABC, it does not become orphaned.
-But if Ladder standalone is active, do not touch its local orchestration
-block (Ladder standalone does not have Precheck). **Update the footer** to
-`routing=no`.
+the `wf-sdd-trigger`, `wf-preflight`, and PRECHECK sections from `AGENTS.md`.
+**Important**: the PRECHECK lives inside `wf-sdd-trigger` — if it was only
+there because of this feature, it does not become orphaned. If `wf-ladder`
+standalone is still active, keep `wf-orchestrator` and `wf-ladder` (standalone
+`wf-ladder` has no PRECHECK). **Update the footer**'s `routing=` token to `no`.
 
 Confirm:
 ```
-✓ SDD Routes ABC: <enabled / disabled>
+✓ wf-sdd-trigger: <enabled / disabled>
 ✓ .wizard-state.json: features.routing_abc = <yes/no>
 ✓ AGENTS.md footer updated
 ```
@@ -488,7 +494,7 @@ Do you want to keep or migrate?
 **If they choose keep**: move to the next option.
 
 > **This is the most delicate migration** — unlike TDD/extras/
-> Decision Ladder (which are just config), changing the SDD backend can
+> wf-ladder (which are just config), changing the SDD backend can
 > mean moving or duplicating real data (already written specs, Engram
 > memories).
 
@@ -513,8 +519,12 @@ lost, before touching anything:
 Do you confirm you want to continue anyway? [yes / no]
 ```
 
-**Wait for explicit confirmation.** Only after confirming, update
-`openspec/config.yaml` with the new backend.
+**Wait for explicit confirmation.** Only after confirming, apply a **targeted, agent-driven edit**
+to the existing `openspec/config.yaml` (never regenerate/overwrite it — see protocol `sdd`,
+"Wizard-Allowed Field Edits"): read the real file first, locate whichever field it actually uses to
+declare the backend (the exact key name can vary — e.g. `artifact_store`, `backend`, `schema` — do
+not assume; gentle-ai's own docs confirm the shape is not fully uniform), change only that leaf
+value to the new backend, and preserve `context.*`, `sdd.*`, `notes`, and every other key verbatim.
 
 > **About `strict_tdd` when migrating**: since Engram always saves
 > `sdd/{project}/testing-capabilities` regardless of the declared
@@ -1017,6 +1027,44 @@ jq '.cd.trigger = "<new_trigger>"' .wizard-state.json > .wizard-state.json.tmp &
 
 ---
 
+### 17 — Fix Windsurf gentle-ai (conditional, only if Windsurf is active)
+
+**Gate**: Only show this option if Windsurf or Devin is in `state.answers.ides`.
+
+```
+Fix Windsurf gentle-ai — Reapply the workaround for gentle-ai's legacy path bug
+
+This reapplies the AGENTS.md rule and .windsurf/workflows/sdd-new.md
+in case they were overwritten by a manual "gentle-ai sync".
+
+Do you want to reapply the Windsurf fix now? [yes / no, skip]
+```
+
+**If they choose "no, skip"**: move to Phase 4.
+
+**If they choose "yes"**:
+
+1. **Merge AGENTS.md rule** — same as phase45 did:
+   - Read the rule from temp-files/AGENTS.md (Gentle AI — Legacy Path Bridge section).
+   - Check if it already exists in the project's AGENTS.md.
+   - If not present, insert it at the top (after title, before other content).
+   - If already present, skip (do not duplicate).
+
+2. **Rewrite .windsurf/workflows/sdd-new.md**:
+   - Read `.windsurf/workflows/sdd-new.md` if it exists.
+   - If it matches the legacy version (check for "legacy" string or old content), replace it.
+   - Write the modern version from temp-files/sdd-new.md.
+   - Adapt the backend reference to match `state.sdd.backend`.
+
+Confirm:
+```
+✓ Windsurf gentle-ai fix reapplied
+✓ AGENTS.md rule: in place
+✓ .windsurf/workflows/sdd-new.md: updated to modern version
+```
+
+---
+
 ## PHASE 4 — Anything else?
 
 After applying each change (one at a time, if the user chose several in
@@ -1042,7 +1090,7 @@ Show the consolidated summary of ALL changes made in this session
 
 ```
 Session settings summary:
-  ✓ Decision Ladder: enabled
+  ✓ wf-ladder: enabled
   ✓ TDD Mode: standard → Strict TDD Mode
 
 Modified files:
