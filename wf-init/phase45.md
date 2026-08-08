@@ -39,7 +39,7 @@ fi
 
 1. **Merge the AGENTS.md rule** (read temp-files/AGENTS.md and fuse into the project's AGENTS.md):
    - Open `AGENTS.md` (already generated in Phase 6).
-   - Read the rule from `/Users/user/Documents/DevProjects/ai-workflow-wizard/temp-files/AGENTS.md` (the **Gentle AI — Legacy Path Bridge for Windsurf/Devin** section).
+   - Read the rule from `$WF_REPO/temp-files/AGENTS.md` (the **Gentle AI — Legacy Path Bridge for Windsurf/Devin** section).
    - Insert this rule at the top of AGENTS.md (after the title and before other content) so it loads first.
    - Save AGENTS.md.
 
@@ -47,7 +47,7 @@ fi
 
 2. **Create `.windsurf/workflows/sdd-new.md`** (to replace the legacy version):
    - If `.windsurf/workflows/` does not exist, create it.
-   - Write the content from `/Users/user/Documents/DevProjects/ai-workflow-wizard/temp-files/sdd-new.md` to `.windsurf/workflows/sdd-new.md`.
+   - Write the content from `$WF_REPO/temp-files/sdd-new.md` to `.windsurf/workflows/sdd-new.md`.
    - Adapt the file to use the actual SDD backend chosen by the user (read from `state.sdd.backend`).
 
 Tell the user:
