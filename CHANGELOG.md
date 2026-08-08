@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.4.5-beta.1...v0.5.0-beta.1) (2026-08-08)
+
+
+### Features
+
+* add mandatory hard stops for SDD workflow enforcement ([#59](https://github.com/hugoafj/ai-workflow-wizard/issues/59)) ([29b14eb](https://github.com/hugoafj/ai-workflow-wizard/commit/29b14eb8301253d48e67355d47b9a4b9f878f9e8))
+
+
+### Bug Fixes
+
+* reinsert windsurf rule in AGENTS.md after staging copy ([#57](https://github.com/hugoafj/ai-workflow-wizard/issues/57)) ([bce897a](https://github.com/hugoafj/ai-workflow-wizard/commit/bce897ab0824c14e13fbe25e2f3fe9a69c13876a))
+
 ## [0.4.5-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.4.4-beta.1...v0.4.5-beta.1) (2026-08-08)
 
 
