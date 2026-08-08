@@ -103,8 +103,9 @@ Skip a step only if its feature is not active for this project.
 2. Walk the Decision Gates table above, in order, loading only the active protocols.
 3. After `wf-ladder` (if active), pause explicitly and wait for the user to review and confirm
    the ladder rungs before continuing to `wf-sdd-trigger`.
-4. After `wf-sdd-trigger`, if the user confirms the outcome, proceed to `wf-tdd` (if active) or
-   directly to implementation.
+4. After `wf-sdd-trigger`, if the user confirms the outcome:
+   - **If `wf-no-sdd`**: proceed to `wf-tdd` (if active) or directly to implementation.
+   - **If `wf-force-sdd`**: invoke the gentle-ai SDD pipeline (sdd-new/propose/spec/design/tasks). After sdd-tasks completes, ALWAYS invoke `wf-tdd` (if active) to emit TDD PROPOSAL BEFORE proceeding to sdd-apply. This is mandatory — do not skip wf-tdd or run sdd-apply without TDD confirmation.
 5. No additional checklist or combined precheck is emitted — the ladder rungs (if active) and the
    `wf-preflight` block are sufficient before proceeding.
 
