@@ -1261,7 +1261,7 @@ After `wf-preflight`, the agent asks the user for explicit confirmation:
 - If `wf-preflight` proposed `wf-no-sdd`: "Do you want to proceed without SDD, or prefer to use SDD?" 
 - If `wf-preflight` proposed `wf-force-sdd`: "Do you want to proceed with SDD, or prefer to implement directly?"
 
-The user always has the chance to override. Only after confirmation does the agent proceed (invoke `/sdd-new` if SDD confirmed, or implement directly if no-SDD confirmed).
+The user always has the chance to override. Only after confirmation does the agent proceed (invoke `sdd-new` if SDD confirmed, or implement directly if no-SDD confirmed).
 
 #### How to correct the flow manually
 
