@@ -19,8 +19,7 @@
 > any task, READ `wf-orchestrator` (the project's packaged skill — see Protocol routing below).
 > It is the single entry point and source of truth for this project's workflow: it decides the
 > gate sequence (Ladder → Preflight → Decision → TDD ritual). If you skipped it, STOP and read
-> it before doing anything else. Exception: read-only questions ("explain X", "what does Y do")
-> do not trigger this gate.
+> it before doing anything else.
 </if>
 
 ## Commands
