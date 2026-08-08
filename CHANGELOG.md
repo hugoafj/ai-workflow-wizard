@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.5.0-beta.1...v0.5.1-beta.1) (2026-08-08)
+
+
+### Bug Fixes
+
+* apply orphaned testing extras and fragments during build ([#60](https://github.com/hugoafj/ai-workflow-wizard/issues/60)) ([8a64e7b](https://github.com/hugoafj/ai-workflow-wizard/commit/8a64e7b36252ce7eb2f79079917565c1d5ee925f))
+
 ## [0.5.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.4.5-beta.1...v0.5.0-beta.1) (2026-08-08)
 
 
