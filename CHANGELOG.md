@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.5.2-beta.1...v0.6.0-beta.1) (2026-08-08)
+
+
+### Features
+
+* add HARD STOP RULE to AGENTS.md router ([#64](https://github.com/hugoafj/ai-workflow-wizard/issues/64)) ([9474a63](https://github.com/hugoafj/ai-workflow-wizard/commit/9474a638e195f566d941201821b0e7b0ce92a8ca))
+
 ## [0.5.2-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.5.1-beta.1...v0.5.2-beta.1) (2026-08-08)
 
 
