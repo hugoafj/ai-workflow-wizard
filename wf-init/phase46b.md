@@ -198,14 +198,17 @@ For each selected additional MCP, register it in the MCPs table of AGENTS.md
 MCPs that require credentials are marked as "API key in `.env.local`" —
 wf-onboard will guide the new developer through that step.
 
-**Deferred to Phase 8, step 8.1d** — the targeted, agent-driven edit of `openspec/config.yaml`
+**Deferred to Phase 8, step 8.1d** — the targeted, `yq`-based edit of `openspec/config.yaml`
 (this file was created by gentle-ai's `/sdd-init` in Phase 4.5; the wizard is never allowed to
 regenerate or stamp it wholesale — see protocol `sdd`, "Wizard-Allowed Field Edits"). Phase 8.1d
-reads the real file, locates the keys wherever they actually live (top-level or nested under
-`context.*`), and updates `testing.configured`, `runner`, `layers.*`, `extras.coverage_threshold`,
-`visual_regression`, `page_object_model`, `conventions` and `checks_before_done` — preserving every
-other key byte-for-byte. This includes writing `extras.coverage_threshold` when the coverage extra
-was activated.
+maps the activated testing configuration onto gentle-ai's canonical schema, the fields its SDD
+skills actually read: `testing.runner.{command,framework}`, `testing.layers.<layer>.{available,tool}`,
+`testing.coverage.{available,command}` and `rules.verify.coverage_threshold` (coverage extra),
+plus `rules.apply.test_command` and `rules.verify.{test_command,build_command}` (always) — preserving
+every other key byte-for-byte. It does NOT invent keys like `testing.configured`, `extras.*`,
+`conventions`, or `checks_before_done` — no gentle-ai consumer reads them. `visual_regression`
+and `page_object_model` stay in `.wizard-state.json` only; they surface in the generated
+`playwright.config.ts` / `e2e/pages/`.
 
 **Update the Testing section of `AGENTS.md`** — find the `## Testing` (or `## Testing Approach`) section and replace it with:
 
@@ -298,7 +301,7 @@ Testing stack configured (in memory — everything is written in Phase 8):
   Files modified in Phase 8:
     package.json  → test scripts added
     AGENTS.md     → Testing section updated + TDD Protocol (automatically included)
-    openspec/config.yaml → testing.configured: true, layers, extras, checks_before_done
+    openspec/config.yaml → testing.runner/layers/coverage + rules.verify.coverage_threshold
 
   Playwright MCP:
     <if e2e>  .claude/settings.json (and IDE equivalents) ← Phase 8

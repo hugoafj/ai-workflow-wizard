@@ -356,11 +356,12 @@ Do you want to keep or change?
 
 **If enabling**: ask for the threshold (same as in `wf-init.md` Phase 4.6) and
 add the `coverage.thresholds` block to `vitest.config.ts`. Save in
-`openspec/config.yaml` the field `extras.coverage_threshold`.
+`openspec/config.yaml` the field `rules.verify.coverage_threshold` (gentle-ai's canonical
+field, via Phase 8 step 8.1d — never stamped).
 
 **If disabling**: remove the `coverage.thresholds` block from `vitest.config.ts`
-and the `extras.coverage_threshold` field from `openspec/config.yaml` (leave it
-`null`).
+and the `rules.verify.coverage_threshold` field from `openspec/config.yaml` (leave it
+unset or `0`).
 
 Confirm:
 ```
