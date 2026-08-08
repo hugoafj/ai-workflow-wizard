@@ -58,8 +58,11 @@ Which ones do I activate? [comma-separated numbers / none for now]
 
 **Wait for user response.**
 
-**If they activated extra 1 (coverage targets)**, ask for the threshold and add the
-`coverage.thresholds` block to `vitest.config.ts`:
+**If they activated extra 1 (coverage targets)**, ask for the threshold. It is stored in
+`state.testing.coverage_threshold` (persistence below); the builder injects the
+`coverage.thresholds` block into `vitest.config.ts` in Phase 6b (step B8a, from
+`coverage-thresholds.tmpl.md` resolving `{{threshold}}`) and Phase 8 promotes it to the real file —
+do NOT edit `vitest.config.ts` here, the file doesn't exist yet in this phase:
 
 ```
 What minimum coverage percentage do you want to require? (recommended: 70-80%
@@ -69,24 +72,13 @@ utility libs that warrant it)
 [70 / 80 / 90 / other: specify]
 ```
 
-```typescript
-// Add inside test: { ... } in vitest.config.ts
-coverage: {
-  provider: 'v8',
-  thresholds: {
-    lines: <umbral>,
-    functions: <umbral>,
-    branches: <umbral>,
-    statements: <umbral>,
-  },
-},
-```
-
-**If they activated extra 2 (visual regression)**, add to `playwright.config.ts`
-the snapshot configuration and generate an example spec:
+**If they activated extra 2 (visual regression)**, save `testing.visual_regression: true` in
+state (persistence below). The builder injects the snapshot configuration into
+`playwright.config.ts` in Phase 6b (step B8a, from `visual-snapshots.tmpl.md`) and Phase 8 promotes
+it to the real file — do NOT edit `playwright.config.ts` here, the file doesn't exist yet in this phase:
 
 ```typescript
-// Add inside defineConfig({ ... })
+// Injected by the builder (visual-snapshots.tmpl.md) inside defineConfig({ ... })
 expect: {
   toHaveScreenshot: { maxDiffPixels: 100 },
 },
@@ -126,7 +118,7 @@ export default defineConfig({
 import '@testing-library/jest-dom'
 ```
 
-Scripts to add to `package.json`:
+Scripts added to `package.json` in Phase 8, step 8.1e (same content as `test-scripts.tmpl.md`):
 ```json
 "test": "vitest",
 "test:ui": "vitest --ui",
@@ -171,7 +163,7 @@ test('app loads correctly', async ({ page }) => {
 })
 ```
 
-Scripts to add:
+Scripts added to `package.json` in Phase 8, step 8.1e (same content as `e2e-scripts.tmpl.md`):
 ```json
 "test:e2e": "playwright test",
 "test:e2e:ui": "playwright test --ui",
@@ -206,54 +198,14 @@ For each selected additional MCP, register it in the MCPs table of AGENTS.md
 MCPs that require credentials are marked as "API key in `.env.local`" —
 wf-onboard will guide the new developer through that step.
 
-**Concrete instructions for Phase 8** — targeted, agent-driven edit of `openspec/config.yaml` (this file was created by gentle-ai's `/sdd-init` in Phase 4.5; the wizard is never allowed to regenerate or stamp it wholesale — see protocol `sdd`, "Wizard-Allowed Field Edits"):
-
-```bash
-# Read the CURRENT, real file — its exact shape can vary (gentle-ai itself documents
-# that the schema is not fully uniform across its own skills, e.g. `testing` may live
-# at the top level or nested under `context.testing` depending on how /sdd-init wrote it).
-cat openspec/config.yaml
-```
-
-**Do NOT overwrite the file.** Locate, inside the real file you just read, wherever the following
-keys already live (top-level `testing`/`layers`/`checks_before_done`, or nested under `context.*`
-— match whatever the file actually has) and update **only those specific leaf values**, preserving
-every other key byte-for-byte (`artifact_store`/`schema`, `project`, `context.stack`/`pattern`/etc.,
-`sdd.*`, `notes`, `rules.*`, and anything else present):
-
-```yaml
-# strict_tdd — REAL FIELD, the source gentle-ai's sdd-apply queries directly
-# (confirmed against the actual installed skill source)
-strict_tdd: false        # true if they chose option 2
-testing:
-  configured: true
-  runner: vitest          # or "playwright" if only e2e, or "vitest+playwright" if both
-  planned: null           # no longer "planned", it's configured
-layers:
-  unit: true              # if layer 1 was activated
-  integration: true       # if layer 2 was activated
-  e2e: true               # if layer 3 was activated
-  coverage: false         # true if extra 1 was activated (coverage targets)
-extras:
-  coverage_threshold: null      # number if extra 1 was activated, e.g. 80
-  visual_regression: false      # true if extra 2 was activated
-  page_object_model: false      # true if extra 3 was activated
-conventions:
-  unit: "Component.test.tsx — junto al componente"
-  integration: "*.integration.test.tsx — en src/__tests__/integration/"
-  e2e: "e2e/<feature-name>.spec.ts — one file per user flow, named by flow not by component"
-checks_before_done:
-  - npm run lint
-  - npm run build
-  - npm run test          # add if unit/integration was activated
-  - npm run test:e2e      # add if e2e was activated
-```
-
-If a key from this list does not exist yet in the real file, add it at the same nesting level as
-its siblings (e.g. if the file has a top-level `testing:` block, add `layers` there too — do not
-invent a new top-level shape). If in doubt about where a key belongs, ask the user to confirm
-before writing rather than guessing a structure that could break what `/sdd-init`, `sdd-apply`, or
-`sdd-verify` expect to read.
+**Deferred to Phase 8, step 8.1d** — the targeted, agent-driven edit of `openspec/config.yaml`
+(this file was created by gentle-ai's `/sdd-init` in Phase 4.5; the wizard is never allowed to
+regenerate or stamp it wholesale — see protocol `sdd`, "Wizard-Allowed Field Edits"). Phase 8.1d
+reads the real file, locates the keys wherever they actually live (top-level or nested under
+`context.*`), and updates `testing.configured`, `runner`, `layers.*`, `extras.coverage_threshold`,
+`visual_regression`, `page_object_model`, `conventions` and `checks_before_done` — preserving every
+other key byte-for-byte. This includes writing `extras.coverage_threshold` when the coverage extra
+was activated.
 
 **Update the Testing section of `AGENTS.md`** — find the `## Testing` (or `## Testing Approach`) section and replace it with:
 
@@ -298,9 +250,10 @@ npm run test:e2e    # if e2e
 \`\`\`
 ```
 
-**Register Playwright MCP** (only if the user activated layer 3) — add the MCP to the active agent's configuration. The Playwright MCP is `@playwright/mcp` and lets the agent launch browsers during sdd-apply and sdd-verify.
-
-For Claude Code, the MCP is registered in `.claude/settings.json` (or `.claude/settings.local.json` to avoid committing it if it has an API key):
+**Playwright MCP** (only if the user activated layer 3) — registered in Phase 8, step 8.1e
+(from `playwright-mcp.settings.tmpl.md`), NOT here: `.claude/settings.json` and the IDE
+equivalents don't exist yet in this phase. The MCP is `@playwright/mcp` and lets the agent launch
+browsers during sdd-apply and sdd-verify:
 
 ```json
 {
@@ -313,7 +266,10 @@ For Claude Code, the MCP is registered in `.claude/settings.json` (or `.claude/s
 }
 ```
 
-For other agents configured in this project, check each one's MCP registration format (Cursor: `.cursor/mcp.json`, Windsurf: `.windsurf/mcp.json`). If the format isn't clear for any agent, tell the user which files to create and with what content, and wait for confirmation before writing.
+For other agents configured in this project, Phase 8.1e checks each one's MCP registration format
+(Cursor: `.cursor/mcp.json`, Windsurf: `.windsurf/mcp.json`). If the format isn't clear for any
+agent, it tells the user which files to create and with what content, and waits for confirmation
+before writing.
 
 > **Note**: `npx @playwright/mcp` doesn't require an API key — it launches Playwright directly. There are no credentials to protect. It IS reasonable to commit this MCP to the repo so all developers on the team have it.
 
@@ -369,7 +325,7 @@ Testing stack configured (in memory — everything is written in Phase 8):
 
 ---
 > **⛔ STOP HERE — don't execute anything else.**
-> **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `testing.extras` (coverage/visual/POM), `testing.coverage_threshold` (if applicable), `mcps` (project MCPs to configure). Mark `wf_phase_done phase46b <next>`.
+> **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `testing.coverage_threshold` (number or null, if the coverage extra was activated), `testing.visual_regression` (bool), `testing.page_object_model` (bool), `mcps` (project MCPs to configure). Mark `wf_phase_done phase46b <next>`.
 > Calculate the next phase based on features:
 > ```bash
 > if jq -e '.features.ci == true or .features.cd == true or .features.release_please == true' .wizard-state.json >/dev/null; then

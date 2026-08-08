@@ -1691,11 +1691,12 @@ After the selection, the wizard:
 
 1. Installs dependencies (`npm install --save-dev vitest @testing-library/react @playwright/test`, according to selection).
 2. Generates config files (`vitest.config.ts`, `playwright.config.ts`).
-3. Adds scripts to `package.json` (`test`, `test:ui`, `test:e2e`, `test:coverage`).
-4. Updates `openspec/config.yaml` with `testing.configured: true`, active layers, and the runner.
-5. Updates `AGENTS.md` "Testing" section with the real commands.
-6. If the user activated Playwright: configures the Playwright MCP in the agent's folder.
-7. Everything with human review gate before writing any files.
+3. Adds scripts to `package.json` (`test`, `test:ui`, `test:e2e`, `test:coverage`) — Phase 8, step 8.1e, from `test-scripts.tmpl.md` / `e2e-scripts.tmpl.md`.
+4. Updates `openspec/config.yaml` with `testing.configured: true`, active layers, and the runner. This is the targeted leaf-field edit executed in Phase 8, step 8.1d (Wizard-Allowed Field Edits) — the wizard never regenerates or stamps the file; `/sdd-init` owns it. `extras.coverage_threshold` is written here when the coverage extra is activated.
+5. Injects the extra fragments into the generated configs (Phase 6b, step B8a, promoted in Phase 8): `coverage-thresholds.tmpl.md` into `vitest.config.ts` when `state.testing.coverage_threshold` is a number, and `visual-snapshots.tmpl.md` into `playwright.config.ts` when `state.testing.visual_regression` is true.
+6. Updates `AGENTS.md` "Testing" section with the real commands.
+7. If the user activated Playwright: configures the Playwright MCP in the agent's folder — Phase 8, step 8.1e, from `playwright-mcp.settings.tmpl.md`.
+8. Everything with human review gate before writing any files.
 
 This makes `checks_before_done` in the SDD pipeline go from just `lint + build` to `lint + build + test` (or `lint + build + test + e2e` depending on layers). The agent runs it all automatically before archiving a change.
 

@@ -27,7 +27,7 @@ automatically verifies that changes do not break behavior (adds `test`,
 > The exact layer menu and TDD mode (standard/strict) are asked in phase46 and
 > stored in `state.testing`. The TDD Protocol itself lives in the `tdd` protocol.
 
-## Optional extras (state.testing.extras)
+## Optional extras (state.testing: coverage_threshold, visual_regression, page_object_model)
 
 - **coverage**: configurable threshold → `coverage-thresholds.tmpl.md` in `vitest.config.ts`.
 - **visual regression**: Playwright snapshots → `visual-snapshots.tmpl.md`.

@@ -210,16 +210,24 @@ For each command in the catalog (protocol `commands`) and each IDE ∈ IDES:
   `$WF_ROOT/templates/protocols/testing/vitest.config.tmpl.md` as
   `STAGING/vitest.config.ts` (strip `# prose header` lines if they exist, no code fence).
   Also generate `src/test/setup.ts` from `setup.tmpl.md`.
+  - **Coverage extra (fragment injection)**: if `state.testing.coverage_threshold` is a
+    number, inject `$WF_ROOT/templates/protocols/testing/coverage-thresholds.tmpl.md` inside
+    the `test: { ... }` block of the generated `vitest.config.ts` (before the closing `}`),
+    resolving `{{threshold}}` → `state.testing.coverage_threshold`.
 - If `LAYERS` includes e2e: write
   `$WF_ROOT/templates/protocols/testing/playwright.config.tmpl.md` as
   `STAGING/playwright.config.ts` (strip `# prose header`). Also
   `$WF_ROOT/templates/protocols/testing/e2e-example.tmpl.md` as
   `STAGING/e2e/example.spec.ts` (raw, already clean). Install browsers.
+  - **Visual regression extra (fragment injection)**: if `state.testing.visual_regression ==
+    true`, inject `$WF_ROOT/templates/protocols/testing/visual-snapshots.tmpl.md` inside the
+    `defineConfig({ ... })` block of the generated `playwright.config.ts` (before the closing
+    `})`), no placeholders to resolve.
 - **`openspec/config.yaml` is NEVER written or overwritten by the builder**, in any backend. It is
   the exclusive artifact of gentle-ai's `/sdd-init` (see protocol `sdd`, BLOCK RULE). If `BACKEND ∈
   {openspec, hybrid}` and testing/strict_tdd values need to be reflected in it, that happens as a
-  **targeted, agent-driven edit** in Phase 4.6b (`phase46b.md`) against the file `/sdd-init` already
-  created — never here, never from `config.yaml.tmpl.md` as a stamp. `config.yaml.tmpl.md` is a
+  **targeted, agent-driven edit** in Phase 8, step 8.1d (`phase8.md`) against the file `/sdd-init`
+  already created — never here, never from `config.yaml.tmpl.md` as a stamp. `config.yaml.tmpl.md` is a
   **field reference**, not a file to copy.
 
 ### Step B8b — CI and CD (Block 6, from `state.ci` and `state.cd`)
