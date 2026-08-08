@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.4-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.4.3-beta.1...v0.4.4-beta.1) (2026-08-06)
+
+
+### Bug Fixes
+
+* wf-refresh must sync wf-version footer even without AGENTS.md content changes ([#52](https://github.com/hugoafj/ai-workflow-wizard/issues/52)) ([f0e0d6f](https://github.com/hugoafj/ai-workflow-wizard/commit/f0e0d6f7f95a17362bacf96bfa854f7873f6b97f))
+
 ## [0.4.3-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.4.2-beta.1...v0.4.3-beta.1) (2026-08-06)
 
 
