@@ -2040,7 +2040,7 @@ The command stub in `AGENTS.md` (or in the IDE's commands directory) simply indi
 
 #### 8.4.8 Installation as command (same pattern as Block 3)
 
-Same as `wf-ladder`, `wf-sdd-lite`, `wf-onboard`, and `wf-refresh`, `/wf-worktree` is generated in Phase 6 of `wf-init` (or added via `/wf-refresh` if the project is already initialized) for each active IDE, with the same path table and formats from section 7.5:
+Same as `wf-ladder`, `wf-onboard`, and `wf-refresh`, `/wf-worktree` is generated in Phase 6 of `wf-init` (or added via `/wf-refresh` if the project is already initialized) for each active IDE, with the same path table and formats from section 7.5:
 
 | IDE | Path | Format |
 |---|---|---|

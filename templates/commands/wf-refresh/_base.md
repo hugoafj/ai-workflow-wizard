@@ -602,11 +602,10 @@ hardcoded knowledge:
 
 - id: routing
   description: |
-    wf-sdd-trigger + wf-preflight/PRECHECK. This wizard's own policy for when
+    wf-sdd-trigger + wf-preflight. This wizard's own policy for when
     a project's rules require explicitly requesting gentle-ai's SDD
-    (wf-no-sdd vs wf-force-sdd, with wf-sdd-lite as a lighter severity),
-    mandatory wf-preflight with checklist, and ✅ PRECHECK block before
-    production code. Never re-specifies how gentle-ai itself routes or
+    (wf-no-sdd vs wf-force-sdd), and mandatory wf-preflight confirmation
+    before proceeding. Never re-specifies how gentle-ai itself routes or
     delegates once SDD is requested. `wf-orchestrator` (single entry point to
     this wizard's own protocols) is built alongside it.
   content-source: https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/wf-sdd-trigger/_base.md
