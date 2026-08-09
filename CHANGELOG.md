@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.5-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.6.4-beta.1...v0.6.5-beta.1) (2026-08-09)
+
+
+### Bug Fixes
+
+* phase8 validates AGENTS.md wf-version footer is concrete semver ([#74](https://github.com/hugoafj/ai-workflow-wizard/issues/74)) ([a1e0cb9](https://github.com/hugoafj/ai-workflow-wizard/commit/a1e0cb999da442f27ca882176ee0f7365dd0b34c))
+
 ## [0.6.4-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.6.3-beta.1...v0.6.4-beta.1) (2026-08-09)
 
 
