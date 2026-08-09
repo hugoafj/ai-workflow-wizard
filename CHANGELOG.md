@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.6.0-beta.1...v0.6.1-beta.1) (2026-08-09)
+
+
+### Bug Fixes
+
+* conditional CLAUDE.md, complete wf-cleanup, add IDEs/CLIs settings ([#66](https://github.com/hugoafj/ai-workflow-wizard/issues/66)) ([4e62dc4](https://github.com/hugoafj/ai-workflow-wizard/commit/4e62dc4faafdd8196d43f622e73ba5df6e70b53d))
+
 ## [0.6.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.5.2-beta.1...v0.6.0-beta.1) (2026-08-08)
 
 
