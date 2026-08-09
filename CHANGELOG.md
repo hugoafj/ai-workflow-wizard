@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.4-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.6.3-beta.1...v0.6.4-beta.1) (2026-08-09)
+
+
+### Bug Fixes
+
+* phase8 8.1d — Windsurf rule reinsert + coverage test_command ([#72](https://github.com/hugoafj/ai-workflow-wizard/issues/72)) ([a985bee](https://github.com/hugoafj/ai-workflow-wizard/commit/a985bee2517485b6cc0ab421e927472d70a52913))
+
 ## [0.6.3-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.6.2-beta.1...v0.6.3-beta.1) (2026-08-09)
 
 
