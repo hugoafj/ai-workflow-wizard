@@ -49,6 +49,8 @@ See `base-paths-table.section.md` (VERBATIM phase2 45-55).
 
 ## Satellites
 
-One satellite per active IDE, all pointing to AGENTS.md. `CLAUDE.md` always (Claude does not
-natively read AGENTS.md as of June 2026). Each satellite template is available at:
+One satellite per active IDE, all pointing to AGENTS.md — including `CLAUDE.md`, which is
+generated ONLY when `claude-code` is in `state.answers.ides` (Claude does not natively read
+AGENTS.md as of June 2026, but if Claude Code is not an active IDE, no `CLAUDE.md` or `.claude/`
+directory is produced). Each satellite template is available at:
 `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/satellites/`.

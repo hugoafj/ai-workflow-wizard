@@ -173,7 +173,11 @@ corresponding destination (see protocol `ides`):
 - `kiro` → `STAGING/.kiro/steering/project-context.md`
 - `gemini-cli` → `STAGING/GEMINI.md`
 - `antigravity` → `STAGING/ANTIGRAVITY.md`
-`CLAUDE.md` is ALWAYS generated (Claude does not read AGENTS.md natively).
+
+`CLAUDE.md` (and its `.claude/` satellite directory) is generated ONLY when
+`claude-code` ∈ IDES — exactly like every other IDE's satellite. No IDE is
+special-cased: if `claude-code` was not selected, neither `CLAUDE.md` nor
+`.claude/skills` is produced.
 
 ### Step B7 — Commands (per active IDE)
 

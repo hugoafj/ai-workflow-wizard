@@ -11,8 +11,16 @@ Only run because the user explicitly approved in Phase 7.
 ```bash
 STAGING=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' .wizard-state.json)
 
-# Create universal directories (not IDE-specific; those are created on demand by the copy loop below)
-mkdir -p .agents/protocols .claude/skills
+# Active IDEs (used to gate IDE-specific artifacts below)
+IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
+
+# Create universal directories (not IDE-specific; those are created on demand by the copy loop below).
+# .claude/skills is created ONLY when claude-code is an active IDE — otherwise the directory
+# would appear empty in projects that do not use Claude Code.
+mkdir -p .agents/protocols
+if echo "$IDES" | grep -q "claude-code"; then
+  mkdir -p .claude/skills
+fi
 
 # Copy the entire staging tree to the project root, preserving relative paths
 ( cd "$STAGING" && find . -type f -print0 | while IFS= read -r -d '' f; do
@@ -24,7 +32,7 @@ mkdir -p .agents/protocols .claude/skills
 [ -f .git/hooks/post-commit ] && chmod +x .git/hooks/post-commit
 
 # Reinsert Windsurf rule into AGENTS.md (safety net — may have been lost in the copy from staging)
-IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
+# IDES was already read above (8.1); reuse it here.
 if echo "$IDES" | grep -q "windsurf"; then
   WF_RULE_FILE="$WF_DIR/temp-files/AGENTS.md"
   if [ -f "$WF_RULE_FILE" ] && [ -f AGENTS.md ]; then
@@ -314,9 +322,13 @@ echo '!.github/copilot-instructions.md' >> .gitignore   # if applicable
 # the filesystem instead, so running this command costs nothing but helps nothing for them.
 command -v gentle-ai &>/dev/null && gentle-ai skill-registry refresh --quiet 2>/dev/null || true
 
-git add AGENTS.md CLAUDE.md GEMINI.md 2>/dev/null || true
+git add AGENTS.md GEMINI.md 2>/dev/null || true
 git add -f .agents/ 2>/dev/null || true
-git add -f .claude/ 2>/dev/null || true
+# CLAUDE.md and .claude/ exist only when claude-code was selected (see 8.1)
+if echo "$IDES" | grep -q "claude-code"; then
+  git add CLAUDE.md 2>/dev/null || true
+  git add -f .claude/ 2>/dev/null || true
+fi
 git add -f .cursor/ 2>/dev/null || true
 git add -f .windsurf/ 2>/dev/null || true
 git add -f .devin/ 2>/dev/null || true

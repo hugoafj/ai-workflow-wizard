@@ -147,16 +147,17 @@ Record each file. Don't ask — write everything directly to staging.
 6. Write to `{WF_STAGING}/AGENTS.md`
 7. Footer: last line with `wf-version` + stack + all features as flags
 
-### B6 — Satellites per IDE (only selected + CLAUDE.md)
+### B6 — Satellites per IDE (only selected)
 
 **CRITICAL**: Only generate satellites (files AND directories) for IDEs actually in `IDES`.
-Do NOT create empty directories for unselected IDEs.
+Do NOT create empty directories for unselected IDEs. `claude-code` is NOT special-cased:
+`CLAUDE.md` (and its `.claude/` directory) is generated ONLY if `claude-code` ∈ IDES.
 
-For each IDE in IDES (and ALWAYS for CLAUDE.md), download template and write:
+For each IDE in IDES, download template and write:
 
 | IDE | Template | Destination | Notes |
 |-----|----------|---------|---------|
-| `claude-code` | `satellites/claude.tmpl` | `{WF_STAGING}/CLAUDE.md` | ALWAYS generated |
+| `claude-code` | `satellites/claude.tmpl` | `{WF_STAGING}/CLAUDE.md` | Only if in IDES |
 | `vscode-copilot` | `satellites/copilot.tmpl` | `{WF_STAGING}/.github/copilot-instructions.md` | Only if in IDES |
 | `cursor` | `satellites/cursor.tmpl` | `{WF_STAGING}/.cursor/rules/project.mdc` | Only if in IDES |
 | `windsurf` | `satellites/windsurf.tmpl` | `{WF_STAGING}/.windsurf/rules/project.md` | Only if in IDES |
@@ -165,10 +166,9 @@ For each IDE in IDES (and ALWAYS for CLAUDE.md), download template and write:
 | `antigravity` | `satellites/antigravity.tmpl` | `{WF_STAGING}/ANTIGRAVITY.md` | Only if in IDES |
 
 **Process**:
-1. Always download and write `satellites/claude.tmpl` → `CLAUDE.md`
-2. For each IDE in IDES: download its template, create parent directories as needed, write the file
-3. Do NOT pre-create empty directories
-4. Verify: `ls -la {WF_STAGING}` should show ONLY Claude.md + directories for IDEs in IDES, no empty dirs
+1. For each IDE in IDES: download its template, create parent directories as needed, write the file
+2. Do NOT pre-create empty directories
+3. Verify: `ls -la {WF_STAGING}` should show ONLY satellites + directories for IDEs in IDES, no empty dirs
 
 ## Expected output
 

@@ -25,7 +25,7 @@ AGENTS.md (thin router, full content shown above)
 
 Files to be created (from .wizard-staging/):
   AGENTS.md
-  CLAUDE.md
+  CLAUDE.md                        (if applicable — only when claude-code is active)
   .agents/protocols/<...>.md        (packaged protocols, flat file)
   .claude/skills/<...>/SKILL.md      (packaged protocols, Claude skill — if applicable)
 <list based on confirmed IDEs: satellites and commands>

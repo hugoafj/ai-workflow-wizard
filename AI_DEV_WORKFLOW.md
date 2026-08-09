@@ -556,7 +556,7 @@ These files live in `~/`, are common to all your projects, and do NOT know your 
 These live in the repo. Each one connects its specific IDE to THIS project's `AGENTS.md`:
 
 - `AGENTS.md` — the content (source of truth).
-- `CLAUDE.md` with `@AGENTS.md` (Claude Code does not read AGENTS.md natively).
+- `CLAUDE.md` with `@AGENTS.md` — only when Claude Code is an active IDE (Claude Code does not read AGENTS.md natively).
 - `.github/copilot-instructions.md` (Copilot does not read AGENTS.md).
 - `.cursor/rules/project.mdc` (optional in 2026; Cursor already reads AGENTS.md natively).
 - `.windsurf/rules/project.md` with `trigger: always_on` (Windsurf does not read AGENTS.md).
@@ -864,7 +864,8 @@ After the wizard finishes, in another terminal:
 git log -1 --stat
 
 # Verify created files
-ls -la AGENTS.md CLAUDE.md
+ls -la AGENTS.md
+ls -la CLAUDE.md   # only if you selected Claude Code
 ls -la .github/copilot-instructions.md
 ls -la .windsurf/rules/project.md   # if you checked Windsurf
 ls -la .kiro/steering/project-context.md   # if you checked Kiro
@@ -2173,7 +2174,7 @@ Unchanged from the original criteria: no mass retrofitting of tests onto legacy 
 
 Once `/wf-init` has run, several decisions the developer made (TDD mode, testing extras, Decision Ladder, SDD backend) are fixed in the project — but they are not immutable, and it shouldn't require editing files by hand or re-running full `wf-init` to change them. `/wf-settings` (new standalone file, same format as `wf-onboard.md` and `wf-worktree.md`) closes that gap.
 
-**The four things it manages**:
+**The five things it manages**:
 
 | Module | What it toggles | Risk when changing |
 |---|---|---|
@@ -2181,6 +2182,7 @@ Once `/wf-init` has run, several decisions the developer made (TDD mode, testing
 | Testing extras | Coverage targets / Visual regression / Page Object Model, each independent | Low — only config, although deactivating visual regression or POM doesn't automatically rewrite existing specs |
 | Decision Ladder | Included or not in `AGENTS.md` | Real — it's an anti-over-engineering safeguard, removing it requires additional explicit confirmation |
 | SDD persistence backend | engram ↔ openspec ↔ hybrid | Variable — migrating *to* hybrid is safe (only adds), migrating *from* hybrid implies real functionality loss and requires double confirmation |
+| IDEs/CLIs | Add/remove an active IDE — generates (satellite + commands + skills + Windsurf fix) or deletes everything related, downloading templates from the wizard's raw source | Real — creates or removes project files; requires explicit confirmation |
 
 **Interaction pattern**: the command always shows the real state first (reading `openspec/config.yaml` and `AGENTS.md` directly, never assuming what the developer remembers choosing), lets you choose one or several changes, applies and confirms each individually, and asks "anything else?" before closing with a consolidated commit — without `git push`, like the rest of this workflow.
 
@@ -2281,6 +2283,13 @@ curl -fsSL https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/ins
 - Builder B7: generates for all IDEs including `.codex/commands/`.
 - Unified naming: "AI Workflow Wizard" in all active files.
 - Command `/wf-cleanup` to uninstall the wizard from a project without touching gentle-ai.
+  Detection covers everything the wizard creates: satellites (including
+  `.cursor/rules/`, `.windsurf/rules/`, `.kiro/steering/`), flat protocols (`.agents/protocols/`),
+  commands, CI/CD workflows (including `deploy.yml`), MCP settings (Playwright MCP entries),
+  test configs, the `post-commit` hook (`.git/hooks/`), `.husky/`, `.gga`, `.pr_agent.toml`,
+  release-please configs, `.wizard-staging/`, `.wizard-manifests/`, and `.gitignore` entries.
+  Confirmation is free-form: after the inventory, the user writes in their own words what to
+  keep, and everything wizard-owned not mentioned is deleted after a per-group confirmation.
 
 ---
 

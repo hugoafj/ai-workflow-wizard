@@ -116,7 +116,17 @@ done
 # 3. Wizard satellites
 echo ""
 echo "📡 Wizard satellites:"
-for f in CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/copilot-instructions.md; do
+for f in CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/copilot-instructions.md \
+         .cursor/rules/project.mdc .windsurf/rules/project.md .kiro/steering/project-context.md; do
+  if [ -f "$f" ]; then
+    echo "  🗑 $f (wizard)"
+  fi
+done
+
+# 3b. Wizard protocols (flat files — the universal fallback, protocol `ides`)
+echo ""
+echo "📄 Wizard protocols (flat):"
+for f in .agents/protocols/*.md; do
   if [ -f "$f" ]; then
     echo "  🗑 $f (wizard)"
   fi
@@ -129,7 +139,7 @@ if [ -d ".github/workflows" ]; then
   for wf in .github/workflows/*; do
     wf_name=$(basename "$wf")
     case "$wf_name" in
-      gemini-review.yml|claude-review.yml|gga-review.yml|quality-guard.yml|security-review.*.yml|ai-summary-job.*.yml|release-please.yml)
+      gemini-review.yml|claude-review.yml|gga-review.yml|quality-guard.yml|security-review.*.yml|ai-summary-job.*.yml|release-please.yml|deploy.yml)
         echo "  🗑 $wf (wizard)"
         ;;
       *)
@@ -139,69 +149,182 @@ if [ -d ".github/workflows" ]; then
   done
 fi
 
+# 4b. MCP settings (Playwright MCP registered by the wizard in phase8)
+echo ""
+echo "🔌 Wizard MCP settings:"
+for f in .claude/settings.json .claude/settings.local.json .cursor/mcp.json .windsurf/mcp.json; do
+  if [ -f "$f" ] && grep -q "playwright" "$f" 2>/dev/null; then
+    echo "  🗑 $f (wizard — Playwright MCP entry)"
+  fi
+done
+
+# 4c. Test configs (injected by the wizard — may also hold user settings)
+echo ""
+echo "🧪 Wizard test configs:"
+for f in vitest.config.ts playwright.config.ts; do
+  if [ -f "$f" ]; then
+    echo "  🗑 $f (wizard — review before deleting: may contain your own settings)"
+  fi
+done
+
 # 5. Other wizard artifacts
 echo ""
 echo "📁 Other artifacts:"
 [ -f ".wizard-state.json" ] && echo "  🗑 .wizard-state.json"
 [ -f ".wf-status" ] && echo "  🗑 .wf-status"
 [ -f ".commitlintrc.json" ] && echo "  🗑 .commitlintrc.json"
-[ -f "post-commit" ] && echo "  🗑 post-commit (git hook)"
+[ -d ".husky" ] && echo "  🗑 .husky/ (conventional commits)"
+[ -f ".gga" ] && echo "  🗑 .gga (GGA config)"
+[ -f ".pr_agent.toml" ] && echo "  🗑 .pr_agent.toml"
+[ -f "release-please-config.json" ] && echo "  🗑 release-please-config.json"
+[ -f ".release-please-manifest.json" ] && echo "  🗑 .release-please-manifest.json"
+[ -f ".git/hooks/post-commit" ] && echo "  🗑 .git/hooks/post-commit (git hook installed by the wizard)"
+[ -d ".wizard-staging" ] && echo "  🗑 .wizard-staging/ (leftover from an interrupted run)"
+[ -d ".wizard-manifests" ] && echo "  🗑 .wizard-manifests/ (manifest history)"
 [ -d "openspec" ] && echo "  ⏭ openspec/ (gentle-ai — DO NOT delete)"
+if [ -f ".gitignore" ] && grep -qE "^\.wf-status$|^\.wizard-state\.json$|^\.wizard-staging/$|^!\.cursor/$|^!\.windsurf/$|^!\.devin/$|^!\.kiro/$|^!\.github/copilot-instructions\.md$" .gitignore; then
+  echo "  🗑 .gitignore (wizard entries — review which ones to revert)"
+fi
 ```
 
-**PAUSE**. Show the complete inventory to the user and ask:
+**PAUSE**. Show the complete inventory and ask the user to write freely what to keep:
 
 ```
-Wizard artifacts detected. What would you like to delete?
+Wizard artifacts detected (see the inventory above).
 
-[w] All wizard artifacts (skills, commands, satellites, CI/CD, hooks)
-[s] Only wizard skills
-[c] Only wizard commands
-[t] Only wizard satellites
-[i] Only wizard CI/CD workflows
-[o] Only other artifacts (hooks, configs)
-[p] Customize — choose file by file
-[n] Delete nothing — I just want to see what's there
+Write, in your own words, what you want to KEEP. Examples:
+  "keep .husky/ and release-please-config.json"
+  "keep the cursor satellite and vitest.config.ts"
+  "keep nothing — delete all wizard artifacts"
+  "delete nothing — I just want to see what's here"
 
-Your choice:
+Everything wizard-owned that you did not mention will be deleted.
 ```
 
----
+**Wait for the free-text response.**
 
-## Phase 1 · Selected deletion
+Then build the deletion list:
 
-According to the user's choice:
-
-### Option [w] — All
-
-Delete ALL wizard artifacts detected in Phase 0. Before each group, show the diff and ask for confirmation:
+1. **Parse the response**: anything the user mentioned is PRESERVED; everything
+   else in the inventory is a deletion candidate. If the user wrote "keep nothing",
+   every wizard artifact is a candidate. If they wrote "delete nothing", stop here.
+2. **Show the resulting deletion list grouped by type and confirm** (inviolable
+   rule: confirm before each deletion):
 
 ```
 I will delete:
 
-Skills (6 files):
-  - .claude/skills/workflow/SKILL.md
-  - .claude/skills/commands/SKILL.md
-  - .claude/skills/cicd/SKILL.md
-  - .claude/skills/ides/SKILL.md
-  - .claude/skills/testing/SKILL.md
-  - .claude/skills/architecture/SKILL.md
+Skills (N files):
+  - ...
+
+Commands (N files):
+  - ...
+
+Satellites (N files):
+  - ...
+
+Protocols flat (N files):
+  - ...
+
+CI/CD workflows (N files):
+  - ...
+
+MCP settings (N files):
+  - ...
+
+Test configs (N files):
+  - ...
+
+Other artifacts (N files):
+  - ...
+
+Preserved (your choice): <list>
 
 Delete these? [yes / no]
 ```
 
-Repeat for each group (commands, satellites, CI/CD, others).
+- `yes`: continue to Phase 1.
+- `no`: show the inventory again and repeat the "what do you want to keep?" question.
 
-### Option [s/c/t/i/o] — Specific group
+---
 
-Delete only the selected group, with the same confirmation logic.
+## Phase 1 · Delete the confirmed groups
 
-### Option [p] — Customize
+Delete each group confirmed in Phase 0, group by group, and report each one.
+Never delete gentle-ai artifacts (`sdd-*`, `gentle-orchestrator`, `openspec/`,
+`~/.<ide>/`).
 
-Iterate over each detected file and ask individually:
+### Skills
+
+Remove each wizard skill directory detected in Phase 0 (only wizard ones — never
+`sdd-*` or `gentle-orchestrator`):
+
+```bash
+# Example per detected wizard skill (replace with the actual list)
+rm -rf .claude/skills/workflow .claude/skills/commands
+```
+
+### Commands
+
+Remove each wizard command file detected in Phase 0:
+
+```bash
+# Example per detected wizard command
+rm -f .claude/commands/wf-settings.md
+```
+
+### Satellites
+
+Remove each wizard satellite detected in Phase 0:
+
+```bash
+rm -f CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/copilot-instructions.md \
+      .cursor/rules/project.mdc .windsurf/rules/project.md .kiro/steering/project-context.md
+```
+
+### Protocols flat
+
+Remove each wizard protocol in `.agents/protocols/` detected in Phase 0:
+
+```bash
+rm -f .agents/protocols/wf-orchestrator.md
+```
+
+### CI/CD workflows
+
+Remove each wizard workflow detected in Phase 0:
+
+```bash
+rm -f .github/workflows/quality-guard.yml .github/workflows/deploy.yml
+```
+
+### MCP settings
+
+For each MCP settings file detected, remove only the wizard's Playwright MCP
+entry. If the file only contained that entry, delete the file.
+
+### Test configs
+
+For each test config detected, remove the wizard-injected blocks. If the user
+confirmed deleting the whole file, delete it.
+
+### Other artifacts
+
+Remove the remaining detected items:
+
+```bash
+rm -f .wizard-state.json .wf-status .commitlintrc.json .gga .pr_agent.toml
+rm -f release-please-config.json .release-please-manifest.json
+rm -rf .husky .wizard-staging .wizard-manifests
+rm -f .git/hooks/post-commit
+```
+
+Revert the wizard entries in `.gitignore` (the lines detected in Phase 0).
+
+After each group, report:
 
 ```
-.claude/skills/workflow/SKILL.md — Delete? [y/n]
+✓ Deleted: <group> (<N> files)
 ```
 
 ---
@@ -233,19 +356,24 @@ After deleting the artifacts, clean up AGENTS.md **but preserve all custom user 
 # Everything else = custom user content = PRESERVE
 ```
 
-**PAUSE**. Show the resulting AGENTS.md and ask for confirmation before writing:
+**PAUSE**. Show the resulting AGENTS.md and ask the user to write freely what to keep:
 
 ```
-I will delete these wizard sections:
+Here is the AGENTS.md with the wizard sections removed.
+
+Write, in your own words, what you want to KEEP (for example:
+  "keep the Commands section", "keep the MCPs table",
+  "keep everything about SDD"). Examples of wizard sections:
   - Commands
   - MCPs
   - wf-version footer
+  - Behavior Preferences (wizard-specific)
 
-I will KEEP your custom content:
-  - [list user sections found]
-
-OK to proceed? [yes / no]
+Everything else stays deleted. OK to proceed? [free text]
 ```
+
+**Wait for the free-text response.** Reinsert whatever the user asked to keep,
+then confirm the final result once more before writing:
 
 ---
 
@@ -260,7 +388,7 @@ git commit -m "chore: remove AI Workflow Wizard artifacts
 Removed:
 - [list of deleted files]
 - Cleaned AGENTS.md (removed wizard sections)
-- Kept: [list of preserved files]"
+- Kept: [list of preserved files / sections]"
 ```
 
 NO `git push`.
@@ -276,13 +404,15 @@ Deleted:
 - [N] wizard skills
 - [N] wizard commands
 - [N] wizard satellites
+- [N] wizard protocols
 - [N] wizard CI/CD workflows
+- [N] MCP settings / test configs
 - [N] other artifacts
 
-Preserved:
+Preserved (your choice):
 - AGENTS.md (clean, without wizard sections)
 - openspec/ (gentle-ai)
-- [user files that were kept]
+- [user files / sections that were kept]
 
 Commit: <hash>
 
@@ -300,6 +430,12 @@ Next steps:
   names (sdd-apply, sdd-propose, etc.). Wizard skills are: workflow,
   commands, cicd, ides, testing, architecture, wf-refresh, wf-onboard,
   wf-settings, wf-worktree, wf-cleanup.
+- **Confirmation flow**: after the inventory, the user writes freely what to
+  keep (in their own words, files or groups). Everything wizard-owned they did
+  not mention is deleted, after a per-group confirmation.
+- **MCP settings and test configs may mix wizard and user content**: when the
+  user does not mention them, remove only the wizard-injected parts
+  (Playwright MCP entry, coverage/snapshot blocks), not the whole file.
 - **If there are no wizard artifacts**: report "No wizard artifacts found in
   this project. Would you like to verify manually?"
 - **If the project has no AGENTS.md**: there is nothing to clean in AGENTS.md.
