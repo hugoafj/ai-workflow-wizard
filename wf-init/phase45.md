@@ -38,12 +38,17 @@ fi
 **If Windsurf is active** (`WINDSURF_ACTIVE=true`):
 
 1. **Merge the AGENTS.md rule** (read temp-files/AGENTS.md and fuse into the project's AGENTS.md):
-   - Open `AGENTS.md` (already generated in Phase 6).
-   - Read the rule from `$WF_REPO/temp-files/AGENTS.md` (the **Gentle AI — Legacy Path Bridge for Windsurf/Devin** section).
-   - Insert this rule at the top of AGENTS.md (after the title and before other content) so it loads first.
-   - Save AGENTS.md.
+   - If `AGENTS.md` does NOT exist (greenfield — the Builder generates it later in Phase 6):
+     copy the whole file `$WF_REPO/temp-files/AGENTS.md` → `AGENTS.md`. That file IS the
+     "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule and must exist before
+     `/sdd-init` runs in the new Windsurf session.
+   - If `AGENTS.md` already exists (legacy project): read the rule from
+     `$WF_REPO/temp-files/AGENTS.md` (the **Gentle AI — Legacy Path Bridge for Windsurf/Devin** section),
+     insert it at the top (after the title and before other content) so it loads first, and save.
+   - Verify the rule is present: `grep -q "Gentle AI — Legacy Path Bridge" AGENTS.md`.
+     If it is not, fix it before continuing.
 
-   **Why**: gentle-ai installs SDD skills into Windsurf's legacy paths (`~/.codeium/windsurf/skills/`), not the Devin paths. This rule tells the agent where to find them. Without it, sdd-init will not load the skills correctly in Windsurf.
+   **Why**: gentle-ai installs SDD skills into Windsurf's legacy paths (`~/.codeium/windsurf/skills/`), not the Devin paths. This rule tells the agent where to find them. Without it, sdd-init will not load the skills correctly in Windsurf. Phase 45 runs BEFORE the Builder (Phase 6) creates AGENTS.md, so a greenfield project needs the rule file created here directly.
 
 2. **Create `.windsurf/workflows/sdd-new.md`** (to replace the legacy version):
    - If `.windsurf/workflows/` does not exist, create it.
@@ -54,7 +59,7 @@ Tell the user:
 
 ```
 ⚙️ Windsurf compatibility setup:
-  ✓ Updated AGENTS.md with gentle-ai Windsurf paths rule
+  ✓ AGENTS.md: gentle-ai Windsurf paths rule in place (created if it did not exist)
   ✓ Created .windsurf/workflows/sdd-new.md (modern SDD workflow)
 
 This is a temporary workaround for a gentle-ai bug with Windsurf. The agent will now
@@ -269,14 +274,20 @@ TDD_MODE=$(jq -r '.testing.tdd_mode // "standard"' .wizard-state.json)
 if [ "$TDD_MODE" = "strict" ]; then STRICT_TDD="enabled"; else STRICT_TDD="disabled"; fi
 
 cat <<MESSAGE
-To continue, you need to initialize SDD with this configuration:
+To continue, you need to initialize SDD with this configuration.
 
-Open your IDE/CLI chat and say exactly:
+⚠️ IMPORTANT — OPEN A NEW SESSION/CHAT:
 
-  Initialize the gentle-ai sdd-init skill in ${SDD_BACKEND} mode with Strict TDD ${STRICT_TDD}
+  1. Open a NEW chat/session in your IDE/CLI — do NOT run this in the current
+     wf-init session. The wizard has just written new rules and skills to your
+     IDE configuration; they only load in a fresh session.
+  2. In that NEW session, say exactly:
 
-When the skill finishes and you see openspec/config.yaml, openspec/changes/, and
-openspec/specs/ were created, reply **continue** here in the wf-init chat so I can verify and proceed.
+       Initialize the gentle-ai sdd-init skill in ${SDD_BACKEND} mode with Strict TDD ${STRICT_TDD}
+
+  3. When the skill finishes and you see openspec/config.yaml, openspec/changes/,
+     and openspec/specs/ were created, return to THIS session and reply **continue**
+     so I can verify and proceed.
 
 Important notes:
 - `/sdd-init` is a gentle-ai skill, not a terminal command. If your IDE supports it, you can try
@@ -284,6 +295,9 @@ Important notes:
   in ${SDD_BACKEND} mode with Strict TDD ${STRICT_TDD}".
 - Some adapters (e.g., Codex/ChatGPT) may not have slash command support — use the plain 
   language instruction instead.
+- If your IDE is Windsurf/Devin: verify the project AGENTS.md contains the
+  "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule BEFORE opening the new
+  session (the wizard applies it in this phase).
 MESSAGE
 ```
 

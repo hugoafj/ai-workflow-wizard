@@ -528,7 +528,7 @@ The wizard phases:
 - **Phase 2** — Migration of previous artifacts (if any with their own content).
 - **Phase 3** — Mode: greenfield vs legacy (auto-detect + confirmation).
 - **Phase 4** — Reverse engineering (legacy only).
-- **Phase 4.5** — SDD initialization. With the context already discovered (committers, stack, greenfield vs legacy), the wizard explains the three backends (engram / openspec / hybrid), makes a grounded recommendation, and runs `/sdd-init` with the user's choice. The wizard always shows all three modes — the user decides.
+- **Phase 4.5** — SDD initialization. With the context already discovered (committers, stack, greenfield vs legacy), the wizard explains the three backends (engram / openspec / hybrid), makes a grounded recommendation, and runs `/sdd-init` with the user's choice. The wizard always shows all three modes — the user decides. For Windsurf/Devin, it also ensures the "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule is present in the project's `AGENTS.md`; on greenfield projects (where Phase 6 has not generated `AGENTS.md` yet) it creates the file directly so `/sdd-init` can load the legacy skill paths in the new session.
 - **Phase 5** — Minimum questions (4-5 depending on path).
 - **Phase 6** — File generation in memory (does not write yet). The AGENTS.md includes the "📋 wf-sdd-trigger" section as part of the base template.
 - **Phase 7** — Human review gate (preview, approval).
