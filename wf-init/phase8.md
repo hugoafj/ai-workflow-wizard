@@ -38,10 +38,20 @@ if echo "$IDES" | grep -q "windsurf"; then
   if [ -f "$WF_RULE_FILE" ] && [ -f AGENTS.md ]; then
     # Check if the rule is already present
     if ! grep -q "Gentle AI — Legacy Path Bridge" AGENTS.md; then
-      # Extract the Windsurf rule (everything after the title line)
-      WINDSURF_RULE=$(tail -n +2 "$WF_RULE_FILE")
-      # Insert after the first line (after "# AGENTS.md — workflow-wizard")
-      sed -i '1a\n'"$WINDSURF_RULE" AGENTS.md
+      # The rule is the WHOLE file (title + body) — inject it in full so the
+      # "Gentle AI — Legacy Path Bridge" title is present for the grep check.
+      # Insert after the first line (after "# AGENTS.md — <project>") using
+      # head/cat/tail — portable on BOTH BSD (macOS) and GNU (Linux) coreutils.
+      # GNU-style `sed -i '1a\n...'` fails silently on macOS; never use it here.
+      { head -n 1 AGENTS.md; cat "$WF_RULE_FILE"; tail -n +2 AGENTS.md; } > AGENTS.md.tmp
+      mv AGENTS.md.tmp AGENTS.md
+    fi
+    # Verify the rule landed — fail loudly, never silently (the silent failure is the bug)
+    if grep -q "Gentle AI — Legacy Path Bridge" AGENTS.md; then
+      echo "8.1 OK — Windsurf legacy path bridge rule present in AGENTS.md"
+    else
+      echo "8.1 ERROR — Windsurf legacy path bridge rule MISSING from AGENTS.md after reinsert." >&2
+      exit 1
     fi
   fi
 fi
