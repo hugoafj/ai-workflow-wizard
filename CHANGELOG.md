@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.2-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.6.1-beta.1...v0.6.2-beta.1) (2026-08-09)
+
+
+### Bug Fixes
+
+* phase45 creates AGENTS.md greenfield for Windsurf legacy bridge ([#68](https://github.com/hugoafj/ai-workflow-wizard/issues/68)) ([23b800a](https://github.com/hugoafj/ai-workflow-wizard/commit/23b800a6a708466c6b00ab2cf7175f2c745b54ce))
+
 ## [0.6.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.6.0-beta.1...v0.6.1-beta.1) (2026-08-09)
 
 
