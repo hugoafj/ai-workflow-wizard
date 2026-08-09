@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.3-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.6.2-beta.1...v0.6.3-beta.1) (2026-08-09)
+
+
+### Bug Fixes
+
+* phase8 8.1d falls back to agent edit when yq unavailable ([#70](https://github.com/hugoafj/ai-workflow-wizard/issues/70)) ([af43f45](https://github.com/hugoafj/ai-workflow-wizard/commit/af43f453f660dc7e6ab3ae69a752a760f2e3a9c3))
+
 ## [0.6.2-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.6.1-beta.1...v0.6.2-beta.1) (2026-08-09)
 
 
