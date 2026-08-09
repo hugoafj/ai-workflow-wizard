@@ -141,6 +141,10 @@ Record each file. Don't ask — write everything directly to staging.
 2. Replace ALL `{{...}}` placeholders with values from `.wizard-state.json`:
    - `{{answers.*}}`, `{{discovery.*}}`, `{{testing.*}}`, `{{features.*_yesno}}`
    - `{{wizard_version}}` → from the root field `wizard_version`
+   - **NEVER write `latest` or leave an unresolved placeholder** (e.g. `{{wizard_version}}`).
+     Read the EXACT value from the state file. If the state lacks `wizard_version`, use the
+     `VERSION` file content; if that is missing too, use `0.1.0-beta.1`. A footer with `latest`
+     blocks `/wf-refresh` forever (strict version equality), so this is a hard correctness rule.
 3. Resolve `<if ...>` blocks based on state
 4. Insert testing sections if LAYERS is not empty
 5. Build MCPs table based on STACK + LAYERS

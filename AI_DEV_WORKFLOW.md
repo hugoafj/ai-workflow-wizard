@@ -532,7 +532,7 @@ The wizard phases:
 - **Phase 5** — Minimum questions (4-5 depending on path).
 - **Phase 6** — File generation in memory (does not write yet). The AGENTS.md includes the "📋 wf-sdd-trigger" section as part of the base template.
 - **Phase 7** — Human review gate (preview, approval).
-- **Phase 8** — Write, handle `.gitignore`, install post-commit hook (detects AGENTS.md and SDD drift in the same hook), commit. When Windsurf is active, re-inserts the "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule into `AGENTS.md` after the staging copy (portable head/tail/cat, verified with a loud failure check) — the staging router does not carry the rule.
+ - **Phase 8** — Write, handle `.gitignore`, install post-commit hook (detects AGENTS.md and SDD drift in the same hook), commit. When Windsurf is active, re-inserts the "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule into `AGENTS.md` after the staging copy (portable head/tail/cat, verified with a loud failure check) — the staging router does not carry the rule. Validates the `AGENTS.md` `wf-version` footer is a concrete semver (never `latest` or an unresolved placeholder) and cross-checks it against the state's `wizard_version`, failing loudly on mismatch — a non-semver footer would block every `/wf-refresh` (strict version equality).
 
 **How it is invoked**: with `install.sh` it is installed as a global slash command on all detected IDEs. You invoke it with `/wf-init` from any repo. The agent detects and reads the phase files from the repo as it progresses.
 
