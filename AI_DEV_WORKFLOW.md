@@ -1526,7 +1526,7 @@ rules:
     tdd: false           # Set to true to enable RED-GREEN-REFACTOR
     test_command: "npm test"       # ← sdd-apply strict-tdd override
   verify:
-    test_command: "npm test"       # ← sdd-verify runs this
+    test_command: "npm run test:coverage" # ← sdd-verify runs this; coverage script so {test_command} --coverage (Step 5d) produces a real report
     build_command: "npm run build" # ← sdd-verify runs this
     coverage_threshold: 80         # ← sdd-verify enforces this
   archive:

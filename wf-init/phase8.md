@@ -180,8 +180,8 @@ rules:
     tdd: false                # leave as-is
     test_command: "npm test"  # ← sdd-apply strict-tdd reads rules.apply.test_command (override)
   verify:
-    test_command: ""          # ← sdd-verify runs this
-    build_command: ""         # ← sdd-verify runs this
+    test_command: "npm run test:coverage"  # ← sdd-verify runs {test_command} --coverage (Step 5d); use the coverage script so the report is real — npm swallows a bare --coverage flag
+    build_command: "npm run build"         # ← sdd-verify runs this
     coverage_threshold: 0     # ← sdd-verify enforces this (docs/openspec-config.md)
 testing:
   strict_tdd: true            # Phase 4.6 owns this, leave it alone
@@ -254,6 +254,7 @@ preserving every other line byte-for-byte, and creating missing parent keys
 | `testing.layers.e2e.available = true` + `testing.layers.e2e.tool = "playwright"` | e2e active |
 | `testing.coverage.available = true` + `testing.coverage.command = "npm run test:coverage"` + `rules.verify.coverage_threshold = $COVERAGE_THRESHOLD` | coverage activated |
 | `rules.apply.test_command = "npm test"` + `rules.verify.test_command = "npm test"` + `rules.verify.build_command = "npm run build"` | always when testing configured |
+| `rules.verify.test_command = "npm run test:coverage"` **instead of** `"npm test"` | coverage activated — npm swallows a bare `--coverage` flag (`npm test --coverage` runs WITHOUT coverage), so the test_command must be a script that already enables it for sdd-verify's `{test_command} --coverage` (strict-tdd-verify Step 5d) to produce a real report |
 
 Then continue to the verification step below. With `yq` available, apply the edits:
 
@@ -284,7 +285,14 @@ fi
 
 # 4. Command overrides (always when testing configured)
 yq eval '.rules.apply.test_command = "npm test"' -i openspec/config.yaml
-yq eval '.rules.verify.test_command = "npm test"' -i openspec/config.yaml
+# npm swallows a bare --coverage flag: `npm test --coverage` runs WITHOUT coverage.
+# sdd-verify runs {test_command} --coverage (strict-tdd-verify Step 5d), so when coverage
+# is activated the verify command must be the script that already enables coverage.
+if [ "$COVERAGE" = "true" ]; then
+  yq eval '.rules.verify.test_command = "npm run test:coverage"' -i openspec/config.yaml
+else
+  yq eval '.rules.verify.test_command = "npm test"' -i openspec/config.yaml
+fi
 yq eval '.rules.verify.build_command = "npm run build"' -i openspec/config.yaml
 ```
 
