@@ -219,7 +219,33 @@ COVERAGE_THRESHOLD=$(jq -r '.testing.coverage_threshold // null' .wizard-state.j
 Apply the edits with `yq` (same tool Phase 4.6 already uses for `strict_tdd`) — atomic,
 idempotent, preserves every other key byte-for-byte. `yq` creates any missing parent keys in the
 canonical location, so this also works when `/sdd-init` wrote a file without a top-level
-`testing:`/`rules:` block:
+`testing:`/`rules:` block. First make sure `yq` is present (same guard as Phase 4.6):
+
+```bash
+# Install yq if not present
+if ! command -v yq &> /dev/null; then
+  echo "Installing yq for safe YAML editing..."
+  brew install yq  # macOS/Linux
+  # or for Windows: scoop install yq
+fi
+```
+
+**If `yq` is STILL unavailable** (install failed or no package manager): do NOT skip this step and
+do NOT tell the user to update the file by hand. Apply the same edits with your `edit` tool on
+`openspec/config.yaml` — changing ONLY the allowed leaf fields (Wizard-Allowed Field Edits),
+preserving every other line byte-for-byte, and creating missing parent keys
+(`testing.runner`, `testing.layers.<layer>`, `rules.verify`) only when the file lacks them:
+
+| Value | Apply if |
+|---|---|
+| `testing.runner.framework = "$FRAMEWORK"` | always |
+| `testing.layers.unit.available = true` + `testing.layers.unit.tool = "vitest"` | unit or integration active |
+| `testing.layers.integration.available = true` + `testing.layers.integration.tool = "vitest"` | integration active |
+| `testing.layers.e2e.available = true` + `testing.layers.e2e.tool = "playwright"` | e2e active |
+| `testing.coverage.available = true` + `testing.coverage.command = "npm run test:coverage"` + `rules.verify.coverage_threshold = $COVERAGE_THRESHOLD` | coverage activated |
+| `rules.apply.test_command = "npm test"` + `rules.verify.test_command = "npm test"` + `rules.verify.build_command = "npm run build"` | always when testing configured |
+
+Then continue to the verification step below. With `yq` available, apply the edits:
 
 ```bash
 # 1. Runner (sdd-apply detects it from the testing section)
