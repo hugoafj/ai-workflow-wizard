@@ -55,6 +55,26 @@ if echo "$IDES" | grep -q "windsurf"; then
     fi
   fi
 fi
+
+# Validate the AGENTS.md wf-version footer — NEVER accept "latest" or an unresolved placeholder.
+# /wf-refresh Phase -1 compares local vs remote with STRICT equality; a non-semver value like
+# "latest" would block every refresh forever (0.6.4-beta.1 != latest → UPGRADE REQUIRED).
+# sed extraction is portable on BSD (macOS) and GNU (Linux) — `grep -oP` is GNU-only.
+WF_FOOTER_VER=$(sed -n 's/.*wf-version: \([^ |]*\).*/\1/p' AGENTS.md | tail -1)
+if ! printf '%s' "$WF_FOOTER_VER" | grep -qE '^v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+  echo "8.1 ERROR — AGENTS.md wf-version footer is not a concrete semver: '$WF_FOOTER_VER'." >&2
+  echo "        Expected a concrete wizard version (e.g. v0.6.4-beta.1), never 'latest'." >&2
+  echo "        Fix the Builder so it writes the EXACT wizard_version from .wizard-state.json." >&2
+  exit 1
+fi
+echo "8.1 OK — AGENTS.md wf-version footer is a concrete semver: $WF_FOOTER_VER"
+
+# Cross-check against the state (normalized: strip a leading v for the comparison)
+WF_STATE_VER=$(jq -r '.wizard_version // ""' .wizard-state.json | sed 's/^v//')
+WF_FOOTER_NORM=$(printf '%s' "$WF_FOOTER_VER" | sed 's/^v//')
+if [ -n "$WF_STATE_VER" ] && [ "$WF_FOOTER_NORM" != "$WF_STATE_VER" ]; then
+  echo "8.1 WARNING — AGENTS.md wf-version ($WF_FOOTER_VER) differs from state wizard_version ($WF_STATE_VER)." >&2
+fi
 ```
 
 ### 8.1b CI/CD activation (only what requires running commands)
