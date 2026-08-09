@@ -113,6 +113,7 @@ Workflow settings — current state:
 <if Windsurf is in active IDEs>
 17. Fix Windsurf gentle-ai — <Reapply workaround>
 </if>
+18. IDEs/CLIs — <comma-separated active list>
 
 Which number do you want to adjust?
 
@@ -1063,6 +1064,124 @@ Confirm:
 ✓ AGENTS.md rule: in place
 ✓ .windsurf/workflows/sdd-new.md: updated to modern version
 ```
+
+---
+
+### 18 — IDEs/CLIs
+
+```
+IDEs/CLIs: <comma-separated active list>
+
+Do you want to add or remove an IDE/CLI?
+  [add / remove]
+```
+
+This option toggles which IDEs/CLIs this project's wizard artifacts are generated for.
+Adding an IDE creates EVERYTHING related for it (satellite, commands, native skills, and the
+Windsurf fix if applicable); removing an IDE deletes EVERYTHING related. Only project files
+are touched — never `~/.<ide>/` (global gentle-ai config).
+
+**Source**: the templates are downloaded from the wizard's raw template root
+`https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main` (the same source the
+Builder uses). If a `$WF_RAW` variable is already defined in this session, prefer it —
+`WF_RAW="${WF_RAW:-https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main}"`.
+Always read the current list from `state.answers.ides`
+(`jq -r '.answers.ides[]' .wizard-state.json`) — never assume what was chosen in `/wf-init`.
+
+**If they choose `add`**:
+
+```
+Which IDE/CLI do you want to add?
+  1. Claude Code
+  2. Cursor
+  3. Windsurf / Devin
+  4. Kiro
+  5. OpenCode
+  6. GitHub Copilot (VS Code)
+  7. Gemini CLI
+  8. Codex
+  9. Antigravity CLI
+
+Which one? [1-9]
+```
+
+Generate everything related for the chosen IDE, downloading from `$WF_RAW`:
+
+1. **Satellite** — `$WF_RAW/templates/satellites/<ide>.tmpl` → its destination
+   (route table in protocol `ides`): `claude-code` → `CLAUDE.md`,
+   `vscode-copilot` → `.github/copilot-instructions.md`, `cursor` → `.cursor/rules/project.mdc`,
+   `windsurf` → `.windsurf/rules/project.md`, `kiro` → `.kiro/steering/project-context.md`,
+   `gemini-cli` → `GEMINI.md`, `antigravity` → `ANTIGRAVITY.md`. Create parent
+   directories as needed.
+2. **Commands** — every command in the catalog (same list as Builder B7:
+   `wf-refresh`, `wf-worktree`, `wf-settings`, `wf-onboard`, `wf-cicd`, `wf-cleanup`,
+   plus `wf-ladder` if active) → the IDE's command directory
+   (`.claude/commands/`, `.cursor/commands/`, `.windsurf/workflows/`, `.kiro/steering/`,
+   `.opencode/commands/`, `.github/prompts/`, `.codex/commands/`), applying the per-IDE
+   frontmatter (protocol `ides`, routing-table.section.md).
+3. **Skills** — the packaged protocol skills → the IDE's native skills directory
+   (`.claude/skills/`, `.kiro/skills/`, `.codex/skills/`, `.windsurf/skills/`,
+   `.agents/skills/`).
+4. **Windsurf fix** — ONLY if the added IDE is Windsurf/Devin: apply the same logic as
+   Option 17 (AGENTS.md "Gentle AI — Legacy Path Bridge" rule + `.windsurf/workflows/sdd-new.md`).
+
+Confirm:
+```
+✓ <IDE> added
+✓ Satellite: <path>
+✓ Commands: <N> generated in <dir>
+✓ Skills: <N> generated in <dir>
+<if Windsurf/Devin> ✓ Windsurf fix applied
+```
+
+**State update**:
+```bash
+jq '.answers.ides += ["<ide>"]' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+```
+
+**If they choose `remove`**:
+
+```
+Which IDE/CLI do you want to remove?
+  <numbered list of the current active IDEs>
+
+Which one? [1-N]
+```
+
+Delete everything related for the chosen IDE, confirming first:
+
+```
+Removing <IDE> deletes:
+  - <satellite path>
+  - <N> commands in <command dir>
+  - <N> skills in <skills dir>
+  <if Windsurf/Devin>: - AGENTS.md "Legacy Path Bridge" rule + .windsurf/workflows/sdd-new.md
+
+Confirm deletion? [yes / no]
+```
+
+- Delete ONLY the files this wizard generated in the project (satellite, commands, skills).
+  Never touch `~/.<ide>/` or gentle-ai's global config.
+- If some of the files are already gone, just remove what exists and update the state.
+- If the IDE is Windsurf/Devin, also remove the "Legacy Path Bridge" rule from AGENTS.md
+  (revert the Option 17 logic) and delete `.windsurf/workflows/sdd-new.md`.
+
+Confirm:
+```
+✓ <IDE> removed
+✓ <satellite path> deleted
+✓ <N> commands deleted
+✓ <N> skills deleted
+<if Windsurf/Devin> ✓ AGENTS.md rule removed
+```
+
+**State update**:
+```bash
+jq '.answers.ides -= ["<ide>"]' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+```
+
+**If they say something other than `add` or `remove`**: show the current list again and
+repeat the question. Do not guess.
 
 ---
 
