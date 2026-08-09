@@ -532,7 +532,7 @@ The wizard phases:
 - **Phase 5** — Minimum questions (4-5 depending on path).
 - **Phase 6** — File generation in memory (does not write yet). The AGENTS.md includes the "📋 wf-sdd-trigger" section as part of the base template.
 - **Phase 7** — Human review gate (preview, approval).
-- **Phase 8** — Write, handle `.gitignore`, install post-commit hook (detects AGENTS.md and SDD drift in the same hook), commit.
+- **Phase 8** — Write, handle `.gitignore`, install post-commit hook (detects AGENTS.md and SDD drift in the same hook), commit. When Windsurf is active, re-inserts the "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule into `AGENTS.md` after the staging copy (portable head/tail/cat, verified with a loud failure check) — the staging router does not carry the rule.
 
 **How it is invoked**: with `install.sh` it is installed as a global slash command on all detected IDEs. You invoke it with `/wf-init` from any repo. The agent detects and reads the phase files from the repo as it progresses.
 
@@ -1526,7 +1526,7 @@ rules:
     tdd: false           # Set to true to enable RED-GREEN-REFACTOR
     test_command: "npm test"       # ← sdd-apply strict-tdd override
   verify:
-    test_command: "npm test"       # ← sdd-verify runs this
+    test_command: "npm run test:coverage" # ← sdd-verify runs this; coverage script so {test_command} --coverage (Step 5d) produces a real report
     build_command: "npm run build" # ← sdd-verify runs this
     coverage_threshold: 80         # ← sdd-verify enforces this
   archive:
