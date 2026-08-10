@@ -19,10 +19,11 @@
 | `/wf-onboard` | project-specific (Phase 6) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-onboard/` |
 | `/wf-worktree` | project-specific (Phase 6) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-worktree/` |
 | `/wf-settings` | project-specific (Phase 6) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-settings/` |
-| `/wf-cicd` | project-specific (Phase 6) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-cicd/` |
 
 > Only `/wf-init`, `/wf-refresh`, and `/wf-cleanup` are global (installed with `install.sh`).
 > The rest are generated per project in Phase 6 of `/wf-init`.
+> `/wf-cicd` was archived (`templates/_archive/wf-cicd/`) — its flow is now the `cicd`
+> protocol, consumed by `/wf-settings` (options 9-14) and `/wf-init` Phase 4.7.
 
 ## Per-IDE generation
 

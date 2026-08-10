@@ -377,8 +377,8 @@ echo '!.github/copilot-instructions.md' >> .gitignore   # if applicable
 
 ```bash
 # Refresh gentle-ai's skill registry so its own Skill Resolver Protocol picks up
-# this project's wf-* skills (wf-orchestrator, wf-ladder, wf-sdd-trigger, wf-tdd,
-# wf-sdd-config) right away, instead of waiting for the next commit's post-commit hook.
+# this project's wf-* skills (wf-orchestrator, wf-ladder, wf-sdd-trigger, wf-tdd)
+# right away, instead of waiting for the next commit's post-commit hook.
 # Helps adapters whose orchestrator reads .atl/skill-registry.md before delegating (Claude
 # Code, OpenCode, Cursor, Kiro, Codex). Harmless no-op for Windsurf/Devin — confirmed against
 # gentle-ai's own source (internal/skillregistry/registry.go) that it never scans
@@ -416,8 +416,7 @@ git commit -m "chore: initialize AI Workflow Wizard
 - Add AGENTS.md router (thin) pointing to packaged protocols
 - Add protocols as Claude skills and flat files (.agents/protocols)
 - Add satellite files for configured IDEs
-- Add project-specific commands (wf-ladder, wf-onboard)
-- Add maintenance commands (wf-refresh, wf-worktree, wf-settings)
+- Add project commands (wf-ladder, wf-onboard, wf-worktree, wf-settings)
 - Add post-commit hook for drift detection
 - Add CI/CD (Block 6): AI review, quality guard, conventional commits
 - Update .gitignore for AI workflow files

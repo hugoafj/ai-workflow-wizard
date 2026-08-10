@@ -62,7 +62,7 @@ check file by file — not just whether the directory exists:
 ```bash
 # List of commands expected by this wizard version (update every
 # version that adds new commands)
-EXPECTED_COMMANDS="wf-ladder wf-onboard wf-refresh wf-worktree wf-settings wf-cicd wf-cleanup"
+EXPECTED_COMMANDS="wf-ladder wf-onboard wf-worktree wf-settings"
 
 # Example verification for Claude Code — repeat the pattern for each
 # active IDE, adjusting directory and extension based on its format:

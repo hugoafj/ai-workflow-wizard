@@ -54,7 +54,7 @@ Examples:
   "1,3,4"  → Ladder + Routing + CI (no CD)
   "4,5"    → Full CI + CD
   "6"      → Release-please only (automatic versioning)
-  "none"   → Only .gitignore + wf-refresh + maintenance commands
+  "none"   → Only .gitignore + maintenance commands (wf-onboard, wf-worktree, wf-settings)
 ```
 
 **Wait for user response** (via structured input tool or plain text fallback).

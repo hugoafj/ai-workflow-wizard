@@ -46,12 +46,14 @@ LAYERS=$(jq -r '.testing.layers[]' .wizard-state.json)
 ### B7 — Commands (the heaviest part)
 
 Commands always included (maintenance):
-`wf-refresh`, `wf-worktree`, `wf-settings`, `wf-onboard`, `wf-cicd`, `wf-cleanup`
+`wf-worktree`, `wf-settings`, `wf-onboard`
+
+> `/wf-init`, `/wf-refresh`, `/wf-cleanup` are **global-only** commands (installed by
+> `install.sh`, never emitted into projects). `/wf-cicd` was archived
+> (`templates/_archive/wf-cicd/`); its flow lives in the `cicd` protocol.
 
 Conditional commands by feature:
 - `wf-ladder`: only if LADDER==true
-- `wf-sdd-lite`: ARCHIVED (command no longer generated)
-  severity — this wizard's own name, never a gentle-ai command)
 
 For each active command and each IDE in IDES:
 

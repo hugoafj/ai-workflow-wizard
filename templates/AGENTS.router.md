@@ -103,7 +103,7 @@ bloating the context. They are NOT written in full here — they live in dedicat
 </if>
 <if state.sdd.backend != null>
 | When gentle-ai's SDD was explicitly requested (via `wf-sdd-trigger`'s `wf-force-sdd` outcome) | SDD skills live in your IDE's path (see table above) — **gentle-ai's own**, not this wizard's. **READ them before relying on them** — do not invent the flow, and do not describe how they delegate; that is gentle-ai's own native content for this adapter. Available skills: `sdd-propose`, `sdd-spec`, `sdd-design`, `sdd-tasks`, `sdd-apply`, `sdd-verify`, `sdd-archive`, `sdd-explore`, `sdd-init`, `sdd-onboard` |
-| When migrating SDD backend or touching `openspec/config.yaml`'s known fields | `wf-sdd-config` — wizard-owned rules (persistence backends, Wizard-Allowed Field Edits) |
+| When migrating SDD backend or touching `openspec/config.yaml`'s known fields | `sdd` — wizard-owned rules (persistence backends, Wizard-Allowed Field Edits) — flat file `.agents/protocols/sdd.md` |
 </if>
 | When generating/auditing AGENTS.md | `architecture` — AI context architecture |
 

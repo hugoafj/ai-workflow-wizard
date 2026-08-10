@@ -75,7 +75,7 @@ After `/wf-init`, your repo has:
 - **IDE satellites** — auto-generated files in `.cursor/rules/`, `.windsurf/rules/`, `.kiro/steering/`, `CLAUDE.md`, etc. that point to `AGENTS.md` ([learn more](AI_DEV_WORKFLOW.md#54-project-specific-satellites-what-they-are-and-why-we-need-them))
 - **Post-commit hook** — detects when `AGENTS.md` drifts out of sync with the codebase
 - **CI/CD templates** — GitHub Actions with quality guard, AI review, and release-please ([learn more](AI_DEV_WORKFLOW.md#10-block-6--cicd-pipeline--gga))
-- **Project-specific slash commands** — `/wf-onboard`, `/wf-settings`, `/wf-worktree`, `/wf-cicd`
+- **Project-specific slash commands** — `/wf-onboard`, `/wf-settings`, `/wf-worktree`
 
 ## The Day-to-Day
 
@@ -101,7 +101,9 @@ Once set up, here's what working with the AI Workflow looks like:
 | `/wf-onboard` | Project | Onboarding guide for new developers |
 | `/wf-settings` | Project | Toggle optional modules: TDD, testing extras, Decision Ladder ([learn more](AI_DEV_WORKFLOW.md#98-wf-settings--toggle-optional-modules-after-installation)) |
 | `/wf-worktree` | Project | Git worktree management with automatic port assignment ([learn more](AI_DEV_WORKFLOW.md#84-worktrees--wf-worktree-built-in-this-block)) |
-| `/wf-cicd` | Project | CI/CD pipeline configuration ([learn more](AI_DEV_WORKFLOW.md#10-block-6--cicd-pipeline--gga)) |
+
+> CI/CD re-configuration lives in `/wf-settings` (options 9-14), sourced from the `cicd`
+> protocol (`templates/protocols/cicd/_base.md`).
 
 ## When to Use /wf-cleanup + /wf-init Instead of /wf-refresh
 

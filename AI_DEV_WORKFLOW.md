@@ -1730,9 +1730,10 @@ Commands the wizard generates in Phase 6 and writes in Phase 8. They are project
 
 **`/wf-ladder`** — forces explicit wf-ladder with visible `🪜` output per rung.
 **`/wf-onboard`** — stub that points to `wf-onboard.md` for new developer onboarding.
-**`/wf-refresh`** — stub that invokes the AGENTS.md refresh wizard.
+**`/wf-settings`** — toggle optional modules: CI/CD, TDD, testing extras, Decision Ladder.
+**`/wf-worktree`** — git worktree management with automatic port assignment.
 
-**Global vs project-specific commands**: `wf-init`, `wf-refresh`, and `wf-cleanup` are installed globally with `install.sh`. `wf-onboard`, `wf-settings`, `wf-worktree`, and `wf-cicd` are generated per project in Phase 6. `wf-ladder` is project-specific — it has project context in its content.
+**Global vs project-specific commands**: `wf-init`, `wf-refresh`, and `wf-cleanup` are installed globally with `install.sh`. `wf-onboard`, `wf-settings`, and `wf-worktree` are generated per project in Phase 6. `wf-ladder` is project-specific — it has project context in its content. `/wf-cicd` was archived; CI/CD re-configuration happens through `/wf-settings` (options 9-14), whose single source is the `cicd` protocol.
 
 **Correct paths and formats per IDE** (verified against official documentation):
 
@@ -2057,7 +2058,7 @@ The command stub in `AGENTS.md` (or in the IDE's commands directory) simply indi
 
 #### 8.4.8 Installation as command (same pattern as Block 3)
 
-Same as `wf-ladder`, `wf-onboard`, and `wf-refresh`, `/wf-worktree` is generated in Phase 6 of `wf-init` (or added via `/wf-refresh` if the project is already initialized) for each active IDE, with the same path table and formats from section 7.5:
+Same as `wf-ladder` and `wf-onboard`, `/wf-worktree` is generated in Phase 6 of `wf-init` (or added via `/wf-refresh` if the project is already initialized) for each active IDE, with the same path table and formats from section 7.5:
 
 | IDE | Path | Format |
 |---|---|---|
@@ -2247,8 +2248,8 @@ Workflow/config templates are a single source of truth in `templates/protocols/c
 
 `/wf-init` asks you about CI and CD in its configuration flow (Phase 4.7) and generates
 the artifacts in Phase 6e. If you already initialized the project and want to change something,
-use `/wf-settings` (CI options, AI Reviewer, Security Review, CD, etc.) or
-`/wf-cicd` for complete block re-configuration.
+use `/wf-settings` (CI options, AI Reviewer, Security Review, CD, etc.) for complete
+CI/CD block re-configuration (single source: `templates/protocols/cicd/_base.md`).
 
 ---
 
@@ -2273,7 +2274,7 @@ curl -fsSL https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/ins
 | Type | Commands | Installation |
 |---|---|---|
 | **Global** | `/wf-init`, `/wf-refresh` | `install.sh` → per-IDE global paths |
-| **Project-specific** | `/wf-onboard`, `/wf-settings`, `/wf-worktree`, `/wf-cicd` | `/wf-init` Phase 6 → repo |
+| **Project-specific** | `/wf-onboard`, `/wf-settings`, `/wf-worktree` | `/wf-init` Phase 6 → repo |
 | **Global** | `/wf-cleanup` | `install.sh` → per-IDE global paths |
 | **Project-specific** | `/wf-ladder` | `/wf-init` Phase 6 → repo |
 

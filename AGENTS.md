@@ -9,7 +9,6 @@
 | `/wf-settings` | `.claude/commands/wf-settings.md` |
 | `/wf-onboard` | `.claude/commands/wf-onboard.md` |
 | `/wf-cleanup` | `.claude/commands/wf-cleanup.md` / `.github/prompts/wf-cleanup.prompt.md` |
-| `/wf-cicd` | `.claude/commands/wf-cicd.md` / `.github/prompts/wf-cicd.prompt.md` |
 
 ## Code Style & Conventions
 
