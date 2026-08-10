@@ -82,7 +82,7 @@ install_agents_skills() {
 do_install() {
   # Detect IDEs
   local has_claude=0 has_cursor=0 has_windsurf=0 has_kiro=0
-  local has_codex=0 has_copilot=0 has_antigravity=0 has_opencode=0
+  local has_codex=0 has_copilot=0 has_antigravity=0 has_opencode=0 has_devin=0
   local ide_count=0
 
   [[ -d "$HOME/.claude" ]]          && has_claude=1      && ide_count=$((ide_count + 1))
@@ -93,10 +93,11 @@ do_install() {
   [[ -d "$HOME/.copilot" ]]         && has_copilot=1     && ide_count=$((ide_count + 1))
   [[ -d "$HOME/.gemini" ]]          && has_antigravity=1 && ide_count=$((ide_count + 1))
   [[ -d "$HOME/.config/opencode" ]] && has_opencode=1    && ide_count=$((ide_count + 1))
+  [[ -d "$HOME/.config/devin" ]]    && has_devin=1       && ide_count=$((ide_count + 1))
 
   if [[ $ide_count -eq 0 ]]; then
     echo "No supported IDEs detected. Install one of: Claude Code, Cursor,"
-    echo "Windsurf, Kiro, Codex, Copilot, Antigravity, or OpenCode, then re-run."
+    echo "Windsurf, Kiro, Codex, Copilot, Antigravity, OpenCode, or Devin, then re-run."
     exit 1
   fi
 
@@ -137,6 +138,19 @@ do_install() {
       installed=$((installed + 1))
     fi
     if [[ $has_windsurf -eq 1 ]]; then
+      # Windsurf legacy global workflows (flat .md, frontmatter description required)
+      install_windsurf "$HOME/.codeium/windsurf/global_workflows" "$cmd" "$body" "$desc" "$VERSION"
+      installed=$((installed + 1))
+      # Windsurf legacy global skills (safety net for older Windsurf channels)
+      install_agents_skills "$HOME/.codeium/windsurf/skills" "$cmd" "$body" "$desc" "$VERSION"
+      installed=$((installed + 1))
+      # Devin path (Windsurf rebrand) — only when Devin itself is not detected
+      if [[ $has_devin -eq 0 ]]; then
+        install_copilot "$HOME/.config/devin" "$cmd" "$body" "$desc" "$VERSION"
+        installed=$((installed + 1))
+      fi
+    fi
+    if [[ $has_devin -eq 1 ]]; then
       install_copilot "$HOME/.config/devin" "$cmd" "$body" "$desc" "$VERSION"
       installed=$((installed + 1))
     fi
@@ -144,8 +158,11 @@ do_install() {
       install_kiro "$HOME/.kiro/steering" "$cmd" "$body" "$VERSION"
       installed=$((installed + 1))
     fi
+    # Unconditional: .agents/skills is read by Codex, OpenCode, Gemini, Antigravity, and Devin
+    install_agents_skills "$HOME/.agents/skills" "$cmd" "$body" "$desc" "$VERSION"
+    installed=$((installed + 1))
     if [[ $has_codex -eq 1 ]]; then
-      install_agents_skills "$HOME/.agents/skills" "$cmd" "$body" "$desc" "$VERSION"
+      install_plain "$HOME/.codex/commands" "$cmd" "$body" "$VERSION"
       installed=$((installed + 1))
     fi
     if [[ $has_copilot -eq 1 ]]; then
@@ -199,10 +216,20 @@ do_uninstall() {
     f="$HOME/.cursor/commands/${cmd}.md"
     [[ -f "$f" ]] && rm -f "$f" && echo "  ✓ Removed ${f#$HOME/}" && removed=$((removed + 1))
 
+    # Windsurf legacy global workflows + skills
+    f="$HOME/.codeium/windsurf/global_workflows/${cmd}.md"
+    [[ -f "$f" ]] && rm -f "$f" && echo "  ✓ Removed ${f#$HOME/}" && removed=$((removed + 1))
+
+    f="$HOME/.codeium/windsurf/skills/${cmd}/SKILL.md"
+    [[ -f "$f" ]] && rm -f "$f" && echo "  ✓ Removed ${f#$HOME/}" && removed=$((removed + 1))
+
     f="$HOME/.config/devin/skills/${cmd}/SKILL.md"
     [[ -f "$f" ]] && rm -f "$f" && echo "  ✓ Removed ${f#$HOME/}" && removed=$((removed + 1))
 
     f="$HOME/.kiro/steering/${cmd}.md"
+    [[ -f "$f" ]] && rm -f "$f" && echo "  ✓ Removed ${f#$HOME/}" && removed=$((removed + 1))
+
+    f="$HOME/.codex/commands/${cmd}.md"
     [[ -f "$f" ]] && rm -f "$f" && echo "  ✓ Removed ${f#$HOME/}" && removed=$((removed + 1))
 
     f="$HOME/.agents/skills/${cmd}/SKILL.md"

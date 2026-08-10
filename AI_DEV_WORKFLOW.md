@@ -2262,19 +2262,31 @@ use `/wf-settings` (CI options, AI Reviewer, Security Review, CD, etc.) or
 curl -fsSL https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/install.sh | bash
 ```
 
-- Detects IDEs by directories in `~/` (Claude, Cursor, Windsurf, Kiro, Codex, Copilot, Antigravity)
-- Installs `/wf-init` and `/wf-refresh` as self-contained slash commands
-- Applies correct format per IDE (frontmatter for Windsurf/Kiro/Copilot, SKILL.md for Antigravity)
+- Detects IDEs by directories in `~/` (Claude, Cursor, Windsurf, Kiro, Codex, Copilot, Antigravity, OpenCode, Devin)
+- Installs `/wf-init`, `/wf-refresh`, and `/wf-cleanup` as self-contained slash commands
+- Applies correct format per IDE (plain `.md` for Claude/Cursor/Codex/OpenCode, frontmatter `description:` for Windsurf workflows, SKILL.md with `name:`/`description:` for Windsurf/Devin/Copilot/Antigravity, `inclusion: manual` for Kiro)
+- Installs unconditional global skills to `~/.agents/skills/` (read by Codex, OpenCode, Gemini, Antigravity, and Devin)
 - Supports `--uninstall` to remove only the installed commands
 
 ### Global vs project-specific commands
 
 | Type | Commands | Installation |
 |---|---|---|
-| **Global** | `/wf-init`, `/wf-refresh` | `install.sh` → `~/.<ide>/commands/` |
+| **Global** | `/wf-init`, `/wf-refresh` | `install.sh` → per-IDE global paths |
 | **Project-specific** | `/wf-onboard`, `/wf-settings`, `/wf-worktree`, `/wf-cicd` | `/wf-init` Phase 6 → repo |
-| **Global** | `/wf-cleanup` | `install.sh` → `~/.<ide>/commands/` |
+| **Global** | `/wf-cleanup` | `install.sh` → per-IDE global paths |
 | **Project-specific** | `/wf-ladder` | `/wf-init` Phase 6 → repo |
+
+Global paths written by `install.sh` per command:
+
+| IDE | Paths |
+|---|---|
+| Claude / Cursor / Codex / OpenCode | `~/.<ide>/commands/<cmd>.md` (plain markdown) |
+| Windsurf (legacy) | `~/.codeium/windsurf/global_workflows/<cmd>.md` (frontmatter `description:`) + `~/.codeium/windsurf/skills/<cmd>/SKILL.md` |
+| Devin (Windsurf rebrand) | `~/.config/devin/skills/<cmd>/SKILL.md` — detected via `~/.config/devin/`; written by the Windsurf block too when Devin is not detected separately |
+| Kiro | `~/.kiro/steering/<cmd>.md` (frontmatter `inclusion: manual`) |
+| Copilot / Antigravity | `~/.copilot/skills/<cmd>/SKILL.md`, `~/.gemini/.../skills/<cmd>/SKILL.md` |
+| All IDEs | `~/.agents/skills/<cmd>/SKILL.md` — unconditional |
 
 ### What the block includes
 
