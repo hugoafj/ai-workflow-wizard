@@ -68,7 +68,7 @@ build_protocol_body(name):
 Active protocols (conditional by features):
 | Protocol | Active if |
 |-----------|-----------|
-| `wf-orchestrator` | LADDER==true or ROUTING==true (single entry point, never duplicates the other two) |
+| `wf-orchestrator` | LADDER==true or ROUTING==true or TDD==true (single entry point, never duplicates the other two) |
 | `wf-ladder` | LADDER==true |
 | `wf-sdd-trigger` | ROUTING==true |
 | `tdd` (skill `wf-tdd`) | TDD==true AND LAYERS not empty |
