@@ -28,52 +28,52 @@ fetch_cmd() {
 }
 
 install_plain() {
-  local dir="$1" cmd="$2" content="$3"
+  local dir="$1" cmd="$2" content="$3" version="$4"
   mkdir -p "$dir"
-  echo "$content" > "${dir}/${cmd}.md"
+  printf -- '<!-- wf-cmd-version: %s -->\n%s\n' "$version" "$content" > "${dir}/${cmd}.md"
   echo "  ✓ ${dir}/${cmd}.md"
 }
 
 install_windsurf() {
-  local dir="$1" cmd="$2" content="$3" desc="$4"
+  local dir="$1" cmd="$2" content="$3" desc="$4" version="$5"
   mkdir -p "$dir"
-  printf -- '---\ndescription: %s\n---\n\n%s\n' "$desc" "$content" \
+  printf -- '---\ndescription: %s\nversion: %s\n---\n\n%s\n' "$desc" "$version" "$content" \
     > "${dir}/${cmd}.md"
   echo "  ✓ ${dir}/${cmd}.md"
 }
 
 install_kiro() {
-  local dir="$1" cmd="$2" content="$3"
+  local dir="$1" cmd="$2" content="$3" version="$4"
   mkdir -p "$dir"
-  printf -- '---\ninclusion: manual\n---\n\n%s\n' "$content" \
+  printf -- '---\ninclusion: manual\nversion: %s\n---\n\n%s\n' "$version" "$content" \
     > "${dir}/${cmd}.md"
   echo "  ✓ ${dir}/${cmd}.md"
 }
 
 install_antigravity() {
-  local dir="$1" cmd="$2" content="$3" desc="$4"
+  local dir="$1" cmd="$2" content="$3" desc="$4" version="$5"
   local skill_dir="${dir}/skills/${cmd}"
   mkdir -p "$skill_dir"
-  printf -- '---\nname: %s\ndescription: %s\n---\n\n%s\n' \
-    "$cmd" "$desc" "$content" > "${skill_dir}/SKILL.md"
+  printf -- '---\nname: %s\ndescription: %s\nversion: %s\n---\n\n%s\n' \
+    "$cmd" "$desc" "$version" "$content" > "${skill_dir}/SKILL.md"
   echo "  ✓ ${skill_dir}/SKILL.md"
 }
 
 install_copilot() {
-  local dir="$1" cmd="$2" content="$3" desc="$4"
+  local dir="$1" cmd="$2" content="$3" desc="$4" version="$5"
   local skill_dir="${dir}/skills/${cmd}"
   mkdir -p "$skill_dir"
-  printf -- '---\nname: %s\ndescription: %s\n---\n\n%s\n' \
-    "$cmd" "$desc" "$content" > "${skill_dir}/SKILL.md"
+  printf -- '---\nname: %s\ndescription: %s\nversion: %s\n---\n\n%s\n' \
+    "$cmd" "$desc" "$version" "$content" > "${skill_dir}/SKILL.md"
   echo "  ✓ ${skill_dir}/SKILL.md"
 }
 
 install_agents_skills() {
-  local dir="$1" cmd="$2" content="$3" desc="$4"
+  local dir="$1" cmd="$2" content="$3" desc="$4" version="$5"
   local skill_dir="${dir}/${cmd}"
   mkdir -p "$skill_dir"
-  printf -- '---\nname: %s\ndescription: %s\n---\n\n%s\n' \
-    "$cmd" "$desc" "$content" > "${skill_dir}/SKILL.md"
+  printf -- '---\nname: %s\ndescription: %s\nversion: %s\n---\n\n%s\n' \
+    "$cmd" "$desc" "$version" "$content" > "${skill_dir}/SKILL.md"
   echo "  ✓ ${skill_dir}/SKILL.md"
 }
 
@@ -103,6 +103,13 @@ do_install() {
   echo "Detected ${ide_count} IDE(s). Installing global commands..."
   echo ""
 
+  # Fetch remote version
+  echo -n "Fetching remote version... "
+  local VERSION
+  VERSION=$(curl -fsSL "${RAW}/VERSION" 2>/dev/null | head -1)
+  echo "${VERSION}"
+  echo ""
+
   # Descriptions for Windsurf/Antigravity frontmatter
   local desc_init="Wizard de bootstrap del AI Workflow Wizard — inicializa el workflow en un repo nuevo"
   local desc_refresh="Refresh Wizard — actualiza AGENTS.md cuando el proyecto evolucionó — 3 capas de drift"
@@ -122,38 +129,38 @@ do_install() {
     [[ "$cmd" == "wf-cleanup" ]] && desc="$desc_cleanup"
 
     if [[ $has_claude -eq 1 ]]; then
-      install_plain "$HOME/.claude/commands" "$cmd" "$body"
+      install_plain "$HOME/.claude/commands" "$cmd" "$body" "$VERSION"
       installed=$((installed + 1))
     fi
     if [[ $has_cursor -eq 1 ]]; then
-      install_plain "$HOME/.cursor/commands" "$cmd" "$body"
+      install_plain "$HOME/.cursor/commands" "$cmd" "$body" "$VERSION"
       installed=$((installed + 1))
     fi
     if [[ $has_windsurf -eq 1 ]]; then
-      install_copilot "$HOME/.config/devin" "$cmd" "$body" "$desc"
+      install_copilot "$HOME/.config/devin" "$cmd" "$body" "$desc" "$VERSION"
       installed=$((installed + 1))
     fi
     if [[ $has_kiro -eq 1 ]]; then
-      install_kiro "$HOME/.kiro/steering" "$cmd" "$body"
+      install_kiro "$HOME/.kiro/steering" "$cmd" "$body" "$VERSION"
       installed=$((installed + 1))
     fi
     if [[ $has_codex -eq 1 ]]; then
-      install_agents_skills "$HOME/.agents/skills" "$cmd" "$body" "$desc"
+      install_agents_skills "$HOME/.agents/skills" "$cmd" "$body" "$desc" "$VERSION"
       installed=$((installed + 1))
     fi
     if [[ $has_copilot -eq 1 ]]; then
-      install_copilot "$HOME/.copilot" "$cmd" "$body" "$desc"
+      install_copilot "$HOME/.copilot" "$cmd" "$body" "$desc" "$VERSION"
       installed=$((installed + 1))
     fi
     if [[ $has_antigravity -eq 1 ]]; then
       # CLI path
-      install_antigravity "$HOME/.gemini/antigravity-cli/builtin" "$cmd" "$body" "$desc"
+      install_antigravity "$HOME/.gemini/antigravity-cli/builtin" "$cmd" "$body" "$desc" "$VERSION"
       # IDE path (workaround for gentle-ai#746)
-      install_antigravity "$HOME/.gemini/config" "$cmd" "$body" "$desc"
+      install_antigravity "$HOME/.gemini/config" "$cmd" "$body" "$desc" "$VERSION"
       installed=$((installed + 2))
     fi
     if [[ $has_opencode -eq 1 ]]; then
-      install_plain "$HOME/.config/opencode/commands" "$cmd" "$body"
+      install_plain "$HOME/.config/opencode/commands" "$cmd" "$body" "$VERSION"
       installed=$((installed + 1))
     fi
   done

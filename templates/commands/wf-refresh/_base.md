@@ -64,12 +64,25 @@ re-running `/wf-init` or cleaning the project:
 **Execution** (you execute this automatically on skill start):
 
 ```bash
+# Helper function to extract version from the current command file
+extract_version_from_this_file() {
+  # Try YAML frontmatter first (skills)
+  local ver=$(grep -oP 'version: \K[v0-9a-z.-]+' "$0" 2>/dev/null | head -1)
+  if [ -n "$ver" ]; then
+    echo "$ver"
+    return
+  fi
+  # Try HTML comment (plain files)
+  ver=$(grep -oP 'wf-cmd-version: \K[v0-9a-z.-]+' "$0" 2>/dev/null | head -1)
+  if [ -n "$ver" ]; then
+    echo "$ver"
+    return
+  fi
+}
+
 # CRITICAL: Extract REPO from AGENTS.md footer
 SOURCE_URL=$(grep "source:" AGENTS.md 2>/dev/null | tail -1 | sed 's/.*source: //')
 REPO=$(echo "$SOURCE_URL" | sed 's|github.com/||' || echo "hugoafj/ai-workflow-wizard")
-
-# Get local version from AGENTS.md footer
-LOCAL_VER=$(grep -oP 'wf-version: \K[v0-9a-z.-]+' AGENTS.md | tail -1)
 
 # Get remote version from VERSION file or GitHub API
 REMOTE_VER=$(curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/VERSION" 2>/dev/null | head -1)
@@ -77,14 +90,15 @@ if [ -z "$REMOTE_VER" ]; then
   REMOTE_VER=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null | jq -r '.tag_name // empty' 2>/dev/null)
 fi
 
-# BLOCK if versions don't match
-if [ -n "$REMOTE_VER" ] && [ -n "$LOCAL_VER" ] && [ "$REMOTE_VER" != "$LOCAL_VER" ]; then
+# CHECK 1: Global command version vs remote version
+GLOBAL_VER=$(extract_version_from_this_file)
+if [ -n "$REMOTE_VER" ] && [ -n "$GLOBAL_VER" ] && [ "$REMOTE_VER" != "$GLOBAL_VER" ]; then
   printf '\n┌────────────────────────────────────────────────────────┐\n' >&2
-  printf '│  ⚠  WIZARD VERSION MISMATCH — UPGRADE REQUIRED         │\n' >&2
+  printf '│  ⚠  GLOBAL COMMAND OUTDATED — UPGRADE REQUIRED        │\n' >&2
   printf '└────────────────────────────────────────────────────────┘\n' >&2
-  printf '\n  Remote version: %s\n' "$REMOTE_VER" >&2
-  printf '  Your version:   %s\n' "$LOCAL_VER" >&2
-  printf '\n  The /wf-refresh command you are running is version %s.\n' "$LOCAL_VER" >&2
+  printf '\n  Remote version:   %s\n' "$REMOTE_VER" >&2
+  printf '  Your global cmd:  %s\n' "$GLOBAL_VER" >&2
+  printf '\n  The /wf-refresh command you are running is outdated.\n' >&2
   printf '  To apply all updates correctly, upgrade the global commands first.\n\n' >&2
   printf '  UPGRADE REQUIRED:\n' >&2
   printf '    1. Run: curl -fsSL https://raw.githubusercontent.com/%s/main/install.sh | bash\n' "$REPO" >&2
@@ -92,11 +106,11 @@ if [ -n "$REMOTE_VER" ] && [ -n "$LOCAL_VER" ] && [ "$REMOTE_VER" != "$LOCAL_VER
   printf '    3. Run /wf-refresh AGAIN in a NEW chat session\n\n' >&2
   printf '  Do you want to upgrade now?\n' >&2
   printf '  [Type "upgrade" to proceed, or "skip" to continue anyway]\n\n' >&2
-  
+
   read -p "  Your choice: " upgrade_choice
-  
+
   if [ "$upgrade_choice" = "upgrade" ]; then
-    echo "Upgrading global commands from $LOCAL_VER to $REMOTE_VER..."
+    echo "Upgrading global commands from $GLOBAL_VER to $REMOTE_VER..."
     curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/install.sh" | bash
     echo ""
     echo "✓ Global commands upgraded."
@@ -104,8 +118,20 @@ if [ -n "$REMOTE_VER" ] && [ -n "$LOCAL_VER" ] && [ "$REMOTE_VER" != "$LOCAL_VER
     echo "⚠ RESTART YOUR IDE AND RUN /wf-refresh AGAIN IN A NEW CHAT SESSION"
     exit 0
   fi
-  
-  printf '\n⚠  Continuing with version %s. Some updates may be incomplete.\n\n' "$LOCAL_VER" >&2
+
+  printf '\n⚠  Continuing with global command version %s. Some updates may be incomplete.\n\n' "$GLOBAL_VER" >&2
+fi
+
+# CHECK 2: Project AGENTS.md version vs remote version (only if CHECK 1 passed)
+LOCAL_VER=$(grep -oP 'wf-version: \K[v0-9a-z.-]+' AGENTS.md | tail -1)
+if [ -n "$REMOTE_VER" ] && [ -n "$LOCAL_VER" ] && [ "$REMOTE_VER" != "$LOCAL_VER" ]; then
+  printf '\n┌────────────────────────────────────────────────────────┐\n' >&2
+  printf '│  ⚠  PROJECT AGENTS.md OUTDATED — REFRESH NEEDED          │\n' >&2
+  printf '└────────────────────────────────────────────────────────┘\n' >&2
+  printf '\n  Remote version:   %s\n' "$REMOTE_VER" >&2
+  printf '  Your AGENTS.md:    %s\n' "$LOCAL_VER" >&2
+  printf '\n  Your project AGENTS.md is outdated.\n' >&2
+  printf '  Proceeding with refresh to update it...\n\n' >&2
 fi
 ```
 
