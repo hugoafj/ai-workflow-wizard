@@ -36,29 +36,29 @@ pending until you push the repo to GitHub. **Don't stop the wizard because of th
 
 #### Mode 1 — Full CI (features.ci == true)
 
-Present the exact same questions as `wf-cicd.md` PHASE 1-5 (single source of
+Present the exact same questions as `cicd` protocol PHASE 1-5 (single source of
 option text). Collect in `state.ci`:
 
-1. **AI reviewer** (`wf-cicd.md` PHASE 1) → `state.ci.ai_reviewer` ∈
+1. **AI reviewer** (`cicd` protocol PHASE 1) → `state.ci.ai_reviewer` ∈
    `{gga, copilot, claude, gemini, none}` (recommended: **gga**).
 
    Try the structured input tool with all 5 options. If the tool is unavailable or doesn't
-   support 5, display the `wf-cicd.md` PHASE 1 options as plain text and
+   support 5, display the `cicd` protocol PHASE 1 options as plain text and
    wait for typed response. Parse the user's choice (1, 2, 3, 4, or 5).
 
    - If `gga`: ask `state.ci.gga_provider` (claude/gemini/codex/opencode/ollama/...)
      and `state.ci.gga_modes` ⊆ `{local, ci}` (recommended: both).
-2. **Dedicated security review** (`wf-cicd.md` PHASE 3) → `state.ci.security_review`
+2. **Dedicated security review** (`cicd` protocol PHASE 3) → `state.ci.security_review`
    (`false` | `claude` | `gemini`).
-3. **Conventional commits** (`wf-cicd.md` PHASE 4) → `state.ci.conventional_commits`
+3. **Conventional commits** (`cicd` protocol PHASE 4) → `state.ci.conventional_commits`
    (bool, recommended `true`). Includes migration of drift hook to Husky.
-4. **release-please** (`wf-cicd.md` PHASE 5) → `state.ci.release_please` (bool) and, if yes,
+4. **release-please** (`cicd` protocol PHASE 5) → `state.ci.release_please` (bool) and, if yes,
     `state.ci.release_ai_summary` (bool, optional AI summary for the release PR).
     - If yes → ask `state.ci.release_ai_provider` ∈ `{gemini, claude, openai}`.
       If GGA is configured with a provider (`state.ci.gga_provider`), use that same one
       as default.
 
-> The Quality Guard (`wf-cicd.md` PHASE 2) is **mandatory** — not asked; the Builder
+> The Quality Guard (`cicd` protocol PHASE 2) is **mandatory** — not asked; the Builder
 > always generates it, conditioned on the actual `package.json` scripts (`state.testing` +
 > discovery). It doesn't need user input beyond what's already collected.
 

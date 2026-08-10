@@ -110,19 +110,22 @@ naming/scope rationale). Three independent protocols, NEVER split or summarize t
 Protocols to build (conditional by features):
 - `wf-orchestrator`, `wf-ladder`, `wf-sdd-trigger`: per the rules above.
 - `tdd` (packaged as skill `wf-tdd`): if `TDD == true` AND `LAYERS` is not empty (variant = `TDD_MODE`).
-- `sdd` (packaged as skill `wf-sdd-config`): always when `BACKEND != null`.
+- `sdd` (flat file only — its `skill/SKILL.md` wrapper was removed, single source is the
+  `_base.md`): always when `BACKEND != null`.
 - `architecture`: always.
-- (`testing`, `cicd`, `ides`, `commands`, `workflow`: are packaged as skill/flat
-  file as well, so they are available; the router references only the applicable ones.)
+- (`testing`, `cicd`, `ides`, `commands`, `workflow`: are packaged per the presence-driven
+  rule — native skill if `skill/SKILL.md` exists, flat file always — so they are available;
+  the router references only the applicable ones.)
 
 ### Step B4 — Package protocols by IDE (native skills + flat file fallback)
 From the SAME `build_protocol_body(name)`:
 1. **Flat file** → `STAGING/.agents/protocols/<name>.md` = body (universal fallback, `<name>` is
    the protocol's source folder name under `templates/protocols/`).
-2. **Native skills** per IDE that supports SKILL.md — for each IDE in `IDES` that has
-   a native skill path, emit a copy of the frontmatter from
-   `$WF_ROOT/templates/protocols/<name>/skill/SKILL.md` (replacing `{{PROTOCOL_BODY: ...}}`
-   with the body) in its corresponding directory:
+2. **Native skills** per IDE that supports SKILL.md — **presence-driven**: only if
+   `$WF_ROOT/templates/protocols/<name>/skill/SKILL.md` exists (protocols like `sdd` and
+   `cicd` are flat-only now). For each IDE in `IDES` that has a native skill path, emit a
+   copy of the frontmatter from `$WF_ROOT/templates/protocols/<name>/skill/SKILL.md`
+   (replacing `{{PROTOCOL_BODY: ...}}` with the body) in its corresponding directory:
 
    | IDE | Skills path |
    |-----|-------------|
@@ -134,10 +137,10 @@ From the SAME `build_protocol_body(name)`:
 
    **`<skill-name>` is the skill's `name:` frontmatter field** (read from
    `skill/SKILL.md` before writing), NOT necessarily the protocol's source folder name — e.g.
-   the `tdd` protocol packages as skill folder `wf-tdd/`, and `sdd` packages as `wf-sdd-config/`,
-   even though their source folders under `templates/protocols/` stay `tdd/`/`sdd/` for internal
-   consistency with existing cross-references. This keeps every user/model-facing skill name
-   `wf-`-prefixed and unambiguous, without requiring a full source-tree rename.
+   the `tdd` protocol packages as skill folder `wf-tdd/`, even though its source folder under
+   `templates/protocols/` stays `tdd/` for internal consistency with existing
+   cross-references. This keeps every user/model-facing skill name `wf-`-prefixed and
+   unambiguous, without requiring a full source-tree rename.
 
    If the IDE is not in the table, no native skills are emitted (uses the flat file fallback).
    Register each file in `state.build_plan.protocols_flat` / `.protocols_skills`.
@@ -184,7 +187,11 @@ special-cased: if `claude-code` was not selected, neither `CLAUDE.md` nor
 ### Step B7 — Commands (per active IDE)
 
 Commands **always** included (maintenance):
-- `/wf-refresh`, `/wf-worktree`, `/wf-settings`, `/wf-onboard`, `/wf-cicd`, `/wf-cleanup`
+- `/wf-worktree`, `/wf-settings`, `/wf-onboard`
+
+> `/wf-init`, `/wf-refresh`, `/wf-cleanup` are **global-only** commands (installed by
+> `install.sh`, never emitted into projects). `/wf-cicd` was archived
+> (`templates/_archive/wf-cicd/`); its flow lives in the `cicd` protocol.
 
 Commands **conditional** by feature:
 - `/wf-ladder`: only if `LADDER == true` (the command to explicitly invoke the wf-ladder steps).

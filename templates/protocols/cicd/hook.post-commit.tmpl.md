@@ -80,7 +80,7 @@ fi
 
 # 4. Opportunistically refresh gentle-ai's skill registry so its own Skill Resolver
 #    Protocol picks up this wizard's wf-* skills (wf-orchestrator, wf-ladder,
-#    wf-sdd-trigger, wf-tdd, wf-sdd-config) without the user having to remember to run
+#    wf-sdd-trigger, wf-tdd) without the user having to remember to run
 #    it manually. Helps Claude Code/OpenCode/Cursor/Kiro/Codex (orchestrators that read
 #    .atl/skill-registry.md before delegating). Harmless no-op for Windsurf/Devin — confirmed
 #    against gentle-ai's own source that it never scans .windsurf/skills/ or .devin/skills/;

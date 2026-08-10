@@ -72,7 +72,7 @@ Active protocols (conditional by features):
 | `wf-ladder` | LADDER==true |
 | `wf-sdd-trigger` | ROUTING==true |
 | `tdd` (skill `wf-tdd`) | TDD==true AND LAYERS not empty |
-| `sdd` (skill `wf-sdd-config`) | BACKEND != null |
+| `sdd` (flat only — skill wrapper removed) | BACKEND != null |
 | `architecture` | **always** |
 | `testing` | **always** |
 | `cicd` | **always** |
@@ -112,10 +112,12 @@ For each active protocol (body already built):
 **1. Flat file** (universal fallback):
 `{WF_STAGING}/.agents/protocols/<name>.md` = cuerpo
 
-**2. Native skills per IDE** (only IDEs that support SKILL.md). `<skill-name>` is the skill's
-`name:` frontmatter field (from `skill/SKILL.md`) — NOT necessarily the protocol's source folder
-`<name>` (e.g. protocol `tdd` packages as skill folder `wf-tdd/`, protocol `sdd` as
-`wf-sdd-config/`), so every user/model-facing skill stays `wf-`-prefixed and unambiguous:
+**2. Native skills per IDE** (only IDEs that support SKILL.md). **Presence-driven**: a
+protocol gets native skills ONLY if `$WF_RAW/templates/protocols/<name>/skill/SKILL.md`
+exists (protocols like `sdd` and `cicd` are flat-only now). `<skill-name>` is the skill's
+`name:` frontmatter field (from `skill/SKILL.md`) — NOT necessarily the protocol's source
+folder `<name>` (e.g. protocol `tdd` packages as skill folder `wf-tdd/`), so every
+user/model-facing skill stays `wf-`-prefixed and unambiguous:
 
 | IDE | Skills path |
 |-----|-------------|

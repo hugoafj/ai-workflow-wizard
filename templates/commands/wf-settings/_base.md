@@ -633,6 +633,9 @@ jq '.features.ci = <value>' .wizard-state.json > .wizard-state.json.tmp && mv .w
 ### 10 — AI Reviewer
 
 > Only available if CI = ON.
+> **Single source**: the complete option text and per-option generation logic live in
+> `templates/protocols/cicd/_base.md` (PHASE 1). If a provider's details change, change them
+> there; this option only adapts the summary and delegates generation.
 
 ```
 Current AI Reviewer: <GGA (provider: X) / Copilot / Claude / Gemini / None>
@@ -797,6 +800,8 @@ Confirm:
 ### 12 — Dedicated Security Review
 
 > Only available if CI = ON.
+> **Single source**: the question text and artifact names live in
+> `templates/protocols/cicd/_base.md` (PHASE 3).
 
 ```
 Dedicated Security Review: <Claude / Gemini / OFF>
@@ -887,6 +892,8 @@ jq '.ci.e2e_in_ci = <value>' .wizard-state.json > .wizard-state.json.tmp && mv .
 
 > Only visible if CI = OFF. If CI is active, release-please is already
 > included and this option does not apply.
+> **Single source**: the question text and artifact names live in
+> `templates/protocols/cicd/_base.md` (PHASE 5).
 
 ```
 release-please standalone: <ON / OFF>
@@ -1122,8 +1129,8 @@ Generate everything related for the chosen IDE, downloading from `$WF_RAW`:
    `gemini-cli` → `GEMINI.md`, `antigravity` → `ANTIGRAVITY.md`. Create parent
    directories as needed.
 2. **Commands** — every command in the catalog (same list as Builder B7:
-   `wf-refresh`, `wf-worktree`, `wf-settings`, `wf-onboard`, `wf-cicd`, `wf-cleanup`,
-   plus `wf-ladder` if active) → the IDE's command directory
+   `wf-worktree`, `wf-settings`, `wf-onboard`, plus `wf-ladder` if active) → the IDE's
+   command directory
    (`.claude/commands/`, `.cursor/commands/`, `.windsurf/workflows/`, `.kiro/steering/`,
    `.opencode/commands/`, `.github/prompts/`, `.codex/commands/`), applying the per-IDE
    frontmatter (protocol `ides`, routing-table.section.md).

@@ -726,7 +726,7 @@ commands for the current wizard version (keep in sync with
 `EXPECTED_COMMANDS` from `wf-init.md`):
 
 ```bash
-EXPECTED_COMMANDS="wf-ladder wf-onboard wf-refresh wf-worktree wf-settings wf-cicd wf-cleanup"
+EXPECTED_COMMANDS="wf-ladder wf-onboard wf-worktree wf-settings"
 
 # Example for Claude Code — repeat the pattern adjusting path/extension
 # for each active IDE (see route table in wf-init.md Phase 6 section)
