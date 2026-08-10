@@ -499,7 +499,7 @@ A section typically at the end of AGENTS.md with operational preferences from th
 
 The `AGENTS.md` is **per-repository, not per-developer**. Each project has its own AGENTS.md adapted to the stack it uses.
 
-**When the project uses routing or the decision ladder**, the router starts with a **⛔ HARD STOP RULE** block right after the title: it orders the agent to read `wf-orchestrator` before classifying/planning/implementing any task (the single entry point and source of truth for the gate sequence Ladder → Preflight → Decision → TDD ritual). Read-only questions ("explain X", "what does Y do") are explicitly exempt. It exists because the router is a thin router — the protocols are loaded on demand, so without a visible top-level gate the agent can skip wf-orchestrator and lose the gate sequence.
+**When the project uses routing, the decision ladder, or the TDD protocol**, the router starts with a **⛔ HARD STOP RULE** block right after the title: it orders the agent to read `wf-orchestrator` before classifying/planning/implementing any task (the single entry point and source of truth for the gate sequence Ladder → Preflight → Decision → TDD ritual). Read-only questions ("explain X", "what does Y do") are explicitly exempt. It exists because the router is a thin router — the protocols are loaded on demand, so without a visible top-level gate the agent can skip wf-orchestrator and lose the gate sequence.
 
 **What changes between stacks** (mental map):
 

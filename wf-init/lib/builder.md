@@ -102,8 +102,10 @@ naming/scope rationale). Three independent protocols, NEVER split or summarize t
 - `wf-ladder` (7 rungs) is OPTIONAL: included only if `LADDER == true` (state field kept as
   `features.decision_ladder`).
 - `wf-orchestrator` (single entry point) is built whenever `ROUTING == true` OR `LADDER == true`
-  — it never duplicates their content, it only sequences which of them (plus `wf-tdd`) apply.
-- If both `ROUTING` and `LADDER` are false: none of the three are built.
+  OR `TDD == true` — it never duplicates their content, it only sequences which of the active
+  `wf-` protocols (`wf-ladder`, `wf-sdd-trigger`, `wf-tdd`) apply.
+- If `ROUTING`, `LADDER`, and `TDD` are all false: none of the four `wf-` protocols
+  (`wf-ladder`, `wf-sdd-trigger`, `wf-tdd`, `wf-orchestrator`) are built.
 
 Protocols to build (conditional by features):
 - `wf-orchestrator`, `wf-ladder`, `wf-sdd-trigger`: per the rules above.

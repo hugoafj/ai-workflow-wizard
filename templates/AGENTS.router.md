@@ -12,7 +12,7 @@
 
 # AGENTS.md — {{answers.project_name}} — {{answers.stack_versions}}
 
-<if state.features.routing_abc or state.features.decision_ladder>
+<if state.features.routing_abc or state.features.decision_ladder or state.features.tdd_protocol>
 > **⛔ HARD STOP RULE — always follow wf-orchestrator skill first.**
 >
 > always follow wf-orchestrator.md skill first. Before classifying, planning, or implementing
@@ -95,8 +95,8 @@ bloating the context. They are NOT written in full here — they live in dedicat
 > IDE. This wizard's own protocols never re-specify HOW gentle-ai delegates or routes.
 
 | When | Protocol to read |
-<if state.features.routing_abc or state.features.decision_ladder>
-| Before classifying or implementing any task | `wf-orchestrator` — single entry point to this project's own wf- protocols<if state.features.decision_ladder> (loads `wf-ladder`)</if><if state.features.routing_abc> (loads `wf-sdd-trigger`)</if> |
+<if state.features.routing_abc or state.features.decision_ladder or state.features.tdd_protocol>
+| Before classifying or implementing any task | `wf-orchestrator` — single entry point to this project's own wf- protocols<if state.features.decision_ladder> (loads `wf-ladder`)</if><if state.features.routing_abc> (loads `wf-sdd-trigger`)</if><if state.features.tdd_protocol> (loads `wf-tdd`)</if> |
 </if>
 <if state.features.tdd_protocol>
 | Before writing tests or code for a feature | `wf-tdd` — TDD Protocol (wizard-owned) |

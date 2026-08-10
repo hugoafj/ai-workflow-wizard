@@ -158,7 +158,9 @@ Do you want to keep it as is or change it?
 **If they want to change (enable)**: inject the `wf-ladder` section into
 `AGENTS.md` (same content that `wf-init.md` documents in its Behavior
 Preferences phase, Question 4) and generate the `/wf-ladder` command for
-active IDEs if it does not already exist. **Update the footer**'s `features:`
+active IDEs if it does not already exist. Ensure `wf-orchestrator` is also
+present (it must be built whenever `wf-ladder`, `wf-sdd-trigger`, or `wf-tdd`
+is active). **Update the footer**'s `features:`
 line (single line, comma-separated — see `templates/AGENTS.router.md`) so its
 `ladder=` token becomes `ladder=yes`:
 
@@ -178,6 +180,7 @@ implementing. Do you confirm you want to remove it? [yes / no]
 **Wait for explicit confirmation before removing it.** If confirmed, remove the
 section from `AGENTS.md` (do not delete the `/wf-ladder` command
 file). **Update the footer**'s `ladder=` token to `no` (same `sed` pattern above with `no`).
+If no other `wf-` protocol remains active (`routing`, `tdd`), also remove `wf-orchestrator`.
 
 Confirm:
 ```
@@ -207,7 +210,9 @@ Do you want to keep it as is or change it?
 
 **If they want to change (enable)**: inject the TDD Protocol section into
 `AGENTS.md`. Run `/sdd-init` so it detects the test runner and configures
-Testing Capabilities. **Update the footer** to `tdd=yes`.
+Testing Capabilities. Ensure `wf-orchestrator` is also present (it must be
+built whenever `wf-ladder`, `wf-sdd-trigger`, or `wf-tdd` is active).
+**Update the footer** to `tdd=yes`.
 
 After enabling, ask about options:
 
@@ -225,6 +230,7 @@ Which one do you configure? [3 / 4 / 5 / 6 / none]
 `AGENTS.md`. Ask if they want to keep or clean
 `openspec/testing-capabilities.yaml`. **Update the footer** to `tdd=no`.
 **Update `.wizard-state.json`**: `features.tdd_protocol = false`.
+If no other `wf-` protocol remains active (`ladder`, `routing`), also remove `wf-orchestrator`.
 
 ---
 
@@ -452,7 +458,7 @@ Do you want to keep or change?
 **If they want to change (enable)**: set `state.routing_abc = true`, inject
 the `wf-sdd-trigger` + `wf-preflight` + PRECHECK section into `AGENTS.md`
 (from the `wf-init.md` template), and ensure `wf-orchestrator` is also present
-(it must be built whenever `wf-ladder` OR `wf-sdd-trigger` is active). Run
+(it must be built whenever `wf-ladder` OR `wf-sdd-trigger` OR `wf-tdd` is active). Run
 `phase45.md` to initialize gentle-ai's SDD if it does not exist. **Update the
 footer**'s `routing=` token to `yes` (same `sed` pattern as Option 1, targeting
 `routing=` instead of `ladder=`).
@@ -460,9 +466,11 @@ footer**'s `routing=` token to `yes` (same `sed` pattern as Option 1, targeting
 **If they want to change (disable)**: set `state.routing_abc = false`. Remove
 the `wf-sdd-trigger`, `wf-preflight`, and PRECHECK sections from `AGENTS.md`.
 **Important**: the PRECHECK lives inside `wf-sdd-trigger` — if it was only
-there because of this feature, it does not become orphaned. If `wf-ladder`
-standalone is still active, keep `wf-orchestrator` and `wf-ladder` (standalone
-`wf-ladder` has no PRECHECK). **Update the footer**'s `routing=` token to `no`.
+there because of this feature, it does not become orphaned. If `wf-ladder` or
+`wf-tdd` standalone is still active, keep `wf-orchestrator` and the remaining
+standalone protocol (standalone `wf-ladder` and standalone `wf-tdd` have no
+PRECHECK). If none remain active, remove `wf-orchestrator`.
+**Update the footer**'s `routing=` token to `no`.
 
 Confirm:
 ```

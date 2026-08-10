@@ -488,7 +488,7 @@ preferences" if there is no footer). The content is always the same:
 > VERBATIM, character by character, immediately before the HTML `wf-version` footer (or at the
 > end of "Behavior preferences" if there is no footer). Do not paraphrase or omit subsections.
 > Also ensure `wf-orchestrator`'s content is present (it is built whenever `wf-sdd-trigger` OR
-> `wf-ladder` is active — see `templates/protocols/wf-orchestrator/_base.md`).
+> `wf-ladder` OR `wf-tdd` is active — see `templates/protocols/wf-orchestrator/_base.md`).
 >
 > In projects with Claude Code, the same content is already packaged as skills in
 > `.claude/skills/wf-sdd-trigger/SKILL.md` and `.claude/skills/wf-orchestrator/SKILL.md`; for
