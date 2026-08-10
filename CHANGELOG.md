@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.6.6-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.6.5-beta.1...v0.6.6-beta.1) (2026-08-10)
+
+
+### Bug Fixes
+
+* implement two-phase version check to prevent infinite loop in wf-refresh ([#76](https://github.com/hugoafj/ai-workflow-wizard/issues/76)) ([233d7d7](https://github.com/hugoafj/ai-workflow-wizard/commit/233d7d797203d01cb02cf1a04a616a377cb8e215))
+* **install:** add codex commands, windsurf legacy paths, and devin detection ([#78](https://github.com/hugoafj/ai-workflow-wizard/issues/78)) ([78e78c4](https://github.com/hugoafj/ai-workflow-wizard/commit/78e78c42c7b0211919eaa199de9cabd72c616c88))
+* **protocols:** archive wf-cicd, make cicd/sdd protocols flat-only single source ([#80](https://github.com/hugoafj/ai-workflow-wizard/issues/80)) ([ece59bc](https://github.com/hugoafj/ai-workflow-wizard/commit/ece59bc16b49e961e0886b8fbfabdbca7f075348))
+* **protocols:** make wf-orchestrator conditional on ladder, routing, or tdd ([#79](https://github.com/hugoafj/ai-workflow-wizard/issues/79)) ([56f79ab](https://github.com/hugoafj/ai-workflow-wizard/commit/56f79ab133a5fed7a18ca4f190eb3fa9f137167c))
+
 ## [0.6.5-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.6.4-beta.1...v0.6.5-beta.1) (2026-08-09)
 
 
