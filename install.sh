@@ -158,7 +158,10 @@ do_install() {
       install_kiro "$HOME/.kiro/steering" "$cmd" "$body" "$VERSION"
       installed=$((installed + 1))
     fi
-    # Unconditional: .agents/skills is read by Codex, OpenCode, Gemini, Antigravity, and Devin
+    # Unconditional: .agents/skills is read by Codex, OpenCode, Gemini (AGY app),
+    # and Devin. NOTE: AGY CLI does NOT read ~/.agents/skills/ — Antigravity CLI/IDE
+    # coverage comes from the ~/.gemini/antigravity-cli/builtin + ~/.gemini/config
+    # installs below (config/skills is the only global path all three read).
     install_agents_skills "$HOME/.agents/skills" "$cmd" "$body" "$desc" "$VERSION"
     installed=$((installed + 1))
     if [[ $has_codex -eq 1 ]]; then

@@ -416,7 +416,7 @@ git commit -m "chore: initialize AI Workflow Wizard
 - Add AGENTS.md router (thin) pointing to packaged protocols
 - Add protocols as Claude skills and flat files (.agents/protocols)
 - Add satellite files for configured IDEs
-- Add project commands (wf-ladder, wf-onboard, wf-worktree, wf-settings)
+- Add project commands (wf-ladder, wf-tdd, wf-orchestrator, wf-sdd-trigger, wf-onboard, wf-worktree, wf-settings)
 - Add post-commit hook for drift detection
 - Add CI/CD (Block 6): AI review, quality guard, conventional commits
 - Update .gitignore for AI workflow files

@@ -18,6 +18,9 @@
 | wf-refresh | global | Updates AGENTS.md when the project has evolved — 3 drift layers |
 | wf-cleanup | global | Removes wizard artifacts from a project (safe — preserves user code) |
 | wf-ladder | project-specific | Applies wf-ladder (Decision Ladder) before implementing — anti-over-engineering |
+| wf-tdd | project-specific | TDD Protocol — RED→GREEN→REFACTOR (strict) or TDD Proposal (standard) |
+| wf-orchestrator | project-specific | Single entry point to this project's wf- protocols — routing, ladder, TDD |
+| wf-sdd-trigger | project-specific | Decides `wf-no-sdd`/`wf-force-sdd` and emits the `wf-preflight` gate |
 | wf-onboard | project-specific | Onboarding for new developer — configures local environment without touching the repo |
 | wf-worktree | project-specific | Creates, lists, or cleans git worktrees — includes automatic port assignment |
 | wf-settings | project-specific | Toggles optional workflow modules — TDD, testing extras, Decision Ladder, SDD backend, IDEs/CLIs |

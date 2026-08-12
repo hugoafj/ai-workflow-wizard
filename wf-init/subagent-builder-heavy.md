@@ -54,6 +54,9 @@ Commands always included (maintenance):
 
 Conditional commands by feature:
 - `wf-ladder`: only if LADDER==true
+- `wf-tdd`: only if TDD==true AND LAYERS not empty
+- `wf-orchestrator`: only if ROUTING==true OR LADDER==true OR TDD==true
+- `wf-sdd-trigger`: only if ROUTING==true
 
 For each active command and each IDE in IDES:
 

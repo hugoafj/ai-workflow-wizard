@@ -9,4 +9,4 @@ metadata:
 
 <!-- Body assembled by the Builder from ../_base.md. Not duplicated here. -->
 
-{{PROTOCOL_BODY: protocols/wf-orchestrator/_base.md}}
+{{PROTOCOL_BODY: templates/commands/wf-orchestrator/_base.md}}

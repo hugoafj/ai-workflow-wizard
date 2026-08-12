@@ -69,7 +69,7 @@ for dir in .claude/skills .agents/skills .kiro/skills .codex/skills; do
     for skill in "$dir"/*/; do
       skill_name=$(basename "$skill")
       # gentle-ai skills: sdd-apply, sdd-propose, sdd-tasks, sdd-spec, sdd-design, sdd-explore, sdd-verify, sdd-archive, sdd-init, sdd-onboard, gentle-orchestrator
-      # wizard skills: workflow, commands, cicd, ides, testing, architecture, wf-refresh, wf-onboard, wf-settings, wf-worktree, wf-cleanup
+      # wizard skills (SPLIT protocol commands): wf-ladder, wf-tdd, wf-orchestrator, wf-sdd-trigger
       case "$skill_name" in
         sdd-apply|sdd-propose|sdd-tasks|sdd-spec|sdd-design|sdd-explore|sdd-verify|sdd-archive|sdd-init|sdd-onboard|gentle-orchestrator)
           echo "  ⏭ $dir/$skill_name (gentle-ai — DO NOT delete)"
@@ -90,7 +90,7 @@ for dir in .claude/commands .cursor/commands .windsurf/workflows .kiro/steering 
     for cmd in "$dir"/*; do
       cmd_name=$(basename "$cmd")
       case "$cmd_name" in
-        wf-init|wf-refresh|wf-onboard|wf-settings|wf-worktree|wf-cicd|wf-cleanup|wf-ladder)
+        wf-init|wf-refresh|wf-onboard|wf-settings|wf-worktree|wf-cicd|wf-cleanup|wf-ladder|wf-tdd|tdd|wf-orchestrator|wf-sdd-trigger)
           echo "  🗑 $cmd (wizard)"
           ;;
         *)
@@ -261,7 +261,8 @@ Remove each wizard skill directory detected in Phase 0 (only wizard ones — nev
 
 ```bash
 # Example per detected wizard skill (replace with the actual list)
-rm -rf .claude/skills/workflow .claude/skills/commands
+rm -rf .claude/skills/wf-ladder .claude/skills/wf-tdd \
+       .claude/skills/wf-orchestrator .claude/skills/wf-sdd-trigger
 ```
 
 ### Commands

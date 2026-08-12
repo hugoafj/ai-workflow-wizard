@@ -158,7 +158,7 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
   `python-django`). This is what the Builder uses to select `variants/<stack_key>.md`.
   **Never branch with `if stack === ...`**: the key selects a file.
 - **`answers.ides`**: determines which satellites/commands/packed protocols are generated.
-- **`testing.tdd_mode`**: `standard` | `strict` → selects `protocols/tdd/variants/{standard,strict}.md`.
+- **`testing.tdd_mode`**: `standard` | `strict` → selects `templates/commands/wf-tdd/variants/{standard,strict}.md`.
 - **`build_plan`**: populated by the Builder (M6) with the exact list of artifacts to write.
 
 ## Read/write helpers (bash, agnostic)

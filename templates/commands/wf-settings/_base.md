@@ -323,13 +323,13 @@ mode, regardless of what that block says.
    were omitted if the project originally chose Strict TDD.
 
    **SINGLE SOURCE**: Do NOT copy an embedded block from this file. Read the
-   VERBATIM content from `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/tdd/variants/standard.md` (which is the
-   `standard` variant of the `tdd` protocol) and insert it as-is. Do not summarize, do not
+   VERBATIM content from `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-tdd/variants/standard.md` (which is the
+   `standard` variant of the `wf-tdd` protocol) and insert it as-is. Do not summarize, do not
    paraphrase: without the exact `🧪 TDD PROPOSAL` format and its numbered options, the
    executing agent has no real pause point before writing tests or code.
 
-   Also regenerate the `tdd` protocol packaging (skill `.claude/skills/wf-tdd/`
-   and flat `.agents/protocols/tdd.md`) from the single source (Builder B4), so they
+   Also regenerate the `wf-tdd` protocol packaging (skill `.claude/skills/wf-tdd/`
+   and flat `.agents/protocols/wf-tdd.md`) from the single source (Builder B4), so they
    do not get out of sync.
 
 3. **Do not touch** "Playwright Dual-loop" or "wf-sdd-trigger Integration"

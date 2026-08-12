@@ -3,7 +3,7 @@
 <!--
   SINGLE SOURCE of the TDD Protocol. Written once here; wf-init (Builder),
   wf-refresh and wf-settings READ IT from this file — none embed or paraphrase it.
-  Copied VERBATIM. Dual packaging: skill/SKILL.md + .agents/protocols/tdd.md.
+  Copied VERBATIM. Dual packaging: skill/SKILL.md + .agents/protocols/wf-tdd.md.
 
   ASSEMBLY (applied by the Builder based on state.testing):
   - Included only if state.testing.layers has at least one layer.
@@ -100,7 +100,7 @@ based on the type of change and presents a proposal before writing any code.
 The matrix is a guideline. If there is logic that could break silently and
 the table does not cover it, the agent proposes tests anyway.
 
-<!-- {{TDD_MODE_VARIANT: protocols/tdd/variants/<standard|strict>.md}} -->
+<!-- {{TDD_MODE_VARIANT: templates/commands/wf-tdd/variants/<standard|strict>.md}} -->
 
 <!-- ===== PART 2: Dual-loop (if e2e) + SDD Integration (VERBATIM phase6a 170-206) ===== -->
 

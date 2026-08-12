@@ -1728,12 +1728,15 @@ Complete output order before implementing: 🪜 Ladder → 🔍 Preflight → �
 
 Commands the wizard generates in Phase 6 and writes in Phase 8. They are project-specific markdown files — live in the repo, not globally. They are used as slash commands in the IDE (correct format per IDE).
 
-**`/wf-ladder`** — forces explicit wf-ladder with visible `🪜` output per rung.
+**`/wf-ladder`** — forces explicit wf-ladder with visible `🪜` output per rung (only if `LADDER == true`).
+**`/wf-tdd`** — invokes the TDD ritual explicitly (only if `TDD == true` AND testing layers exist).
+**`/wf-orchestrator`** — single entry point for the wizard's own gate sequence (only if `ROUTING == true` OR `LADDER == true` OR `TDD == true`).
+**`/wf-sdd-trigger`** — forces the SDD classification tree (only if `ROUTING == true`).
 **`/wf-onboard`** — stub that points to `wf-onboard.md` for new developer onboarding.
 **`/wf-settings`** — toggle optional modules: CI/CD, TDD, testing extras, Decision Ladder.
 **`/wf-worktree`** — git worktree management with automatic port assignment.
 
-**Global vs project-specific commands**: `wf-init`, `wf-refresh`, and `wf-cleanup` are installed globally with `install.sh`. `wf-onboard`, `wf-settings`, and `wf-worktree` are generated per project in Phase 6. `wf-ladder` is project-specific — it has project context in its content. `/wf-cicd` was archived; CI/CD re-configuration happens through `/wf-settings` (options 9-14), whose single source is the `cicd` protocol.
+**Global vs project-specific commands**: `wf-init`, `wf-refresh`, and `wf-cleanup` are installed globally with `install.sh`. `wf-onboard`, `wf-settings`, and `wf-worktree` are generated per project in Phase 6. `wf-ladder`, `wf-tdd`, `wf-orchestrator`, and `wf-sdd-trigger` are project-specific too, each conditional on its feature flag(s). `/wf-cicd` was archived; CI/CD re-configuration happens through `/wf-settings` (options 9-14), whose single source is the `cicd` protocol.
 
 **Correct paths and formats per IDE** (verified against official documentation):
 
@@ -2266,7 +2269,7 @@ curl -fsSL https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/ins
 - Detects IDEs by directories in `~/` (Claude, Cursor, Windsurf, Kiro, Codex, Copilot, Antigravity, OpenCode, Devin)
 - Installs `/wf-init`, `/wf-refresh`, and `/wf-cleanup` as self-contained slash commands
 - Applies correct format per IDE (plain `.md` for Claude/Cursor/Codex/OpenCode, frontmatter `description:` for Windsurf workflows, SKILL.md with `name:`/`description:` for Windsurf/Devin/Copilot/Antigravity, `inclusion: manual` for Kiro)
-- Installs unconditional global skills to `~/.agents/skills/` (read by Codex, OpenCode, Gemini, Antigravity, and Devin)
+- Installs unconditional global skills to `~/.agents/skills/` (read by Codex, OpenCode, Gemini/AGY app, and Devin; AGY CLI does NOT read it — Antigravity coverage comes from the `~/.gemini/antigravity-cli/builtin` + `~/.gemini/config/skills` installs)
 - Supports `--uninstall` to remove only the installed commands
 
 ### Global vs project-specific commands
@@ -2276,7 +2279,8 @@ curl -fsSL https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/ins
 | **Global** | `/wf-init`, `/wf-refresh` | `install.sh` → per-IDE global paths |
 | **Project-specific** | `/wf-onboard`, `/wf-settings`, `/wf-worktree` | `/wf-init` Phase 6 → repo |
 | **Global** | `/wf-cleanup` | `install.sh` → per-IDE global paths |
-| **Project-specific** | `/wf-ladder` | `/wf-init` Phase 6 → repo |
+| **Project-specific** | `/wf-ladder` (LADDER), `/wf-tdd` (TDD && LAYERS) | `/wf-init` Phase 6 → repo |
+| **Project-specific** | `/wf-orchestrator` (ROUTING‖LADDER‖TDD), `/wf-sdd-trigger` (ROUTING) | `/wf-init` Phase 6 → repo |
 
 Global paths written by `install.sh` per command:
 
@@ -2286,8 +2290,9 @@ Global paths written by `install.sh` per command:
 | Windsurf (legacy) | `~/.codeium/windsurf/global_workflows/<cmd>.md` (frontmatter `description:`) + `~/.codeium/windsurf/skills/<cmd>/SKILL.md` |
 | Devin (Windsurf rebrand) | `~/.config/devin/skills/<cmd>/SKILL.md` — detected via `~/.config/devin/`; written by the Windsurf block too when Devin is not detected separately |
 | Kiro | `~/.kiro/steering/<cmd>.md` (frontmatter `inclusion: manual`) |
-| Copilot / Antigravity | `~/.copilot/skills/<cmd>/SKILL.md`, `~/.gemini/.../skills/<cmd>/SKILL.md` |
-| All IDEs | `~/.agents/skills/<cmd>/SKILL.md` — unconditional |
+| Copilot | `~/.copilot/skills/<cmd>/SKILL.md` |
+| Antigravity | `~/.gemini/antigravity-cli/builtin/skills/<cmd>/SKILL.md` (CLI) + `~/.gemini/config/skills/<cmd>/SKILL.md` (canonical global path read by AGY, AGY CLI, AGY IDE) — installed only when `~/.gemini/` is detected |
+| All IDEs | `~/.agents/skills/<cmd>/SKILL.md` — unconditional (not read by AGY CLI) |
 
 ### What the block includes
 

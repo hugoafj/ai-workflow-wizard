@@ -15,7 +15,10 @@
 | `/wf-init` | global (install.sh) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-init/` |
 | `/wf-refresh` | global (install.sh) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-refresh/` |
 | `/wf-cleanup` | global (install.sh) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-cleanup/` |
-| `/wf-ladder` | project-specific (Phase 6) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-ladder/` |
+| `/wf-ladder` | project-specific (Phase 6, LADDER) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-ladder/` |
+| `/wf-tdd` | project-specific (Phase 6, TDD && LAYERS) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-tdd/` |
+| `/wf-orchestrator` | project-specific (Phase 6, ROUTING‖LADDER‖TDD) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-orchestrator/` |
+| `/wf-sdd-trigger` | project-specific (Phase 6, ROUTING) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-sdd-trigger/` |
 | `/wf-onboard` | project-specific (Phase 6) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-onboard/` |
 | `/wf-worktree` | project-specific (Phase 6) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-worktree/` |
 | `/wf-settings` | project-specific (Phase 6) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-settings/` |

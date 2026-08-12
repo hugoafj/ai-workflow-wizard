@@ -11,4 +11,8 @@
 | Codex | `.codex/commands/` | Plain markdown, no frontmatter |
 | Antigravity | `.agents/skills/<name>/SKILL.md` | Frontmatter `name:` + `description:` — the SKILL.md itself works as a slash command |
 
+> **Global commands (install.sh)**: `wf-init`, `wf-refresh`, and `wf-cleanup` are also
+> installed user-level at `~/.codeium/windsurf/global_workflows/<cmd>.md` (Windsurf,
+> `description:` required) and `~/.codex/commands/<cmd>.md` (Codex, plain markdown).
+
 > **Implementation note**: before writing commands for Windsurf or Kiro, verify that the target directories exist. For Windsurf, `description:` in frontmatter is required — without it, the workflow does not appear in the slash menu. For Kiro, `inclusion: manual` is what turns the file into a slash command — with `inclusion: always` it would be an always-on context rule (a different concept, already covered by satellites).

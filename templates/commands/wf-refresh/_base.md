@@ -482,13 +482,13 @@ inserts it **immediately before the HTML comment footer** (or at the end of "Beh
 preferences" if there is no footer). The content is always the same:
 
 > The content of the `wf-sdd-trigger` section is read from
-> `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/wf-sdd-trigger/_base.md`
+> `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-sdd-trigger/_base.md`
 > (Minimal Exploration, Decision Tree, `wf-no-sdd`/`wf-force-sdd` outcomes, `wf-preflight`,
 > wf-sdd-trigger evaluation fragment). Insert that content
 > VERBATIM, character by character, immediately before the HTML `wf-version` footer (or at the
 > end of "Behavior preferences" if there is no footer). Do not paraphrase or omit subsections.
 > Also ensure `wf-orchestrator`'s content is present (it is built whenever `wf-sdd-trigger` OR
-> `wf-ladder` OR `wf-tdd` is active — see `templates/protocols/wf-orchestrator/_base.md`).
+> `wf-ladder` OR `wf-tdd` is active — see `templates/commands/wf-orchestrator/_base.md`).
 >
 > In projects with Claude Code, the same content is already packaged as skills in
 > `.claude/skills/wf-sdd-trigger/SKILL.md` and `.claude/skills/wf-orchestrator/SKILL.md`; for
@@ -616,7 +616,7 @@ hardcoded knowledge:
     writing code and declares each rung out loud with its answer. Always
     applies before wf-preflight, and again per task once gentle-ai's sdd-apply
     is requested (wf-force-sdd).
-  content-source: https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/wf-ladder/_base.md
+  content-source: https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-ladder/_base.md
 
 - id: tdd
   description: |
@@ -624,7 +624,7 @@ hardcoded knowledge:
     Includes the 🧪 TDD PROPOSAL ritual (standard mode) or direct
     RED→GREEN evidence (strict mode, via gentle-ai's strict_tdd field).
     Independent of SDD — can be injected per change without openspec/.
-  content-source: https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/tdd/_base.md
+  content-source: https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-tdd/_base.md
 
 - id: routing
   description: |
@@ -634,7 +634,7 @@ hardcoded knowledge:
     before proceeding. Never re-specifies how gentle-ai itself routes or
     delegates once SDD is requested. `wf-orchestrator` (single entry point to
     this wizard's own protocols) is built alongside it.
-  content-source: https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/wf-sdd-trigger/_base.md
+  content-source: https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-sdd-trigger/_base.md
 
 - id: ci
   description: |
