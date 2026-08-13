@@ -145,7 +145,10 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
     "protocols_flat": [],
     "protocols_skills": [],
     "hook": false,
-    "staging_dir": ".wizard-staging"
+    "staging_dir": ".wizard-staging",
+    "generated_files": [],
+    "managed_paths": [],
+    "approval": {}
   }
 }
 ```
@@ -159,7 +162,10 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
   **Never branch with `if stack === ...`**: the key selects a file.
 - **`answers.ides`**: determines which satellites/commands/packed protocols are generated.
 - **`testing.tdd_mode`**: `standard` | `strict` → selects `templates/commands/wf-tdd/variants/{standard,strict}.md`.
-- **`build_plan`**: populated by the Builder (M6) with the exact list of artifacts to write.
+- **`build_plan`**: populated by the Builder with the exact list of artifacts to write.
+  - `generated_files[]`: array of `{ path, hash, managed }` for every file written to staging.
+  - `managed_paths[]`: array of project-relative paths that the wizard owns (for deletion detection in `/wf-refresh`).
+  - `approval{}`: user approvals for adds, updates, deletions (used by `/wf-refresh`).
 
 ## Read/write helpers (bash, agnostic)
 
