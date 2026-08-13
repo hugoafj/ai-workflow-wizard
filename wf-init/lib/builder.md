@@ -317,31 +317,8 @@ details) using `$WF_ROOT/templates/protocols/cicd/` as the single source.
 - Verify secrets (`SERVER_IP`, `SSH_USER`, `SSH_KEY`).
 
 ### Step B9 — Register plan and advance
-
-Populate `state.build_plan` with the exact list of files in staging, including SHA256 hashes for each file. Mark `phases.phase6.status = done`, `phase_pointer = phase7`.
-
-**Process**:
-
-1. For each file in `.wizard-staging/`:
-   - Calculate SHA256 hash: `sha256sum <file> | awk '{print $1}'`
-   - Add to `build_plan.generated_files[]`: `{ path, hash, managed: true }`
-   - Add path to `build_plan.managed_paths[]`
-
-2. Preserve custom AGENTS.md sections:
-   - If `AGENTS.md` exists in project root:
-     - Extract all sections inside `<!-- WF: DO NOT REGENERATE -->` markers
-     - After Builder generates `.wizard-staging/AGENTS.md`:
-       - Re-inject custom sections at same relative location
-   - If no existing `AGENTS.md`: use generated version as-is
-
-3. Update state:
-   ```bash
-   jq '.build_plan.generated_files = $files |
-       .build_plan.managed_paths = $paths |
-       .phases.phase6.status = "done" |
-       .phase_pointer = "phase7"' "$WF_STATE" > "$WF_STATE.tmp"
-   mv "$WF_STATE.tmp" "$WF_STATE"
-   ```
+Populate `state.build_plan` with the exact list of files in staging. Mark
+`phases.phase6.status = done`, `phase_pointer = phase7`.
 
 ## Phase 8 (promotion)
 Phase 8 moves `STAGING/*` to their final destinations, updates `.gitignore`

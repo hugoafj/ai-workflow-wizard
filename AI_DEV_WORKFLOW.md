@@ -694,16 +694,10 @@ Solves two different problems:
 
 **Git hooks run ONLY locally**, not on GitHub or CI. Each developer installs them on their machine. The distribution problem is solved with **Husky** (configured in the CI/CD block), which registers hooks via `package.json` so they install automatically with `npm install`.
 
-**Trigger 2 · Slash command `/wf-refresh`**. When invoked, the agent runs seven phases (builder-driven):
+**Trigger 2 · Slash command `/wf-refresh`**. When invoked, the agent runs two layers:
 
-- **Phase R-1**: Update global commands (`wf-init`, `wf-refresh`, `wf-cleanup`) if outdated
-- **Phase R0**: Validate `.wizard-state.json` and detect active IDEs
-- **Phase R1**: Re-discover project (stack, node engine, etc.) and detect drift
-- **Phase R2**: Migrate state schema and ask about new optional features
-- **Phase R3**: Re-run Builder (B1-B9) to generate all artifacts into `.wizard-staging/`
-- **Phase R4**: Compare staging with project using SHA256 hashes; classify files as add/update/delete/unchanged
-- **Phase R5**: Show grouped diff and collect user approvals
-- **Phase R6**: Apply approved changes, update state, commit, clean staging
+- **Layer 1**: re-runs Phase 4 of the wizard (reverse engineering), compares with AGENTS.md, proposes diffs.
+- **Layer 2**: reads the AGENTS.md footer (`wf-version` + `source`), fetches from GitHub, compares local vs remote version. If there is a new version, shows the changelog and proposes template updates.
 
 **Trigger 3 · Rule in AGENTS.md**. The most effective. A line in "Behavior Preferences":
 
@@ -735,49 +729,45 @@ The `optional-features` field is new and critical. It tracks which optional feat
 
 **Recommendation**: Option 1 to start.
 
-#### Builder-driven refresh mechanism
+#### Intelligent refresh mechanism · Three layers
 
-`/wf-refresh` is now builder-driven: it re-runs the same Builder (B1-B9) that `/wf-init` uses, ensuring a single source of truth. This solves the core problem: when new wizard versions ship with new features, the user does NOT have to clean up and re-run the wizard. Refresh integrates them incrementally using hash-based comparison.
+`/wf-refresh` does not just apply changes. It is a command with **three analysis layers** that run sequentially. This solves the core problem: when new wizard versions ship with new features, the user does NOT have to clean up and re-run the wizard. Refresh integrates them incrementally.
 
-**Key concepts**:
+**Layer 1 · Project content drift**
 
-1. **Single source of truth**: The Builder (B1-B9) is the only rendering engine. No parallel template logic in `/wf-refresh`.
-2. **Hash-based diff**: Each file is compared using SHA256 hashes. Unchanged files are skipped; only changed files are proposed.
-3. **Explicit approval**: User approves adds, updates, and deletions separately before any changes are applied.
-4. **Custom content preservation**: Sections inside `<!-- WF: DO NOT REGENERATE -->` markers in `AGENTS.md` are preserved.
-5. **State migrations**: Schema and feature migrations are applied automatically; user is asked about new optional features.
+Re-runs Phase 4 of the wizard (reverse engineering) on the current repo state. Compares with the existing `AGENTS.md`. Detects new scripts, reorganized folders, added dependencies, conventions that evolved. Proposes specific diffs. You approve each one.
 
-**Phases R1–R6 in detail**:
+**Layer 2 · Wizard template drift (mandatory changes)**
 
-- **Phase R1 · Project content drift**: Re-discovers the project (stack, node engine, etc.) and detects changes.
-- **Phase R2 · State/schema migration**: Migrates `.wizard-state.json` to current schema; asks about new optional features.
-- **Phase R3 · Builder re-run**: Re-runs B1-B9 to generate all artifacts into `.wizard-staging/`.
-- **Phase R4 · Hash-based diff**: Compares staging vs project; classifies files as add/update/delete/unchanged.
-- **Phase R5 · Review gate**: Shows grouped diff; collects user approvals.
-- **Phase R6 · Apply and close**: Applies approved changes, updates state, commits, cleans staging.
+Reads the AGENTS.md footer: current `wf-version`. Fetches the wizard repo and compares versions. Reads the changelog and separates changes into two categories:
 
-**New optional features** are handled in Phase R2:
+- **Mandatory changes** (bug fixes, obsolete template fixes). These changes are proposed for automatic application (with human review before writing).
+- **Optional changes** (see layer 3).
 
-When running `/wf-refresh`, Phase R2 does the following:
+**Layer 3 · New optional features**
 
-1. Reads `.wizard-state.json` features (e.g., `features.decision_ladder`).
-2. Detects new features in the current wizard version.
-3. **For each feature not in the local state**: asks you. Example:
+This is the key piece for the workflow to evolve without forcing the user to re-run the wizard. The wizard maintains a registry of optional features.
+
+When running `/wf-refresh`, layer 3 does the following:
+
+1. Reads `optional-features` from the local AGENTS.md footer. Example: `decision-ladder=yes`.
+2. Fetches the remote wizard and reads its `OPTIONAL_FEATURES.md` file that lists all optional features.
+3. **For each feature the wizard has but is NOT in `optional-features` of the local AGENTS.md**: asks you. Example:
 
 ```
-New optional features available:
+Two optional features are available that your AGENTS.md does not include:
 
-1. ABC routing pattern
-   Enables ABC routing for SDD workflows.
-   Enable? [y/n]
+1. Test pyramid documentation
+   Adds a subsection to Testing with the suggested test pyramid for your stack.
+   Include? [yes / no / explain more]
 
-2. Visual regression testing
-   Adds visual regression tests to your testing config.
-   Enable? [y/n]
+2. Performance budgets
+   Adds performance constraints (Lighthouse scores, bundle size limits) to Critical Constraints.
+   Include? [yes / no / explain more]
 ```
 
-4. For each user response, updates `features.*` in `.wizard-state.json`.
-5. Features marked as disabled are not asked again in future refreshes.
+4. For each user response, updates `optional-features` in the AGENTS.md footer. Example after: `decision-ladder=yes,test-pyramid=no,performance-budgets=yes`.
+5. Features marked with `=no` are not asked again in future refreshes, unless the user explicitly requests re-review with a flag (`/wf-refresh --reconsider-skipped`).
 
 #### When refresh is NOT enough and you need to re-run the wizard
 

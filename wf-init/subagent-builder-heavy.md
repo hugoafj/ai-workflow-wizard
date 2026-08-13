@@ -234,28 +234,6 @@ fi
 
 Mark `wf_phase_done phase6 phase7`.
 
-## B9.5 — Update managed paths (for /wf-refresh)
-
-After all files are written to staging, also populate `state.build_plan.managed_paths` with the list of paths that the wizard owns. This is used by `/wf-refresh` to detect which files can be safely deleted.
-
-```bash
-# Build list of managed paths from staging
-cd "{WF_STAGING}"
-PATHS_JSON="[]"
-for file in $(find . -type f); do
-  REL_PATH="${file#./}"
-  PATHS_JSON=$(jq --arg path "$REL_PATH" '. += [$path]' <<< "$PATHS_JSON")
-done
-
-# Update state
-jq --argjson paths "$PATHS_JSON" \
-  '.build_plan.managed_paths = $paths' \
-  "{WF_STATE}" > "{WF_STATE}.tmp"
-mv "{WF_STATE}.tmp" "{WF_STATE}"
-
-cd "{PROJECT_PATH}"
-```
-
 ## Expected output
 
 ```
@@ -265,7 +243,6 @@ cd "{PROJECT_PATH}"
   - Testing configs: <list>
   - CI/CD: <generated workflows>
   - build_plan registrado en estado
-  - managed_paths registrado en estado
 ```
 
 The staging now has all files ready for review (Phase 7).

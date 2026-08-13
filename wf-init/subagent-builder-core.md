@@ -199,30 +199,6 @@ For each IDE in IDES, download template and write:
 2. Do NOT pre-create empty directories
 3. Verify: `ls -la {WF_STAGING}` should show ONLY satellites + directories for IDEs in IDES, no empty dirs
 
-## B6.5 — Register generated files (for /wf-refresh)
-
-After all files are written to staging, register them in `state.build_plan.generated_files` with SHA256 hashes. This is used by `/wf-refresh` to detect which files changed.
-
-```bash
-# For each file in staging, calculate hash and register
-cd "{WF_STAGING}"
-FILES_JSON="[]"
-for file in $(find . -type f); do
-  REL_PATH="${file#./}"
-  HASH=$(sha256sum "$file" | awk '{print $1}')
-  FILES_JSON=$(jq --arg path "$REL_PATH" --arg hash "$HASH" \
-    '. += [{"path": $path, "hash": $hash, "managed": true}]' <<< "$FILES_JSON")
-done
-
-# Update state
-jq --argjson files "$FILES_JSON" \
-  '.build_plan.generated_files = $files' \
-  "{WF_STATE}" > "{WF_STATE}.tmp"
-mv "{WF_STATE}.tmp" "{WF_STATE}"
-
-cd "{PROJECT_PATH}"
-```
-
 ## Expected output
 
 ```
@@ -230,7 +206,6 @@ cd "{PROJECT_PATH}"
   - Packaged protocols: N (flat) + M (skills)
   - AGENTS.md router ready
   - Satellites generated: N
-  - Generated files registered: N
 ```
 
 Don't delete the staging. Leave everything in `{WF_STAGING}` so the next sub-agent can continue.

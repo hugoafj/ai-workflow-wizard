@@ -24,28 +24,31 @@
 
 ---
 
-## Phase -1 · Check for wizard-managed files
+## Phase -1 · Check for deleted files (from manifest)
 
-Before detection, check if there's a `.wizard-managed-files.json` from a previous `/wf-refresh`:
+Before detection, check if there's a manifest with deleted files that the user should know about:
 
 ```bash
-# Check if .wizard-managed-files.json exists (from /wf-refresh)
-if [ -f ".wizard-managed-files.json" ]; then
-  echo "ℹ Found .wizard-managed-files.json (from /wf-refresh)"
-  MANAGED_FILES=$(jq -r '.files[] | .path' ".wizard-managed-files.json" 2>/dev/null || echo "")
+# Check if there's a WIZARD_MANIFEST in the project
+if [ -f "WIZARD_MANIFEST.json" ] || [ -f ".wizard-manifests/WIZARD_MANIFEST-*.json" ]; then
+  MANIFEST=$(find .wizard-manifests -name "WIZARD_MANIFEST-*.json" 2>/dev/null | head -1 || find . -name "WIZARD_MANIFEST.json" | head -1)
   
-  if [ -n "$MANAGED_FILES" ]; then
-    echo "ℹ Wizard-managed files to be removed:"
-    echo "$MANAGED_FILES" | while read file; do
-      echo "  - $file"
+  if jq -e '._deleted_files' "$MANIFEST" 2>/dev/null > /dev/null; then
+    echo "⚠️  WARNING: Some wizard files were deleted in recent releases:"
+    echo ""
+    jq -r '._deleted_files.files[]' "$MANIFEST" | while read deleted_file; do
+      echo "  - $deleted_file"
     done
     echo ""
+    echo "These files are no longer part of the wizard."
+    echo "Cleaning up will remove them from your project."
+    echo ""
+    read -p "Continue? [yes / no]: " continue_choice
+    if [ "$continue_choice" != "yes" ]; then
+      echo "Cleanup cancelled."
+      exit 0
+    fi
   fi
-fi
-
-# Also check for old WIZARD_MANIFEST files (legacy)
-if [ -f "WIZARD_MANIFEST.json" ] || [ -f ".wizard-manifests/WIZARD_MANIFEST-*.json" ]; then
-  echo "ℹ Found legacy WIZARD_MANIFEST files (will be removed as wizard artifacts)"
 fi
 ```
 
