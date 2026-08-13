@@ -19,9 +19,9 @@ User is 2+ releases behind AND:
 /wf-init       # Fresh install with current state
 ```
 
-### 2. **Deleted Files in Release** (_deleted_files in manifest)
+### 2. **Deleted Files in Release**
 
-If the manifest shows deleted files AND:
+If the new wizard version removed files AND:
 - User has modified those files locally
 - Not sure if deletion is intentional
 - Better to ask user than auto-delete
@@ -37,7 +37,7 @@ If the manifest shows deleted files AND:
 
 ### 3. **Content Hash Mismatch**
 
-If a file's content_hash doesn't match what's expected:
+If a file's content hash doesn't match what's expected:
 - Corruption detected
 - File may have been manually edited in conflicting ways
 - Regeneration might fail or lose data
@@ -74,70 +74,63 @@ User is trying to jump from 0.1.0 → 0.2.5 AND:
 
 **Recommendation:**
 ```bash
-echo "Your wizard is 3+ versions behind."
-echo "For safety, we recommend a fresh install:"
-echo ""
-echo "/wf-cleanup   # Remove old artifacts"
-echo "/wf-init      # Install latest version"
-echo ""
-echo "This ensures no orphaned or conflicting files."
+Your wizard is 3+ versions behind.
+For safety, we recommend a fresh install:
+
+/wf-cleanup   # Remove old artifacts
+/wf-init      # Install latest version
+
+This ensures no orphaned or conflicting files.
 ```
 
 ---
 
 ## How /wf-refresh Detects These Cases
 
-### Content Hashes (WIZARD_MANIFEST-*.json)
+### Hash-Based Diff
 
-Each file includes SHA256 hash of content:
+`/wf-refresh` uses SHA256 hashes to compare the Builder's staging output with the project:
 
-```json
-{
-  "files": {
-    "release-please": {
-      "content_hash": "abc123def456...",
-      "status": "changed"
-    }
-  }
-}
+```bash
+# For each file in .wizard-staging/
+STAGING_HASH=$(sha256sum ".wizard-staging/$file" | awk '{print $1}')
+
+if [[ -f "$file" ]]; then
+  PROJECT_HASH=$(sha256sum "$file" | awk '{print $1}')
+  if [[ "$STAGING_HASH" == "$PROJECT_HASH" ]]; then
+    echo "unchanged: $file"
+  else
+    echo "update: $file"
+  fi
+else
+  echo "add: $file"
+fi
 ```
 
-If downloaded file's hash ≠ manifest hash:
-- File was modified outside /wf-refresh
+If the project file's hash differs from the staging hash:
+- File was modified outside `/wf-refresh`
 - Regeneration might conflict
-- **Warn user: offer /wf-cleanup option**
+- `/wf-refresh` will show a diff and ask for approval
 
-### Deleted Files (_deleted_files in manifest)
+### Deprecated Files Detection
 
-```json
-{
-  "_deleted_files": {
-    "files": [
-      ".github/workflows/old-ci.yml",
-      ".agents/protocols/deprecated.md"
-    ]
-  }
-}
-```
+`/wf-refresh` compares the previous `.wizard-managed-files.json` with the newly generated staging:
 
-If manifest shows deleted files:
-- /wf-cleanup will ask about each one
-- User decides whether to keep or remove
-- Safer than auto-delete
+- Files in old `managed_paths` but not in new staging → proposed for deletion
+- Files with unchanged hash → safe to delete
+- Files with modified hash → user is warned and must approve explicitly
 
 ### Multi-Version Detection
 
-In `/wf-refresh` Phase -1:
+In `/wf-refresh` Phase R-1:
 
 ```bash
-LOCAL_VERSION=$(grep "wf-version:" AGENTS.md)      # 0.1.0
-REMOTE_VERSION=$(curl .../VERSION)                   # 0.2.5
-VERSION_GAP=$((REMOTE_VERSION - LOCAL_VERSION))     # 3 releases
+LOCAL_VERSION=$(grep "wf-version:" AGENTS.md | sed 's/.*wf-version: //' | cut -d' ' -f1)
+REMOTE_VERSION=$(curl -s https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/VERSION)
 
-if [ "$VERSION_GAP" -gt 2 ]; then
-  echo "⚠️ WARNING: Jump of $VERSION_GAP releases"
-  echo "For safety, consider: /wf-cleanup && /wf-init"
-  echo "Continue anyway? [yes/no]"
+if [[ "$LOCAL_VERSION" < "$REMOTE_VERSION" ]]; then
+  echo "⚠ Wizard is outdated (local: $LOCAL_VERSION, remote: $REMOTE_VERSION)"
+  read -p "Update global commands? [y/n] " -n 1 -r
 fi
 ```
 
@@ -152,12 +145,14 @@ fi
 - ✅ Wizard CI/CD workflows (release-please, quality-guard, etc.)
 - ✅ .wizard-state.json
 - ✅ .wf-status
+- ✅ .wizard-managed-files.json
 
 **Preserves:**
 - ✅ Project code
 - ✅ gentle-ai files (MCPs, OpenSpec, Engram)
 - ✅ Your AGENTS.md custom sections
 - ✅ User configuration files
+- ✅ User-created skills
 
 **Safety Features:**
 - ✅ Shows complete inventory before deleting
@@ -190,17 +185,17 @@ fi
 
 ---
 
-## Flow: When to Recommend
+## Flow: When to Recommend Cleanup
 
-In `/wf-refresh` **Phase 2** or **Phase 3**:
+In `/wf-refresh` Phase R4 (Diff and Plan):
 
 ```bash
-# After manifest analysis
-DELETED_COUNT=$(jq '.[] | select(.status=="deleted") | length' MANIFEST)
-CHANGED_COUNT=$(jq '.[] | select(.regenerate==true) | length' MANIFEST)
+ADDED_COUNT=$(jq '.added | length' refresh-plan.json)
+UPDATED_COUNT=$(jq '.updated | length' refresh-plan.json)
+DELETED_COUNT=$(jq '.deleted | length' refresh-plan.json)
 
-if [ "$DELETED_COUNT" -gt 2 ] || [ "$CHANGED_COUNT" -gt 5 ]; then
-  echo "⚠️ This update is complex (many deletions or regenerations)"
+if [[ $DELETED_COUNT -gt 2 ]] || [[ $((ADDED_COUNT + UPDATED_COUNT)) -gt 5 ]]; then
+  echo "⚠ This update is complex (many additions, updates, or deletions)"
   echo ""
   echo "For safety, consider:"
   echo "  1. /wf-cleanup"
@@ -209,7 +204,7 @@ if [ "$DELETED_COUNT" -gt 2 ] || [ "$CHANGED_COUNT" -gt 5 ]; then
   echo "Continue with /wf-refresh? [yes/no]"
   read -p "Your choice: " choice
   
-  if [ "$choice" != "yes" ]; then
+  if [[ "$choice" != "yes" ]]; then
     echo "Run /wf-cleanup when ready to start fresh"
     exit 0
   fi
@@ -225,3 +220,5 @@ fi
 - **Offer recovery**: If /wf-refresh fails, offer /wf-cleanup + /wf-init path
 - **wf-cleanup is safe**: It's designed to preserve project work
 - **/wf-init is idempotent**: Running it twice is safe
+- **Builder is single source of truth**: /wf-refresh reuses /wf-init Builder (B1-B9)
+- **Custom sections are preserved**: Content inside `<!-- WF: DO NOT REGENERATE -->` markers is kept
