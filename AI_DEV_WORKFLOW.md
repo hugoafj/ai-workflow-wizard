@@ -1738,6 +1738,8 @@ Commands the wizard generates in Phase 6 and writes in Phase 8. They are project
 
 **Global vs project-specific commands**: `wf-init`, `wf-refresh`, and `wf-cleanup` are installed globally with `install.sh`. `wf-onboard`, `wf-settings`, and `wf-worktree` are generated per project in Phase 6. `wf-ladder`, `wf-tdd`, `wf-orchestrator`, and `wf-sdd-trigger` are project-specific too, each conditional on its feature flag(s). `/wf-cicd` was archived; CI/CD re-configuration happens through `/wf-settings` (options 9-14), whose single source is the `cicd` protocol.
 
+**Skills 1:1** — every command in this section is also packaged as a SKILL.md, so it can be invoked as a slash command AND by natural language. Project commands are emitted by Builder B4 in the IDE's native skill path (`.claude/skills/`, `.kiro/skills/`, `.codex/skills/`, `.windsurf/skills/`, `.devin/skills/`) plus the universal `.agents/skills/<cmd>/SKILL.md` and the flat `.agents/protocols/<cmd>.md`. Global commands get the same 1:1 from `install.sh` (each detected IDE's skill path + `~/.agents/skills/`).
+
 **Correct paths and formats per IDE** (verified against official documentation):
 
 | IDE | Directory | Format |
@@ -2269,7 +2271,7 @@ curl -fsSL https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/ins
 - Detects IDEs by directories in `~/` (Claude, Cursor, Windsurf, Kiro, Codex, Copilot, Antigravity, OpenCode, Devin)
 - Installs `/wf-init`, `/wf-refresh`, and `/wf-cleanup` as self-contained slash commands
 - Applies correct format per IDE (plain `.md` for Claude/Cursor/Codex/OpenCode, frontmatter `description:` for Windsurf workflows, SKILL.md with `name:`/`description:` for Windsurf/Devin/Copilot/Antigravity, `inclusion: manual` for Kiro)
-- Installs unconditional global skills to `~/.agents/skills/` (read by Codex, OpenCode, Gemini/AGY app, and Devin; AGY CLI does NOT read it — Antigravity coverage comes from the `~/.gemini/antigravity-cli/builtin` + `~/.gemini/config/skills` installs)
+- Installs the matching SKILL.md (1:1) in each detected IDE's global skills path (`~/.claude/skills/`, `~/.cursor/skills/`, `~/.codex/skills/`, `~/.config/opencode/skills/`, Windsurf/Devin/Copilot/Antigravity) plus `~/.agents/skills/` (read by Codex, OpenCode, Gemini/AGY app, and Devin; AGY CLI does NOT read it — Antigravity coverage comes from the `~/.gemini/antigravity-cli/builtin` + `~/.gemini/config/skills` installs)
 - Supports `--uninstall` to remove only the installed commands
 
 ### Global vs project-specific commands
@@ -2286,7 +2288,7 @@ Global paths written by `install.sh` per command:
 
 | IDE | Paths |
 |---|---|
-| Claude / Cursor / Codex / OpenCode | `~/.<ide>/commands/<cmd>.md` (plain markdown) |
+| Claude / Cursor / Codex / OpenCode | `~/.<ide>/commands/<cmd>.md` (plain markdown) + `~/.<ide>/skills/<cmd>/SKILL.md` (1:1 skill) |
 | Windsurf (legacy) | `~/.codeium/windsurf/global_workflows/<cmd>.md` (frontmatter `description:`) + `~/.codeium/windsurf/skills/<cmd>/SKILL.md` |
 | Devin (Windsurf rebrand) | `~/.config/devin/skills/<cmd>/SKILL.md` — detected via `~/.config/devin/`; written by the Windsurf block too when Devin is not detected separately |
 | Kiro | `~/.kiro/steering/<cmd>.md` (frontmatter `inclusion: manual`) |

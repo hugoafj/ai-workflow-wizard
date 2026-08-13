@@ -64,18 +64,21 @@ echo ""
 
 # 1. Wizard skills (Do NOT confuse with gentle-ai skills)
 echo "📦 Wizard skills:"
-for dir in .claude/skills .agents/skills .kiro/skills .codex/skills; do
+for dir in .claude/skills .agents/skills .kiro/skills .codex/skills .windsurf/skills .devin/skills; do
   if [ -d "$dir" ]; then
     for skill in "$dir"/*/; do
       skill_name=$(basename "$skill")
       # gentle-ai skills: sdd-apply, sdd-propose, sdd-tasks, sdd-spec, sdd-design, sdd-explore, sdd-verify, sdd-archive, sdd-init, sdd-onboard, gentle-orchestrator
-      # wizard skills (SPLIT protocol commands): wf-ladder, wf-tdd, wf-orchestrator, wf-sdd-trigger
+      # wizard skills (7 commands): wf-ladder, wf-tdd, wf-orchestrator, wf-sdd-trigger, wf-onboard, wf-worktree, wf-settings
       case "$skill_name" in
         sdd-apply|sdd-propose|sdd-tasks|sdd-spec|sdd-design|sdd-explore|sdd-verify|sdd-archive|sdd-init|sdd-onboard|gentle-orchestrator)
           echo "  ⏭ $dir/$skill_name (gentle-ai — DO NOT delete)"
           ;;
-        *)
+        wf-ladder|wf-tdd|wf-orchestrator|wf-sdd-trigger|wf-onboard|wf-worktree|wf-settings)
           echo "  🗑 $dir/$skill_name (wizard)"
+          ;;
+        *)
+          echo "  ⏸ $dir/$skill_name (unknown — skipping)"
           ;;
       esac
     done
@@ -107,7 +110,18 @@ for skills_dir in .windsurf/skills .devin/skills; do
     for skill in "$skills_dir"/*/SKILL.md; do
       if [ -f "$skill" ]; then
         skill_name=$(basename "$(dirname "$skill")")
-        echo "  🗑 $skills_dir/$skill_name (wizard)"
+        # Exclude gentle-ai skills from deletion
+        case "$skill_name" in
+          sdd-apply|sdd-propose|sdd-tasks|sdd-spec|sdd-design|sdd-explore|sdd-verify|sdd-archive|sdd-init|sdd-onboard|gentle-orchestrator)
+            echo "  ⏭ $skills_dir/$skill_name (gentle-ai — DO NOT delete)"
+            ;;
+          wf-ladder|wf-tdd|wf-orchestrator|wf-sdd-trigger|wf-onboard|wf-worktree|wf-settings)
+            echo "  🗑 $skills_dir/$skill_name (wizard)"
+            ;;
+          *)
+            echo "  ⏸ $skills_dir/$skill_name (unknown — skipping)"
+            ;;
+        esac
       fi
     done
   fi
@@ -260,9 +274,26 @@ Remove each wizard skill directory detected in Phase 0 (only wizard ones — nev
 `sdd-*` or `gentle-orchestrator`):
 
 ```bash
-# Example per detected wizard skill (replace with the actual list)
+# Example per detected wizard skill (replace with the actual list — all 7 wizard
+# commands ship skills 1:1, in native IDE paths AND the universal .agents/skills/)
 rm -rf .claude/skills/wf-ladder .claude/skills/wf-tdd \
-       .claude/skills/wf-orchestrator .claude/skills/wf-sdd-trigger
+       .claude/skills/wf-orchestrator .claude/skills/wf-sdd-trigger \
+       .claude/skills/wf-onboard .claude/skills/wf-worktree .claude/skills/wf-settings \
+       .kiro/skills/wf-ladder .kiro/skills/wf-tdd \
+       .kiro/skills/wf-orchestrator .kiro/skills/wf-sdd-trigger \
+       .kiro/skills/wf-onboard .kiro/skills/wf-worktree .kiro/skills/wf-settings \
+       .codex/skills/wf-ladder .codex/skills/wf-tdd \
+       .codex/skills/wf-orchestrator .codex/skills/wf-sdd-trigger \
+       .codex/skills/wf-onboard .codex/skills/wf-worktree .codex/skills/wf-settings \
+       .windsurf/skills/wf-ladder .windsurf/skills/wf-tdd \
+       .windsurf/skills/wf-orchestrator .windsurf/skills/wf-sdd-trigger \
+       .windsurf/skills/wf-onboard .windsurf/skills/wf-worktree .windsurf/skills/wf-settings \
+       .devin/skills/wf-ladder .devin/skills/wf-tdd \
+       .devin/skills/wf-orchestrator .devin/skills/wf-sdd-trigger \
+       .devin/skills/wf-onboard .devin/skills/wf-worktree .devin/skills/wf-settings \
+       .agents/skills/wf-ladder .agents/skills/wf-tdd \
+       .agents/skills/wf-orchestrator .agents/skills/wf-sdd-trigger \
+       .agents/skills/wf-onboard .agents/skills/wf-worktree .agents/skills/wf-settings
 ```
 
 ### Commands

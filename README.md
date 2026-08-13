@@ -75,7 +75,7 @@ After `/wf-init`, your repo has:
 - **IDE satellites** — auto-generated files in `.cursor/rules/`, `.windsurf/rules/`, `.kiro/steering/`, `CLAUDE.md`, etc. that point to `AGENTS.md` ([learn more](AI_DEV_WORKFLOW.md#54-project-specific-satellites-what-they-are-and-why-we-need-them))
 - **Post-commit hook** — detects when `AGENTS.md` drifts out of sync with the codebase
 - **CI/CD templates** — GitHub Actions with quality guard, AI review, and release-please ([learn more](AI_DEV_WORKFLOW.md#10-block-6--cicd-pipeline--gga))
-- **Project-specific slash commands** — `/wf-onboard`, `/wf-settings`, `/wf-worktree`
+- **Project-specific slash commands** — `/wf-onboard`, `/wf-settings`, `/wf-worktree` (plus `/wf-ladder`, `/wf-tdd`, `/wf-orchestrator`, `/wf-sdd-trigger` when the corresponding features are enabled). Every command is also packaged as a skill (1:1), so it can be invoked by natural language too.
 
 ## The Day-to-Day
 
@@ -101,6 +101,13 @@ Once set up, here's what working with the AI Workflow looks like:
 | `/wf-onboard` | Project | Onboarding guide for new developers |
 | `/wf-settings` | Project | Toggle optional modules: TDD, testing extras, Decision Ladder ([learn more](AI_DEV_WORKFLOW.md#98-wf-settings--toggle-optional-modules-after-installation)) |
 | `/wf-worktree` | Project | Git worktree management with automatic port assignment ([learn more](AI_DEV_WORKFLOW.md#84-worktrees--wf-worktree-built-in-this-block)) |
+| `/wf-ladder` | Project (LADDER) | Decision Ladder — avoids over-engineering before implementing ([learn more](AI_DEV_WORKFLOW.md#58-optional-behavior-improvements--wf-ladder)) |
+| `/wf-tdd` | Project (TDD + layers) | TDD Protocol — RED→GREEN→REFACTOR or TDD Proposal ([learn more](AI_DEV_WORKFLOW.md#9-block-5--tdd-pro--playwright-integrated)) |
+| `/wf-orchestrator` | Project (ROUTING‖LADDER‖TDD) | Single entry point to the project's wf- protocols |
+| `/wf-sdd-trigger` | Project (ROUTING) | Decides `wf-no-sdd`/`wf-force-sdd` before gentle-ai's SDD ([learn more](AI_DEV_WORKFLOW.md#6-block-2--specification-layer-sdd)) |
+
+> Every command is also packaged as a SKILL.md (1:1): project ones by the Builder (native
+> per IDE + `.agents/skills/` universal + flat fallback), global ones by `install.sh`.
 
 > CI/CD re-configuration lives in `/wf-settings` (options 9-14), sourced from the `cicd`
 > protocol (`templates/protocols/cicd/_base.md`).

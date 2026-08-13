@@ -1,9 +1,11 @@
 # /wf-onboard — Onboarding wizard for new developers
 
 > **Note**: onboarding reads the live repo source of truth (AGENTS.md router,
-> `openspec/config.yaml`, satellites). The project's protocols live packaged in
-> `.claude/skills/<n>/` (Claude, auto-discovery) and `.agents/protocols/<n>.md` (other
-> IDEs, referenced by the AGENTS.md router), not embedded in AGENTS.md. When
+> `openspec/config.yaml`, satellites). The project's protocols live packaged as
+> skills in the IDE's native path (`.claude/skills/<n>/`, `.kiro/skills/<n>/`,
+> `.codex/skills/<n>/`, `.windsurf/skills/<n>/`, `.devin/skills/<n>/`), with the
+> universal `.agents/skills/<n>/` and flat `.agents/protocols/<n>.md` fallbacks
+> (referenced by the AGENTS.md router), not embedded in AGENTS.md. When
 > configuring the environment, no special action is needed: they are versioned with the repo.
 
 > **When to use**: when you are a new developer who just cloned a repo

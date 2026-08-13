@@ -35,6 +35,13 @@ referenced from the AGENTS.md router.
 > Native skills (SKILL.md) auto-discover and do not require the router to
 > mention them. The flat file in `.agents/protocols/` is always the **universal fallback**
 > for any IDE that does not support auto-discovery, or for manual reference.
+>
+> **Wizard skills 1:1** — the 7 project wizard commands (`wf-*`) emit their SKILL.md in the
+> IDE's native skills path above **plus** the universal `.agents/skills/<n>/SKILL.md` (always,
+> for every IDE) and the flat `.agents/protocols/<n>.md`. Native copies auto-discover; the
+> universal copy is the fallback read by Codex/OpenCode/Gemini (AGY app)/Devin and covers
+> Antigravity's project-side command path (see B4). Global commands get the same 1:1 from
+> `install.sh` (`~/.agents/skills/` + each detected IDE's skill path).
 
 ## Command routes and formats table per IDE (VERBATIM)
 

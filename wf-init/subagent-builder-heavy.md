@@ -79,6 +79,10 @@ For each active command and each IDE in IDES:
 
 Write each file to `{WF_STAGING}/<path>`.
 
+> **Skill 1:1** — every command in this catalog is also packaged as a skill (B4): native
+> SKILL.md per IDE + universal `.agents/skills/<cmd>/SKILL.md` + flat
+> `.agents/protocols/<cmd>.md`. All 7 wizard commands (4 SPLIT + 3 maintenance) ship skills.
+
 > **⚠️ STAGING RULE**: ALL generated files are written inside
 > `{WF_STAGING}`. The paths in the instructions below are relative to the project
 > root, but `{WF_STAGING}/` is always prepended. The agent NEVER writes

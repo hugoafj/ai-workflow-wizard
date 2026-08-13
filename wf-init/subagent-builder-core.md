@@ -126,16 +126,17 @@ For each active protocol (body already built):
 
 **1. Flat file** (universal fallback):
 `{WF_STAGING}/.agents/protocols/<name>.md` = cuerpo — `<name>` is the protocol's source folder
-name (under `templates/protocols/` for pure protocols, `templates/commands/` for the 4 SPLIT
-wizard protocols; the `tdd` protocol was renamed `wf-tdd`, so its flat is
+name (under `templates/protocols/` for pure protocols, `templates/commands/` for the 7 wizard
+commands that ship skills; the `tdd` protocol was renamed `wf-tdd`, so its flat is
 `.agents/protocols/wf-tdd.md`).
 
 **2. Native skills per IDE** (only IDEs that support SKILL.md). **Presence-driven**: a
 protocol gets native skills ONLY if `<base_dir>/skill/SKILL.md` exists (same SPLIT/pure
-`base_dir` rule as B3 — all pure protocols are flat-only now; only the 4 SPLIT wizard
-protocols ship skills). `<skill-name>` is the skill's `name:` frontmatter field (from
-`skill/SKILL.md`) — NOT necessarily the command folder `<name>` (e.g. the `wf-tdd` command
-folder packages as skill folder `wf-tdd/`), so every user/model-facing skill stays
+`base_dir` rule as B3 — all pure protocols are flat-only now; only the 7 wizard commands ship
+skills: the 4 SPLIT `wf-ladder`, `wf-tdd`, `wf-orchestrator`, `wf-sdd-trigger` plus the 3
+maintenance `wf-onboard`, `wf-worktree`, `wf-settings`). `<skill-name>` is the skill's `name:`
+frontmatter field (from `skill/SKILL.md`) — NOT necessarily the command folder `<name>` (e.g. the
+`wf-tdd` command folder packages as skill folder `wf-tdd/`), so every user/model-facing skill stays
 `wf-`-prefixed and unambiguous:
 
 | IDE | Skills path |
@@ -144,11 +145,14 @@ folder packages as skill folder `wf-tdd/`), so every user/model-facing skill sta
 | `kiro` | `{WF_STAGING}/.kiro/skills/<skill-name>/SKILL.md` |
 | `codex` | `{WF_STAGING}/.codex/skills/<skill-name>/SKILL.md` |
 | `windsurf` | `{WF_STAGING}/.windsurf/skills/<skill-name>/SKILL.md`, `{WF_STAGING}/.devin/skills/<skill-name>/SKILL.md` (both written for Windsurf/Devin compatibility) |
-| `antigravity` | `{WF_STAGING}/.agents/skills/<skill-name>/SKILL.md` |
 
+**Universal — always emitted, regardless of `IDES`** (the 1:1 skill fallback):
+`{WF_STAGING}/.agents/skills/<skill-name>/SKILL.md` — the standard `.agents/` path read by
+Codex, OpenCode, Gemini (AGY app), and Devin; covers `antigravity` project-side skills.
 For each native skill: download `<base_dir>/skill/SKILL.md`, read its
 `name:` frontmatter field to get `<skill-name>`, replace `{{PROTOCOL_BODY: ...}}` with the body,
-write to the corresponding path (or paths for `windsurf`).
+write to the corresponding path (or paths for `windsurf`). If the IDE is not in the table, only
+the universal `.agents/skills/` copy and the flat file fallback are emitted.
 
 **3. Reference files**: if `<base_dir>/reference/` exists (currently only
 `wf-sdd-trigger`), download it verbatim and place it at `<same-directory-as-SKILL.md>/reference/`
