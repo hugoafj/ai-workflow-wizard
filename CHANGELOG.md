@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.7-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.6.6-beta.1...v0.6.7-beta.1) (2026-08-13)
+
+
+### Bug Fixes
+
+* **skills:** correct findings from skills ↔ commands 1:1 audit ([#81](https://github.com/hugoafj/ai-workflow-wizard/issues/81)) ([eddd218](https://github.com/hugoafj/ai-workflow-wizard/commit/eddd218bef6adfb0ba888d1b29fb5960eac77fd6))
+
 ## [0.6.6-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.6.5-beta.1...v0.6.6-beta.1) (2026-08-10)
 
 
