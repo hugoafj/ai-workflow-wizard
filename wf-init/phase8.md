@@ -492,6 +492,31 @@ Next steps:
 
 ---
 
+### 8.3 Write .wizard-managed-files.json
+
+After all files are promoted, write a manifest of wizard-managed files for `/wf-refresh` to use during future refreshes.
+
+```bash
+# Get wizard version
+WIZARD_VERSION=$(jq -r '.wizard_version // "0.1.0-beta.1"' .wizard-state.json)
+GENERATED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+# Build managed files list from build_plan.generated_files
+jq -n \
+  --arg version "$WIZARD_VERSION" \
+  --arg generated_at "$GENERATED_AT" \
+  --argjson files "$(jq '.build_plan.generated_files' .wizard-state.json)" \
+  '{wizard_version: $version, generated_at: $generated_at, files: $files}' \
+  > .wizard-managed-files.json
+
+# Add to .gitignore (so it's not committed)
+if ! grep -q "\.wizard-managed-files\.json" .gitignore 2>/dev/null; then
+  echo ".wizard-managed-files.json" >> .gitignore
+fi
+```
+
+---
+
 ### 8.4 Closing
 
 ```bash
