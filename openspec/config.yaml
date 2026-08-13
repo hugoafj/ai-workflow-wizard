@@ -1,0 +1,35 @@
+---
+# OpenSpec configuration for ai-workflow-wizard
+# SDD contract: all changes use OpenSpec format (openspec/changes/)
+
+project: ai-workflow-wizard
+description: AI Workflow Wizard — markdown-docs project for workflow initialization
+sdd_version: "1"
+artifact_format: openspec  # never .sdd/
+storage: openspec/changes/
+
+# Gentle AI integration
+gentle_ai:
+  enabled: true
+  mcp_servers:
+    - engram
+    - context7
+
+# Project conventions
+conventions:
+  language: English
+  code_style: markdown
+  naming: kebab-case
+  structure: templates + wf-init phases
+
+# Testing and verification
+testing:
+  lint: "bash -n on scripts"
+  build: "no build step (markdown project)"
+  verify: "manual review + git diff"
+
+# Approval gates
+approval_gates:
+  - proposal_review
+  - code_review_before_commit
+  - no_push_without_user_approval
