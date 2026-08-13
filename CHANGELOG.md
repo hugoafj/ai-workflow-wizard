@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.6.7-beta.1...v0.7.0-beta.1) (2026-08-13)
+
+
+### Features
+
+* refactor /wf-refresh to builder-driven migration mechanism ([#84](https://github.com/hugoafj/ai-workflow-wizard/issues/84)) ([cdda4a4](https://github.com/hugoafj/ai-workflow-wizard/commit/cdda4a4961edde5c7df39abbd3c567ecf3ad4b42))
+
 ## [0.6.7-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.6.6-beta.1...v0.6.7-beta.1) (2026-08-13)
 
 
