@@ -15,7 +15,7 @@ These test scenarios verify that the new `/wf-refresh` implementation works corr
 **Purpose**: Verify that `/wf-refresh` correctly identifies unchanged files and skips them.
 
 **Setup**:
-- Project initialized with `/wf-init` on v0.6.8-beta
+- Project initialized with `/wf-init` on v0.7.1-beta.1
 - No changes to project structure or dependencies
 - No changes to wizard templates
 
@@ -50,7 +50,7 @@ cd test-project-1
 **Setup**:
 - Project initialized with `/wf-init` on v0.6.4-beta (old version)
 - `.wizard-state.json` has `features.decision_ladder = false`
-- New wizard version v0.6.8-beta has `features.decision_ladder` available
+- New wizard version v0.7.1-beta.1 has `features.decision_ladder` available
 
 **Execution**:
 ```bash
@@ -121,7 +121,7 @@ cd test-project-3
 
 **Setup**:
 - Project initialized with v0.6.4-beta (which had `wf-cicd` command)
-- New wizard v0.6.8-beta removed `wf-cicd` command
+- New wizard v0.7.1-beta.1 removed `wf-cicd` command
 - `.wizard-managed-files.json` tracks old files
 
 **Execution**:
@@ -144,14 +144,14 @@ cd test-project-4
 
 ---
 
-## Scenario 5: Migration from v0.6.4-beta to v0.6.8-beta
+## Scenario 5: Migration from v0.6.4-beta to v0.7.1-beta.1
 
 **Purpose**: Verify that state migrations work correctly across versions.
 
 **Setup**:
 - Project initialized with v0.6.4-beta
 - `.wizard-state.json` has schema_version 2
-- Wizard version 0.6.8-beta has schema_version 3
+- Wizard version 0.7.1-beta.1 has schema_version 3
 
 **Execution**:
 ```bash
@@ -165,15 +165,15 @@ cd test-project-5
   - `build_plan.generated_files` added
   - `build_plan.managed_paths` added
   - `build_plan.approval` added
-- Phase R2: Wizard version migrated (0.6.4 → 0.6.8)
-  - New features asked (routing_abc, decision_ladder, visual_regression)
+- Phase R2: Wizard version migrated (0.6.4 → 0.7.1-beta.1) using semver-aware cumulative migrations
+  - New features asked (routing_abc, decision_ladder)
   - New CI/CD options set to defaults
 - Phase R3: Builder runs with migrated state
 - Phase R6: State updated with new schema_version and wizard_version
 
 **Acceptance criteria**:
 - [ ] `schema_version` set to 3
-- [ ] `wizard_version` set to "0.6.8-beta"
+- [ ] `wizard_version` set to "0.7.1-beta.1"
 - [ ] `build_plan` has all three new fields
 - [ ] Exit code 0
 

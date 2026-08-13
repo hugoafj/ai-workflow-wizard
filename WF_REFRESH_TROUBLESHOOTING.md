@@ -107,32 +107,37 @@ else
 fi
 ```
 
-If the project file's hash differs from the staging hash:
-- File was modified outside `/wf-refresh`
-- Regeneration might conflict
-- `/wf-refresh` will show a diff and ask for approval
+| Classification | Meaning |
+|---------------|---------|
+| `added` | File only in staging |
+| `updated` | File in project and staging, but hash differs |
+| `deleted` | Old managed file, no longer in staging, and project hash matches the recorded hash |
+| `deleted_modified` | Old managed file, no longer in staging, but project hash differs (user edited it) |
+| `unchanged` | File in project and staging with the same hash (skipped) |
 
 ### Deprecated Files Detection
 
-`/wf-refresh` compares the previous `.wizard-managed-files.json` with the newly generated staging:
+`/wf-refresh` compares the previous `.wizard-managed-files.json` (derived from `.wizard-state.json` `build_plan.managed_paths`) with the newly generated staging:
 
-- Files in old `managed_paths` but not in new staging → proposed for deletion
-- Files with unchanged hash → safe to delete
-- Files with modified hash → user is warned and must approve explicitly
+- Files in old `managed_paths` but not in new staging → proposed for `deleted` or `deleted_modified`
+- Files with unchanged hash → classified as `deleted` (safe to delete)
+- Files with modified hash → classified as `deleted_modified` (user is warned and must approve explicitly)
 
 ### Multi-Version Detection
 
-In `/wf-refresh` Phase R-1:
+In `/wf-refresh` Phase R-2, versions are compared with a proper semver helper, not lexicographically:
 
 ```bash
 LOCAL_VERSION=$(grep "wf-version:" AGENTS.md | sed 's/.*wf-version: //' | cut -d' ' -f1)
 REMOTE_VERSION=$(curl -s https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/VERSION)
 
-if [[ "$LOCAL_VERSION" < "$REMOTE_VERSION" ]]; then
+if version_lt "$LOCAL_VERSION" "$REMOTE_VERSION"; then
   echo "⚠ Wizard is outdated (local: $LOCAL_VERSION, remote: $REMOTE_VERSION)"
   read -p "Update global commands? [y/n] " -n 1 -r
 fi
 ```
+
+`version_lt` handles `x.y.z[-prerelease[.N]]` correctly, so `0.10.0` is detected as greater than `0.6.8-beta` and `0.6.10` is greater than `0.6.8`.
 
 ---
 

@@ -50,7 +50,7 @@ Detects project drift and applies updates safely:
 
 ## Implementation
 
-Source the refresher library and execute phases in order:
+Download the refresh orchestrator and supporting files, then read and execute each phase in `refresher.md` in order. **Do NOT `source` Markdown files** — read them as instructions and execute the fenced bash blocks one at a time.
 
 ```bash
 #!/bin/bash
@@ -63,49 +63,40 @@ if [[ ! -f .wizard-state.json ]]; then
   exit 1
 fi
 
-# Source refresher library
-source wf-init/lib/refresher.md
+# Wizard repository
+WIZARD_REPO="hugoafj/ai-workflow-wizard"
+WIZARD_BRANCH="main"
+WF_RAW="https://raw.githubusercontent.com/${WIZARD_REPO}/${WIZARD_BRANCH}"
 
-# Execute phases in order
-echo "ℹ Starting refresh..."
-echo ""
+# Local directory for downloaded refresh files (temporary, can be cleaned later)
+WF_DIR="/tmp/wf-refresh-phases"
+mkdir -p "$WF_DIR"
+mkdir -p "$WF_DIR/lib"
 
-refresh_phase_r_minus_1 || exit 1
-echo ""
+echo "Downloading refresh files from GitHub..."
+echo "Source: ${WIZARD_REPO}@${WIZARD_BRANCH}/wf-init/"
 
-refresh_phase_r0 || exit 1
-echo ""
+curl -fsSL "${WF_RAW}/wf-init/lib/refresher.md" > "${WF_DIR}/lib/refresher.md"
+curl -fsSL "${WF_RAW}/wf-init/lib/state.md" > "${WF_DIR}/lib/state.md"
+curl -fsSL "${WF_RAW}/wf-init/lib/builder.md" > "${WF_DIR}/lib/builder.md"
+curl -fsSL "${WF_RAW}/wf-init/subagent-builder-core.md" > "${WF_DIR}/subagent-builder-core.md"
+curl -fsSL "${WF_RAW}/wf-init/subagent-builder-heavy.md" > "${WF_DIR}/subagent-builder-heavy.md"
+curl -fsSL "${WF_RAW}/wf-init/phase6a-agents.md" > "${WF_DIR}/phase6a-agents.md"
+curl -fsSL "${WF_RAW}/wf-init/phase6b-build-heavy.md" > "${WF_DIR}/phase6b-build-heavy.md"
+curl -fsSL "${WF_RAW}/wf-init/phase7.md" > "${WF_DIR}/phase7.md"
+curl -fsSL "${WF_RAW}/wf-init/phase8.md" > "${WF_DIR}/phase8.md"
 
-refresh_phase_r1 || exit 1
-echo ""
-
-refresh_phase_r2 || exit 1
-echo ""
-
-refresh_phase_r3 || exit 1
-echo ""
-
-refresh_phase_r4 || exit 1
-echo ""
-
-refresh_phase_r5 || exit 1
-echo ""
-
-# Check if user approved any changes
-APPROVE_ADDED=$(jq -r '.build_plan.approval.added // false' .wizard-state.json)
-APPROVE_UPDATED=$(jq -r '.build_plan.approval.updated // false' .wizard-state.json)
-APPROVE_DELETED=$(jq -r '.build_plan.approval.deleted // false' .wizard-state.json)
-
-if [[ "$APPROVE_ADDED" != "true" ]] && [[ "$APPROVE_UPDATED" != "true" ]] && [[ "$APPROVE_DELETED" != "true" ]]; then
-  echo "ℹ No changes approved; exiting"
-  exit 0
+if [ ! -s "${WF_DIR}/lib/refresher.md" ]; then
+  echo "✗ Could not download refresher.md from GitHub"
+  exit 1
 fi
 
-refresh_phase_r6 || exit 1
-echo ""
-
-echo "✓ Refresh completed successfully"
+echo "✓ Refresh files downloaded to: ${WF_DIR}"
 ```
+
+Now read the orchestrator and execute each phase in order:
+
+**Next step**: open `${WF_DIR}/lib/refresher.md` and execute the bash blocks under each **Phase** heading in sequence, pausing for user approval at Phase R5.
 
 ---
 
@@ -156,7 +147,8 @@ Each file in staging is compared with the project using SHA256 hashes:
 - **Unchanged**: Hash matches → file is skipped (not re-copied)
 - **Updated**: Hash differs → file is proposed for update
 - **Added**: File only in staging → proposed for addition
-- **Deleted**: File only in project and marked as wizard-managed → proposed for deletion
+- **Deleted**: File only in project and marked as wizard-managed, unchanged → proposed for deletion
+- **Deleted-modified**: File in old `managed_paths`, not in new staging, but project hash differs from recorded hash → flagged for explicit approval
 
 ### Wizard-managed files
 

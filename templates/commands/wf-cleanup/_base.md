@@ -343,6 +343,7 @@ Remove the remaining detected items:
 
 ```bash
 rm -f .wizard-state.json .wf-status .commitlintrc.json .gga .pr_agent.toml
+rm -f .wizard-managed-files.json
 rm -f release-please-config.json .release-please-manifest.json
 rm -rf .husky .wizard-staging .wizard-manifests
 rm -f .git/hooks/post-commit

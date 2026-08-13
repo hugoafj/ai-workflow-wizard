@@ -23,11 +23,11 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
    pointers). Framework rules are NEVER copied here — they live in
    `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/`.
 
-## Schema (schema_version 2)
+## Schema (schema_version 3)
 
 ```json
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "wizard_version": "<auto: VERSION file in workflow-wizard>",
   "phase_pointer": "phase0",
   "started_at": "ISO-8601",
@@ -201,7 +201,7 @@ wf_state_init() {
   local version
   version=$(wf_fetch_version)
   cat > "$WF_STATE" <<JSON
-{ "schema_version": 2, "wizard_version": "$version", "phase_pointer": "phase0",
+{ "schema_version": 3, "wizard_version": "$version", "phase_pointer": "phase0",
   "phases": {}, "gentle_ai": {}, "discovery": {}, "answers": {}, "features": {},
   "agents": [], "sdd": {}, "testing": {}, "mcps": [], "migration": {}, "build_plan": {} }
 JSON

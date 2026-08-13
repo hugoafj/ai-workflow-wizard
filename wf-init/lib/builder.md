@@ -184,6 +184,10 @@ From the SAME `build_protocol_body(name)`:
   `data-testid.section.md`) according to `LAYERS`.
 - Build the MCPs table based on `STACK` + `LAYERS` (see protocol `architecture`).
 - Resolve `{{features.*_yesno}}` to `yes`/`no` based on each boolean feature.
+- Validate the final `AGENTS.md`: the `wf-version` footer comment must contain the exact
+  `.wizard-state.json` `wizard_version` and the `features` list must reflect the actual
+  selected booleans (`routing_abc`, `decision_ladder`, `tdd_protocol`, `ci`, `cd`,
+  `release_please`). If any `{{...}}` placeholder or `latest` remains in the footer, fail.
 - Footer `wf-version` with `STACK` and `features: ladder={{yes/no}}, tdd={{yes/no}}, routing={{yes/no}}, ci={{yes/no}}, cd={{yes/no}}, release={{yes/no}}` (ALWAYS the last line). Field names in the
   footer are kept as-is for backward compatibility with existing projects/wf-refresh parsing;
   `routing=yes` now means "wf-sdd-trigger is active" (this wizard's own SDD-forcing policy, not

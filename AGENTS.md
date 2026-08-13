@@ -73,4 +73,4 @@ wf-init/          — wizard phases
 
 <!-- No agent protocols: the project does not use Ladder, Routes ABC, or TDD. -->
 
-<!-- wf-version: 0.1.0-beta.1 | source: github.com/hugoafj/ai-workflow-wizard | stack: markdown-docs | features: ladder=no, tdd=no, routing=no, ci=no, cd=no, release=yes -->
+<!-- wf-version: 0.7.1-beta.1 | source: github.com/hugoafj/ai-workflow-wizard | stack: markdown-docs | features: ladder=no, tdd=no, routing=no, ci=no, cd=no, release=yes -->

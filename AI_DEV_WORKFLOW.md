@@ -722,7 +722,7 @@ The agent already reading the code is the one who best detects inconsistencies. 
 Footer of `AGENTS.md` with version + GitHub source URL + accepted optional features:
 
 ```markdown
-<!-- wf-version: 0.1.0-beta.1 | source: github.com/hugoafj/ai-workflow-wizard | stack: vite-react-ts | optional-features: decision-ladder=yes -->
+<!-- wf-version: 0.7.1-beta.1 | source: github.com/hugoafj/ai-workflow-wizard | stack: vite-react-ts | features: ladder=no, tdd=no, routing=no, ci=no, cd=no, release=yes -->
 ```
 
 The `optional-features` field is new and critical. It tracks which optional features of the wizard the user accepted or rejected. Without it, every time the wizard ships a new feature, the system wouldn't know if the user already considered it or if it's new to them.
@@ -1290,7 +1290,7 @@ If the agent determined `wf-force-sdd` and you confirm it's trivial:
 This task is simpler than what you classified in the wf-preflight. Reclassify as wf-no-sdd and implement directly. The AGENTS.md constraints still apply.
 ```
 
-> The exact text of the "📋 wf-sdd-trigger" section lives in each project's AGENTS.md (the wizard injects it in Phase 6, and `wf-refresh` syncs it in Layer 2). This section 6.3 is only the conceptual summary.
+> The exact text of the "📋 wf-sdd-trigger" section lives in each project's AGENTS.md (the wizard injects it in Phase 6, and `/wf-refresh` re-runs the Builder in Phase R3 to keep it synced). This section 6.3 is only the conceptual summary.
 
 #### The human gate in each phase
 
@@ -2317,7 +2317,7 @@ Global paths written by `install.sh` per command:
   `.cursor/rules/`, `.windsurf/rules/`, `.kiro/steering/`), flat protocols (`.agents/protocols/`),
   commands, CI/CD workflows (including `deploy.yml`), MCP settings (Playwright MCP entries),
   test configs, the `post-commit` hook (`.git/hooks/`), `.husky/`, `.gga`, `.pr_agent.toml`,
-  release-please configs, `.wizard-staging/`, `.wizard-manifests/`, and `.gitignore` entries.
+  release-please configs, `.wizard-staging/`, `.wizard-managed-files.json`, and `.gitignore` entries.
   Confirmation is free-form: after the inventory, the user writes in their own words what to
   keep, and everything wizard-owned not mentioned is deleted after a per-group confirmation.
 
