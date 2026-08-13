@@ -52,6 +52,7 @@ echo "Source: ${WIZARD_REPO}@${WIZARD_BRANCH}/wf-init/"
 
 PHASES=(
   "lib/state.md"
+  "lib/state-helpers.sh"
   "lib/builder.md"
   "phase0.md"
   "phase0b.md"

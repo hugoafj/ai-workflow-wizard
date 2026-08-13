@@ -22,7 +22,7 @@ Exception: `.tmpl.md` templates WITHOUT code fence (like `vitest.config.tmpl.md`
 ### 0. Setup
 
 ```bash
-source "{WF_PATH}/wf-init/lib/state.md"
+source "{WF_PATH}/wf-init/lib/state-helpers.sh"
 mkdir -p "{WF_STAGING}"
 cd "{PROJECT_PATH}"
 cat .wizard-state.json

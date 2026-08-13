@@ -24,7 +24,7 @@ Extraction formats:
 ### 0. Setup
 
 ```bash
-source "{WF_PATH}/wf-init/lib/state.md"
+source "{WF_PATH}/wf-init/lib/state-helpers.sh"
 ls "{WF_STAGING}/"  # verify that builder-core already ran
 cd "{PROJECT_PATH}"
 cat .wizard-state.json
