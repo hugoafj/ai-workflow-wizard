@@ -377,7 +377,8 @@ echo '!.github/copilot-instructions.md' >> .gitignore   # if applicable
 
 ```bash
 # Refresh gentle-ai's skill registry so its own Skill Resolver Protocol picks up
-# this project's wf-* skills (wf-orchestrator, wf-ladder, wf-sdd-trigger, wf-tdd)
+# this project's wf-* skills (wf-orchestrator, wf-ladder, wf-sdd-trigger, wf-tdd,
+# wf-onboard, wf-worktree, wf-settings)
 # right away, instead of waiting for the next commit's post-commit hook.
 # Helps adapters whose orchestrator reads .atl/skill-registry.md before delegating (Claude
 # Code, OpenCode, Cursor, Kiro, Codex). Harmless no-op for Windsurf/Devin — confirmed against
@@ -397,6 +398,7 @@ git add -f .cursor/ 2>/dev/null || true
 git add -f .windsurf/ 2>/dev/null || true
 git add -f .devin/ 2>/dev/null || true
 git add -f .kiro/ 2>/dev/null || true
+git add -f .codex/ 2>/dev/null || true
 git add -f .opencode/ 2>/dev/null || true
 git add -f .github/copilot-instructions.md .github/prompts/ 2>/dev/null || true
 # CI/CD (Block 6): workflows, conventional commits, husky, release-please, .gga
@@ -414,9 +416,9 @@ GA_VER=$(jq -r '.gentle_ai.version // "unknown"' .wizard-state.json)
 git commit -m "chore: initialize AI Workflow Wizard
 
 - Add AGENTS.md router (thin) pointing to packaged protocols
-- Add protocols as Claude skills and flat files (.agents/protocols)
+- Add protocols as IDE native skills + universal .agents/skills + flat files (.agents/protocols)
 - Add satellite files for configured IDEs
-- Add project commands (wf-ladder, wf-onboard, wf-worktree, wf-settings)
+- Add project commands (wf-ladder, wf-tdd, wf-orchestrator, wf-sdd-trigger, wf-onboard, wf-worktree, wf-settings)
 - Add post-commit hook for drift detection
 - Add CI/CD (Block 6): AI review, quality guard, conventional commits
 - Update .gitignore for AI workflow files

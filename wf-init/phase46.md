@@ -115,7 +115,7 @@ Which do you prefer? [1 / 2]
 **Wait for user response.**
 
 **If they chose option 1 (Standard TDD Protocol)**: the Builder writes the standard protocol
-(source `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/tdd/variants/standard.md`) in the AGENTS.md.
+(source `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-tdd/variants/standard.md`) in the AGENTS.md.
 
 > **CRITICAL — reset Strict TDD if it was active (known bug)**: choosing "standard" is NOT
 > enough to just write the protocol in AGENTS.md. If the project **already had Strict TDD
@@ -137,7 +137,7 @@ Which do you prefer? [1 / 2]
 > 4. Save in the state `state.testing.tdd_mode = "standard"`.
 >
 > Only when all three sources agree on "standard" is the mode truly applied.
-> (Rule in the `tdd` protocol.) If there was NO prior strict, there's nothing to reset.
+> (Rule in the `wf-tdd` protocol.) If there was NO prior strict, there's nothing to reset.
 
 **If they chose option 2 (Strict TDD Mode)**:
 

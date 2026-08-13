@@ -27,8 +27,11 @@ The AGENTS.md no longer contains the heavy embedded mechanism. It contains ONLY:
 - **Footer `wf-version`** (last line, mandatory — read by /wf-settings and /wf-refresh).
 
 > The flow control mechanism (`wf-ladder`, `wf-sdd-trigger`, `wf-orchestrator`, `wf-tdd`)
-> **no longer lives inside AGENTS.md**: it lives in
-> `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/` (`wf-ladder`, `wf-sdd-trigger`, `wf-orchestrator`, `tdd`)
+> **no longer lives inside AGENTS.md**: it lives in the SPLIT wizard protocol folders
+> (`https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-ladder/_base.md`,
+> `.../templates/commands/wf-tdd/_base.md`, `.../templates/commands/wf-orchestrator/_base.md`,
+> `.../templates/commands/wf-sdd-trigger/_base.md` — each self-contained: command body + skill
+> + flat file, single source)
 > and is packaged as a skill + flat file. The router points to them. This eliminates the
 > accumulation of 350-450 lines of mechanism in AGENTS.md.
 

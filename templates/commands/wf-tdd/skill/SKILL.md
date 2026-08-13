@@ -13,4 +13,4 @@ metadata:
   (standard|strict) according to state.testing.tdd_mode. Not duplicated here.
 -->
 
-{{PROTOCOL_BODY: protocols/tdd/_base.md + variants/<tdd_mode>.md}}
+{{PROTOCOL_BODY: templates/commands/wf-tdd/_base.md + variants/<tdd_mode>.md}}

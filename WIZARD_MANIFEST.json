@@ -68,18 +68,6 @@
       "state_mappings": null,
       "content_hash": "2d9d81a96206f31b4628102c7d2bb247f291088b0c60b0387db3d96c4dbf924d"
     },
-    "SKILL.md": {
-      "version": "0.6.6-beta.1",
-      "type": "protocol",
-      "path": "templates/protocols/workflow/skill/SKILL.md",
-      "output": null,
-      "status": "unchanged",
-      "regenerate": false,
-      "template": "templates/protocols/workflow/skill/SKILL.md",
-      "state_vars": [],
-      "state_mappings": null,
-      "content_hash": "e6b81358fdef3442a213f1f8992e034da8aa0213cc4e45bb71157e5a44dae015"
-    },
     "hook.post-commit.tmpl.md": {
       "version": "0.6.6-beta.1",
       "type": "protocol",

@@ -25,7 +25,7 @@ automatically verifies that changes do not break behavior (adds `test`,
    Scripts: `test:e2e`, `test:e2e:ui`, `test:e2e:report`. Activates the Playwright MCP.
 
 > The exact layer menu and TDD mode (standard/strict) are asked in phase46 and
-> stored in `state.testing`. The TDD Protocol itself lives in the `tdd` protocol.
+> stored in `state.testing`. The TDD Protocol itself lives in the `wf-tdd` protocol.
 
 ## Optional extras (state.testing: coverage_threshold, visual_regression, page_object_model)
 

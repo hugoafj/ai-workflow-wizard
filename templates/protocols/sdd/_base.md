@@ -78,7 +78,7 @@ the *delta* greenfield/legacy concept are documented in `AI_DEV_WORKFLOW.md` §6
   canonical schema for this file — it is prompt-driven, and its exact shape is **not fully uniform**
   even across gentle-ai's own skills (e.g. `strict_tdd`/`testing`/`layers` may live at the top level
   or nested under `context.*`, depending on how `/sdd-init` wrote it for this project).
-- `strict_tdd: true|false` is the source of truth that `sdd-apply`/`sdd-verify` consult (see `tdd`
+- `strict_tdd: true|false` is the source of truth that `sdd-apply`/`sdd-verify` consult (see `wf-tdd`
   strict variant protocol). When migrating backends, preserve `strict_tdd`.
 - `openspec/config.yaml` is **excluded** from the drift hook (it is the output of /sdd-init;
   including it would cause a loop).

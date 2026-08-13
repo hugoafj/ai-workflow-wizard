@@ -78,7 +78,10 @@ Use `wf_state_set` to persist to `.wizard-state.json`:
 For each IDE that has a directory in the project, check expected commands:
 
 ```bash
-EXPECTED_COMMANDS="wf-ladder wf-onboard wf-worktree wf-settings"
+# Conditional by feature: wf-ladder (LADDER), wf-tdd (TDD && LAYERS),
+# wf-orchestrator (ROUTING || LADDER || TDD), wf-sdd-trigger (ROUTING);
+# wf-onboard, wf-worktree, wf-settings are always emitted.
+EXPECTED_COMMANDS="wf-ladder wf-tdd wf-orchestrator wf-sdd-trigger wf-onboard wf-worktree wf-settings"
 ```
 
 | IDE | Base path | Extension |

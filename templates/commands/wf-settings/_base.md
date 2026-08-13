@@ -323,14 +323,15 @@ mode, regardless of what that block says.
    were omitted if the project originally chose Strict TDD.
 
    **SINGLE SOURCE**: Do NOT copy an embedded block from this file. Read the
-   VERBATIM content from `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/tdd/variants/standard.md` (which is the
-   `standard` variant of the `tdd` protocol) and insert it as-is. Do not summarize, do not
+   VERBATIM content from `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-tdd/variants/standard.md` (which is the
+   `standard` variant of the `wf-tdd` protocol) and insert it as-is. Do not summarize, do not
    paraphrase: without the exact `🧪 TDD PROPOSAL` format and its numbered options, the
    executing agent has no real pause point before writing tests or code.
 
-   Also regenerate the `tdd` protocol packaging (skill `.claude/skills/wf-tdd/`
-   and flat `.agents/protocols/tdd.md`) from the single source (Builder B4), so they
-   do not get out of sync.
+   Also regenerate the `wf-tdd` protocol packaging (native skills per active IDE
+   `.claude/skills/wf-tdd/`, `.kiro/skills/wf-tdd/`, `.codex/skills/wf-tdd/`, plus the
+   universal `.agents/skills/wf-tdd/` and flat `.agents/protocols/wf-tdd.md`) from the
+   single source (Builder B4), so they do not get out of sync.
 
 3. **Do not touch** "Playwright Dual-loop" or "wf-sdd-trigger Integration"
    — those two subsections do not depend on the TDD mode
@@ -1135,7 +1136,7 @@ Generate everything related for the chosen IDE, downloading from `$WF_RAW`:
    `.opencode/commands/`, `.github/prompts/`, `.codex/commands/`), applying the per-IDE
    frontmatter (protocol `ides`, routing-table.section.md).
 3. **Skills** — the packaged protocol skills → the IDE's native skills directory
-   (`.claude/skills/`, `.kiro/skills/`, `.codex/skills/`, `.windsurf/skills/`,
+   (`.claude/skills/`, `.kiro/skills/`, `.codex/skills/`, `.windsurf/skills/`, `.devin/skills/`,
    `.agents/skills/`).
 4. **Windsurf fix** — ONLY if the added IDE is Windsurf/Devin: apply the same logic as
    Option 17 (AGENTS.md "Gentle AI — Legacy Path Bridge" rule + `.windsurf/workflows/sdd-new.md`).

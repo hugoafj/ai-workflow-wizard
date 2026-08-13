@@ -10,18 +10,24 @@
 
 ## Commands catalog
 
-| Command | Scope | Template |
-|---|---|---|
-| `/wf-init` | global (install.sh) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-init/` |
-| `/wf-refresh` | global (install.sh) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-refresh/` |
-| `/wf-cleanup` | global (install.sh) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-cleanup/` |
-| `/wf-ladder` | project-specific (Phase 6) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-ladder/` |
-| `/wf-onboard` | project-specific (Phase 6) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-onboard/` |
-| `/wf-worktree` | project-specific (Phase 6) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-worktree/` |
-| `/wf-settings` | project-specific (Phase 6) | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-settings/` |
+| Command | Scope | Skill (1:1) | Template |
+|---|---|---|---|
+| `/wf-init` | global (install.sh) | ✓ | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-init/` |
+| `/wf-refresh` | global (install.sh) | ✓ | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-refresh/` |
+| `/wf-cleanup` | global (install.sh) | ✓ | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-cleanup/` |
+| `/wf-ladder` | project-specific (Phase 6, LADDER) | ✓ | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-ladder/` |
+| `/wf-tdd` | project-specific (Phase 6, TDD && LAYERS) | ✓ | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-tdd/` |
+| `/wf-orchestrator` | project-specific (Phase 6, ROUTING‖LADDER‖TDD) | ✓ | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-orchestrator/` |
+| `/wf-sdd-trigger` | project-specific (Phase 6, ROUTING) | ✓ | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-sdd-trigger/` |
+| `/wf-onboard` | project-specific (Phase 6) | ✓ | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-onboard/` |
+| `/wf-worktree` | project-specific (Phase 6) | ✓ | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-worktree/` |
+| `/wf-settings` | project-specific (Phase 6) | ✓ | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-settings/` |
 
 > Only `/wf-init`, `/wf-refresh`, and `/wf-cleanup` are global (installed with `install.sh`).
 > The rest are generated per project in Phase 6 of `/wf-init`.
+> **Skill 1:1** — every command in this catalog is also packaged as a SKILL.md: global ones
+> by `install.sh` (IDE skill paths + `~/.agents/skills/`), project ones by Builder B4 (native
+> per IDE + universal `.agents/skills/<cmd>/SKILL.md` + flat `.agents/protocols/<cmd>.md`).
 > `/wf-cicd` was archived (`templates/_archive/wf-cicd/`) — its flow is now the `cicd`
 > protocol, consumed by `/wf-settings` (options 9-14) and `/wf-init` Phase 4.7.
 

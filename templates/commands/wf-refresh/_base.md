@@ -482,20 +482,22 @@ inserts it **immediately before the HTML comment footer** (or at the end of "Beh
 preferences" if there is no footer). The content is always the same:
 
 > The content of the `wf-sdd-trigger` section is read from
-> `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/wf-sdd-trigger/_base.md`
+> `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-sdd-trigger/_base.md`
 > (Minimal Exploration, Decision Tree, `wf-no-sdd`/`wf-force-sdd` outcomes, `wf-preflight`,
 > wf-sdd-trigger evaluation fragment). Insert that content
 > VERBATIM, character by character, immediately before the HTML `wf-version` footer (or at the
 > end of "Behavior preferences" if there is no footer). Do not paraphrase or omit subsections.
 > Also ensure `wf-orchestrator`'s content is present (it is built whenever `wf-sdd-trigger` OR
-> `wf-ladder` OR `wf-tdd` is active — see `templates/protocols/wf-orchestrator/_base.md`).
+> `wf-ladder` OR `wf-tdd` is active — see `templates/commands/wf-orchestrator/_base.md`).
 >
-> In projects with Claude Code, the same content is already packaged as skills in
-> `.claude/skills/wf-sdd-trigger/SKILL.md` and `.claude/skills/wf-orchestrator/SKILL.md`; for
-> other IDEs, in `.agents/protocols/wf-sdd-trigger.md` and `.agents/protocols/wf-orchestrator.md`.
-> When refreshing, also regenerate those packages from the single source (Builder B4) so they do
-> not get out of sync. For adapters whose orchestrator reads `.atl/skill-registry.md` before
-> delegating (Claude Code, OpenCode, Cursor, Kiro, Codex), also run `gentle-ai skill-registry
+> All 7 wizard commands (wf-ladder, wf-tdd, wf-orchestrator, wf-sdd-trigger, wf-onboard,
+> wf-worktree, wf-settings) are packaged as skills in the IDE's native skill path
+> (`.claude/skills/`, `.kiro/skills/`, `.codex/skills/`, `.windsurf/skills/`, `.devin/skills/`),
+> plus the universal `.agents/skills/<name>/SKILL.md` and the flat
+> `.agents/protocols/<name>.md` fallback. When refreshing, also regenerate those packages from
+> the single source (Builder B4) so they do not get out of sync. For adapters whose orchestrator
+> reads `.atl/skill-registry.md` before delegating (Claude Code, OpenCode, Cursor, Kiro, Codex),
+> also run `gentle-ai skill-registry
 > refresh` if available so gentle-ai's own Skill Resolver Protocol picks them up. **This step is a
 > no-op for Windsurf/Devin** — confirmed against gentle-ai's own source
 > (`internal/skillregistry/registry.go`), it never scans `.windsurf/skills/` or `.devin/skills/`
@@ -616,7 +618,7 @@ hardcoded knowledge:
     writing code and declares each rung out loud with its answer. Always
     applies before wf-preflight, and again per task once gentle-ai's sdd-apply
     is requested (wf-force-sdd).
-  content-source: https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/wf-ladder/_base.md
+  content-source: https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-ladder/_base.md
 
 - id: tdd
   description: |
@@ -624,7 +626,7 @@ hardcoded knowledge:
     Includes the 🧪 TDD PROPOSAL ritual (standard mode) or direct
     RED→GREEN evidence (strict mode, via gentle-ai's strict_tdd field).
     Independent of SDD — can be injected per change without openspec/.
-  content-source: https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/tdd/_base.md
+  content-source: https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-tdd/_base.md
 
 - id: routing
   description: |
@@ -634,7 +636,7 @@ hardcoded knowledge:
     before proceeding. Never re-specifies how gentle-ai itself routes or
     delegates once SDD is requested. `wf-orchestrator` (single entry point to
     this wizard's own protocols) is built alongside it.
-  content-source: https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/wf-sdd-trigger/_base.md
+  content-source: https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-sdd-trigger/_base.md
 
 - id: ci
   description: |
@@ -726,7 +728,10 @@ commands for the current wizard version (keep in sync with
 `EXPECTED_COMMANDS` from `wf-init.md`):
 
 ```bash
-EXPECTED_COMMANDS="wf-ladder wf-onboard wf-worktree wf-settings"
+# All 7 project commands; the 4 conditional ones apply only when their feature is
+# active (wf-ladder: LADDER; wf-tdd: TDD+LAYERS; wf-orchestrator: ROUTING OR LADDER OR TDD;
+# wf-sdd-trigger: ROUTING).
+EXPECTED_COMMANDS="wf-ladder wf-tdd wf-orchestrator wf-sdd-trigger wf-onboard wf-worktree wf-settings"
 
 # Example for Claude Code — repeat the pattern adjusting path/extension
 # for each active IDE (see route table in wf-init.md Phase 6 section)
@@ -735,9 +740,16 @@ for cmd in $EXPECTED_COMMANDS; do
     echo "MISSING: .claude/commands/${cmd}.md"
   fi
 done
+
+# Also verify skills (1:1 with commands) — universal fallback
+for cmd in $EXPECTED_COMMANDS; do
+  if [ ! -f ".agents/skills/${cmd}/SKILL.md" ]; then
+    echo "MISSING: .agents/skills/${cmd}/SKILL.md (universal fallback)"
+  fi
+done
 ```
 
-If you find missing commands, inform the user and add them to the change
+If you find missing commands or skills, inform the user and add them to the change
 buffer (they are written together with the rest in Phase 5, not before):
 
 ```

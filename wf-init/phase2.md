@@ -62,7 +62,10 @@ check file by file — not just whether the directory exists:
 ```bash
 # List of commands expected by this wizard version (update every
 # version that adds new commands)
-EXPECTED_COMMANDS="wf-ladder wf-onboard wf-worktree wf-settings"
+# Conditional by feature: wf-ladder (LADDER), wf-tdd (TDD && LAYERS),
+# wf-orchestrator (ROUTING || LADDER || TDD), wf-sdd-trigger (ROUTING);
+# wf-onboard, wf-worktree, wf-settings are always emitted.
+EXPECTED_COMMANDS="wf-ladder wf-tdd wf-orchestrator wf-sdd-trigger wf-onboard wf-worktree wf-settings"
 
 # Example verification for Claude Code — repeat the pattern for each
 # active IDE, adjusting directory and extension based on its format:

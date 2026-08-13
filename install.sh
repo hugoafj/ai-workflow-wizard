@@ -1,6 +1,6 @@
 #!/bin/bash
 # AI Workflow Wizard — Global command installer
-# Installs /wf-init and /wf-refresh as global slash commands.
+# Installs /wf-init, /wf-refresh, and /wf-cleanup as global slash commands (1:1 with skills).
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/install.sh | bash
@@ -101,7 +101,7 @@ do_install() {
     exit 1
   fi
 
-  echo "Detected ${ide_count} IDE(s). Installing global commands..."
+  echo "Detected ${ide_count} IDE(s). Installing global commands + skills..."
   echo ""
 
   # Fetch remote version
@@ -132,9 +132,13 @@ do_install() {
     if [[ $has_claude -eq 1 ]]; then
       install_plain "$HOME/.claude/commands" "$cmd" "$body" "$VERSION"
       installed=$((installed + 1))
+      install_agents_skills "$HOME/.claude/skills" "$cmd" "$body" "$desc" "$VERSION"
+      installed=$((installed + 1))
     fi
     if [[ $has_cursor -eq 1 ]]; then
       install_plain "$HOME/.cursor/commands" "$cmd" "$body" "$VERSION"
+      installed=$((installed + 1))
+      install_agents_skills "$HOME/.cursor/skills" "$cmd" "$body" "$desc" "$VERSION"
       installed=$((installed + 1))
     fi
     if [[ $has_windsurf -eq 1 ]]; then
@@ -158,11 +162,17 @@ do_install() {
       install_kiro "$HOME/.kiro/steering" "$cmd" "$body" "$VERSION"
       installed=$((installed + 1))
     fi
-    # Unconditional: .agents/skills is read by Codex, OpenCode, Gemini, Antigravity, and Devin
+    # Unconditional: .agents/skills is read by Codex, OpenCode, Gemini (AGY app),
+    # and Devin — the universal skill fallback for every IDE/CLI (1:1 command ↔ skill).
+    # NOTE: AGY CLI does NOT read ~/.agents/skills/ — Antigravity CLI/IDE
+    # coverage comes from the ~/.gemini/antigravity-cli/builtin + ~/.gemini/config
+    # installs below (config/skills is the only global path all three read).
     install_agents_skills "$HOME/.agents/skills" "$cmd" "$body" "$desc" "$VERSION"
     installed=$((installed + 1))
     if [[ $has_codex -eq 1 ]]; then
       install_plain "$HOME/.codex/commands" "$cmd" "$body" "$VERSION"
+      installed=$((installed + 1))
+      install_agents_skills "$HOME/.codex/skills" "$cmd" "$body" "$desc" "$VERSION"
       installed=$((installed + 1))
     fi
     if [[ $has_copilot -eq 1 ]]; then
@@ -178,6 +188,8 @@ do_install() {
     fi
     if [[ $has_opencode -eq 1 ]]; then
       install_plain "$HOME/.config/opencode/commands" "$cmd" "$body" "$VERSION"
+      installed=$((installed + 1))
+      install_agents_skills "$HOME/.config/opencode/skills" "$cmd" "$body" "$desc" "$VERSION"
       installed=$((installed + 1))
     fi
   done
@@ -213,7 +225,13 @@ do_uninstall() {
     f="$HOME/.claude/commands/${cmd}.md"
     [[ -f "$f" ]] && rm -f "$f" && echo "  ✓ Removed ${f#$HOME/}" && removed=$((removed + 1))
 
+    f="$HOME/.claude/skills/${cmd}/SKILL.md"
+    [[ -f "$f" ]] && rm -f "$f" && echo "  ✓ Removed ${f#$HOME/}" && removed=$((removed + 1))
+
     f="$HOME/.cursor/commands/${cmd}.md"
+    [[ -f "$f" ]] && rm -f "$f" && echo "  ✓ Removed ${f#$HOME/}" && removed=$((removed + 1))
+
+    f="$HOME/.cursor/skills/${cmd}/SKILL.md"
     [[ -f "$f" ]] && rm -f "$f" && echo "  ✓ Removed ${f#$HOME/}" && removed=$((removed + 1))
 
     # Windsurf legacy global workflows + skills
@@ -230,6 +248,9 @@ do_uninstall() {
     [[ -f "$f" ]] && rm -f "$f" && echo "  ✓ Removed ${f#$HOME/}" && removed=$((removed + 1))
 
     f="$HOME/.codex/commands/${cmd}.md"
+    [[ -f "$f" ]] && rm -f "$f" && echo "  ✓ Removed ${f#$HOME/}" && removed=$((removed + 1))
+
+    f="$HOME/.codex/skills/${cmd}/SKILL.md"
     [[ -f "$f" ]] && rm -f "$f" && echo "  ✓ Removed ${f#$HOME/}" && removed=$((removed + 1))
 
     f="$HOME/.agents/skills/${cmd}/SKILL.md"
@@ -260,6 +281,9 @@ do_uninstall() {
 
     f="$HOME/.config/opencode/commands/${cmd}.md"
     [[ -f "$f" ]] && rm -f "$f" && echo "  ✓ Removed ${f#$HOME/}" && removed=$((removed + 1))
+
+    f="$HOME/.config/opencode/skills/${cmd}/SKILL.md"
+    [[ -f "$f" ]] && rm -f "$f" && echo "  ✓ Removed ${f#$HOME/}" && removed=$((removed + 1))
   done
 
   echo ""
@@ -278,8 +302,8 @@ case "${1:-}" in
     echo "AI Workflow Wizard installer"
     echo ""
     echo "Usage:"
-    echo "  bash install.sh            Install global commands"
-    echo "  bash install.sh --uninstall Remove global commands"
+    echo "  bash install.sh            Install global commands + skills"
+    echo "  bash install.sh --uninstall Remove global commands + skills"
     ;;
   *)  do_install ;;
 esac

@@ -2,8 +2,9 @@
   This is the AGENTS.md template that the Builder (wf-init/lib/builder.md) writes to
   the target project. It is a THIN ROUTER (constraint 7): only global policies,
   project-specific content and routing to packaged protocols. It NEVER contains
-  the full protocols (wf-orchestrator, wf-ladder, wf-sdd-trigger, wf-tdd) — those live in
-  .claude/skills/<n>/ and .agents/protocols/<n>.md, and the router points to them.
+  the full protocols (wf-orchestrator, wf-ladder, wf-sdd-trigger, wf-tdd, wf-onboard,
+  wf-worktree, wf-settings) — those live as skills in your IDE's native skill path and
+  in .agents/protocols/<n>.md, and the router points to them.
 
   The {{PLACEHOLDERS}} are filled deterministically from .wizard-state.json.
   The <if ...> blocks are conditionals that the Builder resolves by state (not by
@@ -85,7 +86,11 @@ bloating the context. They are NOT written in full here — they live in dedicat
 | Copilot | `~/.copilot/skills/` | `.github/skills/` |
 | Kiro | `~/.kiro/skills/`, `~/.kiro/steering/` | `.kiro/skills/`, `.kiro/steering/` |
 | Gemini CLI | `~/.gemini/skills/` | `.gemini/skills/`, `.agents/skills/` |
-| Antigravity | `~/.gemini/antigravity/skills/`, `~/.gemini/antigravity-ide/skills/`, `~/.gemini/antigravity-cli/skills/` | `.agents/skills/` |
+| Antigravity | `~/.gemini/antigravity/skills/`, `~/.gemini/antigravity-ide/skills/`, `~/.gemini/antigravity-cli/skills/`, `~/.gemini/config/skills/` (canonical) | `.agents/skills/` |
+
+> The wizard's own 7 `wf-*` skills are emitted by the Builder in the project path above
+> (native auto-discovery) **plus** `.agents/skills/<n>/SKILL.md` (universal fallback) and the
+> flat `.agents/protocols/<n>.md`. Global `wf-*` commands get the same 1:1 from `install.sh`.
 
 ### Available protocols
 
@@ -101,6 +106,9 @@ bloating the context. They are NOT written in full here — they live in dedicat
 <if state.features.tdd_protocol>
 | Before writing tests or code for a feature | `wf-tdd` — TDD Protocol (wizard-owned) |
 </if>
+| When onboarding a new developer | `wf-onboard` — local environment setup (always available) |
+| When managing git worktrees | `wf-worktree` — parallel work isolation (always available) |
+| When toggling optional modules | `wf-settings` — TDD, testing, ladder, SDD backend (always available) |
 <if state.sdd.backend != null>
 | When gentle-ai's SDD was explicitly requested (via `wf-sdd-trigger`'s `wf-force-sdd` outcome) | SDD skills live in your IDE's path (see table above) — **gentle-ai's own**, not this wizard's. **READ them before relying on them** — do not invent the flow, and do not describe how they delegate; that is gentle-ai's own native content for this adapter. Available skills: `sdd-propose`, `sdd-spec`, `sdd-design`, `sdd-tasks`, `sdd-apply`, `sdd-verify`, `sdd-archive`, `sdd-explore`, `sdd-init`, `sdd-onboard` |
 | When migrating SDD backend or touching `openspec/config.yaml`'s known fields | `sdd` — wizard-owned rules (persistence backends, Wizard-Allowed Field Edits) — flat file `.agents/protocols/sdd.md` |

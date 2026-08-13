@@ -9,4 +9,4 @@ metadata:
 
 <!-- Body assembled by the Builder from ../_base.md. Not duplicated here. -->
 
-{{PROTOCOL_BODY: protocols/wf-sdd-trigger/_base.md}}
+{{PROTOCOL_BODY: templates/commands/wf-sdd-trigger/_base.md}}

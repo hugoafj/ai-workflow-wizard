@@ -54,13 +54,28 @@ For each active protocol, download its `_base.md` from GitHub raw and build the 
 
 ```
 build_protocol_body(name):
-  body = curl -fsSL "$WF_RAW/templates/protocols/<name>/_base.md"
+  # SPLIT wizard protocols (wf-ladder, wf-tdd, wf-orchestrator, wf-sdd-trigger) are
+  # self-contained under templates/commands/<name>/ (command body + skill + flat, single
+  # source). Pure flat-only protocols (architecture, cicd, commands, ides, sdd, testing,
+  # workflow) stay under templates/protocols/<name>/.
+  if name in (wf-ladder, wf-tdd, wf-orchestrator, wf-sdd-trigger):
+    base_dir = $WF_RAW/templates/commands/<name>
+  else:
+    base_dir = $WF_RAW/templates/protocols/<name>
+  body = curl -fsSL "<base_dir>/_base.md"
   # remove only the internal header comment (first <!-- ... --> lines if any)
-  # insert stack variant if exists (templates/protocols/<name>/variants/<STACK>.md)
-  if exists $WF_RAW/templates/protocols/<name>/variants/<STACK>.md:
+  # header injection (presence-driven): wf-ladder ships a protocol-header.md; the protocol
+  # artifact (flat + skill) swaps the command header for it. Other SPLIT protocols use the
+  # whole _base.md for both command and protocol artifacts.
+  if exists <base_dir>/protocol-header.md:
+    protocol_header = curl -fsSL "<base_dir>/protocol-header.md"
+    body = protocol_header (without the internal header comment)
+           + "\n\n" + body from the first "## " heading onward
+  # insert stack variant if exists (<base_dir>/variants/<STACK>.md)
+  if exists <base_dir>/variants/<STACK>.md:
     body = body with {{VARIANT_MARKER}} replaced by that variant
-  # special case tdd: variant by mode, not by stack
-  if name == "tdd":
+  # special case wf-tdd: variant by mode, not by stack
+  if name == "wf-tdd":
     body = body with {{TDD_MODE_VARIANT}} replaced by variants/<TDD_MODE>.md
   return body
 ```
@@ -71,7 +86,7 @@ Active protocols (conditional by features):
 | `wf-orchestrator` | LADDER==true or ROUTING==true or TDD==true (single entry point, never duplicates the other two) |
 | `wf-ladder` | LADDER==true |
 | `wf-sdd-trigger` | ROUTING==true |
-| `tdd` (skill `wf-tdd`) | TDD==true AND LAYERS not empty |
+| `wf-tdd` (SPLIT — command + skill + flat) | TDD==true AND LAYERS not empty |
 | `sdd` (flat only — skill wrapper removed) | BACKEND != null |
 | `architecture` | **always** |
 | `testing` | **always** |
@@ -110,14 +125,19 @@ This ensures custom sections from the previous AGENTS.md are never accidentally 
 For each active protocol (body already built):
 
 **1. Flat file** (universal fallback):
-`{WF_STAGING}/.agents/protocols/<name>.md` = cuerpo
+`{WF_STAGING}/.agents/protocols/<name>.md` = cuerpo — `<name>` is the protocol's source folder
+name (under `templates/protocols/` for pure protocols, `templates/commands/` for the 7 wizard
+commands that ship skills; the `tdd` protocol was renamed `wf-tdd`, so its flat is
+`.agents/protocols/wf-tdd.md`).
 
 **2. Native skills per IDE** (only IDEs that support SKILL.md). **Presence-driven**: a
-protocol gets native skills ONLY if `$WF_RAW/templates/protocols/<name>/skill/SKILL.md`
-exists (protocols like `sdd` and `cicd` are flat-only now). `<skill-name>` is the skill's
-`name:` frontmatter field (from `skill/SKILL.md`) — NOT necessarily the protocol's source
-folder `<name>` (e.g. protocol `tdd` packages as skill folder `wf-tdd/`), so every
-user/model-facing skill stays `wf-`-prefixed and unambiguous:
+protocol gets native skills ONLY if `<base_dir>/skill/SKILL.md` exists (same SPLIT/pure
+`base_dir` rule as B3 — all pure protocols are flat-only now; only the 7 wizard commands ship
+skills: the 4 SPLIT `wf-ladder`, `wf-tdd`, `wf-orchestrator`, `wf-sdd-trigger` plus the 3
+maintenance `wf-onboard`, `wf-worktree`, `wf-settings`). `<skill-name>` is the skill's `name:`
+frontmatter field (from `skill/SKILL.md`) — NOT necessarily the command folder `<name>` (e.g. the
+`wf-tdd` command folder packages as skill folder `wf-tdd/`), so every user/model-facing skill stays
+`wf-`-prefixed and unambiguous:
 
 | IDE | Skills path |
 |-----|-------------|
@@ -125,13 +145,16 @@ user/model-facing skill stays `wf-`-prefixed and unambiguous:
 | `kiro` | `{WF_STAGING}/.kiro/skills/<skill-name>/SKILL.md` |
 | `codex` | `{WF_STAGING}/.codex/skills/<skill-name>/SKILL.md` |
 | `windsurf` | `{WF_STAGING}/.windsurf/skills/<skill-name>/SKILL.md`, `{WF_STAGING}/.devin/skills/<skill-name>/SKILL.md` (both written for Windsurf/Devin compatibility) |
-| `antigravity` | `{WF_STAGING}/.agents/skills/<skill-name>/SKILL.md` |
 
-For each native skill: download `$WF_RAW/templates/protocols/<name>/skill/SKILL.md`, read its
+**Universal — always emitted, regardless of `IDES`** (the 1:1 skill fallback):
+`{WF_STAGING}/.agents/skills/<skill-name>/SKILL.md` — the standard `.agents/` path read by
+Codex, OpenCode, Gemini (AGY app), and Devin; covers `antigravity` project-side skills.
+For each native skill: download `<base_dir>/skill/SKILL.md`, read its
 `name:` frontmatter field to get `<skill-name>`, replace `{{PROTOCOL_BODY: ...}}` with the body,
-write to the corresponding path (or paths for `windsurf`).
+write to the corresponding path (or paths for `windsurf`). If the IDE is not in the table, only
+the universal `.agents/skills/` copy and the flat file fallback are emitted.
 
-**3. Reference files**: if `$WF_RAW/templates/protocols/<name>/reference/` exists (currently only
+**3. Reference files**: if `<base_dir>/reference/` exists (currently only
 `wf-sdd-trigger`), download it verbatim and place it at `<same-directory-as-SKILL.md>/reference/`
 for every emitted skill copy — not inlined into the body, only linked from `## References`.
 

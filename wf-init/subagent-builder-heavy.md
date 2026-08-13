@@ -54,6 +54,9 @@ Commands always included (maintenance):
 
 Conditional commands by feature:
 - `wf-ladder`: only if LADDER==true
+- `wf-tdd`: only if TDD==true AND LAYERS not empty
+- `wf-orchestrator`: only if ROUTING==true OR LADDER==true OR TDD==true
+- `wf-sdd-trigger`: only if ROUTING==true
 
 For each active command and each IDE in IDES:
 
@@ -75,6 +78,10 @@ For each active command and each IDE in IDES:
 | antigravity | `.agents/skills/<cmd>/SKILL.md` | — | `name:` + `description:` in yaml |
 
 Write each file to `{WF_STAGING}/<path>`.
+
+> **Skill 1:1** — every command in this catalog is also packaged as a skill (B4): native
+> SKILL.md per IDE + universal `.agents/skills/<cmd>/SKILL.md` + flat
+> `.agents/protocols/<cmd>.md`. All 7 wizard commands (4 SPLIT + 3 maintenance) ship skills.
 
 > **⚠️ STAGING RULE**: ALL generated files are written inside
 > `{WF_STAGING}`. The paths in the instructions below are relative to the project

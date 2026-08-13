@@ -111,20 +111,30 @@ jobs:
                   template = file_path
                   regenerate = status == "changed"
               elif file_path.startswith("templates/commands/"):
-                  file_type = "command"
-                  template = file_path
-                  try:
-                      with open(file_path) as f:
-                          content = f.read()
-                          if "{{" in content:
-                              regenerate = True
-                              import re
-                              vars_found = re.findall(r'\{\{([^}]+)\}\}', content)
-                              state_vars = sorted(set(v for v in vars_found if v and not v.startswith('/') and len(v) < 50))
-                  except:
-                      pass
-                  cmd_name = file_path.split('/')[2]
-                  output = f".claude/commands/{cmd_name}.md"
+                  parts = file_path.split('/')
+                  is_asset = len(parts) >= 4 and (parts[3] in ("skill", "variants", "reference") or parts[3].startswith("protocol-header"))
+                  if is_asset:
+                      # Template asset (skill/variants/reference/protocol-header): NOT a
+                      # command. Output None -> not written by wf-refresh, only tracked
+                      # for drift, like the pure protocols.
+                      file_type = "protocol"
+                      template = file_path
+                      regenerate = status == "changed"
+                  else:
+                      file_type = "command"
+                      template = file_path
+                      try:
+                          with open(file_path) as f:
+                              content = f.read()
+                              if "{{" in content:
+                                  regenerate = True
+                                  import re
+                                  vars_found = re.findall(r'\{\{([^}]+)\}\}', content)
+                                  state_vars = sorted(set(v for v in vars_found if v and not v.startswith('/') and len(v) < 50))
+                      except:
+                          pass
+                      cmd_name = parts[2]
+                      output = f".claude/commands/{cmd_name}.md"
               elif file_path.startswith(".github/workflows/"):
                   file_type = "workflow"
                   output = file_path
