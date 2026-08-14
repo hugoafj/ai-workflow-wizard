@@ -74,11 +74,41 @@ for artifact in AGENTS.md; do
   fi
 done
 
-# Check that at least one IDE command was added (proof Builder-Heavy ran)
-IDE_COMMANDS=$(find .wizard-staging -name "*.md" -type f -print0 | xargs -0 grep -l "IDE command" 2>/dev/null | wc -l)
-if [ "$IDE_COMMANDS" -eq 0 ]; then
-  echo "WARNING: No IDE commands found in staging. Builder-Heavy may have skipped or failed."
-  echo "Check that .wizard-state.json has valid answers.ides[] configuration."
+# Check that command files were actually generated for the active IDEs
+IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
+FOUND=0
+for IDE in $IDES; do
+  case "$IDE" in
+    claude-code)
+      [ -n "$(find .wizard-staging/.claude/commands -maxdepth 1 -name 'wf-*.md' -print -quit 2>/dev/null)" ] && FOUND=$((FOUND + 1))
+      ;;
+    opencode)
+      [ -n "$(find .wizard-staging/.opencode/commands -maxdepth 1 -name 'wf-*.md' -print -quit 2>/dev/null)" ] && FOUND=$((FOUND + 1))
+      ;;
+    cursor)
+      [ -n "$(find .wizard-staging/.cursor/commands -maxdepth 1 -name 'wf-*.md' -print -quit 2>/dev/null)" ] && FOUND=$((FOUND + 1))
+      ;;
+    windsurf)
+      [ -n "$(find .wizard-staging/.windsurf/workflows -maxdepth 1 -name 'wf-*.md' -print -quit 2>/dev/null)" ] && FOUND=$((FOUND + 1))
+      ;;
+    kiro)
+      [ -n "$(find .wizard-staging/.kiro/steering -maxdepth 1 -name 'wf-*.md' -print -quit 2>/dev/null)" ] && FOUND=$((FOUND + 1))
+      ;;
+    vscode-copilot)
+      [ -n "$(find .wizard-staging/.github/prompts -maxdepth 1 -name 'wf-*.prompt.md' -print -quit 2>/dev/null)" ] && FOUND=$((FOUND + 1))
+      ;;
+    codex)
+      [ -n "$(find .wizard-staging/.codex/commands -maxdepth 1 -name 'wf-*.md' -print -quit 2>/dev/null)" ] && FOUND=$((FOUND + 1))
+      ;;
+    antigravity)
+      [ -n "$(find .wizard-staging/.agents/skills -maxdepth 2 -name 'SKILL.md' -print -quit 2>/dev/null)" ] && FOUND=$((FOUND + 1))
+      ;;
+  esac
+done
+if [ "$FOUND" -eq 0 ]; then
+  echo "ERROR: No generated command files found in .wizard-staging for the active IDEs."
+  echo "Builder-Heavy may have skipped or failed. Check .wizard-state.json answers.ides[] and command generation logs."
+  exit 1
 fi
 
 echo "✓ Builder-Heavy validation passed"

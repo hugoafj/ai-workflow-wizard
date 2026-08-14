@@ -73,5 +73,7 @@ staging manually bypassing the state — the state is the source of truth.
 ---
 > **⛔ STOP HERE — DO NOT write any files outside staging yet.**
 > Tell the user exactly this: *"Review complete. Reply **yes** to approve and write all files, or **edit first: [description]** to adjust something."*
-> **Only when the user explicitly replies "yes"**: mark `phases.phase7.status = done`,
-> `phase_pointer = phase8`, and run in bash: `cat "$WF_DIR/phase8.md"`
+```bash
+source "$WF_DIR/lib/state-helpers.sh"
+wf_phase_done phase7 phase8
+```

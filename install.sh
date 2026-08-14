@@ -112,9 +112,9 @@ do_install() {
   echo ""
 
   # Descriptions for Windsurf/Antigravity frontmatter
-  local desc_init="Wizard de bootstrap del AI Workflow Wizard — inicializa el workflow en un repo nuevo"
-  local desc_refresh="Refresh Wizard — actualiza AGENTS.md cuando el proyecto evolucionó — 3 capas de drift"
-  local desc_cleanup="Uninstaller global del AI Workflow Wizard — elimina artefactos del wizard de un proyecto"
+  local desc_init="AI Workflow Wizard bootstrap — initialize the workflow in a new repo"
+  local desc_refresh="AI Workflow Wizard refresh — re-run the builder-driven generator and apply hash-based diffs when the project evolves"
+  local desc_cleanup="AI Workflow Wizard uninstaller — remove wizard artifacts from a project"
 
   local installed=0
 

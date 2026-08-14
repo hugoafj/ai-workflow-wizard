@@ -128,12 +128,12 @@ fi
 In `/wf-refresh` Phase R-1, versions are compared with a proper semver helper, not lexicographically:
 
 ```bash
-LOCAL_VERSION=$(grep "wf-version:" AGENTS.md | sed 's/.*wf-version: //' | cut -d' ' -f1)
-REMOTE_VERSION=$(curl -s https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/VERSION)
+LOCAL_VERSION=$(sed -n 's/.*wf-version: \([^ |]*\).*/\1/p' AGENTS.md | tail -1)
+REMOTE_VERSION=$(curl -fsSL https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/VERSION)
 
 if version_lt "$LOCAL_VERSION" "$REMOTE_VERSION"; then
   echo "⚠ Wizard is outdated (local: $LOCAL_VERSION, remote: $REMOTE_VERSION)"
-  read -p "Update global commands? [y/n] " -n 1 -r
+  read -p "Update global commands? [y/n] " -r
 fi
 ```
 

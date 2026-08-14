@@ -33,14 +33,16 @@ cat .wizard-state.json
 Resolve keys:
 
 ```bash
-IDES=$(jq -r '.answers.ides[]' .wizard-state.json)
+IDES=$(jq -r '.answers.ides[]?' .wizard-state.json)
 LADDER=$(jq -r '.features.decision_ladder' .wizard-state.json)
+TDD=$(jq -r '.features.tdd_protocol' .wizard-state.json)
+TDD_MODE=$(jq -r '.testing.tdd_mode // "standard"' .wizard-state.json)
 ROUTING=$(jq -r '.features.routing_abc' .wizard-state.json)
 CICD=$(jq -r '.features.ci' .wizard-state.json)
 CD=$(jq -r '.features.cd' .wizard-state.json)
 RELEASE=$(jq -r '.features.release_please' .wizard-state.json)
 BACKEND=$(jq -r '.sdd.backend' .wizard-state.json)
-LAYERS=$(jq -r '.testing.layers[]' .wizard-state.json)
+LAYERS=$(jq -r '.testing.layers[]?' .wizard-state.json)
 ```
 
 ### B7 — Commands (the heaviest part)
@@ -224,12 +226,39 @@ When finished, update `.wizard-state.json` with the build plan:
 
 ```bash
 wf_state_set '.build_plan.agents_md' 'true'
-wf_state_set '.build_plan.commands' '["<list of generated command paths>"]'
 wf_state_set '.build_plan.hook' 'true'
-# Register CI/CD files if applicable
-if [ "$CICD" = "true" ]; then
-  wf_state_set '.build_plan.ci_workflows' '["<list of workflows>"]'
-fi
+
+ACTIVE_COMMANDS="[]"
+for CMD in wf-worktree wf-settings wf-onboard; do
+  ACTIVE_COMMANDS=$(jq --arg c "$CMD" '. += [$c]' <<< "$ACTIVE_COMMANDS")
+done
+[ "$LADDER" = "true" ] && ACTIVE_COMMANDS=$(jq --arg c "wf-ladder" '. += [$c]' <<< "$ACTIVE_COMMANDS")
+[ "$TDD" = "true" ] && [ -n "$LAYERS" ] && ACTIVE_COMMANDS=$(jq --arg c "wf-tdd" '. += [$c]' <<< "$ACTIVE_COMMANDS")
+{ [ "$ROUTING" = "true" ] || [ "$LADDER" = "true" ] || [ "$TDD" = "true" ]; } && ACTIVE_COMMANDS=$(jq --arg c "wf-orchestrator" '. += [$c]' <<< "$ACTIVE_COMMANDS")
+[ "$ROUTING" = "true" ] && ACTIVE_COMMANDS=$(jq --arg c "wf-sdd-trigger" '. += [$c]' <<< "$ACTIVE_COMMANDS")
+
+COMMANDS_JSON="[]"
+for IDE in $IDES; do
+  while IFS= read -r CMD; do
+    case "$IDE" in
+      claude-code)    REL=".claude/commands/${CMD}.md" ;;
+      opencode)       REL=".opencode/commands/${CMD}.md" ;;
+      cursor)         REL=".cursor/commands/${CMD}.md" ;;
+      windsurf)       REL=".windsurf/workflows/${CMD}.md" ;;
+      kiro)           REL=".kiro/steering/${CMD}.md" ;;
+      vscode-copilot) REL=".github/prompts/${CMD}.prompt.md" ;;
+      codex)          REL=".codex/commands/${CMD}.md" ;;
+      antigravity)    REL=".agents/skills/${CMD}/SKILL.md" ;;
+      *)              REL="" ;;
+    esac
+    if [ -n "$REL" ] && [ -f "{WF_STAGING}/${REL}" ]; then
+      COMMANDS_JSON=$(jq --arg p "$REL" '. += [$p]' <<< "$COMMANDS_JSON")
+    fi
+  done < <(jq -r '.[]' <<< "$ACTIVE_COMMANDS")
+done
+COMMANDS_JSON=$(jq -c <<< "$COMMANDS_JSON")
+
+wf_state_set '.build_plan.commands' "$COMMANDS_JSON"
 ```
 
 Mark `wf_phase_done phase6 phase7` **only if the current phase_pointer is `phase6`** (skip during `/wf-refresh` so a completed project is not rewound to phase7).
@@ -241,22 +270,27 @@ if [ "$CURRENT_PHASE" = "phase6" ]; then
 fi
 ```
 
-## B9.5 — Update managed paths (for /wf-refresh)
+## B9.5 — Register generated files and managed paths (for /wf-refresh)
 
-After all files are written to staging, also populate `state.build_plan.managed_paths` with the list of paths that the wizard owns. This is used by `/wf-refresh` to detect which files can be safely deleted.
+After all files are written to staging, populate `state.build_plan.generated_files` with SHA256 hashes and `state.build_plan.managed_paths` in a single atomic update. This is used by `/wf-refresh` to detect which files changed and which can be safely deleted.
 
 ```bash
-# Build list of managed paths from staging (null-delimited for paths with spaces).
+# Scan the complete staging directory (null-delimited for paths with spaces).
 cd "{WF_STAGING}"
+FILES_JSON="[]"
 PATHS_JSON="[]"
 while IFS= read -r -d '' file; do
   REL_PATH="${file#./}"
+  HASH=$(wf_sha256 "$file")
+  FILES_JSON=$(jq --arg path "$REL_PATH" --arg hash "$HASH" \
+    '. += [{"path": $path, "hash": $hash, "managed": true}]' <<< "$FILES_JSON")
   PATHS_JSON=$(jq --arg path "$REL_PATH" '. += [$path]' <<< "$PATHS_JSON")
 done < <(find . -type f -print0)
 
 # Update state
-jq --argjson paths "$PATHS_JSON" \
-  '.build_plan.managed_paths = $paths' \
+jq --argjson files "$FILES_JSON" --argjson paths "$PATHS_JSON" \
+  '.build_plan.generated_files = $files |
+   .build_plan.managed_paths = $paths' \
   "{WF_STATE}" > "{WF_STATE}.tmp"
 mv "{WF_STATE}.tmp" "{WF_STATE}"
 

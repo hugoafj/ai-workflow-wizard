@@ -6,7 +6,7 @@
 
 ## Overview
 
-This specification details the seven phases of the new `/wf-refresh` workflow (R-1 through R6) and the supporting infrastructure (state schema, Builder updates, migrations).
+This specification details the eight phases of the new `/wf-refresh` workflow (R-1 through R6) and the supporting infrastructure (state schema, Builder updates, migrations).
 
 ## Phase R-1: Global command refresh
 
@@ -549,7 +549,7 @@ After copying files to project:
 
 ## Success criteria
 
-- [ ] All 7 phases execute in order
+- [ ] All 8 phases execute in order
 - [ ] Hash-based diff correctly identifies add/update/delete/unchanged
 - [ ] User skills are never deleted (protected by pattern + hash)
 - [ ] Custom AGENTS.md rules are preserved

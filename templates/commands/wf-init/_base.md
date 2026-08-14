@@ -82,6 +82,10 @@ for phase in "${PHASES[@]}"; do
   curl -fsSL "${WF_RAW}/wf-init/${phase}" > "${WF_DIR}/${phase}" 2>/dev/null
 done
 
+mkdir -p "$WF_DIR/temp-files"
+curl -fsSL "${WF_RAW}/temp-files/AGENTS.md" > "${WF_DIR}/temp-files/AGENTS.md" 2>/dev/null
+curl -fsSL "${WF_RAW}/temp-files/sdd-new.md" > "${WF_DIR}/temp-files/sdd-new.md" 2>/dev/null
+
 if [ ! -s "${WF_DIR}/phase0.md" ]; then
   echo "Error: could not download phase0.md from GitHub."
   exit 1

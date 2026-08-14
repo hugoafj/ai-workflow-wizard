@@ -36,7 +36,7 @@
 - Use existing helper functions from builder.md
 
 **Acceptance criteria**:
-- [ ] All 7 phases (R-1 to R6) implemented
+- [ ] All 8 phases (R-1 to R6) implemented
 - [ ] Each phase has clear input/output documentation
 - [ ] Error handling for each phase
 - [ ] Syntax check passes (bash -n)

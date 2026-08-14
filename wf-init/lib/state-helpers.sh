@@ -14,7 +14,7 @@ WF_RAW="${WF_RAW:-https://raw.githubusercontent.com/${WIZARD_REPO}/${WIZARD_BRAN
 wf_fetch_version() {
   local version
   # 1. VERSION file in the wizard repo (raw.githubusercontent)
-  version=$(curl -fsSL "${WF_RAW}/VERSION" 2>/dev/null | head -1)
+  version=$(curl -fsSL "${WF_RAW}/VERSION" 2>/dev/null | head -1) || true
 
   # 2. Local VERSION file (e.g. offline/dev checkout)
   if [ -z "$version" ] && [ -f VERSION ]; then
@@ -23,12 +23,12 @@ wf_fetch_version() {
 
   # 3. Latest GitHub release (tag name may include a 'v' prefix)
   if [ -z "$version" ]; then
-    version=$(curl -fsSL "https://api.github.com/repos/${WIZARD_REPO}/releases/latest" 2>/dev/null | jq -r '.tag_name // empty' 2>/dev/null)
+    version=$(curl -fsSL "https://api.github.com/repos/${WIZARD_REPO}/releases/latest" 2>/dev/null | jq -r '.tag_name // empty' 2>/dev/null) || true
   fi
 
   # 4. Latest tag as final remote fallback
   if [ -z "$version" ]; then
-    version=$(curl -fsSL "https://api.github.com/repos/${WIZARD_REPO}/tags?per_page=1" 2>/dev/null | jq -r '.[0].name // empty' 2>/dev/null)
+    version=$(curl -fsSL "https://api.github.com/repos/${WIZARD_REPO}/tags?per_page=1" 2>/dev/null | jq -r '.[0].name // empty' 2>/dev/null) || true
   fi
 
   # Final fallback
@@ -41,9 +41,99 @@ wf_state_init() {
   local version
   version=$(wf_fetch_version)
   cat > "$WF_STATE" <<JSON
-{ "schema_version": 3, "wizard_version": "$version", "phase_pointer": "phase0",
-  "phases": {}, "gentle_ai": {}, "discovery": {}, "answers": {}, "features": {},
-  "agents": [], "sdd": {}, "testing": {}, "mcps": [], "migration": {}, "build_plan": {} }
+{ "schema_version": 3, "wizard_version": "$version", "phase_pointer": "phase0", "started_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")", "updated_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "phases": {},
+  "gentle_ai": {
+    "installed": null,
+    "version": null,
+    "install_choice": null,
+    "doctor": null,
+    "os": null,
+    "warning_incomplete": false
+  },
+  "discovery": {
+    "stack": { "primary": null, "framework": null, "detected_from": null },
+    "stack_key": null,
+    "node_engine": null,
+    "npm_major": null,
+    "default_branch": null,
+    "code_files": null,
+    "git_commits": null,
+    "committers": null,
+    "ci_present": null,
+    "prior_artifacts": { "agents_md": false, "claude_md": false, "satellites": [], "hook": false },
+    "classification": null,
+    "conventions": {}
+  },
+  "answers": {
+    "project_name": null,
+    "stack_versions": null,
+    "ides": [],
+    "critical_constraints": []
+  },
+  "features": {
+    "decision_ladder": null,
+    "tdd_protocol": null,
+    "routing_abc": null,
+    "ci": null,
+    "cd": null,
+    "release_please": null
+  },
+  "agents": [],
+  "sdd": {
+    "backend": null,
+    "already_initialized": false,
+    "refresh_requested": null
+  },
+  "testing": {
+    "runner_detected": null,
+    "layers": [],
+    "tdd_mode": null,
+    "coverage_threshold": null,
+    "visual_regression": false,
+    "page_object_model": false
+  },
+  "mcps": [],
+  "ci": {
+    "ai_reviewer": null,
+    "gga_provider": null,
+    "gga_modes": [],
+    "security_review": null,
+    "conventional_commits": null,
+    "release_please": null,
+    "release_ai_summary": null,
+    "release_ai_provider": null,
+    "github_remote": null,
+    "e2e_in_ci": false,
+    "auto_improve": false,
+    "inline_suggestions": false
+  },
+  "cd": {
+    "enabled": null,
+    "platform": null,
+    "trigger": null,
+    "vps_runtime": null,
+    "stack_detected": null,
+    "deploy_path": null,
+    "missing_secrets": []
+  },
+  "migration": {
+    "prior_content_action": null,
+    "missing_commands": []
+  },
+  "build_plan": {
+    "agents_md": false,
+    "satellites": [],
+    "commands": [],
+    "protocols_flat": [],
+    "protocols_skills": [],
+    "hook": false,
+    "staging_dir": ".wizard-staging",
+    "generated_files": [],
+    "managed_paths": [],
+    "approval": {}
+  }
+}
 JSON
 }
 

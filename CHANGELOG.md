@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.7.0-beta.1...v0.7.1-beta.1) (2026-08-14)
+
+
+### Bug Fixes
+
+* sync version triad and correct documentation paths, phase counts, and cleanup detection
+
 ## [0.7.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.6.7-beta.1...v0.7.0-beta.1) (2026-08-13)
 
 

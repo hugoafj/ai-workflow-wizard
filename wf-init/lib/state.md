@@ -120,7 +120,9 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
     "release_ai_summary": null,
     "release_ai_provider": null,
     "github_remote": null,
-    "e2e_in_ci": false
+    "e2e_in_ci": false,
+    "auto_improve": false,
+    "inline_suggestions": false
   },
 
   "cd": {
@@ -182,6 +184,7 @@ source "$WF_DIR/lib/state-helpers.sh"
 Available helpers:
 - `wf_fetch_version` — Get wizard version from the repo `VERSION` file (fallback: local `VERSION`, GitHub releases/tags); normalized, no `v` prefix.
 - `wf_state_init` — Initialize `.wizard-state.json` if it doesn't exist.
+- `wf_sha256 <file>` — Compute SHA256 hash of a file (portable macOS/Linux fallback).
 - `wf_state_get '<jq-filter>'` — Read a field from state.
 - `wf_state_set '<jq-filter>' '<value>'` — Write a field to state.
 - `wf_phase_done <done_phase> <next>` — Mark a phase done and advance pointer.

@@ -182,6 +182,7 @@ done
 echo ""
 echo "📁 Other artifacts:"
 [ -f ".wizard-state.json" ] && echo "  🗑 .wizard-state.json"
+[ -f ".wizard-managed-files.json" ] && echo "  🗑 .wizard-managed-files.json"
 [ -f ".wf-status" ] && echo "  🗑 .wf-status"
 [ -f ".commitlintrc.json" ] && echo "  🗑 .commitlintrc.json"
 [ -d ".husky" ] && echo "  🗑 .husky/ (conventional commits)"
@@ -193,7 +194,7 @@ echo "📁 Other artifacts:"
 [ -d ".wizard-staging" ] && echo "  🗑 .wizard-staging/ (leftover from an interrupted run)"
 [ -d ".wizard-manifests" ] && echo "  🗑 .wizard-manifests/ (manifest history)"
 [ -d "openspec" ] && echo "  ⏭ openspec/ (gentle-ai — DO NOT delete)"
-if [ -f ".gitignore" ] && grep -qE "^\.wf-status$|^\.wizard-state\.json$|^\.wizard-staging/$|^!\.cursor/$|^!\.windsurf/$|^!\.devin/$|^!\.kiro/$|^!\.github/copilot-instructions\.md$" .gitignore; then
+if [ -f ".gitignore" ] && grep -qE "^\.wf-status$|^\.wizard-state\.json$|^\.wizard-managed-files\.json$|^\.wizard-staging/$|^!\.cursor/$|^!\.windsurf/$|^!\.devin/$|^!\.kiro/$|^!\.github/copilot-instructions\.md$" .gitignore; then
   echo "  🗑 .gitignore (wizard entries — review which ones to revert)"
 fi
 ```

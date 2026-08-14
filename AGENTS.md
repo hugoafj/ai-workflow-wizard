@@ -2,13 +2,15 @@
 
 ## Commands
 
-| Command | Path |
+| Command | Source template |
 |---|---|
-| `/wf-refresh` | `.claude/commands/wf-refresh.md` / `.github/prompts/wf-refresh.prompt.md` |
-| `/wf-worktree` | `.claude/commands/wf-worktree.md` |
-| `/wf-settings` | `.claude/commands/wf-settings.md` |
-| `/wf-onboard` | `.claude/commands/wf-onboard.md` |
-| `/wf-cleanup` | `.claude/commands/wf-cleanup.md` / `.github/prompts/wf-cleanup.prompt.md` |
+| `/wf-refresh` | `templates/commands/wf-refresh/_base.md` |
+| `/wf-worktree` | `templates/commands/wf-worktree/_base.md` |
+| `/wf-settings` | `templates/commands/wf-settings/_base.md` |
+| `/wf-onboard` | `templates/commands/wf-onboard/_base.md` |
+| `/wf-cleanup` | `templates/commands/wf-cleanup/_base.md` |
+
+`/wf-refresh` and `/wf-cleanup` are installed globally by `install.sh`; `/wf-worktree`, `/wf-settings`, and `/wf-onboard` are generated per project by `/wf-init`.
 
 ## Code Style & Conventions
 
@@ -29,6 +31,10 @@ wf-init/          — wizard phases
   lib/            — builder.md, state.md (contracts)
   phase*.md       — phases 0 through 8
 ```
+
+## Artifact Store
+
+This project declares **OpenSpec** as the SDD artifact store; change artifacts live in `openspec/changes/<change-name>/`.
 
 ## Critical Constraints
 
