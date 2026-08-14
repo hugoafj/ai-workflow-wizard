@@ -3,6 +3,7 @@
 > **Gate**: only runs if `features.tdd_protocol == true`.
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
 FEATURES_TDD=$(jq -r '.features.tdd_protocol // false' .wizard-state.json)

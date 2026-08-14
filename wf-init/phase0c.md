@@ -7,6 +7,7 @@
 Read the current state (in case of resumption):
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
 if [ -f .wizard-state.json ] && [ "$(jq -r '.phases.phase0c.status // "pending"' .wizard-state.json)" = "done" ]; then

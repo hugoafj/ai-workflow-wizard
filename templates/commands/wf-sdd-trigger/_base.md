@@ -25,7 +25,7 @@
   Body follows the LLM-first structure from gentle-ai's own docs/skill-style-guide.md (Activation
   Contract, Hard Rules, Decision Gates, Execution Steps, Output Contract, References). Extended
   rationale/examples live in reference/edge-cases.md, not inline, to stay within the 1000-token
-  hard budget. Consumed by: Builder (B3/B5), wf-refresh (Layer 2, mandatory).
+  hard budget. Consumed by: Builder (B3/B5), wf-refresh (R-1, mandatory).
 -->
 
 ## Activation Contract

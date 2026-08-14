@@ -581,6 +581,24 @@ echo "✓ Phase R2 complete"
 
 Re-run the Builder (B1-B9) to generate all artifacts into `.wizard-staging/`.
 
+**Step 0 — Snapshot the current managed files (MUST run before delegating the Builder).**
+
+The Builder overwrites `state.build_plan.generated_files` / `managed_paths` with the NEW
+staging set (B9/B9.5). To detect deletions in R4, the pre-Builder baseline must be captured
+first. Run this block before delegating Builder-Core:
+
+```bash
+#!/bin/bash
+set -e
+
+WF_DIR="${WF_DIR:-/tmp/wf-refresh-phases}"
+source "${WF_DIR}/lib/refresh-lib.sh"
+
+BASELINE=".wizard-refresh-baseline.json"
+jq '{managed_paths: (.build_plan.managed_paths // []), generated_files: (.build_plan.generated_files // [])}' "$WF_STATE" > "$BASELINE"
+echo "✓ Baseline snapshot written ($(jq '.managed_paths | length' "$BASELINE") managed paths)"
+```
+
 **Instructions for the agent:**
 
 1. Use the same Builder sub-agent delegation as `/wf-init` Phase 6:
@@ -622,6 +640,12 @@ for artifact in AGENTS.md; do
     exit 1
   fi
 done
+
+# The R4 deletion diff depends on the pre-Builder snapshot from Step 0.
+if [[ ! -f .wizard-refresh-baseline.json ]]; then
+  echo "✗ Baseline snapshot missing — run the Phase R3 Step 0 block before delegating the Builder."
+  exit 1
+fi
 
 echo "✓ Phase R3 validation passed"
 ```
@@ -667,12 +691,23 @@ while IFS= read -r -d '' file; do
   fi
 done < <(find "$STAGING" -type f -print0)
 
+# Deletion baseline: the R3 Step 0 snapshot (pre-Builder). Fall back to the live
+# state only when the snapshot is missing (e.g. running R4 standalone).
+BASELINE=".wizard-refresh-baseline.json"
+if [[ -f "$BASELINE" ]]; then
+  OLD_MANAGED_SRC="$BASELINE"
+  OLD_FILES_SRC="$BASELINE"
+else
+  OLD_MANAGED_SRC="$WF_STATE"
+  OLD_FILES_SRC="$WF_STATE"
+fi
+
 # Scan old managed paths for deletions (null-delimited for paths with spaces/newlines).
 while IFS= read -r -d '' old_path; do
   if [[ ! -f "$STAGING/$old_path" ]]; then
     if [[ -f "$old_path" ]]; then
       PROJECT_HASH=$(wf_sha256 "$old_path")
-      OLD_HASH=$(jq -r --arg path "$old_path" '.build_plan.generated_files[] | select(.path == $path) | .hash' "$WF_STATE" 2>/dev/null || true)
+      OLD_HASH=$(jq -r --arg path "$old_path" '.generated_files[] | select(.path == $path) | .hash' "$OLD_FILES_SRC" 2>/dev/null || true)
 
       if [[ "$PROJECT_HASH" == "$OLD_HASH" ]]; then
         DELETED=$(jq --arg path "$old_path" --arg hash "$PROJECT_HASH" '. += [{"path": $path, "hash": $hash, "reason": "deprecated"}]' <<< "$DELETED")
@@ -681,7 +716,7 @@ while IFS= read -r -d '' old_path; do
       fi
     fi
   fi
-done < <(jq -j '.build_plan.managed_paths[]? + "\u0000"' "$WF_STATE" 2>/dev/null || true)
+done < <(jq -j '.managed_paths[]? + "\u0000"' "$OLD_MANAGED_SRC" 2>/dev/null || true)
 
 # Write plan
 jq -n \
@@ -704,6 +739,10 @@ echo "  Updated: $UPDATED_COUNT"
 echo "  Deleted: $DELETED_COUNT"
 echo "  Deleted-modified: $DELETED_MODIFIED_COUNT (requires explicit approval)"
 echo "  Unchanged: $UNCHANGED_COUNT (skipped)"
+
+# The plan now holds the classified diff; the pre-Builder baseline is no longer
+# needed. (R6's cleanup trap also removes it defensively.)
+rm -f "$BASELINE"
 
 echo "✓ Phase R4 complete"
 ```
@@ -815,10 +854,11 @@ source "${WF_DIR}/lib/refresh-lib.sh"
 STAGING=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' "$WF_STATE")
 PLAN="refresh-plan.json"
 
-# Ensure staging and plan are removed even if R6 fails.
+# Ensure staging, plan, and the R3 baseline are removed even if R6 fails.
 cleanup_r6() {
   rm -rf "$STAGING"
   rm -f "$PLAN"
+  rm -f .wizard-refresh-baseline.json
 }
 trap cleanup_r6 EXIT
 
@@ -880,72 +920,72 @@ if [[ "$APPROVE_DELETED_MODIFIED" == "true" ]]; then
   echo "✓ Modified-removed files deleted"
 fi
 
-# Recompute generated_files from actual staging after custom-section injection
-GENERATED_FILES="[]"
-MANAGED_PATHS="[]"
-while IFS= read -r -d '' file; do
-  REL_PATH="${file#$STAGING/}"
-  HASH=$(wf_sha256 "$file")
-  GENERATED_FILES=$(jq --arg path "$REL_PATH" --arg hash "$HASH" '. += [{"path": $path, "hash": $hash, "managed": true}]' <<< "$GENERATED_FILES")
-  MANAGED_PATHS=$(jq --arg path "$REL_PATH" '. += [$path]' <<< "$MANAGED_PATHS")
-done < <(find "$STAGING" -type f -print0)
-
-# Write .wizard-managed-files.json with the complete set of managed files
-TARGET_VERSION=$(wf_fetch_version)
-generated_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-jq -n \
-  --arg version "$TARGET_VERSION" \
-  --arg generated_at "$generated_at" \
-  --argjson files "$GENERATED_FILES" \
-  '{wizard_version: $version, generated_at: $generated_at, files: $files}' > ".wizard-managed-files.json"
-
-# Update state build_plan
-jq --argjson files "$GENERATED_FILES" --argjson paths "$MANAGED_PATHS" \
-   '.build_plan.generated_files = $files | .build_plan.managed_paths = $paths' "$WF_STATE" > "$WF_STATE.tmp"
-mv "$WF_STATE.tmp" "$WF_STATE"
-
-# Add to .gitignore (ensure a trailing newline first and use an exact line match).
-GITIGNORE_MODIFIED=false
-if ! grep -qxF ".wizard-managed-files.json" .gitignore 2>/dev/null; then
-  if [ -f .gitignore ] && [ "$(tail -c1 .gitignore | wc -l)" -eq 0 ]; then
-    echo >> .gitignore
-  fi
-  printf '%s\n' ".wizard-managed-files.json" >> .gitignore
-  GITIGNORE_MODIFIED=true
-fi
-
-# Reflect the .gitignore change in the refresh plan so it is approved/committed explicitly.
-if [ "$GITIGNORE_MODIFIED" = true ]; then
-  if ! jq -e '.updated[]? | select(.path == ".gitignore")' "$PLAN" >/dev/null 2>&1; then
-    GI_OLD_HASH=""
-    if git rev-parse --verify HEAD >/dev/null 2>&1; then
-      TMP_GI=$(mktemp)
-      if git show HEAD:.gitignore > "$TMP_GI" 2>/dev/null; then
-        GI_OLD_HASH=$(wf_sha256 "$TMP_GI")
-      fi
-      rm -f "$TMP_GI"
-    fi
-    GI_NEW_HASH=$(wf_sha256 .gitignore)
-    jq --arg path ".gitignore" \
-       --arg old_hash "$GI_OLD_HASH" \
-       --arg new_hash "$GI_NEW_HASH" \
-       '.updated += [{"path": $path, "old_hash": $old_hash, "new_hash": $new_hash}]' "$PLAN" > "$PLAN.tmp"
-    mv "$PLAN.tmp" "$PLAN"
-  fi
-fi
-
 # Git operations (only if any category was approved)
 if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ "$APPROVE_DELETED" == "true" ]] || [[ "$APPROVE_DELETED_MODIFIED" == "true" ]]; then
   echo "ℹ Committing changes..."
 
-  # Clean the index so only explicitly approved changes are committed.
-  # Guard: repos without HEAD (greenfield) cannot be reset.
-  if git rev-parse --verify HEAD >/dev/null 2>&1; then
-    git reset --mixed HEAD
+  # Recompute generated_files from actual staging after custom-section injection,
+  # then persist the refresh bookkeeping. This runs ONLY when at least one
+  # category was approved: a fully declined refresh must not write
+  # .wizard-managed-files.json, touch .gitignore, or update the build plan.
+  GENERATED_FILES="[]"
+  MANAGED_PATHS="[]"
+  while IFS= read -r -d '' file; do
+    REL_PATH="${file#$STAGING/}"
+    HASH=$(wf_sha256 "$file")
+    GENERATED_FILES=$(jq --arg path "$REL_PATH" --arg hash "$HASH" '. += [{"path": $path, "hash": $hash, "managed": true}]' <<< "$GENERATED_FILES")
+    MANAGED_PATHS=$(jq --arg path "$REL_PATH" '. += [$path]' <<< "$MANAGED_PATHS")
+  done < <(find "$STAGING" -type f -print0)
+
+  # Write .wizard-managed-files.json with the complete set of managed files
+  TARGET_VERSION=$(wf_fetch_version)
+  generated_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  jq -n \
+    --arg version "$TARGET_VERSION" \
+    --arg generated_at "$generated_at" \
+    --argjson files "$GENERATED_FILES" \
+    '{wizard_version: $version, generated_at: $generated_at, files: $files}' > ".wizard-managed-files.json"
+
+  # Update state build_plan
+  jq --argjson files "$GENERATED_FILES" --argjson paths "$MANAGED_PATHS" \
+     '.build_plan.generated_files = $files | .build_plan.managed_paths = $paths' "$WF_STATE" > "$WF_STATE.tmp"
+  mv "$WF_STATE.tmp" "$WF_STATE"
+
+  # Add to .gitignore (ensure a trailing newline first and use an exact line match).
+  GITIGNORE_MODIFIED=false
+  if ! grep -qxF ".wizard-managed-files.json" .gitignore 2>/dev/null; then
+    if [ -f .gitignore ] && [ "$(tail -c1 .gitignore | wc -l)" -eq 0 ]; then
+      echo >> .gitignore
+    fi
+    printf '%s\n' ".wizard-managed-files.json" >> .gitignore
+    GITIGNORE_MODIFIED=true
+  fi
+
+  # Reflect the .gitignore change in the refresh plan so it is approved/committed explicitly.
+  if [ "$GITIGNORE_MODIFIED" = true ]; then
+    if ! jq -e '.updated[]? | select(.path == ".gitignore")' "$PLAN" >/dev/null 2>&1; then
+      GI_OLD_HASH=""
+      if git rev-parse --verify HEAD >/dev/null 2>&1; then
+        TMP_GI=$(mktemp)
+        if git show HEAD:.gitignore > "$TMP_GI" 2>/dev/null; then
+          GI_OLD_HASH=$(wf_sha256 "$TMP_GI")
+        fi
+        rm -f "$TMP_GI"
+      fi
+      GI_NEW_HASH=$(wf_sha256 .gitignore)
+      jq --arg path ".gitignore" \
+         --arg old_hash "$GI_OLD_HASH" \
+         --arg new_hash "$GI_NEW_HASH" \
+         '.updated += [{"path": $path, "old_hash": $old_hash, "new_hash": $new_hash}]' "$PLAN" > "$PLAN.tmp"
+      mv "$PLAN.tmp" "$PLAN"
+    fi
   fi
 
   # Stage only the paths the user explicitly approved (null-delimited to handle
-  # spaces and avoid `git add -A` dragging in unrelated user changes).
+  # spaces and avoid `git add -A` dragging in unrelated user changes). Do NOT
+  # reset the whole index: `git reset --mixed HEAD` would unstage unrelated work
+  # the user may have staged. The commit below uses an explicit pathspec, so it
+  # contains ONLY the approved paths.
   GIT_ADD_LIST=$(mktemp)
   if [[ "$APPROVE_ADDED" == "true" ]]; then
     jq -j '.added[]?.path + "\u0000"' "$PLAN" >> "$GIT_ADD_LIST"
@@ -953,12 +993,34 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
   if [[ "$APPROVE_UPDATED" == "true" ]]; then
     jq -j '.updated[]?.path + "\u0000"' "$PLAN" >> "$GIT_ADD_LIST"
   fi
+  if [ "$GITIGNORE_MODIFIED" = true ]; then
+    printf '.gitignore\0' >> "$GIT_ADD_LIST"
+  fi
   if [ -s "$GIT_ADD_LIST" ]; then
     git add --pathspec-from-file="$GIT_ADD_LIST" --pathspec-file-nul
   fi
   rm -f "$GIT_ADD_LIST"
 
-  if ! git diff --cached --quiet; then
+  # Commit exactly the approved paths (working-tree content). Other pre-staged
+  # user files stay in the index and are NOT included in this commit.
+  COMMIT_PATHS=$(mktemp)
+  if [[ "$APPROVE_ADDED" == "true" ]]; then
+    jq -j '.added[]?.path + "\u0000"' "$PLAN" >> "$COMMIT_PATHS"
+  fi
+  if [[ "$APPROVE_UPDATED" == "true" ]]; then
+    jq -j '.updated[]?.path + "\u0000"' "$PLAN" >> "$COMMIT_PATHS"
+  fi
+  if [[ "$APPROVE_DELETED" == "true" ]]; then
+    jq -j '.deleted[]?.path + "\u0000"' "$PLAN" >> "$COMMIT_PATHS"
+  fi
+  if [[ "$APPROVE_DELETED_MODIFIED" == "true" ]]; then
+    jq -j '.deleted_modified[]?.path + "\u0000"' "$PLAN" >> "$COMMIT_PATHS"
+  fi
+  if [ "$GITIGNORE_MODIFIED" = true ]; then
+    printf '.gitignore\0' >> "$COMMIT_PATHS"
+  fi
+
+  if [ -s "$COMMIT_PATHS" ]; then
     COMMIT_MSG=$(cat <<EOF
 chore: refresh workflow to v$TARGET_VERSION
 
@@ -972,12 +1034,16 @@ Generated with /wf-refresh
 EOF
 )
 
-    git commit -m "$COMMIT_MSG"
+    if git diff --cached --quiet --pathspec-from-file="$COMMIT_PATHS" --pathspec-file-nul; then
+      echo "ℹ Approved paths have no staged changes; skipping commit"
+    else
+      git commit -m "$COMMIT_MSG" --pathspec-from-file="$COMMIT_PATHS" --pathspec-file-nul
+    fi
   else
-    echo "ℹ No staged changes to commit"
+    echo "ℹ No approved paths to commit"
   fi
 else
-  echo "ℹ No changes approved; skipping commit"
+  echo "ℹ No changes approved; skipping commit (no files were written)"
 fi
 
 # Staging and plan are cleaned by the EXIT trap installed above.

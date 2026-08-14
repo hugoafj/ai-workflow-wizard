@@ -56,6 +56,7 @@ Tell the user: *"Discovery completed. Reply **continue** to review any previous 
 Wait for the response. Only when confirmed, run in bash:
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 wf_phase_done phase1 phase2
 cat "$WF_DIR/phase2.md"

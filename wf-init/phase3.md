@@ -28,6 +28,7 @@ Then ask explicitly with these visible options:
 - If the project is **GREENFIELD**: mark `phases.phase4.status=skipped`, then compute the next phase based on the ALREADY SELECTED features:
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
 NEXT=

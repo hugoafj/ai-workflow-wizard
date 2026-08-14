@@ -700,10 +700,10 @@ Solves two different problems:
 - **Phase R0**: Validate `.wizard-state.json` and detect active IDEs
 - **Phase R1**: Re-discover project (stack, node engine, etc.) and detect drift
 - **Phase R2**: Migrate state schema and ask about new optional features
-- **Phase R3**: Re-run Builder (B1-B9) to generate all artifacts into `.wizard-staging/`
-- **Phase R4**: Compare staging with project using SHA256 hashes; classify files as add/update/delete/unchanged
+- **Phase R3**: Re-run Builder (B1-B9) to generate all artifacts into `.wizard-staging/` (first snapshots the pre-Builder managed files for deletion detection)
+- **Phase R4**: Compare the R3 baseline snapshot with staging using SHA256 hashes; classify files as add/update/delete/unchanged
 - **Phase R5**: Show grouped diff and collect user approvals
-- **Phase R6**: Apply approved changes, update state, commit, clean staging
+- **Phase R6**: Apply approved changes only; on approval update state, write `.wizard-managed-files.json`, and commit via an explicit pathspec (the user's other staged work is never unstaged); a fully declined refresh writes nothing
 
 **Trigger 3 · Rule in AGENTS.md**. The most effective. A line in "Behavior Preferences":
 
@@ -751,10 +751,10 @@ The `optional-features` field is new and critical. It tracks which optional feat
 
 - **Phase R1 · Project content drift**: Re-discovers the project (stack, node engine, etc.) and detects changes.
 - **Phase R2 · State/schema migration**: Migrates `.wizard-state.json` to current schema; asks about new optional features.
-- **Phase R3 · Builder re-run**: Re-runs B1-B9 to generate all artifacts into `.wizard-staging/` using only the Builder steps of `phase6a-agents.md` / `phase6b-build-heavy.md` (B1-B9). It **never follows the `/wf-init` phase 7/8 tail** (no `wf_phase_done phase6 phase7`, no `cat phase7.md`) — after Builder-Heavy validation it returns to Phase R4. Staging validation checks the generated artifacts (e.g. `AGENTS.md`); `.wizard-state.json` intentionally stays at the project root and is never expected inside staging.
-- **Phase R4 · Hash-based diff**: Compares staging vs project; classifies files as add/update/delete/unchanged.
+- **Phase R3 · Builder re-run**: Re-runs B1-B9 to generate all artifacts into `.wizard-staging/` using only the Builder steps of `phase6a-agents.md` / `phase6b-build-heavy.md` (B1-B9). It **never follows the `/wf-init` phase 7/8 tail** (no `wf_phase_done phase6 phase7`, no `cat phase7.md`) — after Builder-Heavy validation it returns to Phase R4. Staging validation checks the generated artifacts (e.g. `AGENTS.md`); `.wizard-state.json` intentionally stays at the project root and is never expected inside staging. **Step 0 runs first**: it snapshots the pre-Builder `managed_paths`/`generated_files` into `.wizard-refresh-baseline.json` because the Builder overwrites `build_plan` with the new staging set.
+- **Phase R4 · Hash-based diff**: Compares the R3 baseline snapshot (not the live `build_plan`, which the Builder already overwrote) against staging; classifies files as add/update/delete/unchanged, with `deleted_modified` flagged when the user edited a file since the last refresh.
 - **Phase R5 · Review gate**: Shows grouped diff; collects user approvals.
-- **Phase R6 · Apply and close**: Applies approved changes, updates state, commits, cleans staging.
+- **Phase R6 · Apply and close**: Applies approved changes, updates state, writes `.wizard-managed-files.json`, and commits. Bookkeeping (state, `.wizard-managed-files.json`, `.gitignore`) only runs when at least one category is approved; a declined refresh writes nothing. The commit uses an explicit pathspec (`--pathspec-from-file`) so it contains only approved paths and never unstages unrelated user work (`git reset --mixed` is not used).
 
 **New optional features** are handled in Phase R2:
 

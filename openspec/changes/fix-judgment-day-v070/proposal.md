@@ -1,7 +1,7 @@
 # Proposal: Critical fixes for `v0.7.0-beta.1` (Judgment Day findings)
 
-**Change**: `fix-judgment-day-v070`  
-**Status**: Proposal  
+**Change**: `fix-judgment-day-v070`
+**Status**: Proposal
 **Created**: 2026-08-13
 
 ## Intent

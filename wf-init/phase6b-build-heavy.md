@@ -122,6 +122,7 @@ echo "✓ Builder-Heavy validation passed"
 Mark phases 6 and 7 as done (persistence), but **only if the current phase_pointer is still `phase6`**. This makes the phase safe to reuse during `/wf-refresh`, when the project may already be past phase 7:
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 CURRENT_PHASE=$(jq -r '.phase_pointer // empty' .wizard-state.json)
 if [ "$CURRENT_PHASE" = "phase6" ]; then

@@ -4,6 +4,7 @@
 > `features.release_please == true`. If not, skip to Phase 5.
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
 FEATURES_CI=$(jq -r '.features.ci // false' .wizard-state.json)

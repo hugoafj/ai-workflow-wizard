@@ -521,6 +521,7 @@ rm -rf "$STAGING"
 ```
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 wf_phase_done phase8 done
 ```

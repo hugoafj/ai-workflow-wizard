@@ -106,7 +106,7 @@ whenever either of the other two is, since it is only a sequencing pointer betwe
 
 If Phase 2 detected custom content to migrate:
 
-1. Read the migrated custom content from `.wizard-state.json` (field: `migration.prior_artifacts_content`)
+1. Read the custom content to preserve from the project's current files (e.g. the existing `AGENTS.md`, `CLAUDE.md`). The state only records the migration decision — `migration.prior_content_action`, `migration.wrap_custom_in_markers`, `migration.missing_commands` — it does NOT store the content (`migration.prior_artifacts_content` does not exist).
 2. When writing to AGENTS.md, wrap preserved sections:
    ```markdown
    <!-- WF: DO NOT REGENERATE -->
