@@ -1,165 +1,165 @@
 ---
-description: Inicia una nueva feature con SDD (contrato moderno) para Cascade en Windsurf/Devin
+description: Start a new feature with SDD (modern contract) for Cascade in Windsurf/Devin
 ---
 
 # /sdd-new
 
-Este workflow define el comportamiento obligatorio de **Cascade** al iniciar una nueva feature, cambio de alcance medio/grande o trabajo con incertidumbre suficiente como para requerir planificación formal.
+This workflow defines the mandatory behavior of **Cascade** when starting a new feature, medium/large scope change, or work with enough uncertainty to require formal planning.
 
-## Propósito
+## Purpose
 
-Ejecutar `/sdd-new` con el contrato moderno de gentle-ai:
+Execute `/sdd-new` with the modern gentle-ai contract:
 
-- **Orquestador como autoridad**: leer `~/.codeium/windsurf/memories/global_rules.md` PRIMERO y tratarlo como contrato autoritativo.
-- **Plan Mode** para planificar (nunca código antes de aprobación)
-- **Artifact store** según política del orquestador: `engram` (default) | `openspec` | `hybrid` | `none`. Este proyecto declara **openspec** (ver AGENTS.md).
-- **Code Mode** únicamente después de aprobación explícita del usuario
+- **Orchestrator as authority**: read `~/.codeium/windsurf/memories/global_rules.md` FIRST and treat it as the authoritative contract.
+- **Plan Mode** for planning (never code before approval)
+- **Artifact store** according to orchestrator policy: `engram` (default) | `openspec` | `hybrid` | `none`. This project declares **openspec** (see AGENTS.md).
+- **Code Mode** only after explicit user approval
 
-**Este workflow NO crea `.sdd/`.** El directorio `.sdd/` es el formato LEGACY de Windsurf, obsoleto. Si el orquestador, un skill o una instrucción mencionan `.sdd/`, IGNÓRALO.
+**This workflow does NOT create `.sdd/`.** The `.sdd/` directory is the LEGACY Windsurf format, obsolete. If the orchestrator, a skill, or an instruction mentions `.sdd/`, IGNORE it.
 
-## Cuándo usar este workflow
+## When to use this workflow
 
-Activa este workflow cuando ocurra cualquiera de estas condiciones:
+Activate this workflow whenever any of these conditions occur:
 
-- El usuario inicia una **nueva feature**
-- La tarea afecta **múltiples archivos o módulos**
-- El cambio tiene **riesgo arquitectónico** o incertidumbre
-- El usuario pide explícitamente trabajar con **SDD**
-- La implementación requiere un contrato formal antes de escribir código
+- The user starts a **new feature**
+- The task affects **multiple files or modules**
+- The change has **architectural risk** or uncertainty
+- The user explicitly asks to work with **SDD**
+- The implementation requires a formal contract before writing code
 
-Si la tarea es pequeña, puntual o claramente de mantenimiento menor, este workflow NO es el camino correcto (usar Code Mode directo).
+If the task is small, specific, or clearly minor maintenance, this workflow is NOT the right path (use direct Code Mode).
 
 ---
 
-## Secuencia obligatoria
+## Mandatory sequence
 
-### 0. Leer el orquestador (AUTORITATIVO)
+### 0. Read the orchestrator (AUTHORITATIVE)
 
-Leer `~/.codeium/windsurf/memories/global_rules.md` completo. Este contrato manda sobre todo lo que siga. En particular: SDD Init Guard, Execution Mode, Artifact Store Mode, Delivery Strategy y Approval Gates.
+Read `~/.codeium/windsurf/memories/global_rules.md` in full. This contract rules over everything that follows. In particular: SDD Init Guard, Execution Mode, Artifact Store Mode, Delivery Strategy, and Approval Gates.
 
-### 1. SDD Init Guard (MANDATORY, silencioso)
+### 1. SDD Init Guard (MANDATORY, silent)
 
-Antes de ejecutar `/sdd-new`, comprobar si `sdd-init` corrió para este proyecto:
+Before executing `/sdd-new`, check whether `sdd-init` has run for this project:
 
 1. `mem_search(query: "sdd-init/{project}", project: "{project}")`
-2. Si aparece → init hecho, continuar normal.
-3. Si NO aparece → correr la fase `sdd-init` **inline PRIMERO**, y recién después seguir con `/sdd-new`.
+2. If it appears → init done, continue normally.
+3. If it does NOT appear → run the `sdd-init` phase **inline FIRST**, and only then continue with `/sdd-new`.
 
-**NO pedir permiso, NO detenerse**: correr init silenciosamente si hace falta. Esto garantiza detección de capacidades de test, TDD estricto y contexto del proyecto.
+**Do NOT ask permission, do NOT stop**: run init silently if needed. This guarantees detection of test capabilities, strict TDD, and project context.
 
-### 2. Determinar y cachear opciones de sesión
+### 2. Determine and cache session options
 
-La primera vez en la sesión, resolver y cachear:
+The first time in the session, resolve and cache:
 
-- **Execution Mode**: preguntar `Automatic` (default) vs `Interactive`. En Windsurf, `Interactive` es el comportamiento natural vía Approval Gates; `Automatic` omite los gates y corre todo secuencial.
-- **Artifact Store Mode**: preguntar `engram` | `openspec` | `hybrid` | `none`. Si el usuario no especifica, detectar: engram disponible → `engram`; si no → `none`. **Este proyecto declara `openspec`** en AGENTS.md, así que la elección debe partir de ahí.
-- **Delivery Strategy**: preguntar `ask-on-risk` (default) | `auto-chain` | `single-pr` | `exception-ok`.
+- **Execution Mode**: ask `Automatic` (default) vs `Interactive`. In Windsurf, `Interactive` is the natural behavior via Approval Gates; `Automatic` skips gates and runs everything sequentially.
+- **Artifact Store Mode**: ask `engram` | `openspec` | `hybrid` | `none`. If the user does not specify, detect: engram available → `engram`; otherwise → `none`. **This project declares `openspec`** in AGENTS.md, so the choice must start from there.
+- **Delivery Strategy**: ask `ask-on-risk` (default) | `auto-chain` | `single-pr` | `exception-ok`.
 
-Cachear las tres para la sesión. No preguntar de nuevo salvo pedido explícito.
+Cache the three for the session. Do not ask again unless explicitly requested.
 
-### 3. Entrar en Plan Mode
+### 3. Enter Plan Mode
 
-Entrar en **Plan Mode** de inmediato. Analizar el pedido, formular el plan de alto nivel, identificar alcance, riesgos, dependencias y archivos probables.
+Enter **Plan Mode** immediately. Analyze the request, formulate the high-level plan, identify scope, risks, dependencies, and likely files.
 
-Prohibido en esta etapa:
+Prohibited at this stage:
 
-- NO escribir código de producción
-- NO entrar en Code Mode
-- NO modificar lógica de la aplicación
-- NO ejecutar implementación parcial "para adelantar trabajo"
-- NO asumir aprobación implícita
+- DO NOT write production code
+- DO NOT enter Code Mode
+- DO NOT modify application logic
+- DO NOT run partial implementation "to get ahead"
+- DO NOT assume implicit approval
 
-### 4. Recuperar contexto
+### 4. Recover context
 
-Antes de redactar cualquier artefacto SDD, recuperar contexto arquitectónico y restricciones del proyecto:
+Before drafting any SDD artifact, recover architectural context and project constraints:
 
-1. **Engram** vía MCP: `mem_search` para decisiones previas y `mem_context` para contexto reciente
-2. Leer el orquestador (`global_rules.md`) si aún no está en contexto
-3. Leer `AGENTS.md` del proyecto
-4. Cargar los skills SDD de `~/.codeium/windsurf/skills/sdd-*/SKILL.md` cuando la fase los requiera
+1. **Engram** via MCP: `mem_search` for previous decisions and `mem_context` for recent context
+2. Read the orchestrator (`global_rules.md`) if not yet in context
+3. Read the project `AGENTS.md`
+4. Load the SDD skills from `~/.codeium/windsurf/skills/sdd-*/SKILL.md` when the phase requires them
 
-Buscar, como mínimo: decisiones arquitectónicas previas, convenciones del repo, restricciones, reglas de calidad, patrones establecidos.
+Search, at minimum: previous architectural decisions, repo conventions, constraints, quality rules, established patterns.
 
-Si no hay contexto suficiente, decirlo explícitamente en el plan. **No inventar convenciones.**
+If there is not enough context, say so explicitly in the plan. **Do not invent conventions.**
 
-### 5. Fase explore (inline)
+### 5. Explore phase (inline)
 
-Ejecutar la fase `sdd-explore` inline: investigar el codebase para este cambio, comparar enfoques, sin crear archivos. Guardar el artifact `explore` en el store activo:
+Execute the `sdd-explore` phase inline: investigate the codebase for this change, compare approaches, without creating files. Save the `explore` artifact in the active store:
 
 - **engram**: topic key `sdd/{change-name}/explore`
 - **openspec**: `openspec/changes/<change-name>/exploration.md`
 
-Presentar el resumen de exploración al usuario.
+Present the exploration summary to the user.
 
-### 6. Fase propose (inline)
+### 6. Propose phase (inline)
 
-Ejecutar la fase `sdd-propose` inline para crear el proposal a partir de la exploración. Guardar el artifact `proposal` en el store activo:
+Execute the `sdd-propose` phase inline to create the proposal from the exploration. Save the `proposal` artifact in the active store:
 
 - **engram**: topic key `sdd/{change-name}/proposal`
 - **openspec**: `openspec/changes/<change-name>/proposal.md`
 
-Usar el nombre del cambio pasado por el usuario (`$ARGUMENTS`). Si no se indicó nombre, proponer uno en kebab-case y confirmarlo.
+Use the change name passed by the user (`$ARGUMENTS`). If no name was given, propose one in kebab-case and confirm it.
 
-#### Contenido mínimo del proposal
+#### Minimum proposal content
 
-- Título del cambio
-- Problema a resolver
-- Objetivo
-- Alcance incluido / excluido
-- Enfoque propuesto
-- Riesgos principales
-- Supuestos abiertos
-- Preguntas o decisiones pendientes
+- Change title
+- Problem to solve
+- Objective
+- Included / excluded scope
+- Proposed approach
+- Main risks
+- Open assumptions
+- Pending questions or decisions
 
-**NO crear `.sdd/` ni `.sdd/proposal.md` ni `.sdd/spec.md` bajo ninguna circunstancia.**
+**Do NOT create `.sdd/` nor `.sdd/proposal.md` nor `.sdd/spec.md` under any circumstance.**
 
-### 7. Presentar resumen y Approval Gate
+### 7. Present summary and Approval Gate
 
-Presentar un resumen breve del proposal (objetivo, alcance, riesgos) y detenerse **ABSOLUTAMENTE**.
+Present a brief summary of the proposal (objective, scope, risks) and stop **ABSOLUTELY**.
 
-Preguntar exactamente:
+Ask exactly:
 
-**¿Apruebas este plan de implementación?**
+**Do you approve this implementation plan?**
 
-- Esperar confirmación explícita (sí / aprobado / de acuerdo / go ahead / equivalente)
-- NO continuar a Code Mode sin aprobación
-- NO interpretar silencio como aprobación
-- Si el usuario pide cambios: ajustar el proposal, volver a presentar, volver a preguntar
+- Wait for explicit confirmation (yes / approved / agree / go ahead / equivalent)
+- Do NOT continue to Code Mode without approval
+- Do NOT interpret silence as approval
+- If the user asks for changes: adjust the proposal, present again, ask again
 
-### 8. Después de la aprobación
+### 8. After approval
 
-Con el proposal aprobado, continuar con las fases restantes (`spec`, `design`, `tasks`) vía `/sdd-continue` o `/sdd-ff`, según Execution Mode. Solo entonces, y con approval gate superado, pasar a Code Mode para `apply`.
-
----
-
-## Prohibiciones explícitas
-
-Mientras este workflow no haya sido aprobado por el usuario:
-
-- NO escribir código de producción
-- NO editar archivos de implementación
-- NO ejecutar tareas de aplicación
-- NO cambiar a Code Mode
-- NO crear commits
-- NO correr una implementación parcial
-- NO continuar automáticamente al siguiente paso de SDD
-- NO crear el directorio `.sdd/` ni sus artefactos (formato legacy obsoleto)
+With the proposal approved, continue with the remaining phases (`spec`, `design`, `tasks`) via `/sdd-continue` or `/sdd-ff`, according to Execution Mode. Only then, and after the approval gate is passed, switch to Code Mode for `apply`.
 
 ---
 
-## Criterio de salida de este workflow
+## Explicit prohibitions
 
-Este workflow se considera correctamente ejecutado solo si:
+While this workflow has not been approved by the user:
 
-- Leyó el orquestador (`global_rules.md`) como autoridad
-- Aplicó el SDD Init Guard (corriendo `sdd-init` inline y silencioso si faltaba)
-- Resolvió y cacheó Execution Mode, Artifact Store Mode y Delivery Strategy
-- Usó **Plan Mode**
-- Recuperó contexto con **Engram**, el orquestador o `AGENTS.md`
-- Ejecutó `sdd-explore` y `sdd-propose` inline en ese orden
-- Guardó el proposal en el store activo (este proyecto: `openspec/changes/<name>/proposal.md`)
-- Presentó el resumen y preguntó exactamente: **¿Apruebas este plan de implementación?**
-- Se detuvo a esperar aprobación explícita
-- NO creó `.sdd/` en ningún momento
+- DO NOT write production code
+- DO NOT edit implementation files
+- DO NOT run application tasks
+- DO NOT switch to Code Mode
+- DO NOT create commits
+- DO NOT run partial implementation
+- DO NOT automatically continue to the next SDD step
+- DO NOT create the `.sdd/` directory nor its artifacts (legacy obsolete format)
 
-Si cualquiera de esos puntos no ocurre, el workflow está mal ejecutado.
+---
+
+## Exit criteria for this workflow
+
+This workflow is considered correctly executed only if:
+
+- It read the orchestrator (`global_rules.md`) as authority
+- It applied the SDD Init Guard (running `sdd-init` inline and silently if missing)
+- It resolved and cached Execution Mode, Artifact Store Mode, and Delivery Strategy
+- It used **Plan Mode**
+- It recovered context with **Engram**, the orchestrator, or `AGENTS.md`
+- It executed `sdd-explore` and `sdd-propose` inline in that order
+- It saved the proposal in the active store (this project: `openspec/changes/<name>/proposal.md`)
+- It presented the summary and asked exactly: **Do you approve this implementation plan?**
+- It stopped to wait for explicit approval
+- It did NOT create `.sdd/` at any point
+
+If any of these points do not occur, the workflow was executed incorrectly.
