@@ -23,7 +23,7 @@ If your agent environment supports the `task` tool:
 
 1. Replace placeholders in the prompt:
    - `{PROJECT_PATH}` → absolute path of the target project
-   - `{WF_PATH}` → absolute path of the workflow wizard repo (`$WF_DIR/..`)
+   - `{WF_PATH}` → absolute path of the downloaded phase directory (`$WF_DIR`)
    - `{WF_RAW}` → `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main`
 
 2. Use `task` tool with `subagent_type: general` to launch Builder-Core. Wait for it.
@@ -62,8 +62,9 @@ echo "=== Staging directory created ==="
 find .wizard-staging -type f | wc -l
 echo "files in .wizard-staging/"
 
-# Verify key artifacts exist
-for artifact in AGENTS.md .wizard-state.json; do
+# Verify key artifacts exist (.wizard-state.json stays at the project root,
+# never in staging — staging holds only generated files)
+for artifact in AGENTS.md; do
   if [ ! -f ".wizard-staging/$artifact" ]; then
     echo "ERROR: Missing critical artifact: .wizard-staging/$artifact"
     echo "Builder-Core did not complete correctly. Check steps above."

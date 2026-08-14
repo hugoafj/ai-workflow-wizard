@@ -92,11 +92,11 @@ This ensures no orphaned or conflicting files.
 `/wf-refresh` uses SHA256 hashes to compare the Builder's staging output with the project:
 
 ```bash
-# For each file in .wizard-staging/
-STAGING_HASH=$(sha256sum ".wizard-staging/$file" | awk '{print $1}')
+# For each file in .wizard-staging/ (use wf_sha256 for macOS/BSD compatibility)
+STAGING_HASH=$(wf_sha256 ".wizard-staging/$file")
 
 if [[ -f "$file" ]]; then
-  PROJECT_HASH=$(sha256sum "$file" | awk '{print $1}')
+  PROJECT_HASH=$(wf_sha256 "$file")
   if [[ "$STAGING_HASH" == "$PROJECT_HASH" ]]; then
     echo "unchanged: $file"
   else
@@ -125,7 +125,7 @@ fi
 
 ### Multi-Version Detection
 
-In `/wf-refresh` Phase R-2, versions are compared with a proper semver helper, not lexicographically:
+In `/wf-refresh` Phase R-1, versions are compared with a proper semver helper, not lexicographically:
 
 ```bash
 LOCAL_VERSION=$(grep "wf-version:" AGENTS.md | sed 's/.*wf-version: //' | cut -d' ' -f1)

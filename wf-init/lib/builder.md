@@ -23,6 +23,13 @@
 - `.wizard-state.json` (state; see `lib/state.md`).
 - `$WF_ROOT/templates/` from the wizard repo (single source of knowledge and templates).
 
+> **`WF_ROOT` definition**: `WF_ROOT` is the wizard repository base URL
+> (`https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main`), the same
+> value as `WF_RAW`. Template files are fetched on demand from
+> `$WF_ROOT/templates/...`; they are NOT downloaded to disk by `/wf-init` (only
+> the `wf-init/` phase files are). Every `$WF_ROOT/templates/<path>` reference
+> below means "fetch that raw URL", never a local filesystem path.
+
 ## Output
 
 - Staging at `state.build_plan.staging_dir` (default `.wizard-staging/`) within the
@@ -179,6 +186,18 @@ From the SAME `build_protocol_body(name)`:
 - Replace `{{answers.*}}`, `{{discovery.*}}`, `{{testing.*}}`, `{{mcps.table}}`,
   `{{wizard_version}}` with values from `.wizard-state.json` (deterministic).
   `{{wizard_version}}` is resolved from the root field `wizard_version` of the state.
+
+> **Inference-resolved placeholders**: the following five placeholders have NO
+> dedicated state field and are intentionally resolved by the Builder's LLM
+> inference from the state + manifest (they cannot be captured as flat JSON
+> fields):
+> - `{{discovery.commands}}` — exact commands with real flags detected from the manifest (e.g. `npm run lint`, `npm run build`).
+> - `{{discovery.conventions.code_style}}` — non-obvious conventions from `state.discovery.conventions` (when present) + reverse engineering.
+> - `{{discovery.conventions.structure}}` — short tree of main folders and their purpose.
+> - `{{testing.checks_before_done}}` — `lint + build` (+ `test` / `test:e2e` per `state.testing.layers`).
+> - `{{mcps.table}}` — the MCPs table built from `state.discovery.stack` + `state.testing.layers` (see protocol `architecture`).
+> Never leave the raw placeholder unresolved — always emit real content derived
+> from the state.
 - Resolve `<if ...>` blocks based on state (testing active, backend, etc.).
 - Insert testing sections (`testing-approach.section.md`, `checks.section.md`,
   `data-testid.section.md`) according to `LAYERS`.
@@ -322,14 +341,37 @@ details) using `$WF_ROOT/templates/protocols/cicd/` as the single source.
 
 ### Step B9 — Register plan and advance
 
-Populate `state.build_plan` with the exact list of files in staging, including SHA256 hashes for each file. Mark `phases.phase6.status = done`, `phase_pointer = phase7`.
+Populate `state.build_plan` with the exact list of files in staging, including SHA256 hashes for each file. Mark `phases.phase6.status = done`, `phase_pointer = "phase7"` **only if the current pointer is still `phase6`** (this avoids rewinding state when the Builder is reused by `/wf-refresh`).
 
 **Process**:
 
-1. For each file in `.wizard-staging/`:
-   - Calculate SHA256 hash: `sha256sum <file> | awk '{print $1}'`
-   - Add to `build_plan.generated_files[]`: `{ path, hash, managed: true }`
-   - Add path to `build_plan.managed_paths[]`
+1. Source helpers and scan `.wizard-staging/` (null-delimited to handle spaces in paths):
+   ```bash
+   if [ -f "${WF_DIR:-.}/lib/state-helpers.sh" ]; then
+     source "${WF_DIR}/lib/state-helpers.sh"
+   else
+     # Minimal fallback if WF_DIR is not set (not expected in normal use).
+     wf_sha256() {
+       if command -v sha256sum >/dev/null 2>&1; then
+         sha256sum "$1" | awk '{print $1}'
+       else
+         shasum -a 256 "$1" | awk '{print $1}'
+       fi
+     }
+   fi
+   cd ".wizard-staging"
+   FILES="[]"
+   PATHS="[]"
+   while IFS= read -r -d '' file; do
+     REL="${file#./}"
+     HASH=$(wf_sha256 "$file")
+     FILES=$(jq --arg path "$REL" --arg hash "$HASH" \
+       '. += [{"path": $path, "hash": $hash, "managed": true}]' <<< "$FILES")
+     PATHS=$(jq --arg path "$REL" \
+       '. += [$path]' <<< "$PATHS")
+   done < <(find . -type f -print0)
+   cd ..
+   ```
 
 2. Preserve custom AGENTS.md sections:
    - If `AGENTS.md` exists in project root:
@@ -338,12 +380,20 @@ Populate `state.build_plan` with the exact list of files in staging, including S
        - Re-inject custom sections at same relative location
    - If no existing `AGENTS.md`: use generated version as-is
 
-3. Update state:
+3. Update state (advance phase only during `wf-init`):
    ```bash
-   jq '.build_plan.generated_files = $files |
-       .build_plan.managed_paths = $paths |
-       .phases.phase6.status = "done" |
-       .phase_pointer = "phase7"' "$WF_STATE" > "$WF_STATE.tmp"
+   CURRENT_PHASE=$(jq -r '.phase_pointer // empty' "$WF_STATE")
+   if [ "$CURRENT_PHASE" = "phase6" ]; then
+     jq --argjson files "$FILES" --argjson paths "$PATHS" \
+       '.build_plan.generated_files = $files |
+        .build_plan.managed_paths = $paths |
+        .phases.phase6.status = "done" |
+        .phase_pointer = "phase7"' "$WF_STATE" > "$WF_STATE.tmp"
+   else
+     jq --argjson files "$FILES" --argjson paths "$PATHS" \
+       '.build_plan.generated_files = $files |
+        .build_plan.managed_paths = $paths' "$WF_STATE" > "$WF_STATE.tmp"
+   fi
    mv "$WF_STATE.tmp" "$WF_STATE"
    ```
 

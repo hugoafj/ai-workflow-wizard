@@ -180,7 +180,7 @@ source "$WF_DIR/lib/state-helpers.sh"
 ```
 
 Available helpers:
-- `wf_fetch_version` — Get wizard version from the remote `VERSION` file.
+- `wf_fetch_version` — Get wizard version from the repo `VERSION` file (fallback: local `VERSION`, GitHub releases/tags); normalized, no `v` prefix.
 - `wf_state_init` — Initialize `.wizard-state.json` if it doesn't exist.
 - `wf_state_get '<jq-filter>'` — Read a field from state.
 - `wf_state_set '<jq-filter>' '<value>'` — Write a field to state.

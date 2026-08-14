@@ -46,6 +46,7 @@ WIZARD_BRANCH="main"
 # Local directory for downloaded phase files (temporary, can be cleaned up later)
 WF_DIR="/tmp/wf-init-phases"
 mkdir -p "$WF_DIR"
+mkdir -p "$WF_DIR/lib"
 
 echo "Downloading phase files from GitHub..."
 echo "Source: ${WIZARD_REPO}@${WIZARD_BRANCH}/wf-init/"

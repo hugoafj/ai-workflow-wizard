@@ -5,11 +5,10 @@ You are a Builder agent. Your job is to assemble AGENTS.md router, packaged prot
 ## Context
 
 - `PROJECT_PATH`: absolute path to the target project
-- `WF_PATH`: absolute path to the workflow wizard repo
+- `WF_PATH`: absolute path to the downloaded phase directory (WF_DIR — contains `lib/` and phase files)
 - `WF_STATE`: `{PROJECT_PATH}/.wizard-state.json`
 - `WF_STAGING`: `{PROJECT_PATH}/.wizard-staging/`
 - `WF_RAW`: `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main`
-- `TEMPLATES`: `{WF_PATH}/templates/`
 
 ## Universal extraction rule
 
@@ -22,7 +21,7 @@ Exception: `.tmpl.md` templates WITHOUT code fence (like `vitest.config.tmpl.md`
 ### 0. Setup
 
 ```bash
-source "{WF_PATH}/wf-init/lib/state-helpers.sh"
+source "{WF_PATH}/lib/state-helpers.sh"
 mkdir -p "{WF_STAGING}"
 cd "{PROJECT_PATH}"
 cat .wizard-state.json
@@ -166,6 +165,7 @@ Record each file. Don't ask — write everything directly to staging.
 2. Replace ALL `{{...}}` placeholders with values from `.wizard-state.json`:
    - `{{answers.*}}`, `{{discovery.*}}`, `{{testing.*}}`, `{{features.*_yesno}}`
    - `{{wizard_version}}` → from the root field `wizard_version`
+   - **Inference-resolved** (NO dedicated state field — derive from state + manifest, never leave the raw placeholder): `{{discovery.commands}}` (exact commands with real flags), `{{discovery.conventions.code_style}}`, `{{discovery.conventions.structure}}`, `{{testing.checks_before_done}}` (`lint + build` + test per layers), `{{mcps.table}}` (built from stack + layers).
    - **NEVER write `latest` or leave an unresolved placeholder** (e.g. `{{wizard_version}}`).
      Read the EXACT value from the state file. If the state lacks `wizard_version`, use the
      `VERSION` file content; if that is missing too, use `0.1.0-beta.1`. A footer with `latest`
@@ -175,6 +175,24 @@ Record each file. Don't ask — write everything directly to staging.
 5. Build MCPs table based on STACK + LAYERS
 6. Write to `{WF_STAGING}/AGENTS.md`
 7. Footer: last line with `wf-version` + stack + all features as flags
+
+### B5b — Preserve existing custom AGENTS.md sections
+
+**If the project already has an `AGENTS.md`** (e.g. during `/wf-refresh` or a
+re-run), preserve its user-maintained sections BEFORE finalizing the staged
+`AGENTS.md`:
+
+1. Read the existing `{PROJECT_PATH}/AGENTS.md`.
+2. Extract every block between `<!-- WF: DO NOT REGENERATE -->` and
+   `<!-- /WF: DO NOT REGENERATE -->` markers (inclusive).
+3. Re-inject those blocks into `{WF_STAGING}/AGENTS.md` at the same relative
+   location (before the first `## ` heading, or append at the end if there is
+   none).
+4. If `{WF_STAGING}/AGENTS.md` already contains the marker (Builder preserved it
+   earlier), do NOT inject again — the operation is idempotent.
+
+This guarantees `/wf-refresh` never destroys user-maintained sections, even when
+the Builder runs through delegation.
 
 ### B6 — Satellites per IDE (only selected)
 
@@ -204,15 +222,15 @@ For each IDE in IDES, download template and write:
 After all files are written to staging, register them in `state.build_plan.generated_files` with SHA256 hashes. This is used by `/wf-refresh` to detect which files changed.
 
 ```bash
-# For each file in staging, calculate hash and register
+# For each file in staging, calculate hash and register (null-delimited for paths with spaces).
 cd "{WF_STAGING}"
 FILES_JSON="[]"
-for file in $(find . -type f); do
+while IFS= read -r -d '' file; do
   REL_PATH="${file#./}"
-  HASH=$(sha256sum "$file" | awk '{print $1}')
+  HASH=$(wf_sha256 "$file")
   FILES_JSON=$(jq --arg path "$REL_PATH" --arg hash "$HASH" \
     '. += [{"path": $path, "hash": $hash, "managed": true}]' <<< "$FILES_JSON")
-done
+done < <(find . -type f -print0)
 
 # Update state
 jq --argjson files "$FILES_JSON" \

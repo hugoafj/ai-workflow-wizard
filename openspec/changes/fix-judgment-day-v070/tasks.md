@@ -51,7 +51,7 @@ Chain strategy: size-exception
 ## Phase 3: Builder + `AGENTS.md` + cleanup
 
 - [x] 3.1 Fix `wf-init/lib/builder.md` to generate `AGENTS.md` footer and features table matching actual state (`routing_abc`, `decision_ladder`, `tdd_protocol`, `ci`, `release_please`).
-- [x] 3.2 Fix `templates/AGENTS.router.md` placeholders (`{{discovery.commands}}`, `{{features.*_yesno}}`) by either defining corresponding state fields or removing them.
+- [x] 3.2 Fix `templates/AGENTS.router.md` placeholders (`{{discovery.commands}}`, `{{features.*_yesno}}`) by either defining corresponding state fields or removing them. **Resolution (option c, documented in `wf-init/lib/builder.md` B5 + `subagent-builder-core.md` B5)**: the five placeholders without state fields (`{{discovery.commands}}`, `{{discovery.conventions.code_style}}`, `{{discovery.conventions.structure}}`, `{{testing.checks_before_done}}`, `{{mcps.table}}`) are explicitly documented as inference-resolved from state + manifest; the template is left unchanged, and the Builder/sub-agent instructions now state the rule deterministically.
 - [x] 3.3 Regenerate root `AGENTS.md` from the Builder; ensure custom markers are preserved.
 - [x] 3.4 Update `templates/commands/wf-cleanup/_base.md` to remove `.wizard-managed-files.json`.
 - [x] 3.5 Bump `VERSION` to `0.7.1-beta.1`.

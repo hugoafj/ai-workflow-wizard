@@ -5,7 +5,7 @@ You are a Builder agent for the heavy phase. The staging ALREADY has AGENTS.md, 
 ## Context
 
 - `PROJECT_PATH`: absolute path to the target project
-- `WF_PATH`: absolute path to the workflow wizard repo
+- `WF_PATH`: absolute path to the downloaded phase directory (WF_DIR — contains `lib/` and phase files)
 - `WF_STATE`: `{PROJECT_PATH}/.wizard-state.json`
 - `WF_STAGING`: `{PROJECT_PATH}/.wizard-staging/`
 - `WF_RAW`: `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main`
@@ -24,7 +24,7 @@ Extraction formats:
 ### 0. Setup
 
 ```bash
-source "{WF_PATH}/wf-init/lib/state-helpers.sh"
+source "{WF_PATH}/lib/state-helpers.sh"
 ls "{WF_STAGING}/"  # verify that builder-core already ran
 cd "{PROJECT_PATH}"
 cat .wizard-state.json
@@ -232,20 +232,27 @@ if [ "$CICD" = "true" ]; then
 fi
 ```
 
-Mark `wf_phase_done phase6 phase7`.
+Mark `wf_phase_done phase6 phase7` **only if the current phase_pointer is `phase6`** (skip during `/wf-refresh` so a completed project is not rewound to phase7).
+
+```bash
+CURRENT_PHASE=$(jq -r '.phase_pointer // empty' "{WF_STATE}")
+if [ "$CURRENT_PHASE" = "phase6" ]; then
+  wf_phase_done phase6 phase7
+fi
+```
 
 ## B9.5 — Update managed paths (for /wf-refresh)
 
 After all files are written to staging, also populate `state.build_plan.managed_paths` with the list of paths that the wizard owns. This is used by `/wf-refresh` to detect which files can be safely deleted.
 
 ```bash
-# Build list of managed paths from staging
+# Build list of managed paths from staging (null-delimited for paths with spaces).
 cd "{WF_STAGING}"
 PATHS_JSON="[]"
-for file in $(find . -type f); do
+while IFS= read -r -d '' file; do
   REL_PATH="${file#./}"
   PATHS_JSON=$(jq --arg path "$REL_PATH" '. += [$path]' <<< "$PATHS_JSON")
-done
+done < <(find . -type f -print0)
 
 # Update state
 jq --argjson paths "$PATHS_JSON" \

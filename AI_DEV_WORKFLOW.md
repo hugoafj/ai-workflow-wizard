@@ -530,7 +530,7 @@ The wizard phases:
 - **Phase 4** — Reverse engineering (legacy only).
 - **Phase 4.5** — SDD initialization. With the context already discovered (committers, stack, greenfield vs legacy), the wizard explains the three backends (engram / openspec / hybrid), makes a grounded recommendation, and runs `/sdd-init` with the user's choice. The wizard always shows all three modes — the user decides. For Windsurf/Devin, it also ensures the "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule is present in the project's `AGENTS.md`; on greenfield projects (where Phase 6 has not generated `AGENTS.md` yet) it creates the file directly so `/sdd-init` can load the legacy skill paths in the new session.
 - **Phase 5** — Minimum questions (4-5 depending on path).
-- **Phase 6** — File generation in memory (does not write yet). The AGENTS.md includes the "📋 wf-sdd-trigger" section as part of the base template.
+- **Phase 6** — File generation into `.wizard-staging/` on disk (does not promote to the project root yet). The AGENTS.md includes the "📋 wf-sdd-trigger" section as part of the base template.
 - **Phase 7** — Human review gate (preview, approval).
  - **Phase 8** — Write, handle `.gitignore`, install post-commit hook (detects AGENTS.md and SDD drift in the same hook), commit. When Windsurf is active, re-inserts the "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule into `AGENTS.md` after the staging copy (portable head/tail/cat, verified with a loud failure check) — the staging router does not carry the rule. Validates the `AGENTS.md` `wf-version` footer is a concrete semver (never `latest` or an unresolved placeholder) and cross-checks it against the state's `wizard_version`, failing loudly on mismatch — a non-semver footer would block every `/wf-refresh` (strict version equality).
 
@@ -751,7 +751,7 @@ The `optional-features` field is new and critical. It tracks which optional feat
 
 - **Phase R1 · Project content drift**: Re-discovers the project (stack, node engine, etc.) and detects changes.
 - **Phase R2 · State/schema migration**: Migrates `.wizard-state.json` to current schema; asks about new optional features.
-- **Phase R3 · Builder re-run**: Re-runs B1-B9 to generate all artifacts into `.wizard-staging/`.
+- **Phase R3 · Builder re-run**: Re-runs B1-B9 to generate all artifacts into `.wizard-staging/` using only the Builder steps of `phase6a-agents.md` / `phase6b-build-heavy.md` (B1-B9). It **never follows the `/wf-init` phase 7/8 tail** (no `wf_phase_done phase6 phase7`, no `cat phase7.md`) — after Builder-Heavy validation it returns to Phase R4. Staging validation checks the generated artifacts (e.g. `AGENTS.md`); `.wizard-state.json` intentionally stays at the project root and is never expected inside staging.
 - **Phase R4 · Hash-based diff**: Compares staging vs project; classifies files as add/update/delete/unchanged.
 - **Phase R5 · Review gate**: Shows grouped diff; collects user approvals.
 - **Phase R6 · Apply and close**: Applies approved changes, updates state, commits, cleans staging.
@@ -859,7 +859,7 @@ What you will see, in order:
 
 **Phase 5 — Minimum questions**. 4-5 questions depending on path. Answer short and specific. The key question is **which IDEs/CLIs you will use** — that determines the custom satellites generated.
 
-**Phase 6 — In-memory generation**. The agent assembles all files but does NOT write them yet. The generated AGENTS.md includes the abbreviated SDD flow in Behavior Preferences by default.
+**Phase 6 — Staging generation**. The agent assembles all files into `.wizard-staging/` on disk but does NOT promote them to the project root yet. The generated AGENTS.md includes the abbreviated SDD flow in Behavior Preferences by default.
 
 **Phase 7 — Review gate**. Shows you the complete AGENTS.md and the list of files to be created. **Read them carefully**. If something doesn't fit, say "let me edit X first" and describe the change. The agent adjusts and shows again.
 

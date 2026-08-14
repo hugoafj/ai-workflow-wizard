@@ -13,7 +13,7 @@
 
 2. Replace the placeholders in the prompt:
    - `{PROJECT_PATH}` → absolute path of the target project
-   - `{WF_PATH}` → absolute path of the workflow wizard repo (`$WF_DIR/..`)
+   - `{WF_PATH}` → absolute path of the downloaded phase directory (`$WF_DIR`)
    - `{WF_RAW}` → `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main`
 
 3. Use the `task` tool with `subagent_type: general` to launch the sub-agent

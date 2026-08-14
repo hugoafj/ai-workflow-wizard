@@ -25,6 +25,11 @@ WF_RAW="${WF_RAW:-https://raw.githubusercontent.com/${WIZARD_REPO}/${WIZARD_BRAN
 
 mkdir -p "${WF_DIR}/lib"
 
+# Download the shared helpers so /wf-refresh and /wf-init use the same
+# wf_fetch_version / wf_sha256 implementation. If the download fails, the
+# heredoc below provides fallbacks.
+curl -fsSL "${WF_RAW}/wf-init/lib/state-helpers.sh" -o "${WF_DIR}/lib/state-helpers.sh" 2>/dev/null || true
+
 cat > "${WF_DIR}/lib/refresh-lib.sh" << 'LIBEOF'
 #!/bin/bash
 # Pure bash helper library for /wf-refresh.
@@ -32,7 +37,44 @@ cat > "${WF_DIR}/lib/refresh-lib.sh" << 'LIBEOF'
 
 WF_DIR="${WF_DIR:-/tmp/wf-refresh-phases}"
 WF_STATE="${WF_STATE:-.wizard-state.json}"
-WF_RAW="${WF_RAW:-https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main}"
+WIZARD_REPO="${WIZARD_REPO:-hugoafj/ai-workflow-wizard}"
+WIZARD_BRANCH="${WIZARD_BRANCH:-main}"
+WF_RAW="${WF_RAW:-https://raw.githubusercontent.com/${WIZARD_REPO}/${WIZARD_BRANCH}}"
+
+# Source shared helpers (wf_fetch_version, wf_sha256) from /wf-init.
+source "${WF_DIR}/lib/state-helpers.sh" 2>/dev/null || true
+
+# Fallback portable sha256 if the shared helper is unavailable.
+if ! command -v wf_sha256 >/dev/null 2>&1; then
+  wf_sha256() {
+    if command -v sha256sum >/dev/null 2>&1; then
+      sha256sum "$1" | awk '{print $1}'
+    else
+      shasum -a 256 "$1" | awk '{print $1}'
+    fi
+  }
+fi
+
+# Fallback version fetcher if the shared helper is unavailable.
+if ! command -v wf_fetch_version >/dev/null 2>&1; then
+  wf_fetch_version() {
+    local version=""
+    version=$(curl -fsSL "${WF_RAW}/VERSION" 2>/dev/null | head -1 || true)
+    if [[ -z "$version" && -f VERSION ]]; then
+      version=$(head -1 VERSION)
+    fi
+    if [[ -z "$version" ]]; then
+      version=$(curl -fsSL "https://api.github.com/repos/${WIZARD_REPO}/releases/latest" 2>/dev/null | jq -r '.tag_name // empty' 2>/dev/null || true)
+    fi
+    if [[ -z "$version" ]]; then
+      version=$(curl -fsSL "https://api.github.com/repos/${WIZARD_REPO}/tags?per_page=1" 2>/dev/null | jq -r '.[0].name // empty' 2>/dev/null || true)
+    fi
+    if [[ -z "$version" ]]; then
+      version="0.7.1-beta.1"
+    fi
+    printf '%s' "${version#v}"
+  }
+fi
 
 # Normalize a version: strip leading 'v'
 _version_norm() {
@@ -132,24 +174,14 @@ version_lte() {
 
 version_lt() {
   local v1="$1" v2="$2"
+  # Normalize both operands BEFORE the equality check, so "v0.7.1" and "0.7.1"
+  # compare equal and version_lt returns false (they are the same version).
+  v1="$(_version_norm "$v1")"
+  v2="$(_version_norm "$v2")"
   if [[ "$v1" == "$v2" ]]; then
     return 1
   fi
   version_lte "$v1" "$v2"
-}
-
-# Fetch current wizard version from remote, falling back to a local file or default.
-wf_fetch_version() {
-  local version=""
-  version=$(curl -fsSL "${WF_RAW}/VERSION" 2>/dev/null | head -1 || true)
-  if [[ -z "$version" ]]; then
-    if [[ -f VERSION ]]; then
-      version=$(head -1 VERSION)
-    else
-      version="0.7.1-beta.1"
-    fi
-  fi
-  printf '%s' "$version"
 }
 
 # Ask a yes/no question. Returns 0 for yes, 1 for no.
@@ -270,6 +302,13 @@ preserve_custom_agents() {
     return 0
   fi
 
+  # Idempotent: if the Builder already preserved the custom markers into the
+  # staged AGENTS.md, do NOT re-inject (avoids duplicating the section).
+  if grep -q "<!-- WF: DO NOT REGENERATE -->" "$STAGED_AGENTS"; then
+    echo "  ℹ Custom sections already present in staged AGENTS.md (Builder preserved them)"
+    return 0
+  fi
+
   echo "  Preserving custom AGENTS.md sections..."
 
   local TMP="${STAGED_AGENTS}.tmp"
@@ -311,14 +350,6 @@ preserve_custom_agents() {
   echo "  ✓ Custom sections preserved"
 }
 
-# Compute SHA256 hash of a file.
-wf_sha256() {
-  if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$1" | awk '{print $1}'
-  else
-    shasum -a 256 "$1" | awk '{print $1}'
-  fi
-}
 LIBEOF
 
 chmod +x "${WF_DIR}/lib/refresh-lib.sh"
@@ -458,8 +489,10 @@ STACK_KEY="unknown"
 if [[ -f package.json ]]; then
   STACK_KEY="node-react"
   if command -v jq >/dev/null 2>&1; then
-    pkg_framework=$(jq -r '.dependencies.next // .dependencies.vue // empty' package.json 2>/dev/null || true)
-    [[ -n "$pkg_framework" ]] && STACK_KEY="node-$(basename "$pkg_framework")"
+    # Read the package NAME (key), not the version value: .dependencies.next
+    # returns "^14.0.0", which would produce a bogus "node-^14.0.0" key.
+    pkg_framework=$(jq -r '.dependencies | keys[] | select(. == "next" or . == "vue") | .' package.json 2>/dev/null | head -1 || true)
+    [[ -n "$pkg_framework" ]] && STACK_KEY="node-${pkg_framework}"
   fi
 elif [[ -f composer.json ]]; then
   STACK_KEY="php-laravel"
@@ -536,8 +569,9 @@ Re-run the Builder (B1-B9) to generate all artifacts into `.wizard-staging/`.
 
 1. Use the same Builder sub-agent delegation as `/wf-init` Phase 6:
    - Read `phase6a-agents.md` first. If your environment supports it (e.g. Claude Code `task` tool, Devin `run_subagent` tool), delegate Builder-Core to a sub-agent with the prompt from `subagent-builder-core.md`.
+   - When replacing placeholders in the sub-agent prompt, use `{WF_PATH}` → `$WF_DIR` (the downloaded phase directory, e.g. `/tmp/wf-refresh-phases`). The helper `lib/state-helpers.sh` lives directly under `$WF_DIR/lib/`.
    - Otherwise, read `lib/builder.md` and execute B1-B6 manually.
-2. After Builder-Core completes, read `phase6b-build-heavy.md` and run Builder-Heavy (B7-B9) the same way.
+2. After Builder-Core completes, read `phase6b-build-heavy.md` and run Builder-Heavy (B7-B9) the same way — **execute ONLY its steps 1-4 (verify staging, delegate, fallback, validate). Do NOT execute phase6b's Step 5 tail**: no `wf_phase_done phase6 phase7`, no "Wait for user confirmation", and NO `cat "$WF_DIR/phase7.md"`. Those belong to the `/wf-init` phase 7/8 flow, not to refresh — running them would derail into wf-init's review/promotion instead of returning to Phase R4. After Builder-Heavy validates, return to Phase R4 below.
 3. The combined result must be `.wizard-staging/` containing `AGENTS.md`, the satellite files, commands, protocols, etc.
 4. After Builder finishes, run the validation block below.
 
@@ -564,7 +598,9 @@ echo ""
 
 echo "$(find "$STAGING" -type f | wc -l) files in $STAGING/"
 
-for artifact in AGENTS.md .wizard-state.json; do
+# .wizard-state.json intentionally NOT validated in staging: state lives at the
+# project root; staging holds only generated files.
+for artifact in AGENTS.md; do
   if [[ ! -f "$STAGING/$artifact" ]]; then
     echo "✗ Missing critical artifact: $STAGING/$artifact"
     exit 1
@@ -598,8 +634,8 @@ DELETED="[]"
 DELETED_MODIFIED="[]"
 UNCHANGED="[]"
 
-# Scan staging files
-for file in $(find "$STAGING" -type f); do
+# Scan staging files (null-delimited: paths with spaces are safe)
+while IFS= read -r -d '' file; do
   REL_PATH="${file#$STAGING/}"
   STAGING_HASH=$(wf_sha256 "$file")
 
@@ -613,15 +649,14 @@ for file in $(find "$STAGING" -type f); do
   else
     ADDED=$(jq --arg path "$REL_PATH" --arg hash "$STAGING_HASH" '. += [{"path": $path, "hash": $hash}]' <<< "$ADDED")
   fi
-done
+done < <(find "$STAGING" -type f -print0)
 
-# Scan old managed paths for deletions
-OLD_MANAGED=$(jq -r '.build_plan.managed_paths[]?' "$WF_STATE" 2>/dev/null || true)
-for old_path in $OLD_MANAGED; do
+# Scan old managed paths for deletions (null-delimited for paths with spaces/newlines).
+while IFS= read -r -d '' old_path; do
   if [[ ! -f "$STAGING/$old_path" ]]; then
     if [[ -f "$old_path" ]]; then
       PROJECT_HASH=$(wf_sha256 "$old_path")
-      OLD_HASH=$(jq -r ".build_plan.generated_files[] | select(.path == \"$old_path\") | .hash" "$WF_STATE" 2>/dev/null || true)
+      OLD_HASH=$(jq -r --arg path "$old_path" '.build_plan.generated_files[] | select(.path == $path) | .hash' "$WF_STATE" 2>/dev/null || true)
 
       if [[ "$PROJECT_HASH" == "$OLD_HASH" ]]; then
         DELETED=$(jq --arg path "$old_path" --arg hash "$PROJECT_HASH" '. += [{"path": $path, "hash": $hash, "reason": "deprecated"}]' <<< "$DELETED")
@@ -630,7 +665,7 @@ for old_path in $OLD_MANAGED; do
       fi
     fi
   fi
-done
+done < <(jq -j '.build_plan.managed_paths[]? + "\u0000"' "$WF_STATE" 2>/dev/null || true)
 
 # Write plan
 jq -n \
@@ -771,57 +806,66 @@ APPROVE_UPDATED=$(jq -r '.build_plan.approval.updated // false' "$WF_STATE")
 APPROVE_DELETED=$(jq -r '.build_plan.approval.deleted // false' "$WF_STATE")
 APPROVE_DELETED_MODIFIED=$(jq -r '.build_plan.approval.deleted_modified // false' "$WF_STATE")
 
-if [[ "$APPROVE_ADDED" == "true" ]]; then
-  echo "ℹ Copying added files..."
-  jq -r '.added[] | .path' "$PLAN" | while read -r file; do
-    mkdir -p "$(dirname "$file")"
-    cp "$STAGING/$file" "$file"
-    [[ "$file" == *".sh" ]] && chmod +x "$file"
-  done
-  echo "✓ Added files copied"
-fi
-
-if [[ "$APPROVE_UPDATED" == "true" ]]; then
-  echo "ℹ Updating files..."
-  jq -r '.updated[] | .path' "$PLAN" | while read -r file; do
-    cp "$STAGING/$file" "$file"
-    [[ "$file" == *".sh" ]] && chmod +x "$file"
-  done
-  echo "✓ Files updated"
-fi
-
-if [[ "$APPROVE_DELETED" == "true" ]]; then
-  echo "ℹ Deleting removed files..."
-  jq -r '.deleted[] | .path' "$PLAN" | while read -r file; do
-    rm -f "$file"
-  done
-  echo "✓ Files deleted"
-fi
-
-if [[ "$APPROVE_DELETED_MODIFIED" == "true" ]]; then
-  echo "ℹ Deleting modified-removed files..."
-  jq -r '.deleted_modified[] | .path' "$PLAN" | while read -r file; do
-    rm -f "$file"
-  done
-  echo "✓ Modified-removed files deleted"
-fi
-
-# Preserve custom AGENTS.md sections in the staged AGENTS.md before copy
+# Preserve custom AGENTS.md sections BEFORE any copy: the project AGENTS.md still
+# holds the user's custom markers here, and the staged AGENTS.md is the freshly
+# generated plain version. If this ran after the copy loops, the project file
+# would already be overwritten and preservation would silently no-op.
 if [[ "$APPROVE_UPDATED" == "true" ]] || [[ "$APPROVE_ADDED" == "true" ]]; then
   if [[ -f AGENTS.md ]] && [[ -f "$STAGING/AGENTS.md" ]]; then
     preserve_custom_agents "$STAGING"
   fi
 fi
 
+if [[ "$APPROVE_ADDED" == "true" ]]; then
+  echo "ℹ Copying added files..."
+  while IFS= read -r -d '' file; do
+    mkdir -p "$(dirname "$file")"
+    cp "$STAGING/$file" "$file"
+    [[ "$file" == *".sh" ]] && chmod +x "$file"
+  done < <(jq -j '.added[]?.path + "\u0000"' "$PLAN")
+  echo "✓ Added files copied"
+fi
+
+if [[ "$APPROVE_UPDATED" == "true" ]]; then
+  echo "ℹ Updating files..."
+  while IFS= read -r -d '' file; do
+    cp "$STAGING/$file" "$file"
+    [[ "$file" == *".sh" ]] && chmod +x "$file"
+  done < <(jq -j '.updated[]?.path + "\u0000"' "$PLAN")
+  echo "✓ Files updated"
+fi
+
+if [[ "$APPROVE_DELETED" == "true" ]]; then
+  echo "ℹ Deleting removed files..."
+  DELETED_LIST=$(mktemp)
+  jq -j '.deleted[]?.path + "\u0000"' "$PLAN" > "$DELETED_LIST"
+  if [ -s "$DELETED_LIST" ]; then
+    git rm --pathspec-from-file="$DELETED_LIST" --pathspec-file-nul
+  fi
+  rm -f "$DELETED_LIST"
+  echo "✓ Files deleted"
+fi
+
+if [[ "$APPROVE_DELETED_MODIFIED" == "true" ]]; then
+  echo "ℹ Deleting modified-removed files..."
+  DELETED_MODIFIED_LIST=$(mktemp)
+  jq -j '.deleted_modified[]?.path + "\u0000"' "$PLAN" > "$DELETED_MODIFIED_LIST"
+  if [ -s "$DELETED_MODIFIED_LIST" ]; then
+    git rm --pathspec-from-file="$DELETED_MODIFIED_LIST" --pathspec-file-nul
+  fi
+  rm -f "$DELETED_MODIFIED_LIST"
+  echo "✓ Modified-removed files deleted"
+fi
+
 # Recompute generated_files from actual staging after custom-section injection
 GENERATED_FILES="[]"
 MANAGED_PATHS="[]"
-for file in $(find "$STAGING" -type f); do
+while IFS= read -r -d '' file; do
   REL_PATH="${file#$STAGING/}"
   HASH=$(wf_sha256 "$file")
   GENERATED_FILES=$(jq --arg path "$REL_PATH" --arg hash "$HASH" '. += [{"path": $path, "hash": $hash, "managed": true}]' <<< "$GENERATED_FILES")
   MANAGED_PATHS=$(jq --arg path "$REL_PATH" '. += [$path]' <<< "$MANAGED_PATHS")
-done
+done < <(find "$STAGING" -type f -print0)
 
 # Write .wizard-managed-files.json with the complete set of managed files
 TARGET_VERSION=$(wf_fetch_version)
@@ -837,17 +881,35 @@ jq --argjson files "$GENERATED_FILES" --argjson paths "$MANAGED_PATHS" \
    '.build_plan.generated_files = $files | .build_plan.managed_paths = $paths' "$WF_STATE" > "$WF_STATE.tmp"
 mv "$WF_STATE.tmp" "$WF_STATE"
 
-# Add to .gitignore
-if ! grep -q "^\.wizard-managed-files\.json$" .gitignore 2>/dev/null; then
-  echo ".wizard-managed-files.json" >> .gitignore
+# Add to .gitignore (ensure a trailing newline first and use an exact line match).
+if ! grep -qxF ".wizard-managed-files.json" .gitignore 2>/dev/null; then
+  if [ -f .gitignore ] && [ "$(tail -c1 .gitignore | wc -l)" -eq 0 ]; then
+    echo >> .gitignore
+  fi
+  printf '%s\n' ".wizard-managed-files.json" >> .gitignore
 fi
 
 # Git operations (only if any category was approved)
 if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ "$APPROVE_DELETED" == "true" ]] || [[ "$APPROVE_DELETED_MODIFIED" == "true" ]]; then
   echo "ℹ Committing changes..."
-  git add -A
 
-  COMMIT_MSG="chore: refresh workflow to v$TARGET_VERSION
+  # Stage only the paths the user explicitly approved (null-delimited to handle
+  # spaces and avoid `git add -A` dragging in unrelated user changes).
+  GIT_ADD_LIST=$(mktemp)
+  if [[ "$APPROVE_ADDED" == "true" ]]; then
+    jq -j '.added[]?.path + "\u0000"' "$PLAN" >> "$GIT_ADD_LIST"
+  fi
+  if [[ "$APPROVE_UPDATED" == "true" ]]; then
+    jq -j '.updated[]?.path + "\u0000"' "$PLAN" >> "$GIT_ADD_LIST"
+  fi
+  if [ -s "$GIT_ADD_LIST" ]; then
+    git add --pathspec-from-file="$GIT_ADD_LIST" --pathspec-file-nul
+  fi
+  rm -f "$GIT_ADD_LIST"
+
+  if ! git diff --cached --quiet; then
+    COMMIT_MSG=$(cat <<EOF
+chore: refresh workflow to v$TARGET_VERSION
 
 - Updated AGENTS.md with new project info
 - Added $(jq '.added | length' "$PLAN") new files
@@ -855,11 +917,14 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
 - Removed $(jq '.deleted | length' "$PLAN") deprecated files
 - Removed $(jq '.deleted_modified | length' "$PLAN") modified-deprecated files
 
-Generated with /wf-refresh"
+Generated with /wf-refresh
+EOF
+)
 
-  git commit -m "$COMMIT_MSG" 2>/dev/null || {
-    echo "⚠ No changes to commit"
-  }
+    git commit -m "$COMMIT_MSG"
+  else
+    echo "ℹ No staged changes to commit"
+  fi
 else
   echo "ℹ No changes approved; skipping commit"
 fi

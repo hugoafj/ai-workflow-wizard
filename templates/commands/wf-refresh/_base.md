@@ -84,8 +84,6 @@ curl -fsSL "${WF_RAW}/wf-init/subagent-builder-core.md" > "${WF_DIR}/subagent-bu
 curl -fsSL "${WF_RAW}/wf-init/subagent-builder-heavy.md" > "${WF_DIR}/subagent-builder-heavy.md"
 curl -fsSL "${WF_RAW}/wf-init/phase6a-agents.md" > "${WF_DIR}/phase6a-agents.md"
 curl -fsSL "${WF_RAW}/wf-init/phase6b-build-heavy.md" > "${WF_DIR}/phase6b-build-heavy.md"
-curl -fsSL "${WF_RAW}/wf-init/phase7.md" > "${WF_DIR}/phase7.md"
-curl -fsSL "${WF_RAW}/wf-init/phase8.md" > "${WF_DIR}/phase8.md"
 
 if [ ! -s "${WF_DIR}/lib/refresher.md" ]; then
   echo "✗ Could not download refresher.md from GitHub"

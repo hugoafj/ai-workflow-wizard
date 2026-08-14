@@ -31,7 +31,7 @@ If your agent environment supports the `task` tool:
 
 2. Replace placeholders:
    - `{PROJECT_PATH}` → absolute path of the target project
-   - `{WF_PATH}` → absolute path of the workflow wizard repo (`$WF_DIR/..`)
+   - `{WF_PATH}` → absolute path of the downloaded phase directory (`$WF_DIR`)
    - `{WF_RAW}` → `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main`
 
 3. Use `task` tool with `subagent_type: general` to launch Builder-Heavy. Wait for it.
@@ -66,7 +66,8 @@ echo "=== build_plan ==="
 jq '.build_plan' .wizard-state.json 2>/dev/null || echo "(no build_plan in state yet)"
 
 # Verify critical files from both Builder-Core and Builder-Heavy
-for artifact in AGENTS.md .wizard-state.json; do
+# (.wizard-state.json stays at the project root, never in staging)
+for artifact in AGENTS.md; do
   if [ ! -f ".wizard-staging/$artifact" ]; then
     echo "ERROR: Missing critical artifact: .wizard-staging/$artifact"
     exit 1
@@ -74,7 +75,7 @@ for artifact in AGENTS.md .wizard-state.json; do
 done
 
 # Check that at least one IDE command was added (proof Builder-Heavy ran)
-IDE_COMMANDS=$(find .wizard-staging -name "*.md" -type f | xargs grep -l "IDE command" 2>/dev/null | wc -l)
+IDE_COMMANDS=$(find .wizard-staging -name "*.md" -type f -print0 | xargs -0 grep -l "IDE command" 2>/dev/null | wc -l)
 if [ "$IDE_COMMANDS" -eq 0 ]; then
   echo "WARNING: No IDE commands found in staging. Builder-Heavy may have skipped or failed."
   echo "Check that .wizard-state.json has valid answers.ides[] configuration."
@@ -85,10 +86,14 @@ echo "✓ Builder-Heavy validation passed"
 
 ### Step 5: Mark phases complete and inform user
 
-Mark phases 6 and 7 as done (persistence):
+Mark phases 6 and 7 as done (persistence), but **only if the current phase_pointer is still `phase6`**. This makes the phase safe to reuse during `/wf-refresh`, when the project may already be past phase 7:
 
 ```bash
-wf_phase_done phase6 phase7
+source "$WF_DIR/lib/state-helpers.sh"
+CURRENT_PHASE=$(jq -r '.phase_pointer // empty' .wizard-state.json)
+if [ "$CURRENT_PHASE" = "phase6" ]; then
+  wf_phase_done phase6 phase7
+fi
 ```
 
 Then inform the user:
