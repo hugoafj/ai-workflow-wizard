@@ -519,7 +519,7 @@ Stack: Vite 8 + React 19.2 + TS 6 + Tailwind 4 + ESLint 9 flat config. Size: ~82
 
 ### 5.3 Wizard `/wf-init` (greenfield + legacy)
 
-Slash command that orchestrates the complete workflow bootstrap in a project. Split architecture — the orchestrator (`wf-init.md`) is the only thing attached to the chat; phases live in `wf-init/` (10 files) and the agent reads them from disk on-demand. This solves the "lost in the middle" problem a monolithic file would have: the agent only keeps the orchestrator + the active phase in context at any time.
+Slash command that orchestrates the complete workflow bootstrap in a project. Split architecture — the orchestrator (`wf-init.md`) is the only thing attached to the chat; phases, sub-agents and lib contracts live in `wf-init/` and the agent reads them from disk on-demand. This solves the "lost in the middle" problem a monolithic file would have: the agent only keeps the orchestrator + the active phase in context at any time.
 
 The wizard phases:
 
@@ -694,7 +694,7 @@ Solves two different problems:
 
 **Git hooks run ONLY locally**, not on GitHub or CI. Each developer installs them on their machine. The distribution problem is solved with **Husky** (configured in the CI/CD block), which registers hooks via `package.json` so they install automatically with `npm install`.
 
-**Trigger 2 · Slash command `/wf-refresh`**. When invoked, the agent runs seven phases (builder-driven):
+**Trigger 2 · Slash command `/wf-refresh`**. When invoked, the agent runs eight phases (builder-driven):
 
 - **Phase R-1**: Update global commands (`wf-init`, `wf-refresh`, `wf-cleanup`) if outdated
 - **Phase R0**: Validate `.wizard-state.json` and detect active IDEs
@@ -2086,7 +2086,7 @@ Same as `wf-ladder` and `wf-onboard`, `/wf-worktree` is generated in Phase 6 of 
 
 It is a **project-specific** command (like `wf-ladder`), not global — depends on the repo you're in, although its internal logic is generic.
 
-The complete `wf-worktree.md` file is already built as a standalone file (same format as `wf-onboard.md`): three operations (`new`, `list`, `clean`), free port detection per worktree, internal natural language mapping, and inviolable rules to never push or delete without explicit confirmation. It is included in the `EXPECTED_COMMANDS` and in the per-IDE command generation — a project running `/wf-init` from scratch receives it right away, and one already initialized receives it via `/wf-refresh` (Phase 3.5, check for missing commands).
+The complete `wf-worktree.md` file is already built as a standalone file (same format as `wf-onboard.md`): three operations (`new`, `list`, `clean`), free port detection per worktree, internal natural language mapping, and inviolable rules to never push or delete without explicit confirmation. It is included in the `EXPECTED_COMMANDS` and in the per-IDE command generation — a project running `/wf-init` from scratch receives it right away, and one already initialized receives it via `/wf-refresh` (builder-driven refresh, check for missing commands).
 
 ---
 

@@ -28,6 +28,8 @@ Then ask explicitly with these visible options:
 - If the project is **GREENFIELD**: mark `phases.phase4.status=skipped`, then compute the next phase based on the ALREADY SELECTED features:
 
 ```bash
+source "$WF_DIR/lib/state-helpers.sh"
+
 NEXT=
 if [ "$(jq -r '.features.routing_abc // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.tdd_protocol // false' .wizard-state.json)" = "true" ]; then
   NEXT="phase45"

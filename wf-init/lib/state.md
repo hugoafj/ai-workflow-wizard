@@ -121,8 +121,8 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
     "release_ai_provider": null,
     "github_remote": null,
     "e2e_in_ci": false,
-    "auto_improve": false,
-    "inline_suggestions": false
+    "auto_improve": true,
+    "inline_suggestions": true
   },
 
   "cd": {

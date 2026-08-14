@@ -90,7 +90,7 @@ for dir in .claude/commands .cursor/commands .windsurf/workflows .kiro/steering 
     for cmd in "$dir"/*; do
       cmd_name=$(basename "$cmd")
       case "$cmd_name" in
-        wf-init|wf-refresh|wf-onboard|wf-settings|wf-worktree|wf-cicd|wf-cleanup|wf-ladder|wf-tdd|tdd|wf-orchestrator|wf-sdd-trigger)
+        wf-init|wf-refresh|wf-onboard|wf-settings|wf-worktree|wf-cicd|wf-cleanup|wf-ladder|wf-tdd|tdd|wf-orchestrator|wf-sdd-trigger|sdd-new.md|sdd-*.md)
           echo "  🗑 $cmd (wizard)"
           ;;
         *)

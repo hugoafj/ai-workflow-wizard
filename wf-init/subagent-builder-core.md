@@ -163,7 +163,11 @@ Record each file. Don't ask — write everything directly to staging.
 
 1. Download `$WF_RAW/templates/AGENTS.router.md`
 2. Replace ALL `{{...}}` placeholders with values from `.wizard-state.json`:
-   - `{{answers.*}}`, `{{discovery.*}}`, `{{testing.*}}`, `{{features.*_yesno}}`
+   - `{{answers.*}}`, `{{discovery.*}}`, `{{testing.*}}`
+   - For each `{{features.<name>_yesno}}` placeholder (e.g. `decision_ladder_yesno`, `tdd_protocol_yesno`, `routing_abc_yesno`, `ci_yesno`, `cd_yesno`, `release_please_yesno`), read `.features.<name>` and convert:
+     - `true` → `yes`
+     - `false` or `null` → `no`
+     Then replace `{{features.<name>_yesno}}` with the resulting `yes`/`no`.
    - `{{wizard_version}}` → from the root field `wizard_version`
    - **Inference-resolved** (NO dedicated state field — derive from state + manifest, never leave the raw placeholder): `{{discovery.commands}}` (exact commands with real flags), `{{discovery.conventions.code_style}}`, `{{discovery.conventions.structure}}`, `{{testing.checks_before_done}}` (`lint + build` + test per layers), `{{mcps.table}}` (built from stack + layers).
    - **NEVER write `latest` or leave an unresolved placeholder** (e.g. `{{wizard_version}}`).

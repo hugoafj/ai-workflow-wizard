@@ -12,7 +12,7 @@ Execute `/sdd-new` with the modern gentle-ai contract:
 
 - **Orchestrator as authority**: read `~/.codeium/windsurf/memories/global_rules.md` FIRST and treat it as the authoritative contract.
 - **Plan Mode** for planning (never code before approval)
-- **Artifact store** according to orchestrator policy: `engram` (default) | `openspec` | `hybrid` | `none`. This project declares **openspec** (see AGENTS.md).
+- **Artifact store** according to orchestrator policy: `engram` (default) | `openspec` | `hybrid` | `none`. This project declares **{{sdd.backend}}** (see AGENTS.md).
 - **Code Mode** only after explicit user approval
 
 **This workflow does NOT create `.sdd/`.** The `.sdd/` directory is the LEGACY Windsurf format, obsolete. If the orchestrator, a skill, or an instruction mentions `.sdd/`, IGNORE it.
@@ -52,7 +52,7 @@ Before executing `/sdd-new`, check whether `sdd-init` has run for this project:
 The first time in the session, resolve and cache:
 
 - **Execution Mode**: ask `Automatic` (default) vs `Interactive`. In Windsurf, `Interactive` is the natural behavior via Approval Gates; `Automatic` skips gates and runs everything sequentially.
-- **Artifact Store Mode**: ask `engram` | `openspec` | `hybrid` | `none`. If the user does not specify, detect: engram available → `engram`; otherwise → `none`. **This project declares `openspec`** in AGENTS.md, so the choice must start from there.
+- **Artifact Store Mode**: ask `engram` | `openspec` | `hybrid` | `none`. If the user does not specify, detect: engram available → `engram`; otherwise → `none`. **This project declares `{{sdd.backend}}`** in AGENTS.md, so the choice must start from there.
 - **Delivery Strategy**: ask `ask-on-risk` (default) | `auto-chain` | `single-pr` | `exception-ok`.
 
 Cache the three for the session. Do not ask again unless explicitly requested.
@@ -157,7 +157,7 @@ This workflow is considered correctly executed only if:
 - It used **Plan Mode**
 - It recovered context with **Engram**, the orchestrator, or `AGENTS.md`
 - It executed `sdd-explore` and `sdd-propose` inline in that order
-- It saved the proposal in the active store (this project: `openspec/changes/<name>/proposal.md`)
+- It saved the proposal in the active store (this project: `{{sdd.backend}}/changes/<name>/proposal.md`)
 - It presented the summary and asked exactly: **Do you approve this implementation plan?**
 - It stopped to wait for explicit approval
 - It did NOT create `.sdd/` at any point

@@ -71,7 +71,7 @@ EXPECTED_COMMANDS="wf-ladder wf-tdd wf-orchestrator wf-sdd-trigger wf-onboard wf
 # active IDE, adjusting directory and extension based on its format:
 for cmd in $EXPECTED_COMMANDS; do
   if [ ! -f ".claude/commands/${cmd}.md" ]; then
-    echo "FALTA: .claude/commands/${cmd}.md"
+    echo "MISSING: .claude/commands/${cmd}.md"
   fi
 done
 ```

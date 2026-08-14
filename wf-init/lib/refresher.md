@@ -200,9 +200,10 @@ _ask_yesno() {
 # Apply a single state migration block idempotently using jq.
 # Writes a .tmp file and moves it into place.
 _apply_jq_filter() {
-  local filter="$1"
+  local filter="${@: -1}"
+  local args=("${@:1:$#-1}")
   local tmp="${WF_STATE}.tmp"
-  jq "$filter" "$WF_STATE" > "$tmp" && mv "$tmp" "$WF_STATE"
+  jq "${args[@]}" "$filter" "$WF_STATE" > "$tmp" && mv "$tmp" "$WF_STATE"
 }
 
 # Migration to v0.6.8: schema v3 fields + new optional features.
@@ -279,6 +280,7 @@ migrate_state() {
       case "$TO" in
         0.6.8) migrate_to_0_6_8 ;;
         0.7.0) migrate_to_0_7_0 ;;
+        0.7.1-beta.1) migrate_to_0_7_1 ;;
         0.7.1) migrate_to_0_7_1 ;;
       esac
       CURRENT="$TO"
@@ -381,7 +383,7 @@ LOCAL_VERSION="${LOCAL_VERSION#v}"
 
 echo "ℹ Local wizard version: $LOCAL_VERSION"
 
-REMOTE_VERSION=$(curl -s "${WF_RAW}/VERSION" 2>/dev/null | head -1 || true)
+REMOTE_VERSION=$(curl -fsSL "${WF_RAW}/VERSION" 2>/dev/null | head -1 || true)
 REMOTE_VERSION="${REMOTE_VERSION:-$(wf_fetch_version)}"
 REMOTE_VERSION="${REMOTE_VERSION#v}"
 
@@ -452,13 +454,20 @@ fi
 echo "✓ State validation passed (schema v$SCHEMA_VERSION)"
 
 IDES=()
-[[ -d .claude ]] && IDES+=("claude")
+[[ -d .claude ]] && IDES+=("claude-code")
 [[ -d .cursor ]] && IDES+=("cursor")
-[[ -d .windsurf ]] && IDES+=("windsurf")
-[[ -d .devin ]] && IDES+=("devin")
+if [[ -d .windsurf ]] || [[ -d .devin ]]; then
+  IDES+=("windsurf")
+fi
 [[ -d .kiro ]] && IDES+=("kiro")
 [[ -d .codex ]] && IDES+=("codex")
 [[ -d .opencode ]] && IDES+=("opencode")
+if [[ -d .gemini ]] || [[ -f GEMINI.md ]]; then
+  IDES+=("gemini-cli")
+fi
+if [[ -d .antigravity ]] || [[ -f ANTIGRAVITY.md ]]; then
+  IDES+=("antigravity")
+fi
 [[ -f .github/copilot-instructions.md ]] && IDES+=("vscode-copilot")
 
 if [[ ${#IDES[@]} -eq 0 ]]; then
@@ -466,6 +475,9 @@ if [[ ${#IDES[@]} -eq 0 ]]; then
 else
   echo "ℹ Detected IDEs: ${IDES[*]}"
 fi
+
+IDES_JSON=$(printf '%s\n' "${IDES[@]}" | jq -R . | jq -s .)
+_apply_jq_filter --argjson ides "$IDES_JSON" '.answers.ides = $ides'
 
 echo "✓ Phase R0 complete"
 ```
@@ -518,7 +530,11 @@ if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]]; th
   read -p "Use updated project info? [y/n] " -n 1 -r
   echo
   if [[ $REPLY =~ ^[Yy]$ ]]; then
-    _apply_jq_filter ".discovery.stack_key = \"$STACK_KEY\" | .discovery.node_engine = \"$NODE_ENGINE\" | .discovery.git_commits = $GIT_COMMITS"
+    _apply_jq_filter \
+      --arg stack_key "$STACK_KEY" \
+      --arg node_engine "$NODE_ENGINE" \
+      --argjson git_commits "$GIT_COMMITS" \
+      '.discovery.stack_key = $stack_key | .discovery.node_engine = $node_engine | .discovery.git_commits = $git_commits'
     echo "✓ Updated discovery fields"
   else
     echo "ℹ Keeping existing discovery fields"
@@ -799,6 +815,13 @@ source "${WF_DIR}/lib/refresh-lib.sh"
 STAGING=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' "$WF_STATE")
 PLAN="refresh-plan.json"
 
+# Ensure staging and plan are removed even if R6 fails.
+cleanup_r6() {
+  rm -rf "$STAGING"
+  rm -f "$PLAN"
+}
+trap cleanup_r6 EXIT
+
 echo "ℹ Applying approved changes..."
 
 APPROVE_ADDED=$(jq -r '.build_plan.approval.added // false' "$WF_STATE")
@@ -882,16 +905,44 @@ jq --argjson files "$GENERATED_FILES" --argjson paths "$MANAGED_PATHS" \
 mv "$WF_STATE.tmp" "$WF_STATE"
 
 # Add to .gitignore (ensure a trailing newline first and use an exact line match).
+GITIGNORE_MODIFIED=false
 if ! grep -qxF ".wizard-managed-files.json" .gitignore 2>/dev/null; then
   if [ -f .gitignore ] && [ "$(tail -c1 .gitignore | wc -l)" -eq 0 ]; then
     echo >> .gitignore
   fi
   printf '%s\n' ".wizard-managed-files.json" >> .gitignore
+  GITIGNORE_MODIFIED=true
+fi
+
+# Reflect the .gitignore change in the refresh plan so it is approved/committed explicitly.
+if [ "$GITIGNORE_MODIFIED" = true ]; then
+  if ! jq -e '.updated[]? | select(.path == ".gitignore")' "$PLAN" >/dev/null 2>&1; then
+    GI_OLD_HASH=""
+    if git rev-parse --verify HEAD >/dev/null 2>&1; then
+      TMP_GI=$(mktemp)
+      if git show HEAD:.gitignore > "$TMP_GI" 2>/dev/null; then
+        GI_OLD_HASH=$(wf_sha256 "$TMP_GI")
+      fi
+      rm -f "$TMP_GI"
+    fi
+    GI_NEW_HASH=$(wf_sha256 .gitignore)
+    jq --arg path ".gitignore" \
+       --arg old_hash "$GI_OLD_HASH" \
+       --arg new_hash "$GI_NEW_HASH" \
+       '.updated += [{"path": $path, "old_hash": $old_hash, "new_hash": $new_hash}]' "$PLAN" > "$PLAN.tmp"
+    mv "$PLAN.tmp" "$PLAN"
+  fi
 fi
 
 # Git operations (only if any category was approved)
 if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ "$APPROVE_DELETED" == "true" ]] || [[ "$APPROVE_DELETED_MODIFIED" == "true" ]]; then
   echo "ℹ Committing changes..."
+
+  # Clean the index so only explicitly approved changes are committed.
+  # Guard: repos without HEAD (greenfield) cannot be reset.
+  if git rev-parse --verify HEAD >/dev/null 2>&1; then
+    git reset --mixed HEAD
+  fi
 
   # Stage only the paths the user explicitly approved (null-delimited to handle
   # spaces and avoid `git add -A` dragging in unrelated user changes).
@@ -929,9 +980,7 @@ else
   echo "ℹ No changes approved; skipping commit"
 fi
 
-# Clean staging and plan
-rm -rf "$STAGING"
-rm -f "$PLAN"
+# Staging and plan are cleaned by the EXIT trap installed above.
 
 echo "✓ Phase R6 complete"
 echo "ℹ Next: git push (when ready)"

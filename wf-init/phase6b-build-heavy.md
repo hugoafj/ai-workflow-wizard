@@ -100,6 +100,9 @@ for IDE in $IDES; do
     codex)
       [ -n "$(find .wizard-staging/.codex/commands -maxdepth 1 -name 'wf-*.md' -print -quit 2>/dev/null)" ] && FOUND=$((FOUND + 1))
       ;;
+    gemini-cli)
+      [ -f ".wizard-staging/GEMINI.md" ] && FOUND=$((FOUND + 1))
+      ;;
     antigravity)
       [ -n "$(find .wizard-staging/.agents/skills -maxdepth 2 -name 'SKILL.md' -print -quit 2>/dev/null)" ] && FOUND=$((FOUND + 1))
       ;;

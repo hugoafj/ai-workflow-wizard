@@ -1,15 +1,17 @@
 ## PHASE 4.7 — CI and CD configuration — conditional
 
 > **Gate**: only runs if `features.ci == true`, `features.cd == true`, or
-> `features.release_please == true`. If not, skip to Phase 6.
+> `features.release_please == true`. If not, skip to Phase 5.
 
 ```bash
+source "$WF_DIR/lib/state-helpers.sh"
+
 FEATURES_CI=$(jq -r '.features.ci // false' .wizard-state.json)
 FEATURES_CD=$(jq -r '.features.cd // false' .wizard-state.json)
 FEATURES_RELEASE=$(jq -r '.features.release_please // false' .wizard-state.json)
 if [ "$FEATURES_CI" != "true" ] && [ "$FEATURES_CD" != "true" ] && [ "$FEATURES_RELEASE" != "true" ]; then
   echo "PHASE 4.7 skipped — CI and CD not selected."
-  wf_phase_done phase47 phase6a-agents
+  wf_phase_done phase47 phase5
   exit 0
 fi
 ```

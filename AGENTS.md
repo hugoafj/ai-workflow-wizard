@@ -28,8 +28,9 @@ templates/        — single source of truth
   protocols/      — packable protocols
   satellites/     — per-IDE context files
 wf-init/          — wizard phases
-  lib/            — builder.md, state.md (contracts)
+  lib/            — builder.md, state.md, state-helpers.sh, refresher.md (contracts/helpers)
   phase*.md       — phases 0 through 8
+  subagent-*.md   — sub-agent prompts (discovery, builder-core, builder-heavy)
 ```
 
 ## Artifact Store
@@ -65,7 +66,7 @@ This project declares **OpenSpec** as the SDD artifact store; change artifacts l
 
 **BEFORE every commit**, if your changes affect ANY of these topics, verify and update AI_DEV_WORKFLOW.md:
 - IDE paths, detection logic, routing tables, or satellite generation
-- Builder phases (B1–B8), sub-agent roles, or staging workflow
+- Builder phases (B1–B9), sub-agent roles, or staging workflow
 - Phase numbering, phase logic, or resumption contracts
 - State machine structure (`.wizard-state.json` shape)
 - Commands (list, location per IDE, or behavior)

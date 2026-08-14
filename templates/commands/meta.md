@@ -15,7 +15,7 @@
 | Command | Scope | Skill (1:1) | description (Windsurf) |
 |---|---|---|---|
 | wf-init | global | ✓ global (install.sh, all IDE skill paths + ~/.agents/skills/) | AI Workflow Wizard bootstrap — initializes the workflow in a new repo |
-| wf-refresh | global | ✓ global (install.sh, all IDE skill paths + ~/.agents/skills/) | Updates AGENTS.md when the project has evolved — 3 drift layers |
+| wf-refresh | global | ✓ global (install.sh, all IDE skill paths + ~/.agents/skills/) | Updates AGENTS.md when the project has evolved — builder-driven refresh |
 | wf-cleanup | global | ✓ global (install.sh, all IDE skill paths + ~/.agents/skills/) | Removes wizard artifacts from a project (safe — preserves user code) |
 | wf-ladder | project-specific | ✓ project (Builder B4: native + .agents/skills/ + flat) | Applies wf-ladder (Decision Ladder) before implementing — anti-over-engineering |
 | wf-tdd | project-specific | ✓ project (Builder B4: native + .agents/skills/ + flat) | TDD Protocol — RED→GREEN→REFACTOR (strict) or TDD Proposal (standard) |

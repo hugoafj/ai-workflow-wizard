@@ -3,6 +3,8 @@
 > **Gate**: only runs if `features.tdd_protocol == true`.
 
 ```bash
+source "$WF_DIR/lib/state-helpers.sh"
+
 FEATURES_TDD=$(jq -r '.features.tdd_protocol // false' .wizard-state.json)
 if [ "$FEATURES_TDD" != "true" ]; then
   echo "PHASE 4.6 skipped — TDD Protocol not selected."

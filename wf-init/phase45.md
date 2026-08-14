@@ -4,10 +4,12 @@
 > Otherwise, skip to the next applicable phase.
 
 ```bash
+source "$WF_DIR/lib/state-helpers.sh"
+
 FEATURES_ROUTING=$(jq -r '.features.routing_abc // false' .wizard-state.json)
 FEATURES_TDD=$(jq -r '.features.tdd_protocol // false' .wizard-state.json)
 if [ "$FEATURES_ROUTING" != "true" ] && [ "$FEATURES_TDD" != "true" ]; then
-  echo "FASE 4.5 saltada — no requiere SDD (sin Rutas ABC ni TDD Protocol)."
+  echo "Phase 4.5 skipped — SDD not required (no ABC Routing nor TDD Protocol)."
   NEXT=
   if [ "$(jq -r '.features.ci // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.cd // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.release_please // false' .wizard-state.json)" = "true" ]; then
     NEXT="phase47-cicd"
@@ -39,11 +41,11 @@ fi
 
 1. **Merge the AGENTS.md rule** (read temp-files/AGENTS.md and fuse into the project's AGENTS.md):
    - If `AGENTS.md` does NOT exist (greenfield — the Builder generates it later in Phase 6):
-     copy the whole file `$WF_REPO/temp-files/AGENTS.md` → `AGENTS.md`. That file IS the
+     copy the whole file `$WF_DIR/temp-files/AGENTS.md` → `AGENTS.md`. That file IS the
      "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule and must exist before
      `/sdd-init` runs in the new Windsurf session.
    - If `AGENTS.md` already exists (legacy project): read the rule from
-     `$WF_REPO/temp-files/AGENTS.md` (the **Gentle AI — Legacy Path Bridge for Windsurf/Devin** section),
+     `$WF_DIR/temp-files/AGENTS.md` (the **Gentle AI — Legacy Path Bridge for Windsurf/Devin** section),
      insert it at the top (after the title and before other content) so it loads first, and save.
    - Verify the rule is present: `grep -q "Gentle AI — Legacy Path Bridge" AGENTS.md`.
      If it is not, fix it before continuing.
@@ -52,8 +54,20 @@ fi
 
 2. **Create `.windsurf/workflows/sdd-new.md`** (to replace the legacy version):
    - If `.windsurf/workflows/` does not exist, create it.
-   - Write the content from `$WF_REPO/temp-files/sdd-new.md` to `.windsurf/workflows/sdd-new.md`.
+   - Write the content from `$WF_DIR/temp-files/sdd-new.md` to `.windsurf/workflows/sdd-new.md`.
    - Adapt the file to use the actual SDD backend chosen by the user (read from `state.sdd.backend`).
+
+```bash
+SDD_BACKEND=$(jq -r '.sdd.backend // "hybrid"' .wizard-state.json)
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+SDD_PATH="$SDD_BACKEND"
+[ "$SDD_BACKEND" = "hybrid" ] && SDD_PATH="openspec"
+mkdir -p .windsurf/workflows
+cp "$WF_DIR/temp-files/sdd-new.md" .windsurf/workflows/sdd-new.md
+sed -i.bak "s|{{sdd.backend}}/changes/|$SDD_PATH/changes/|g" .windsurf/workflows/sdd-new.md
+sed -i.bak "s/{{sdd.backend}}/$SDD_BACKEND/g" .windsurf/workflows/sdd-new.md
+rm -f .windsurf/workflows/sdd-new.md.bak
+```
 
 Tell the user:
 

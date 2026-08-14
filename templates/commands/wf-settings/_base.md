@@ -835,7 +835,7 @@ Which one do you prefer?
 ```
 
 **If they choose Claude or Gemini**: generate/update
-`https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/cicd/variants/security-review.<provider>.yml` as
+`https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/cicd/variants/security-review.<provider>.yml.md` as
 `.github/workflows/security-review.yml`. Use PR-Agent with the selected
 provider.
 
@@ -1073,6 +1073,20 @@ Do you want to reapply the Windsurf fix now? [yes / no, skip]
    - If it matches the legacy version (check for "legacy" string or old content), replace it.
    - Write the modern version from temp-files/sdd-new.md.
    - Adapt the backend reference to match `state.sdd.backend`.
+
+```bash
+SDD_BACKEND=$(jq -r '.sdd.backend // "hybrid"' .wizard-state.json)
+WF_DIR="${WF_DIR:-/tmp/wf-settings-phases}"
+WF_RAW="${WF_RAW:-https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main}"
+SDD_PATH="$SDD_BACKEND"
+[ "$SDD_BACKEND" = "hybrid" ] && SDD_PATH="openspec"
+mkdir -p "$WF_DIR/temp-files" .windsurf/workflows
+[ -f "$WF_DIR/temp-files/sdd-new.md" ] || curl -fsSL "$WF_RAW/temp-files/sdd-new.md" -o "$WF_DIR/temp-files/sdd-new.md" 2>/dev/null
+cp "$WF_DIR/temp-files/sdd-new.md" .windsurf/workflows/sdd-new.md
+sed -i.bak "s|{{sdd.backend}}/changes/|$SDD_PATH/changes/|g" .windsurf/workflows/sdd-new.md
+sed -i.bak "s/{{sdd.backend}}/$SDD_BACKEND/g" .windsurf/workflows/sdd-new.md
+rm -f .windsurf/workflows/sdd-new.md.bak
+```
 
 Confirm:
 ```
