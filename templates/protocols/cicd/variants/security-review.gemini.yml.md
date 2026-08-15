@@ -26,9 +26,8 @@ jobs:
         id: pr-agent-review
         uses: Codium-ai/pr-agent@v0.42.0
         env:
-          GOOGLE_AI_STUDIO_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # PR Agent reads the Gemini key from GOOGLE_AI_STUDIO.GEMINI_API_KEY (dot notation).
+          GOOGLE_AI_STUDIO.GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CONFIG.MODEL: "gemini/gemini-2.5-flash"
           PR_REVIEWER.EXTRA_INSTRUCTIONS: >

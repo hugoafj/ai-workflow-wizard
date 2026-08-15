@@ -1893,7 +1893,7 @@ This is the only thing gentle-ai truly automates. If your team uses OpenCode:
 # Create a "cheap" profile for experimentation: economical model in general,
 # but a more capable model specifically for the design phase
 gentle-ai sync --profile cheap:openrouter/qwen/qwen3-30b-a3b:free
-gentle-ai sync --profile-phase cheap:sdd-design:anthropic/claude-sonnet-4-20250514
+gentle-ai sync --profile-phase cheap:sdd-design:anthropic/claude-sonnet-5
 ```
 
 You can also create via TUI: `gentle-ai` → "OpenCode SDD Profiles" → Create.
