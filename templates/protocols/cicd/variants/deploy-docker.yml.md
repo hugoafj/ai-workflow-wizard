@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ '{{' }} secrets.SERVER_IP {{ '}}' }}
           username: ${{ '{{' }} secrets.SSH_USER {{ '}}' }}

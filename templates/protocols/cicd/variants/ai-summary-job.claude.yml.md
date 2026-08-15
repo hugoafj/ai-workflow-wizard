@@ -32,7 +32,7 @@
             -H "Content-Type: application/json" \
             -d "$(jq -n \
               --arg text "Summarize these changes for humans, highlighting benefits for the end user. Keep the Markdown format.\n\n${PR_BODY}" \
-              '{model:"claude-sonnet-4-20250514", max_tokens:1024, messages:[{role:"user", content:$text}]}')" \
+              '{model:"claude-3-7-sonnet-20250219", max_tokens:1024, messages:[{role:"user", content:$text}]}')" \
             | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['content'][0]['text'])" 2>/dev/null \
             || echo "_Could not generate automatic summary._")
 

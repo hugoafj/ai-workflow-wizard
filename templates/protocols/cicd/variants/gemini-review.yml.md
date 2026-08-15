@@ -25,9 +25,11 @@ jobs:
 
       - name: PR Agent Action
         id: pr-agent-review
-        uses: Codium-ai/pr-agent@main
+        uses: Codium-ai/pr-agent@v0.42.0
         env:
-          GOOGLE_AI_STUDIO.GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_AI_STUDIO_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Change the model according to your preference. Some models require an API key with billing enabled.
           CONFIG.MODEL: "gemini/gemini-2.5-flash"

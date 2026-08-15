@@ -120,9 +120,14 @@ for IDE in $IDES; do
   esac
 done
 if [ "$FOUND" -eq 0 ]; then
-  echo "ERROR: No generated command files found in .wizard-staging for the active IDEs."
-  echo "Builder-Heavy may have skipped or failed. Check .wizard-state.json answers.ides[] and command generation logs."
-  exit 1
+  IDE_COUNT=$(jq -r '(.answers.ides // []) | length' .wizard-state.json)
+  if [ "$IDE_COUNT" -eq 0 ]; then
+    echo "WARNING: No active IDE/CLI selected — skipping command file validation."
+  else
+    echo "ERROR: No generated command files found in .wizard-staging for the active IDEs."
+    echo "Builder-Heavy may have skipped or failed. Check .wizard-state.json answers.ides[] and command generation logs."
+    exit 1
+  fi
 fi
 
 echo "✓ Builder-Heavy validation passed"

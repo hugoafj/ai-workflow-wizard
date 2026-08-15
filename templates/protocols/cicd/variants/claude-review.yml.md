@@ -29,7 +29,7 @@ jobs:
 
       - name: Claude Code Review
         id: claude-review
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@v1.0.193
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           # Inline suggestions: allows Claude to create inline comments on the code.

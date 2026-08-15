@@ -24,7 +24,7 @@ jobs:
 
       - name: PR Agent Security Audit
         id: pr-agent-review
-        uses: Codium-ai/pr-agent@main
+        uses: Codium-ai/pr-agent@v0.42.0
         env:
           GOOGLE_AI_STUDIO_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

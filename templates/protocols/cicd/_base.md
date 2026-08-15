@@ -383,13 +383,14 @@ from `package.json`:
 
 > **Single source**: write this artifact VERBATIM from `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/cicd/variants/release-please-manifest.json.md`. Do not edit it inline here; if it changes, change it in the template.
 
-Ask about the optional AI summary step (requires the same
-`GEMINI_API_KEY` from previous phases, if configured):
+Ask about the optional AI summary step (requires the same provider API key
+from previous phases if configured — `ANTHROPIC_API_KEY` for Claude,
+`GEMINI_API_KEY` for Gemini, or `OPENAI_API_KEY` for OpenAI):
 
 ```
 Do you want the release PR to include an AI-generated natural language
 summary (in addition to the automatic conventional commits changelog)?
-Requires GEMINI_API_KEY. [yes / no]
+Requires the configured provider's API key. [yes / no]
 ```
 
 If confirmed, add a second job to the same workflow:

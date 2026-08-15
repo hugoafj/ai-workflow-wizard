@@ -195,13 +195,22 @@ version_lt() {
 # Ask a yes/no question safely in BOTH tty and non-tty (agent-driven) contexts.
 # In an interactive tty it prompts like a normal read -n 1. When stdin is EOF or
 # not a tty (agent run), a bare `read` would fail under `set -e` and abort the
-# script — here it is treated as a NO instead. Returns 0 for yes, 1 otherwise.
+# script. In that case, respect WF_REFRESH_DEFAULT_ANSWER ("yes" or "no") if
+# it is set; otherwise fail loudly instead of silently defaulting to NO.
 _ask_yesno_safe() {
   local prompt="$1"
   local reply leftover
-  if ! read -p "$prompt [y/n] " -n 1 -r reply; then
-    echo "(no input — treating as no)"
-    return 1
+  if ! read -p "$prompt [y/n] " -n 1 -r reply 2>/dev/null; then
+    if [ "${WF_REFRESH_DEFAULT_ANSWER:-}" = "yes" ]; then
+      echo "(non-interactive — using WF_REFRESH_DEFAULT_ANSWER=yes)"
+      return 0
+    elif [ "${WF_REFRESH_DEFAULT_ANSWER:-}" = "no" ]; then
+      echo "(non-interactive — using WF_REFRESH_DEFAULT_ANSWER=no)"
+      return 1
+    else
+      echo "ERROR: non-interactive input required but WF_REFRESH_DEFAULT_ANSWER is not set." >&2
+      return 2
+    fi
   fi
   echo
   # When stdin is piped (not a tty), `read -n 1` consumes only the first char and
@@ -271,13 +280,16 @@ migrate_to_0_6_8() {
     fi
   fi
 
-  # Default remaining feature flags to false if missing
-  _apply_jq_filter '
-    .features.tdd_protocol //= false |
-    .features.ci //= false |
-    .features.cd //= false |
-    .features.release_please //= false
-  '
+  # Ask about remaining feature flags (default to false only in non-interactive mode)
+  for feature in tdd_protocol ci cd release_please; do
+    if ! jq -e ".features | has(\"$feature\")" "$WF_STATE" >/dev/null 2>&1; then
+      if _ask_yesno "Enable $feature?"; then
+        _apply_jq_filter ".features.$feature = true"
+      else
+        _apply_jq_filter ".features.$feature = false"
+      fi
+    fi
+  done
 
   # CI/CD defaults
   _apply_jq_filter '

@@ -43,7 +43,12 @@ jobs:
         run: npm ci
 
       - name: Lint
-        run: npm run lint
+        run: |
+          if [ -f package.json ] && grep -q '"lint"' package.json; then
+            npm run lint
+          else
+            echo "No lint script defined; skipping."
+          fi
 
       <if type-check script or tsconfig.json exists>:
       - name: Type check
@@ -62,7 +67,12 @@ jobs:
         run: npm run test:sanitization
 
       - name: Build
-        run: npm run build
+        run: |
+          if [ -f package.json ] && grep -q '"build"' package.json; then
+            npm run build
+          else
+            echo "No build script defined; skipping."
+          fi
 
       <if e2e layer is active>:
       - name: Install Playwright browsers

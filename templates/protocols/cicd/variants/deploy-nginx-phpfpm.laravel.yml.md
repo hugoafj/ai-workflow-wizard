@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@v2.37.2
         with:
           php-version: '{{php_version}}'
           extensions: mbstring, xml, curl, mysql, zip, gd, bcmath, dom, fileinfo
@@ -52,7 +52,7 @@ jobs:
         run: tar -czf deploy.tar.gz --exclude=.git --exclude=node_modules --exclude=vendor .
 
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ '{{' }} secrets.SERVER_IP {{ '}}' }}
           username: ${{ '{{' }} secrets.SSH_USER {{ '}}' }}

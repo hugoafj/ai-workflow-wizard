@@ -525,6 +525,8 @@ Slash command that orchestrates the complete workflow bootstrap in a project. Sp
 The wizard phases:
 
 - **Phase 0** — Self-contained prerequisite. Installs/verifies gentle-ai, runs `gentle-ai doctor`, confirms active agents for this project.
+- **Phase 0b** — System health check. Verifies `gentle-ai doctor` critical checks, warns on disk space and Engram reachability.
+- **Phase 0c** — Workflow feature selection. Lets the user toggle routing, TDD, CI/CD, release-please and other optional modules before discovery.
 - **Phase 1** — Discovery (lists files, manifests, previous satellites, commits).
 - **Phase 2** — Migration of previous artifacts (if any with their own content).
 - **Phase 3** — Mode: greenfield vs legacy (auto-detect + confirmation).
@@ -567,6 +569,7 @@ These live in the repo. Each one connects its specific IDE to THIS project's `AG
 - `.windsurf/rules/project.md` with `trigger: always_on` (Windsurf does not read AGENTS.md).
 - `.kiro/steering/project-context.md` (Kiro partial).
 - `GEMINI.md` (Gemini CLI partial) — `ANTIGRAVITY.md` (Antigravity CLI).
+- `.devin/rules/project.mdc` (Devin local IDE rules; the wizard does not generate this — it is separate from the generated `.devin/skills/`).
 - `post-commit` hook for drift detection.
 - Exceptions in `.gitignore` so satellites are versioned.
 
@@ -767,7 +770,8 @@ When running `/wf-refresh`, Phase R2 does the following:
 
 1. Reads `.wizard-state.json` features (e.g., `features.decision_ladder`).
 2. Detects new features in the current wizard version.
-3. **For each feature not in the local state**: asks you. Example:
+3. **For each feature not in the local state**: asks you. In non-interactive/agent contexts set `WF_REFRESH_DEFAULT_ANSWER=yes|no` so the migration can proceed without stdin; otherwise it fails loudly instead of silently defaulting to NO.
+4. Example:
 
 ```
 New optional features available:
@@ -781,8 +785,8 @@ New optional features available:
    Enable? [y/n]
 ```
 
-4. For each user response, updates `features.*` in `.wizard-state.json`.
-5. Features marked as disabled are not asked again in future refreshes.
+5. For each user response, updates `features.*` in `.wizard-state.json`.
+6. Features marked as disabled are not asked again in future refreshes.
 
 #### When refresh is NOT enough and you need to re-run the wizard
 

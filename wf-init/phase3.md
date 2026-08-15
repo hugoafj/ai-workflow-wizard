@@ -48,6 +48,9 @@ else
   NEXT="phase5"
 fi
 wf_phase_done phase3 "$NEXT"
+# Greenfield projects skip Phase 4 (reverse engineering is legacy-only).
+jq '.phases["phase4"].status = "skipped"' .wizard-state.json > .wizard-state.json.tmp
+mv .wizard-state.json.tmp .wizard-state.json
 cat "$WF_DIR/$NEXT.md"
 ```
 

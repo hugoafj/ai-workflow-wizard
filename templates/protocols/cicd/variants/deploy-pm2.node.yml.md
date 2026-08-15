@@ -33,14 +33,16 @@ jobs:
         run: npm run build
 
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ '{{' }} secrets.SERVER_IP {{ '}}' }}
           username: ${{ '{{' }} secrets.SSH_USER {{ '}}' }}
           key: ${{ '{{' }} secrets.SSH_KEY {{ '}}' }}
           script: |
+            set -euo pipefail
             cd {{deploy_path}}
             git pull origin main
-            npm ci --production
+            npm ci
             npm run build
+            npm ci --omit=dev
             pm2 restart app
