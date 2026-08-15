@@ -109,7 +109,7 @@ Once set up, here's what working with the AI Workflow looks like:
 > Every command is also packaged as a SKILL.md (1:1): project ones by the Builder (native
 > per IDE + `.agents/skills/` universal + flat fallback), global ones by `install.sh`.
 
-> CI/CD re-configuration lives in `/wf-settings` (options 9-15), sourced from the `cicd`
+> CI/CD re-configuration lives in `/wf-settings` (options 9–16: CI/CD and release strategy), sourced from the `cicd`
 > protocol (`templates/protocols/cicd/_base.md`).
 
 ## When to Use /wf-cleanup + /wf-init Instead of /wf-refresh

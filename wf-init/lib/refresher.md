@@ -90,7 +90,9 @@ _version_norm() {
 # Supports x.y.z[-prerelease[.N]] where prerelease fields are '.'-separated.
 # Release (no prerelease) is greater than any prerelease of the same MAJ.MIN.PATCH.
 version_lte() {
-  local LC_ALL=C
+  local LC_ALL
+  LC_ALL=C
+  export LC_ALL
   local v1 v2
   v1="$(_version_norm "$1")"
   v2="$(_version_norm "$2")"
@@ -269,6 +271,14 @@ migrate_to_0_6_8() {
     fi
   fi
 
+  # Default remaining feature flags to false if missing
+  _apply_jq_filter '
+    .features.tdd_protocol //= false |
+    .features.ci //= false |
+    .features.cd //= false |
+    .features.release_please //= false
+  '
+
   # CI/CD defaults
   _apply_jq_filter '
     .ci.e2e_in_ci //= false |
@@ -292,6 +302,9 @@ migrate_to_0_7_1() {
 }
 
 # Migrate state from CURRENT_VERSION to TARGET_VERSION using cumulative migrations.
+# Known migrations are listed explicitly; for versions beyond the known list, a
+# dynamically named migration function is tried (e.g. migrate_to_0_8_0). If no
+# migration exists, a warning is emitted so future versions are not silently skipped.
 migrate_state() {
   local CURRENT_VERSION="$1"
   local TARGET_VERSION="$2"
@@ -327,6 +340,26 @@ migrate_state() {
     fi
   done
 
+  # For target versions newer than the last known migration, try a function named
+  # after the target (e.g. migrate_to_0_8_0 or migrate_to_0_8_0_beta_1).
+  if version_lt "$CURRENT" "$TARGET_VERSION"; then
+    local NORM_TARGET BASE_TARGET MIG_FUNC MIG_FOUND
+    MIG_FOUND=false
+    NORM_TARGET=$(printf '%s' "$TARGET_VERSION" | tr '.-' '_')
+    BASE_TARGET=$(printf '%s' "$TARGET_VERSION" | sed 's/-.*//' | tr '.' '_')
+    for MIG_FUNC in "migrate_to_${NORM_TARGET}" "migrate_to_${BASE_TARGET}"; do
+      if declare -F "$MIG_FUNC" >/dev/null 2>&1; then
+        "$MIG_FUNC"
+        CURRENT="$TARGET_VERSION"
+        MIG_FOUND=true
+        break
+      fi
+    done
+    if [[ "$MIG_FOUND" != "true" ]]; then
+      echo "  ⚠ No migration function defined for versions after $CURRENT up to $TARGET_VERSION" >&2
+    fi
+  fi
+
   # Always write the exact target version at the end.
   _apply_jq_filter ".wizard_version = \"$TARGET_VERSION\""
   echo "  ✓ State migrated to $TARGET_VERSION"
@@ -334,7 +367,9 @@ migrate_state() {
 
 # Ensure custom AGENTS.md sections are preserved.
 # Reads existing AGENTS.md, extracts blocks between markers, and re-injects them
-# into the staged AGENTS.md at the same relative position.
+# into the staged AGENTS.md at the same relative position (before the heading
+# that originally followed each block). Blocks that are already present in the
+# staged file are skipped so the function stays idempotent.
 preserve_custom_agents() {
   local STAGING="${1:-.wizard-staging}"
   local PROJECT_AGENTS="AGENTS.md"
@@ -344,51 +379,119 @@ preserve_custom_agents() {
     return 0
   fi
 
-  # Idempotent: if the Builder already preserved the custom markers into the
-  # staged AGENTS.md, do NOT re-inject (avoids duplicating the section).
-  if grep -q "<!-- WF: DO NOT REGENERATE -->" "$STAGED_AGENTS"; then
-    echo "  ℹ Custom sections already present in staged AGENTS.md (Builder preserved them)"
+  if ! grep -q "<!-- WF: DO NOT REGENERATE -->" "$PROJECT_AGENTS"; then
     return 0
   fi
 
   echo "  Preserving custom AGENTS.md sections..."
 
   local TMP="${STAGED_AGENTS}.tmp"
-  local IN_CUSTOM=false
-  local CUSTOM_BLOCK=""
-  local LINE
+  local BLOCK_DIR="${STAGED_AGENTS}.blocks"
+  rm -rf "$BLOCK_DIR"
+  mkdir -p "$BLOCK_DIR"
 
-  while IFS= read -r LINE; do
-    if [[ "$LINE" == *"<!-- WF: DO NOT REGENERATE -->"* ]]; then
-      IN_CUSTOM=true
-      CUSTOM_BLOCK="${LINE}"$'\n'
+  local -a ALL_LINES
+  local LINE
+  while IFS= read -r LINE || [[ -n "$LINE" ]]; do
+    ALL_LINES+=("$LINE")
+  done < "$PROJECT_AGENTS"
+  local TOTAL=${#ALL_LINES[@]}
+
+  local IN_CUSTOM=false
+  local FOLLOWING=()
+  local SIGNATURES=()
+  local BLOCK_FILES=()
+  local i=0 j=0
+
+  for (( i=0; i<TOTAL; i++ )); do
+    LINE="${ALL_LINES[$i]}"
+    if $IN_CUSTOM; then
+      printf '%s\n' "$LINE" >> "$BLOCK_DIR/block_$j"
+      if [[ "$LINE" == *"<!-- /WF: DO NOT REGENERATE -->"* ]]; then
+        IN_CUSTOM=false
+        local FOLLOWING_H=""
+        local k
+        for (( k=i+1; k<TOTAL; k++ )); do
+          if [[ "${ALL_LINES[$k]}" =~ ^##[[:space:]]+ ]]; then
+            FOLLOWING_H="${ALL_LINES[$k]}"
+            break
+          fi
+        done
+        FOLLOWING+=("$FOLLOWING_H")
+        SIGNATURES+=("$(sed -n '2,$p' "$BLOCK_DIR/block_$j" | sed '$d' | grep -m1 . || true)")
+        BLOCK_FILES+=("$BLOCK_DIR/block_$j")
+        j=$((j + 1))
+      fi
       continue
     fi
-    if [[ "$LINE" == *"<!-- /WF: DO NOT REGENERATE -->"* ]]; then
-      IN_CUSTOM=false
-      CUSTOM_BLOCK="${CUSTOM_BLOCK}${LINE}"$'\n'
-      # Inject into staged file at the same heading level? Simpler: append before first "##".
-      # If no "##", append at end.
-      if grep -q '^## ' "$STAGED_AGENTS"; then
-        local HEADING
-        HEADING=$(grep -n '^## ' "$STAGED_AGENTS" | head -1 | cut -d: -f1)
+
+    if [[ "$LINE" == *"<!-- WF: DO NOT REGENERATE -->"* ]]; then
+      IN_CUSTOM=true
+      printf '%s\n' "$LINE" > "$BLOCK_DIR/block_$j"
+    fi
+  done
+
+  if [[ ${#BLOCK_FILES[@]} -eq 0 ]]; then
+    rm -rf "$BLOCK_DIR"
+    echo "  ℹ No custom sections found in $PROJECT_AGENTS"
+    return 0
+  fi
+
+  local FOLLOWING_H SIG BF
+  for (( j=0; j<${#BLOCK_FILES[@]}; j++ )); do
+    BF="${BLOCK_FILES[$j]}"
+    FOLLOWING_H="${FOLLOWING[$j]}"
+    SIG="${SIGNATURES[$j]}"
+
+    if [[ -n "$SIG" ]] && grep -qF -- "$SIG" "$STAGED_AGENTS"; then
+      continue
+    fi
+
+    if [[ -n "$FOLLOWING_H" ]] && grep -qF -- "$FOLLOWING_H" "$STAGED_AGENTS"; then
+      awk -v heading="$FOLLOWING_H" -v blockfile="$BF" '
+        $0 == heading {
+          print ""
+          while ((getline line < blockfile) > 0) print line
+          close(blockfile)
+          print ""
+          print
+          inserted=1
+          next
+        }
+        { print }
+        END {
+          if (!inserted) {
+            print ""
+            while ((getline line < blockfile) > 0) print line
+            close(blockfile)
+          }
+        }
+      ' "$STAGED_AGENTS" > "$TMP"
+      mv "$TMP" "$STAGED_AGENTS"
+    else
+      local FOOTER_LINE
+      FOOTER_LINE=$(grep -n '^<!-- wf-version:' "$STAGED_AGENTS" | tail -1 | cut -d: -f1 || true)
+      if [[ -n "$FOOTER_LINE" ]]; then
         {
-          head -n "$((HEADING - 1))" "$STAGED_AGENTS"
-          printf '\n%s\n' "$CUSTOM_BLOCK"
-          tail -n "+$HEADING" "$STAGED_AGENTS"
+          head -n "$((FOOTER_LINE - 1))" "$STAGED_AGENTS"
+          printf '\n'
+          cat "$BF"
+          printf '\n'
+          tail -n "+$FOOTER_LINE" "$STAGED_AGENTS"
         } > "$TMP"
         mv "$TMP" "$STAGED_AGENTS"
       else
-        printf '\n%s\n' "$CUSTOM_BLOCK" >> "$STAGED_AGENTS"
+        {
+          printf '\n'
+          cat "$BF"
+          printf '\n'
+        } >> "$STAGED_AGENTS"
       fi
-      CUSTOM_BLOCK=""
-      continue
     fi
-    if $IN_CUSTOM; then
-      CUSTOM_BLOCK="${CUSTOM_BLOCK}${LINE}"$'\n'
-    fi
-  done < "$PROJECT_AGENTS"
+  done
 
+  rm -rf "$BLOCK_DIR"
+  rm -f "$TMP"
   echo "  ✓ Custom sections preserved"
 }
 

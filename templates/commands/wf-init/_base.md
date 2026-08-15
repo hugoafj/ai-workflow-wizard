@@ -99,6 +99,11 @@ if [ ! -s "$WF_DIR/temp-files/AGENTS.md" ]; then
   missing=true
 fi
 
+if [ ! -s "$WF_DIR/temp-files/sdd-new.md" ]; then
+  echo "Error: could not download temp-files/sdd-new.md from GitHub." >&2
+  missing=true
+fi
+
 if [ "$missing" = true ]; then
   exit 1
 fi

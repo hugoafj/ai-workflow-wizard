@@ -11,7 +11,7 @@ You are a project discovery agent. Your job is to run bash commands to analyze a
 
 ## Instructions
 
-### 1. Inicializar helpers de estado
+### 1. Initialize state helpers
 
 ```bash
 source "{WF_PATH}/lib/state-helpers.sh"

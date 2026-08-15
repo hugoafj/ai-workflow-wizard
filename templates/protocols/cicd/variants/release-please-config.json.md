@@ -1,7 +1,7 @@
 {
   "packages": {
     ".": {
-      "release-type": "node"
+      "release-type": "simple"
     }
   }
 }

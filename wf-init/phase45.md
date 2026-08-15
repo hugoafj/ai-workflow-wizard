@@ -57,39 +57,17 @@ fi
    **Why**: gentle-ai installs SDD skills into Windsurf's legacy paths (`~/.codeium/windsurf/skills/`), not the Devin paths. This rule tells the agent where to find them. Without it, sdd-init will not load the skills correctly in Windsurf. Phase 45 runs BEFORE the Builder (Phase 6) creates AGENTS.md, so a greenfield project needs the rule file created here directly.
 
 2. **Create `.windsurf/workflows/sdd-new.md`** (to replace the legacy version):
-   - If `.windsurf/workflows/` does not exist, create it.
-   - Write the content from `$WF_DIR/temp-files/sdd-new.md` to `.windsurf/workflows/sdd-new.md`.
-   - Adapt the file to use the actual SDD backend chosen by the user (read from `state.sdd.backend`).
-
-```bash
-SDD_BACKEND=$(jq -r '.sdd.backend // "hybrid"' .wizard-state.json)
-WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
-SDD_PATH="$SDD_BACKEND"
-[ "$SDD_BACKEND" = "hybrid" ] && SDD_PATH="openspec"
-mkdir -p .windsurf/workflows
-cp "$WF_DIR/temp-files/sdd-new.md" .windsurf/workflows/sdd-new.md
-if [ "$SDD_BACKEND" = "engram" ]; then
-  sed -i.bak "s|{{sdd.backend}}/changes/<name>/proposal.md|Engram memory:|g" .windsurf/workflows/sdd-new.md
-else
-  sed -i.bak "s|{{sdd.backend}}/changes/|$SDD_PATH/changes/|g" .windsurf/workflows/sdd-new.md
-fi
-sed -i.bak "s/{{sdd.backend}}/$SDD_BACKEND/g" .windsurf/workflows/sdd-new.md
-rm -f .windsurf/workflows/sdd-new.md.bak
-```
+   - This file is generated **after** the backend selection below, once `state.sdd.backend` is resolved.
+   - See the "Generate `.windsurf/workflows/sdd-new.md`" step in the `/sdd-init` section.
 
 Tell the user:
 
 ```
 ⚙️ Windsurf compatibility setup:
   ✓ AGENTS.md: gentle-ai Windsurf paths rule in place (created if it did not exist)
-  ✓ Created .windsurf/workflows/sdd-new.md (modern SDD workflow)
+  ⏳ `.windsurf/workflows/sdd-new.md` will be generated after you choose the SDD backend.
 
-This is a temporary workaround for a gentle-ai bug with Windsurf. The agent will now
-be able to find and run SDD skills correctly.
-
-Note: After /sdd-init runs, gentle-ai sync may overwrite .windsurf/workflows/sdd-new.md
-with the legacy version. If that happens, run /wf-settings → "Fix Windsurf gentle-ai" 
-to reapply this fix.
+This is a temporary workaround for a gentle-ai bug with Windsurf.
 ```
 
 ---
@@ -249,6 +227,57 @@ Do you confirm? [yes, I understand and accept / no, I prefer hybrid]
 If the user switches to hybrid, use that option.
 
 ---
+
+### Persist backend and generate Windsurf `sdd-new.md`
+
+The chosen backend must be written to `.wizard-state.json` **before** any `/sdd-init` prompt or `.windsurf/workflows/sdd-new.md` templating, so the values cannot be out of sync.
+
+Map the user's answer to `engram`, `openspec`, or `hybrid` and persist it:
+
+```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
+# Replace <chosen backend> with the value the user selected: engram / openspec / hybrid
+SDD_BACKEND=<chosen backend>
+jq --arg backend "$SDD_BACKEND" \
+   '.sdd.backend = $backend | .updated_at = (now | todate)' \
+   .wizard-state.json > .wizard-state.json.tmp
+mv .wizard-state.json.tmp .wizard-state.json
+```
+
+If Windsurf is active, generate `.windsurf/workflows/sdd-new.md` from the resolved backend:
+
+```bash
+SDD_BACKEND=$(jq -r '.sdd.backend // "hybrid"' .wizard-state.json)
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+SDD_PATH="$SDD_BACKEND"
+[ "$SDD_BACKEND" = "hybrid" ] && SDD_PATH="openspec"
+mkdir -p .windsurf/workflows
+cp "$WF_DIR/temp-files/sdd-new.md" .windsurf/workflows/sdd-new.md
+if [ "$SDD_BACKEND" = "engram" ]; then
+  sed -i.bak "s|{{sdd.backend}}/changes/<name>/proposal.md|Engram memory:|g" .windsurf/workflows/sdd-new.md
+else
+  sed -i.bak "s|{{sdd.backend}}/changes/|$SDD_PATH/changes/|g" .windsurf/workflows/sdd-new.md
+fi
+sed -i.bak "s/{{sdd.backend}}/$SDD_BACKEND/g" .windsurf/workflows/sdd-new.md
+rm -f .windsurf/workflows/sdd-new.md.bak
+```
+
+Then update the Windsurf status:
+
+```
+⚙️ Windsurf compatibility setup:
+  ✓ AGENTS.md: gentle-ai Windsurf paths rule in place (created if it did not exist)
+  ✓ Created `.windsurf/workflows/sdd-new.md` (backend: <SDD_BACKEND>)
+
+This is a temporary workaround for a gentle-ai bug with Windsurf. The agent will now
+be able to find and run SDD skills correctly.
+
+Note: After /sdd-init runs, gentle-ai sync may overwrite .windsurf/workflows/sdd-new.md
+with the legacy version. If that happens, run /wf-settings → "Fix Windsurf gentle-ai"
+to reapply this fix.
+```
 
 ### Running `/sdd-init` (gentle-ai skill)
 

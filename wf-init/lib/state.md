@@ -45,9 +45,8 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
     "phase45":  { "status": "pending" },
     "phase46":  { "status": "pending" },
     "phase46b": { "status": "pending" },
-    "phase47":  { "status": "pending" },
     "phase47-cicd": { "status": "pending" },
-    "phase6":   { "status": "pending" },
+    "phase6":        { "status": "pending" },
     "phase6a-agents": { "status": "pending" },
     "phase7":   { "status": "pending" },
     "phase8":   { "status": "pending" }
@@ -140,7 +139,8 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
 
   "migration": {
     "prior_content_action": null,
-    "missing_commands": []
+    "missing_commands": [],
+    "wrap_custom_in_markers": false
   },
 
   "build_plan": {
@@ -161,9 +161,10 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
 ## Key fields
 
 - **`phase_pointer`**: current phase. On startup, the orchestrator reads it; if it is not
-  `phase0`, it offers to resume. Note that phase 5 advances to `phase6a-agents` (there is no
-  `phase6.md` file; the Builder's phase-6 completion gates accept both `phase6` and
-  `phase6a-agents`), and phase 47 may advance through `phase47-cicd` for CI/CD-only flows.
+  `phase0`, it offers to resume. Phase 5 advances to `phase6a-agents` (there is no
+  `phase6.md` file; `phase6` is a backward-compatible alias). Phase 6b is `phase6b-build-heavy`,
+  which advances to `phase7` when complete. Phase 47 is `phase47-cicd` (the old `phase47` key is
+  not used).
 - **`discovery.stack_key`**: normalized stack key (e.g. `node-react`, `php-laravel`,
   `python-django`). This is what the Builder uses to select `variants/<stack_key>.md`.
   **Never branch with `if stack === ...`**: the key selects a file.

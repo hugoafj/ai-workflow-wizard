@@ -251,7 +251,7 @@ cd "{PROJECT_PATH}"
 ## Expected output
 
 ```
-✓ Builder-Core completado:
+✓ Builder-Core completed:
   - Packaged protocols: N (flat) + M (skills)
   - AGENTS.md router ready
   - Satellites generated: N

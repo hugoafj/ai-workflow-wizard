@@ -35,9 +35,9 @@ jobs:
           github_action_config.pr_actions: '["opened", "synchronize", "reopened"]'
           github_action_config.auto_review: "true"
           github_action_config.auto_describe: "true"
-          # auto_improve disabled: pr-agent fails with Gemini for code suggestions
-          # (falls back to gpt-5.4-mini without an OpenAI key configured)
-          github_action_config.auto_improve: "false"
+          # Configurable from state.ci.auto_improve (default true). Regenerate this
+          # workflow after toggling "AI Review Suggestions" in /wf-settings.
+          github_action_config.auto_improve: "{{ci.auto_improve}}"
 
       - name: Post failure comment on PR
         if: failure()

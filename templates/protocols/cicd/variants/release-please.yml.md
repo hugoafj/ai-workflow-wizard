@@ -7,7 +7,7 @@
 #   answers.project_name — project name for release branch naming
 #
 # Notes:
-#   - release-type: node assumes package.json. For markdown-only, use release-type: simple
+#   - release-type: simple is the default for markdown/templates projects (override to `node` for Node.js projects)
 #   - The repo must allow GitHub Actions to create PRs (Settings → Actions → General → Workflow permissions)
 
 name: release-please
@@ -29,7 +29,7 @@ jobs:
       - uses: googleapis/release-please-action@v4
         id: release
         with:
-          release-type: node
+          release-type: simple
 {{if ci.release_ai_summary}}
 
   ai-summary:

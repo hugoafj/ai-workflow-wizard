@@ -130,16 +130,21 @@ echo "✓ Builder-Heavy validation passed"
 
 ### Step 5: Mark phases complete and inform user
 
-Mark phases 6 and 7 as done (persistence), but **only if the current phase_pointer is still `phase6`**. This makes the phase safe to reuse during `/wf-refresh`, when the project may already be past phase 7:
+Mark the Builder phases done and advance the pointer **only if the current phase_pointer is still one of the Builder phases**. This makes the phase safe to reuse during `/wf-refresh`, when the project may already be past phase 7:
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
+
 CURRENT_PHASE=$(jq -r '.phase_pointer // empty' .wizard-state.json)
-# phase5 advances to phase6a-agents (not phase6), so accept both pointers
-# when completing the Builder phases.
-if [ "$CURRENT_PHASE" = "phase6" ] || [ "$CURRENT_PHASE" = "phase6a-agents" ]; then
-  wf_phase_done phase6 phase7
+# phase5 advances to phase6a-agents (the real key); phase6 is a backward-compatible alias.
+if [ "$CURRENT_PHASE" = "phase6" ] || [ "$CURRENT_PHASE" = "phase6a-agents" ] || [ "$CURRENT_PHASE" = "phase6b-build-heavy" ]; then
+  jq '.phases["phase6"].status = "done" |
+      .phases["phase6a-agents"].status = "done" |
+      .phases["phase6b-build-heavy"].status = "done" |
+      .phase_pointer = "phase7" |
+      .updated_at = (now | todate)' .wizard-state.json > .wizard-state.json.tmp
+  mv .wizard-state.json.tmp .wizard-state.json
 fi
 ```
 

@@ -112,10 +112,10 @@ do_install() {
   echo "${VERSION}"
   echo ""
 
-  # Descriptions for Windsurf/Antigravity frontmatter
-  local desc_init="AI Workflow Wizard bootstrap — initialize the workflow in a new repo"
-  local desc_refresh="AI Workflow Wizard refresh — re-run the builder-driven generator and apply hash-based diffs when the project evolves"
-  local desc_cleanup="AI Workflow Wizard uninstaller — remove wizard artifacts from a project"
+  # Descriptions for Windsurf/Antigravity frontmatter (must match templates/commands/meta.md)
+  local desc_init="AI Workflow Wizard bootstrap — initializes the workflow in a new repo"
+  local desc_refresh="Updates AGENTS.md when the project has evolved — builder-driven refresh"
+  local desc_cleanup="Removes wizard artifacts from a project (safe — preserves user code)"
 
   local installed=0
 

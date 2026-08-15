@@ -9,7 +9,6 @@
 #   {{node_version}}    — e.g. '20' (from .nvmrc or package.json engines)
 #   {{has_node_assets}} — 'true' or 'false' (true when stack_detected == 'laravel_node')
 #   {{deploy_path}}     — e.g. '/var/www/my-app/current'
-#   {{project_name}}    — used for PM2/process name or directory reference
 
 name: Deploy to Production
 

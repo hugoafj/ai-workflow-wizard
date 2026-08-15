@@ -18,10 +18,10 @@ Detects project drift and applies updates safely:
 2. **Phase R0**: Validate `.wizard-state.json` and detect active IDEs
 3. **Phase R1**: Re-discover project (stack, node engine, etc.) and detect drift
 4. **Phase R2**: Migrate state schema and ask about new optional features
-5. **Phase R3**: Re-run Builder (B1-B9) to generate all artifacts into `.wizard-staging/`
-6. **Phase R4**: Compare staging with project using SHA256 hashes; classify files as add/update/delete/unchanged
-7. **Phase R5**: Show grouped diff and collect your approvals
-8. **Phase R6**: Apply approved changes, update state, commit, clean staging
+5. **Phase R3**: Re-run Builder (B1-B9) to generate all artifacts into `.wizard-staging/` (first snapshots the pre-Builder `managed_paths`/`generated_files` into `.wizard-refresh-baseline.json`)
+6. **Phase R4**: Compare the R3 baseline snapshot with staging using SHA256 hashes; classify files as add/update/delete/unchanged, with `deleted_modified` flagged when the user edited a file since the last refresh
+7. **Phase R5**: Show a real content preview (added → staged content; updated → `diff -u` against staging; deleted/deleted_modified → current content) and collect your approvals
+8. **Phase R6**: Apply approved changes only; on approval update state, write `.wizard-managed-files.json`, and commit via an explicit pathspec; a fully declined refresh writes nothing
 
 ---
 

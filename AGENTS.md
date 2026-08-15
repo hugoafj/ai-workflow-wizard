@@ -2,20 +2,9 @@
 
 ## Commands
 
-| Command | Source template |
-|---|---|
-| `/wf-init` | `templates/commands/wf-init/_base.md` |
-| `/wf-refresh` | `templates/commands/wf-refresh/_base.md` |
-| `/wf-worktree` | `templates/commands/wf-worktree/_base.md` |
-| `/wf-settings` | `templates/commands/wf-settings/_base.md` |
-| `/wf-onboard` | `templates/commands/wf-onboard/_base.md` |
-| `/wf-cleanup` | `templates/commands/wf-cleanup/_base.md` |
-| `/wf-orchestrator` | `templates/commands/wf-orchestrator/_base.md` |
-| `/wf-sdd-trigger` | `templates/commands/wf-sdd-trigger/_base.md` |
-| `/wf-tdd` | `templates/commands/wf-tdd/_base.md` |
-| `/wf-ladder` | `templates/commands/wf-ladder/_base.md` |
+This is a documentation/templates repository; there are no automated build, test, lint, or deploy commands. Run checks manually or via your IDE's Markdown tooling.
 
-`/wf-init`, `/wf-refresh`, and `/wf-cleanup` are installed globally by `install.sh`; `/wf-worktree`, `/wf-settings`, and `/wf-onboard` are generated per project by `/wf-init`; `/wf-orchestrator`, `/wf-sdd-trigger`, `/wf-tdd`, and `/wf-ladder` are generated per project only when their feature flags are enabled (see `wf-version` footer).
+Wizard slash commands are documented in the README and generated from `templates/commands/`.
 
 ## Code Style & Conventions
 
@@ -52,7 +41,7 @@ This project declares **OpenSpec** as the SDD artifact store; change artifacts l
 
 ## Programmatic Checks
 
-`lint + build`
+Manual review and validation; no automated lint/build for this markdown-only repository.
 
 ## Project MCPs
 
@@ -87,6 +76,8 @@ This project declares **OpenSpec** as the SDD artifact store; change artifacts l
 
 ---
 
-<!-- No agent protocols: the project does not use Ladder, Routes ABC, or TDD. -->
+<!-- WF: DO NOT REGENERATE -->
+<!-- No agent protocols: the project does not use wf-ladder, wf-sdd-trigger, or wf-tdd. -->
+<!-- /WF: DO NOT REGENERATE -->
 
 <!-- wf-version: 0.7.1-beta.1 | source: github.com/hugoafj/ai-workflow-wizard | stack: markdown-docs | features: ladder=no, tdd=no, routing=no, ci=no, cd=no, release=yes -->

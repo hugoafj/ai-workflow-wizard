@@ -48,7 +48,7 @@
 >
 > **Template formats and how to extract them**:
 > - `.tmpl.md` → extract from ```` ```typescript ````, ```` ```yaml ````, or ```` ```bash ````
-> - `.yml.md` / `.json.md` in `variants/` → extract from ```` ```yaml ```` or ```` ```json ````
+> - `.yml.md` / `.json.md` in `variants/` → if the file is wrapped in a markdown code fence, extract from inside it; otherwise use the file raw (CI/CD variant files are raw YAML/JSON and do not need fence extraction)
 > - `.md` without code fence → use the file AS-IS (raw content, but strip `#` prose header lines if they exist)
 >
 > **Target types**:
@@ -155,9 +155,11 @@ From the SAME `build_protocol_body(name)`:
    | IDE | Skills path |
    |-----|-------------|
    | `claude-code` | `STAGING/.claude/skills/<skill-name>/SKILL.md` |
+   | `cursor` | `STAGING/.cursor/skills/<skill-name>/SKILL.md` |
    | `kiro` | `STAGING/.kiro/skills/<skill-name>/SKILL.md` |
    | `codex` | `STAGING/.codex/skills/<skill-name>/SKILL.md` |
    | `windsurf` | `STAGING/.windsurf/skills/<skill-name>/SKILL.md`, `STAGING/.devin/skills/<skill-name>/SKILL.md` (both for Windsurf/Devin compatibility) |
+   | `gemini-cli` | `STAGING/.gemini/skills/<skill-name>/SKILL.md` |
 
    **Universal — always emitted, regardless of `IDES`** (the 1:1 skill fallback):
    `STAGING/.agents/skills/<skill-name>/SKILL.md` — the standard `.agents/` path read by
@@ -168,8 +170,7 @@ From the SAME `build_protocol_body(name)`:
    `wf-tdd` command folder packages as skill folder `wf-tdd/`. Every user/model-facing skill
    name is `wf-`-prefixed and unambiguous.
 
-   **Note on Cursor**: Cursor does not support native SKILL.md files in projects. For Cursor, only
-   the universal `.agents/skills/` copy and the flat `.agents/protocols/` fallback are emitted.
+   **Note on Cursor and Gemini CLI**: both support native project `SKILL.md` paths (`STAGING/.cursor/skills/<skill-name>/SKILL.md` and `STAGING/.gemini/skills/<skill-name>/SKILL.md`, respectively). The Builder emits the native copy for each active IDE plus the universal `.agents/skills/` copy and the flat `.agents/protocols/` fallback.
 
    If the IDE is not in the table, only the universal `.agents/skills/` copy and the flat file
    fallback are emitted.
@@ -392,13 +393,22 @@ Populate `state.build_plan` with the exact list of files in staging, including S
 3. Update state (advance phase only during `wf-init`):
    ```bash
    CURRENT_PHASE=$(jq -r '.phase_pointer // empty' "$WF_STATE")
-   # phase5 advances to phase6a-agents (not phase6), so accept both pointers
-   # when completing the Builder phases.
+   # phase5 advances to phase6a-agents (the real key); phase6 is a backward-compatible alias.
    if [ "$CURRENT_PHASE" = "phase6" ] || [ "$CURRENT_PHASE" = "phase6a-agents" ]; then
      jq --argjson files "$FILES" --argjson paths "$PATHS" \
        '.build_plan.generated_files = $files |
         .build_plan.managed_paths = $paths |
-        .phases.phase6.status = "done" |
+        .phases["phase6"].status = "done" |
+        .phases["phase6a-agents"].status = "done" |
+        .phase_pointer = "phase6b-build-heavy" |
+       .updated_at = (now | todate)' "$WF_STATE" > "$WF_STATE.tmp"
+   elif [ "$CURRENT_PHASE" = "phase6b-build-heavy" ]; then
+     jq --argjson files "$FILES" --argjson paths "$PATHS" \
+       '.build_plan.generated_files = $files |
+        .build_plan.managed_paths = $paths |
+        .phases["phase6"].status = "done" |
+        .phases["phase6a-agents"].status = "done" |
+        .phases["phase6b-build-heavy"].status = "done" |
         .phase_pointer = "phase7" |
        .updated_at = (now | todate)' "$WF_STATE" > "$WF_STATE.tmp"
    else

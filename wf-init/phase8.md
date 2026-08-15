@@ -92,11 +92,6 @@ jq --argjson files "$GENERATED_FILES" --argjson paths "$MANAGED_PATHS" \
    .wizard-state.json > .wizard-state.json.tmp
 mv .wizard-state.json.tmp .wizard-state.json
 
-WIZARD_VERSION=$(jq -r '.wizard_version // "0.7.1-beta.1"' .wizard-state.json)
-GENERATED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-jq -n --arg version "$WIZARD_VERSION" --arg generated_at "$GENERATED_AT" --argjson files "$GENERATED_FILES" \
-   '{wizard_version: $version, generated_at: $generated_at, files: $files}' > .wizard-managed-files.json
-
 # Validate the AGENTS.md wf-version footer — NEVER accept "latest" or an unresolved placeholder.
 # /wf-refresh Phase -1 compares local vs remote with STRICT equality; a non-semver value like
 # "latest" would block every refresh forever (0.6.4-beta.1 != latest → UPGRADE REQUIRED).
@@ -322,13 +317,43 @@ Then continue to the verification step below. With `yq` available, apply the edi
 
 ```bash
 if [ -f openspec/config.yaml ]; then
-  # Ensure yq is available; try common installers before falling back to edit tool.
-  if ! command -v yq &>/dev/null; then
-    echo "8.1d INFO — yq not found; attempting install..."
-    if command -v brew &>/dev/null; then
-      brew install yq
-    elif command -v pip3 &>/dev/null; then
-      pip3 install yq
+  # Ensure the Go mikefarah/yq binary is available.
+  # pip3's kislyuk/yq wrapper does NOT support `yq eval ... -i`.
+  if ! command -v yq &>/dev/null || ! yq --version 2>/dev/null | grep -q "mikefarah"; then
+    if command -v yq &>/dev/null && yq --version 2>/dev/null | grep -q "kislyuk"; then
+      echo "8.1d WARNING — detected Python yq wrapper (kislyuk); it does not support 'eval -i'." >&2
+    fi
+
+    YQ_INSTALL_DIR="${HOME}/.local/bin"
+    mkdir -p "$YQ_INSTALL_DIR"
+
+    case "$(uname -s)-$(uname -m)" in
+      Linux-x86_64)     YQ_BINARY="yq_linux_amd64" ;;
+      Linux-aarch64|Linux-arm64) YQ_BINARY="yq_linux_arm64" ;;
+      Darwin-x86_64)    YQ_BINARY="yq_darwin_amd64" ;;
+      Darwin-arm64)     YQ_BINARY="yq_darwin_arm64" ;;
+      *)
+        echo "8.1d ERROR — unsupported platform for automatic yq install ($(uname -s)-$(uname -m))." >&2
+        echo "        Install Go yq from https://github.com/mikefarah/yq and re-run this step." >&2
+        exit 1
+        ;;
+    esac
+
+    echo "8.1d INFO — installing Go yq (${YQ_BINARY}) to ${YQ_INSTALL_DIR}..."
+    if command -v curl &>/dev/null; then
+      curl -fsSL "https://github.com/mikefarah/yq/releases/latest/download/${YQ_BINARY}" -o "$YQ_INSTALL_DIR/yq"
+    elif command -v wget &>/dev/null; then
+      wget -q "https://github.com/mikefarah/yq/releases/latest/download/${YQ_BINARY}" -O "$YQ_INSTALL_DIR/yq"
+    else
+      echo "8.1d ERROR — curl or wget is required to install yq." >&2
+      exit 1
+    fi
+    chmod +x "$YQ_INSTALL_DIR/yq"
+    export PATH="$YQ_INSTALL_DIR:$PATH"
+
+    if ! command -v yq &>/dev/null; then
+      echo "8.1d ERROR — yq install to ${YQ_INSTALL_DIR} failed or the directory is not in PATH." >&2
+      exit 1
     fi
   fi
 

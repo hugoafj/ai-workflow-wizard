@@ -26,10 +26,10 @@ referenced from the AGENTS.md router.
 | Kiro | ✅ | `.kiro/skills/<n>/SKILL.md` | `.agents/protocols/<n>.md` |
 | Codex | ✅ | `.codex/skills/<n>/SKILL.md` | `.agents/protocols/<n>.md` |
 | OpenCode | global `~/.config/opencode/skills/` | — (managed by gentle-ai) | `.agents/protocols/<n>.md` |
-| Cursor | ❌ | — | `.agents/protocols/<n>.md` |
+| Cursor | ✅ | `.cursor/skills/<n>/SKILL.md` | `.agents/protocols/<n>.md` |
 | Windsurf/Devin | ✅ | `.windsurf/skills/<n>/SKILL.md`, `.devin/skills/<n>/SKILL.md` | `.agents/protocols/<n>.md` |
 | Copilot | ❌ | — | `.agents/protocols/<n>.md` |
-| Gemini CLI | ❌ | — | `.agents/protocols/<n>.md` |
+| Gemini CLI | ✅ | `.gemini/skills/<n>/SKILL.md` | `.agents/protocols/<n>.md` |
 | Antigravity CLI | ✅ | `.agents/skills/<n>/SKILL.md` | `.agents/protocols/<n>.md` |
 
 > Native skills (SKILL.md) auto-discover and do not require the router to

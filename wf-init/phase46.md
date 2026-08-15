@@ -209,16 +209,42 @@ Additionally, if the detected backend is `openspec` or `hybrid`, update
 `openspec/config.yaml` using `yq` to ensure atomic, safe YAML modification:
 
 ```bash
-# Install yq if not present
-if ! command -v yq &> /dev/null; then
-  echo "Installing yq for safe YAML editing..."
-  if command -v brew &>/dev/null; then
-    brew install yq
-  elif command -v pip3 &>/dev/null; then
-    pip3 install yq
+# Ensure the Go mikefarah/yq binary is available.
+# pip3's kislyuk/yq wrapper does NOT support `yq eval ... -i`.
+if ! command -v yq &>/dev/null || ! yq --version 2>/dev/null | grep -q "mikefarah"; then
+  if command -v yq &>/dev/null && yq --version 2>/dev/null | grep -q "kislyuk"; then
+    echo "WARNING: detected Python yq wrapper (kislyuk); it does not support 'eval -i'." >&2
+  fi
+
+  YQ_INSTALL_DIR="${HOME}/.local/bin"
+  mkdir -p "$YQ_INSTALL_DIR"
+
+  case "$(uname -s)-$(uname -m)" in
+    Linux-x86_64)     YQ_BINARY="yq_linux_amd64" ;;
+    Linux-aarch64|Linux-arm64) YQ_BINARY="yq_linux_arm64" ;;
+    Darwin-x86_64)    YQ_BINARY="yq_darwin_amd64" ;;
+    Darwin-arm64)     YQ_BINARY="yq_darwin_arm64" ;;
+    *)
+      echo "ERROR: unsupported platform for automatic yq install ($(uname -s)-$(uname -m))." >&2
+      echo "Install Go yq from https://github.com/mikefarah/yq and re-run this step." >&2
+      exit 1
+      ;;
+  esac
+
+  echo "Installing Go yq (${YQ_BINARY}) to ${YQ_INSTALL_DIR}..."
+  if command -v curl &>/dev/null; then
+    curl -fsSL "https://github.com/mikefarah/yq/releases/latest/download/${YQ_BINARY}" -o "$YQ_INSTALL_DIR/yq"
+  elif command -v wget &>/dev/null; then
+    wget -q "https://github.com/mikefarah/yq/releases/latest/download/${YQ_BINARY}" -O "$YQ_INSTALL_DIR/yq"
   else
-    echo "ERROR: yq is required for safe YAML editing but no installer found." >&2
-    echo "Install yq (https://github.com/mikefarah/yq) or use your IDE's edit tool to set 'testing.strict_tdd: true' in openspec/config.yaml, then continue." >&2
+    echo "ERROR: curl or wget is required to install yq." >&2
+    exit 1
+  fi
+  chmod +x "$YQ_INSTALL_DIR/yq"
+  export PATH="$YQ_INSTALL_DIR:$PATH"
+
+  if ! command -v yq &>/dev/null; then
+    echo "ERROR: yq install to ${YQ_INSTALL_DIR} failed or the directory is not in PATH." >&2
     exit 1
   fi
 fi

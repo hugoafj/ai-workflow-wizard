@@ -12,7 +12,7 @@ FEATURES_CD=$(jq -r '.features.cd // false' .wizard-state.json)
 FEATURES_RELEASE=$(jq -r '.features.release_please // false' .wizard-state.json)
 if [ "$FEATURES_CI" != "true" ] && [ "$FEATURES_CD" != "true" ] && [ "$FEATURES_RELEASE" != "true" ]; then
   echo "PHASE 4.7 skipped — CI and CD not selected."
-  wf_phase_done phase47 phase5
+  wf_phase_done phase47-cicd phase5
   echo "ℹ Next phase: phase5"
   cat "$WF_DIR/phase5.md"
   exit 0
@@ -268,6 +268,6 @@ On your server make sure you have:
 > - `ci` (all CI decisions + `github_remote`)
 > - `cd` (all CD decisions)
 > - `features.ci`, `features.cd`, `features.release_please` (toggles)
-> Mark `wf_phase_done phase47 phase5`.
+> Mark `wf_phase_done phase47-cicd phase5`.
 > Tell the user: *"CI/CD configured. Reply **continue** so I can assemble the artifacts (Builder → staging on disk, not in memory)."*
 > Wait for the response. Only when they confirm, run in bash: `cat "$WF_DIR/phase5.md"`

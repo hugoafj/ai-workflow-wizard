@@ -87,6 +87,8 @@ Apply the same pattern to each active IDE, adjusting path and extension:
 | Kiro | `.kiro/steering/` | `.md` (caution: this directory mixes satellites `inclusion: always` with commands `inclusion: manual` — verify by filename, don't assume everything there is a satellite) |
 | OpenCode | `.opencode/commands/` | `.md` |
 | Copilot | `.github/prompts/` | `.prompt.md` |
+| Codex CLI | `.codex/commands/` | `.md` |
+| Antigravity | `.agents/skills/<cmd>/` | `SKILL.md` |
 
 If the `EXPECTED_COMMANDS` of this wizard version differs from the one the previous
 detected version had (for example, an upgrade that added `wf-onboard` and

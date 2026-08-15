@@ -1,53 +1,28 @@
 #!/bin/bash
-# Workflow drift detector v3 — AI Workflow
-# Source: github.com/hugoafj/ai-workflow-wizard/blob/main/post-commit
-#
-# Detects two categories of drift on each commit:
-#   1. AGENTS.md drift  → suggests running /wf-refresh
-#   2. SDD drift        → suggests running /sdd-init refresh
-#
-# This hook ONLY notifies — it never executes actions automatically.
-# Users decide when to act on the notifications.
-#
-# Manual installation (if not using the wizard):
-#   cp post-commit .git/hooks/post-commit
-#   chmod +x .git/hooks/post-commit
-#
-# The wizard /wf-init installs this automatically in Phase 8.
+# Workflow drift detector — AI Workflow Wizard
+# Detects three categories of drift on each commit and only notifies.
 
-# ─── Files that trigger /wf-refresh ──────────────────────────────────────────
-# Changes to these files may leave AGENTS.md out of date with respect to
-# the stack, scripts, or project conventions.
+# Files that trigger /wf-refresh (general project context for AI)
 REFRESH_FILES="package.json composer.json pyproject.toml Cargo.toml \
   tsconfig.json vite.config.ts vite.config.js \
   next.config.ts next.config.js \
   tailwind.config.ts tailwind.config.js"
 
-# ─── Files that trigger /sdd-init refresh ────────────────────────────────────
-# Changes to these files may affect the "project capabilities" that
-# /sdd-init detects: test frameworks, build tools, SDD config.
-# package.json is in both lists because it affects both AGENTS.md (scripts)
-# and sdd-init (detected test dependencies).
-#
-# NOTE: openspec/config.yaml is intentionally excluded.
-# It is the output artifact of /sdd-init — including it would cause a loop:
-# /sdd-init writes file → commit → hook detects change → notifies
-# "re-run /sdd-init" → which is exactly what just ran.
-# The real re-init triggers are changes in dependencies and tools,
-# not the config that sdd-init itself generates.
+# Files that trigger /sdd-init refresh (project capabilities tracked by SDD)
 SDD_FILES="package.json \
   vitest.config.ts vitest.config.js \
   jest.config.ts jest.config.js \
   playwright.config.ts playwright.config.js"
+# openspec/config.yaml is excluded: it is the output of /sdd-init.
+# Including it causes a loop: /sdd-init writes the file → commit → hook notifies
+# re-run /sdd-init → guaranteed loop.
 
-# ─── Config files that trigger /wf-refresh ──────────────────────────────────
-# Changes to AGENTS.md, IDE settings, or manually-edited satellites.
+# Config/IDE files that trigger /wf-refresh (AGENTS.md, IDE settings, satellites, commands)
 CONFIG_FILES="AGENTS.md \
   .claude/settings.json .cursor/settings.json .windsurf/settings.json .kiro/settings.json .opencode/config.json \
   .claude/commands .cursor/commands .windsurf/workflows .kiro/steering .github/copilot-instructions.md \
   .agents/protocols .agents/skills"
 
-# ─── Detect changed files in this commit ─────────────────────────────────────
 CHANGED_REFRESH=""
 CHANGED_SDD=""
 
@@ -82,12 +57,12 @@ for pattern in $CONFIG_FILES; do
   fi
 done
 
-# ─── Exit cleanly if no drift ───────────────────────────────────────────────
+# Exit cleanly if no drift
 if [ -z "$CHANGED_REFRESH" ] && [ -z "$CHANGED_SDD" ] && [ -z "$CHANGED_CONFIG" ]; then
   exit 0
 fi
 
-# ─── 1. Print a stderr ──────────────────────────────────────────────────────
+# 1. Print a stderr warning
 printf '\n┌─────────────────────────────────────────────────────┐\n' >&2
 printf '│  ⚠  Workflow context may need refresh              │\n' >&2
 printf '└─────────────────────────────────────────────────────┘\n' >&2
@@ -99,7 +74,7 @@ fi
 
 if [ -n "$CHANGED_SDD" ]; then
   printf '  SDD drift:%s\n' "$CHANGED_SDD" >&2
-  printf '  → Run /sdd-init in your IDE/CLI to refresh SDD capabilities\n' >&2
+  printf '  → Run /sdd-init in your IDE/CLI to refresh SDD project capabilities\n' >&2
 fi
 
 if [ -n "$CHANGED_CONFIG" ]; then
@@ -109,9 +84,7 @@ fi
 
 printf '\n' >&2
 
-# ─── 2. Create persistent .wf-status ────────────────────────────────────────
-# This file persists across IDE sessions and is visible in any editor.
-# Delete it with `rm .wf-status` once you've acted (or if changes don't affect AI context).
+# 2. Create persistent .wf-status
 COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 COMMIT_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date)
 
@@ -147,18 +120,38 @@ COMMIT_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date)
     echo ""
   fi
 
+  if [ -n "$CHANGED_CONFIG" ]; then
+    echo "## Config/IDE files changed"
+    echo ""
+    echo "The following config or IDE files changed and may affect AI context:"
+    echo ""
+    for pattern in $CHANGED_CONFIG; do echo "- \`$pattern\`"; done
+    echo ""
+    echo "**Action**: run \`/wf-refresh\` to sync AGENTS.md and protocols,"
+    echo "or \`rm .wf-status\` if these changes don't affect AI context."
+    echo ""
+  fi
+
   echo "---"
   echo "_This file persists across IDE sessions until you act on it._"
   echo "_Delete it with \`rm .wf-status\` once resolved._"
 } > .wf-status
 
-# ─── 3. Native macOS notification ───────────────────────────────────────────
-# Fails silently on Linux and Windows — no impact on the hook.
+# 3. Native macOS notification
 if command -v osascript > /dev/null 2>&1; then
   NOTIF_TEXT=""
   [ -n "$CHANGED_REFRESH" ] && NOTIF_TEXT="Run /wf-refresh"
   [ -n "$CHANGED_SDD" ] && NOTIF_TEXT="${NOTIF_TEXT:+$NOTIF_TEXT · }/sdd-init"
+  [ -n "$CHANGED_CONFIG" ] && NOTIF_TEXT="${NOTIF_TEXT:+$NOTIF_TEXT · }Config/IDE drift"
   osascript -e "display notification \"$NOTIF_TEXT\" with title \"⚠ Workflow drift detected\"" 2>/dev/null || true
+fi
+
+# 4. Opportunistically refresh gentle-ai's skill registry so its own Skill Resolver
+#    Protocol picks up this wizard's wf-* skills without the user having to remember
+#    to run it manually. Confirmed against gentle-ai's own source that it never scans
+#    .windsurf/skills/ or .devin/skills/; those discover project skills natively.
+if command -v gentle-ai &>/dev/null; then
+  gentle-ai skill-registry refresh --quiet >/dev/null 2>&1 || true
 fi
 
 exit 0

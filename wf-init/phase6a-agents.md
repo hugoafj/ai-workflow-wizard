@@ -86,13 +86,14 @@ done
 echo "✓ Builder-Core validation passed"
 ```
 
-### Step 5: Continue to Builder-Heavy
+### Step 5: Mark Builder-Core done and continue to Builder-Heavy
 
-If validation succeeds, continue with part B:
+If validation succeeds, mark this phase done and continue with part B:
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
+wf_phase_done phase6a-agents phase6b-build-heavy
 cat "$WF_DIR/phase6b-build-heavy.md"
 ```

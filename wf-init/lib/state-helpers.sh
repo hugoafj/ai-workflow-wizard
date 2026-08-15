@@ -123,7 +123,8 @@ wf_state_init() {
   },
   "migration": {
     "prior_content_action": null,
-    "missing_commands": []
+    "missing_commands": [],
+    "wrap_custom_in_markers": false
   },
   "build_plan": {
     "agents_md": false,
@@ -142,7 +143,7 @@ JSON
 }
 
 # Read a field (e.g. wf_state_get '.answers.project_name')
-wf_state_get() { jq -r "$1?" "$WF_STATE" 2>/dev/null; }
+wf_state_get() { jq -r "$1 // empty" "$WF_STATE" 2>/dev/null; }
 
 # Write a field (e.g. wf_state_set '.discovery.classification' '"legacy"')
 wf_state_set() {

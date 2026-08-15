@@ -264,14 +264,18 @@ COMMANDS_JSON=$(jq -c <<< "$COMMANDS_JSON")
 wf_state_set '.build_plan.commands' "$COMMANDS_JSON"
 ```
 
-Mark `wf_phase_done phase6 phase7` **only if the current phase_pointer is `phase6`** (skip during `/wf-refresh` so a completed project is not rewound to phase7).
+Mark the Builder phases done and advance the pointer **only if the current phase_pointer is still one of the Builder phases** (skip during `/wf-refresh` so a completed project is not rewound to phase7).
 
 ```bash
 CURRENT_PHASE=$(jq -r '.phase_pointer // empty' "{WF_STATE}")
-# phase5 advances to phase6a-agents (not phase6), so accept both pointers
-# when completing the Builder phases.
-if [ "$CURRENT_PHASE" = "phase6" ] || [ "$CURRENT_PHASE" = "phase6a-agents" ]; then
-  wf_phase_done phase6 phase7
+# phase5 advances to phase6a-agents (the real key); phase6 is a backward-compatible alias.
+if [ "$CURRENT_PHASE" = "phase6" ] || [ "$CURRENT_PHASE" = "phase6a-agents" ] || [ "$CURRENT_PHASE" = "phase6b-build-heavy" ]; then
+  jq '.phases["phase6"].status = "done" |
+      .phases["phase6a-agents"].status = "done" |
+      .phases["phase6b-build-heavy"].status = "done" |
+      .phase_pointer = "phase7" |
+      .updated_at = (now | todate)' "{WF_STATE}" > "{WF_STATE}.tmp"
+  mv "{WF_STATE}.tmp" "{WF_STATE}"
 fi
 ```
 
@@ -310,8 +314,8 @@ cd "{PROJECT_PATH}"
   - Post-commit hook: <location>
   - Testing configs: <list>
   - CI/CD: <generated workflows>
-  - build_plan registrado en estado
-  - managed_paths registrado en estado
+  - build_plan registered in state
+  - managed_paths registered in state
 ```
 
 The staging now has all files ready for review (Phase 7).

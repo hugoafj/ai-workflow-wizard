@@ -47,7 +47,7 @@
 phase46b → phase47 (CI/CD) → phase5 → phase6a → phase6b (Builder) → phase7 → phase8`.
 
 - CI/CD (Block 6) is part of the /wf-init flow: questions in phase47, generation in phase6b.
-  It is not optional. Re-configuration happens through `/wf-settings` (options 9-15),
+  It is not optional. Re-configuration happens through `/wf-settings` (options 9–16: CI/CD and release strategy),
   whose single source is the `cicd` protocol (`templates/protocols/cicd/_base.md`).
 
 - The only conditional branch: in `phase3`, if `classification == greenfield` it skips

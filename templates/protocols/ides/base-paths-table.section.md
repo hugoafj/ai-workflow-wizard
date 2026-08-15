@@ -32,12 +32,12 @@ Apply the same pattern to each active IDE, adjusting path and extension.
 |---|---|---|---|
 | Claude Code | `~/.claude/skills/` | `.claude/skills/` | native auto-discovery |
 | OpenCode | `~/.config/opencode/skills/` | `.opencode/skills/`, `.claude/skills/`, `.agents/skills/` | also reads compatible paths |
-| Cursor | `~/.cursor/skills/` | `.cursor/skills/` | compatible with `~/.codex/skills` and `~/.claude/skills` |
+| Cursor | `~/.cursor/skills/` | `.cursor/skills/` | native auto-discovery; universal `.agents/skills/` + flat `.agents/protocols/` fallback |
 | Windsurf/Devin | `~/.codeium/windsurf/skills/`, `~/.config/devin/skills/` | `.windsurf/skills/`, `.devin/skills/` | gentle-ai sync; Devin uses XDG path |
 | Codex CLI | `~/.codex/skills/` | `.codex/skills/` | also recognizes `~/.agents/skills/` |
 | Copilot | `~/.copilot/skills/` | `.github/skills/` | — |
 | Kiro | `~/.kiro/skills/`, `~/.kiro/steering/` | `.kiro/skills/`, `.kiro/steering/` | native auto-discovery |
-| Gemini CLI | `~/.gemini/skills/` | `.gemini/skills/`, `.agents/skills/` | alias `.agents/skills/` |
+| Gemini CLI | `~/.gemini/skills/` | `.gemini/skills/` | native auto-discovery; universal `.agents/skills/` + flat `.agents/protocols/` fallback |
 | Antigravity | `~/.gemini/antigravity/skills/`, `~/.gemini/antigravity-ide/skills/`, `~/.gemini/antigravity-cli/skills/` | `.agents/skills/` | see note below |
 
 > **Antigravity note**: `config/skills/` (`~/.gemini/config/skills/`) is the canonical

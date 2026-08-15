@@ -3,7 +3,8 @@
 > **When to use**: when you want to change something you chose during
 > `/wf-init` and are no longer happy with — enable or disable strict TDD
 > mode, add or remove a testing extra, enable or disable the Decision
-> Ladder, or change the SDD persistence backend.
+> Ladder, change the SDD persistence backend, toggle CI/CD, choose the
+> release strategy, or add/remove an IDE/CLI.
 >
 > **Difference from `/wf-refresh`**: `wf-refresh` updates your AGENTS.md
 > when the *wizard template* changed (new version) or the *project*
@@ -709,7 +710,8 @@ Which AI reviewer do you want to use for your PR reviews?
 ────────────────────────────────────────────────────────────
 
 GGA — Recommended
-  Provider agnostic: can use Claude, Gemini, Codex, OpenAI, Ollama, etc.
+  Provider agnostic: Claude, Gemini, Codex, and OpenCode are pre-mapped in `gga-review.yml.md`.
+  Other providers can be used by adding the corresponding CLI/secret mapping.
   Flexible modes: local (on your machine) + CI (in GitHub Actions)
   Native integration with gentle-ai and this workflow
 
@@ -739,13 +741,13 @@ Which one do you prefer?
 ```
 Which provider do you want to use with GGA?
 
-1. Claude (Anthropic)
-2. Gemini (Google)
-3. Codex (OpenAI)
-4. OpenAI (GPT)
-5. Ollama (local)
+1. Claude (Anthropic)     → claude
+2. Gemini (Google)        → gemini
+3. Codex (OpenAI)         → codex
+4. OpenCode (open-source) → opencode
 
-Which one? [1-5]
+Provider keys must match the `gga_provider` values supported by `gga-review.yml.md`.
+Which one? [1-4]
 ```
 
 **If they choose another** (Copilot, Claude, Gemini, None): no additional provider needed.
@@ -1005,7 +1007,8 @@ Correct? [yes / correct]
 
 Then ask about trigger, platform, runtime (Nginx/Apache/Docker/PM2) and deploy path
 (same questions as phase47 PART B). Set `state.cd.enabled = true` and the corresponding
-fields. Run `phase47-cicd.md` to configure if needed.
+fields, then run `/wf-refresh` to regenerate `.github/workflows/deploy.yml`.
+Do NOT run `phase47-cicd.md` from `/wf-settings` — that file belongs to the `/wf-init` phase flow.
 
 **If they want to change (disable)**:
 
@@ -1066,8 +1069,9 @@ When does the deploy execute?
 To use tags you need release-please to generate them
 automatically. Should I activate it too? [yes / no]
 ```
-If yes: set `state.ci.release_please = true`,
-`state.ci.conventional_commits = true`, and `state.cd.trigger = 'tag'`.
+If yes: set `state.features.release_please = true`,
+`state.ci.conventional_commits = true`, `state.ci.release_please = true`,
+and `state.cd.trigger = 'tag'`. Update the AGENTS.md footer to `release=yes`.
 If no: do not change the trigger (stays as push to main).
 
 **If they choose push a main (2)**: no restrictions. Set `state.cd.trigger = 'push_main'`.
@@ -1088,12 +1092,22 @@ Confirm:
 ```
 ✓ Release strategy changed to: <tag v* / push a main>
 ✓ .wizard-state.json: cd.trigger = <tag / push_main>
+✓ <if release-please activated> .features.release_please = true, .ci.conventional_commits = true, .ci.release_please = true
+✓ <if release-please activated> AGENTS.md footer updated to release=yes
 ✓ <if CD ON> .github/workflows/deploy.yml regenerated
 ✓ <if CD OFF> Instructions for configuring your external CD
 ```
 
 **State update**:
 ```bash
+# For tag trigger without release-please:
+jq '.features.release_please = true |
+    .ci.conventional_commits = true |
+    .ci.release_please = true |
+    .cd.trigger = "tag"' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+sed -i.bak -E 's/(features: [^|]*release=)[a-z]*/\1yes/' AGENTS.md && rm AGENTS.md.bak
+
+# For push_main trigger (or when release-please is already active):
 jq '.cd.trigger = "<new_trigger>"' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
 ```
 
@@ -1138,6 +1152,26 @@ WF_RAW="${WF_RAW:-https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/m
 SDD_PATH="$SDD_BACKEND"
 [ "$SDD_BACKEND" = "hybrid" ] && SDD_PATH="openspec"
 mkdir -p "$WF_DIR/temp-files" .windsurf/workflows
+
+# Download the AGENTS.md bridge rule and merge it if missing
+[ -f "$WF_DIR/temp-files/AGENTS.md" ] || curl -fsSL "$WF_RAW/temp-files/AGENTS.md" -o "$WF_DIR/temp-files/AGENTS.md" 2>/dev/null
+if [ -f "$WF_DIR/temp-files/AGENTS.md" ] && [ -f AGENTS.md ]; then
+  if ! grep -q "Gentle AI — Legacy Path Bridge" AGENTS.md; then
+    TITLE_LINE=$(grep -n '^# ' AGENTS.md | head -1 | cut -d: -f1)
+    if [ -n "$TITLE_LINE" ]; then
+      {
+        head -n "$TITLE_LINE" AGENTS.md
+        printf '%s\n' "<!-- WF: DO NOT REGENERATE -->"
+        cat "$WF_DIR/temp-files/AGENTS.md"
+        printf '\n%s\n' "<!-- /WF: DO NOT REGENERATE -->"
+        tail -n +$((TITLE_LINE + 1)) AGENTS.md
+      } > AGENTS.md.tmp
+      mv AGENTS.md.tmp AGENTS.md
+    fi
+  fi
+fi
+
+# Rewrite .windsurf/workflows/sdd-new.md
 [ -f "$WF_DIR/temp-files/sdd-new.md" ] || curl -fsSL "$WF_RAW/temp-files/sdd-new.md" -o "$WF_DIR/temp-files/sdd-new.md" 2>/dev/null
 cp "$WF_DIR/temp-files/sdd-new.md" .windsurf/workflows/sdd-new.md
 sed -i.bak "s|{{sdd.backend}}/changes/|$SDD_PATH/changes/|g" .windsurf/workflows/sdd-new.md

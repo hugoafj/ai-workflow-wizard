@@ -1,92 +1,156 @@
 ```bash
 #!/bin/bash
 # Workflow drift detector — AI Workflow Wizard
-# Detect changes that warrant /wf-refresh and/or /sdd-init.
+# Detects three categories of drift on each commit and only notifies.
 
-# Files that warrant /wf-refresh (general project context for AI)
-REFRESH_FILES="package.json composer.json pyproject.toml Cargo.toml tsconfig.json vite.config.ts vite.config.js next.config.ts next.config.js tailwind.config.ts tailwind.config.js"
+# Files that trigger /wf-refresh (general project context for AI)
+REFRESH_FILES="package.json composer.json pyproject.toml Cargo.toml \
+  tsconfig.json vite.config.ts vite.config.js \
+  next.config.ts next.config.js \
+  tailwind.config.ts tailwind.config.js"
 
-# Files that warrant /sdd-init refresh (project capabilities that SDD tracks)
-# package.json also applies here because it affects test/build scripts detected by sdd-init
-SDD_FILES="package.json vitest.config.ts vitest.config.js jest.config.ts jest.config.js playwright.config.ts playwright.config.js"
-# openspec/config.yaml excluded: it is the output artifact of /sdd-init, not a trigger.
+# Files that trigger /sdd-init refresh (project capabilities tracked by SDD)
+SDD_FILES="package.json \
+  vitest.config.ts vitest.config.js \
+  jest.config.ts jest.config.js \
+  playwright.config.ts playwright.config.js"
+# openspec/config.yaml is excluded: it is the output of /sdd-init.
 # Including it causes a loop: /sdd-init writes the file → commit → hook notifies
-# re-runs /sdd-init → guaranteed loop.
+# re-run /sdd-init → guaranteed loop.
+
+# Config/IDE files that trigger /wf-refresh (AGENTS.md, IDE settings, satellites, commands)
+CONFIG_FILES="AGENTS.md \
+  .claude/settings.json .cursor/settings.json .windsurf/settings.json .kiro/settings.json .opencode/config.json \
+  .claude/commands .cursor/commands .windsurf/workflows .kiro/steering .github/copilot-instructions.md \
+  .agents/protocols .agents/skills"
 
 CHANGED_REFRESH=""
 CHANGED_SDD=""
 
+# git diff HEAD~1 HEAD fails on the first commit (no HEAD~1).
+# Fallback: git diff --cached --name-only for the first commit.
+if git rev-parse HEAD~1 > /dev/null 2>&1; then
+  CHANGED=$(git diff HEAD~1 HEAD --name-only 2>/dev/null)
+else
+  CHANGED=$(git diff --cached --name-only 2>/dev/null)
+fi
+
 for f in $REFRESH_FILES; do
-  if git diff HEAD~1 HEAD --name-only 2>/dev/null | grep -q "^$f$"; then
+  if echo "$CHANGED" | grep -q "^$f$"; then
     CHANGED_REFRESH="$CHANGED_REFRESH $f"
   fi
 done
 
 for f in $SDD_FILES; do
-  if git diff HEAD~1 HEAD --name-only 2>/dev/null | grep -q "^$f$"; then
+  if echo "$CHANGED" | grep -q "^$f$"; then
     CHANGED_SDD="$CHANGED_SDD $f"
   fi
 done
 
-if [ -n "$CHANGED_REFRESH" ] || [ -n "$CHANGED_SDD" ]; then
-  # 1. Print to stderr (better compatibility with IDEs that hide stdout)
-  printf '\n┌─────────────────────────────────────────────────────┐\n' >&2
-  printf '│  ⚠  Workflow context may need refresh              │\n' >&2
-  printf '└─────────────────────────────────────────────────────┘\n' >&2
-  [ -n "$CHANGED_REFRESH" ] && printf '  AGENTS.md drift:%s\n' "$CHANGED_REFRESH" >&2
-  [ -n "$CHANGED_REFRESH" ] && printf '  Run: /wf-refresh\n' >&2
-  [ -n "$CHANGED_SDD" ] && printf '  SDD drift:%s\n' "$CHANGED_SDD" >&2
-  [ -n "$CHANGED_SDD" ] && printf '  Run: /sdd-init to refresh SDD project capabilities\n' >&2
-  printf '\n' >&2
-
-  # 2. Create persistent .wf-status file
-  COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-  COMMIT_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date)
-  {
-    echo "# ⚠ Workflow drift detected"
-    echo ""
-    echo "**Commit**: $COMMIT_HASH"
-    echo "**Date**: $COMMIT_DATE"
-    echo ""
-    if [ -n "$CHANGED_REFRESH" ]; then
-      echo "## AGENTS.md drift"
-      echo ""
-      echo "Files changed that affect AI agent context:"
-      for f in $CHANGED_REFRESH; do echo "- $f"; done
-      echo ""
-      echo "**Action**: run \`/wf-refresh\` to update AGENTS.md, or \`rm .wf-status\` if the changes don't affect AI context."
-      echo ""
-    fi
-    if [ -n "$CHANGED_SDD" ]; then
-      echo "## SDD drift"
-      echo ""
-      echo "Files changed that affect SDD project capabilities (test frameworks, build config, dependencies):"
-      for f in $CHANGED_SDD; do echo "- $f"; done
-      echo ""
-      echo "**Action**: run \`/sdd-init\` in your IDE/CLI to refresh SDD context, or \`rm .wf-status\` if the changes don't affect SDD."
-      echo ""
-    fi
-    echo "This file persists across IDE sessions until you act on it."
-  } > .wf-status
-
-  # 3. macOS notification
-  if command -v osascript &>/dev/null; then
-    NOTIF_TEXT=""
-    [ -n "$CHANGED_REFRESH" ] && NOTIF_TEXT="Run /wf-refresh"
-    [ -n "$CHANGED_SDD" ] && NOTIF_TEXT="${NOTIF_TEXT:+$NOTIF_TEXT and }/sdd-init"
-    osascript -e "display notification \"$NOTIF_TEXT\" with title \"⚠ Workflow drift detected\"" 2>/dev/null || true
+# Detect changes in config files (AGENTS.md, IDE settings, satellites, commands)
+CHANGED_CONFIG=""
+for pattern in $CONFIG_FILES; do
+  # Escape the pattern so dots in paths like .claude/settings.json are treated literally
+  esc_pattern=$(printf '%s' "$pattern" | sed 's/[.^$*?+[\]{}|()]/\\&/g')
+  # Match exact files or any path under a directory prefix
+  if echo "$CHANGED" | grep -qE "^${esc_pattern}(/|$)"; then
+    CHANGED_CONFIG="$CHANGED_CONFIG $pattern/"
   fi
+done
+
+# Exit cleanly if no drift
+if [ -z "$CHANGED_REFRESH" ] && [ -z "$CHANGED_SDD" ] && [ -z "$CHANGED_CONFIG" ]; then
+  exit 0
+fi
+
+# 1. Print a stderr warning
+printf '\n┌─────────────────────────────────────────────────────┐\n' >&2
+printf '│  ⚠  Workflow context may need refresh              │\n' >&2
+printf '└─────────────────────────────────────────────────────┘\n' >&2
+
+if [ -n "$CHANGED_REFRESH" ]; then
+  printf '  AGENTS.md drift:%s\n' "$CHANGED_REFRESH" >&2
+  printf '  → Run /wf-refresh in your IDE/CLI\n' >&2
+fi
+
+if [ -n "$CHANGED_SDD" ]; then
+  printf '  SDD drift:%s\n' "$CHANGED_SDD" >&2
+  printf '  → Run /sdd-init in your IDE/CLI to refresh SDD project capabilities\n' >&2
+fi
+
+if [ -n "$CHANGED_CONFIG" ]; then
+  printf '  Config/IDE files changed:%s\n' "$CHANGED_CONFIG" >&2
+  printf '  → Run /wf-refresh to sync AGENTS.md and protocols\n' >&2
+fi
+
+printf '\n' >&2
+
+# 2. Create persistent .wf-status
+COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+COMMIT_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date)
+
+{
+  echo "# ⚠ Workflow drift detected"
+  echo ""
+  echo "**Commit**: $COMMIT_HASH"
+  echo "**Date**: $COMMIT_DATE"
+  echo ""
+
+  if [ -n "$CHANGED_REFRESH" ]; then
+    echo "## AGENTS.md drift"
+    echo ""
+    echo "The following files changed and may leave AGENTS.md out of date:"
+    echo ""
+    for f in $CHANGED_REFRESH; do echo "- \`$f\`"; done
+    echo ""
+    echo "**Action**: run \`/wf-refresh\` in your IDE/CLI to update AGENTS.md,"
+    echo "or \`rm .wf-status\` if these changes don't affect AI context."
+    echo ""
+  fi
+
+  if [ -n "$CHANGED_SDD" ]; then
+    echo "## SDD drift"
+    echo ""
+    echo "The following files changed and may affect SDD project capabilities"
+    echo "(test frameworks, build config, dependencies, SDD config):"
+    echo ""
+    for f in $CHANGED_SDD; do echo "- \`$f\`"; done
+    echo ""
+    echo "**Action**: run \`/sdd-init\` in your IDE/CLI to refresh SDD context,"
+    echo "or \`rm .wf-status\` if these changes don't affect SDD."
+    echo ""
+  fi
+
+  if [ -n "$CHANGED_CONFIG" ]; then
+    echo "## Config/IDE files changed"
+    echo ""
+    echo "The following config or IDE files changed and may affect AI context:"
+    echo ""
+    for pattern in $CHANGED_CONFIG; do echo "- \`$pattern\`"; done
+    echo ""
+    echo "**Action**: run \`/wf-refresh\` to sync AGENTS.md and protocols,"
+    echo "or \`rm .wf-status\` if these changes don't affect AI context."
+    echo ""
+  fi
+
+  echo "---"
+  echo "_This file persists across IDE sessions until you act on it._"
+  echo "_Delete it with \`rm .wf-status\` once resolved._"
+} > .wf-status
+
+# 3. Native macOS notification
+if command -v osascript > /dev/null 2>&1; then
+  NOTIF_TEXT=""
+  [ -n "$CHANGED_REFRESH" ] && NOTIF_TEXT="Run /wf-refresh"
+  [ -n "$CHANGED_SDD" ] && NOTIF_TEXT="${NOTIF_TEXT:+$NOTIF_TEXT · }/sdd-init"
+  [ -n "$CHANGED_CONFIG" ] && NOTIF_TEXT="${NOTIF_TEXT:+$NOTIF_TEXT · }Config/IDE drift"
+  osascript -e "display notification \"$NOTIF_TEXT\" with title \"⚠ Workflow drift detected\"" 2>/dev/null || true
 fi
 
 # 4. Opportunistically refresh gentle-ai's skill registry so its own Skill Resolver
-#    Protocol picks up this wizard's wf-* skills (wf-orchestrator, wf-ladder,
-#    wf-sdd-trigger, wf-tdd) without the user having to remember to run
-#    it manually. Helps Claude Code/OpenCode/Cursor/Kiro/Codex (orchestrators that read
-#    .atl/skill-registry.md before delegating). Harmless no-op for Windsurf/Devin — confirmed
-#    against gentle-ai's own source that it never scans .windsurf/skills/ or .devin/skills/;
-#    those discover project skills natively from the filesystem instead. Cheap no-op
-#    (cache-hit) when nothing under skills/ changed. Silent and non-blocking: never fail the
-#    commit.
+#    Protocol picks up this wizard's wf-* skills without the user having to remember
+#    to run it manually. Confirmed against gentle-ai's own source that it never scans
+#    .windsurf/skills/ or .devin/skills/; those discover project skills natively.
 if command -v gentle-ai &>/dev/null; then
   gentle-ai skill-registry refresh --quiet >/dev/null 2>&1 || true
 fi

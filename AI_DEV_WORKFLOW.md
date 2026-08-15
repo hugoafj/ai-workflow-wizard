@@ -10,7 +10,8 @@
 > The `/wf-init` wizard is a **state machine with state persisted on disk**:
 >
 > - **State** (user responses + discovery) → `.wizard-state.json` at the project root
->   (contract: `wf-init/lib/state.md`). The process is resumable even if the
+>   (contract: `wf-init/lib/state.md`; read/write helpers in `wf-init/lib/state-helpers.sh`;
+>   refresh orchestrator in `wf-init/lib/refresher.md`). The process is resumable even if the
 >   conversation is lost between phases.
 > - **Permanent knowledge** (wf-ladder, wf-sdd-trigger, wf-tdd, SDD, CI/CD,
 >   Testing, IDEs, Commands, Architecture) → `templates/protocols/<module/>` as **single
@@ -519,7 +520,7 @@ Stack: Vite 8 + React 19.2 + TS 6 + Tailwind 4 + ESLint 9 flat config. Size: ~82
 
 ### 5.3 Wizard `/wf-init` (greenfield + legacy)
 
-Slash command that orchestrates the complete workflow bootstrap in a project. Split architecture — the orchestrator (`wf-init.md`) is the only thing attached to the chat; phases, sub-agents and lib contracts live in `wf-init/` and the agent reads them from disk on-demand. This solves the "lost in the middle" problem a monolithic file would have: the agent only keeps the orchestrator + the active phase in context at any time.
+Slash command that orchestrates the complete workflow bootstrap in a project. Split architecture — the orchestrator (`wf-init.md`) is the only thing attached to the chat; phases, sub-agents and lib contracts/helpers (`state.md`, `state-helpers.sh`, `builder.md`, `refresher.md`) live in `wf-init/` and the agent reads them from disk on-demand. This solves the "lost in the middle" problem a monolithic file would have: the agent only keeps the orchestrator + the active phase in context at any time.
 
 The wizard phases:
 
@@ -698,7 +699,7 @@ Solves two different problems:
 
 **Git hooks run ONLY locally**, not on GitHub or CI. Each developer installs them on their machine. The distribution problem is solved with **Husky** (configured in the CI/CD block), which registers hooks via `package.json` so they install automatically with `npm install`.
 
-**Trigger 2 · Slash command `/wf-refresh`**. When invoked, the agent runs eight phases (builder-driven):
+**Trigger 2 · Slash command `/wf-refresh`**. When invoked, the agent runs eight phases (builder-driven, orchestrated by `wf-init/lib/refresher.md`, using `wf-init/lib/state-helpers.sh` for state access):
 
 - **Phase R-1**: Update global commands (`wf-init`, `wf-refresh`, `wf-cleanup`) if outdated
 - **Phase R0**: Validate `.wizard-state.json` and detect active IDEs
@@ -1757,12 +1758,12 @@ Commands the wizard generates in Phases 6a/6b and writes in Phase 8. They are pr
 **`/wf-orchestrator`** — single entry point for the wizard's own gate sequence (only if `ROUTING == true` OR `LADDER == true` OR `TDD == true`).
 **`/wf-sdd-trigger`** — forces the SDD classification tree (only if `ROUTING == true`).
 **`/wf-onboard`** — stub that points to `wf-onboard.md` for new developer onboarding.
-**`/wf-settings`** — toggle optional modules: CI/CD, TDD, testing extras, Decision Ladder.
+**`/wf-settings`** — toggle optional modules: TDD, testing extras, Decision Ladder, SDD backend, CI/CD, release strategy, and active IDEs/CLIs.
 **`/wf-worktree`** — git worktree management with automatic port assignment.
 
-**Global vs project-specific commands**: `wf-init`, `wf-refresh`, and `wf-cleanup` are installed globally with `install.sh`. `wf-onboard`, `wf-settings`, and `wf-worktree` are generated per project in Phases 6a/6b. `wf-ladder`, `wf-tdd`, `wf-orchestrator`, and `wf-sdd-trigger` are project-specific too, each conditional on its feature flag(s). `/wf-cicd` was archived; CI/CD re-configuration happens through `/wf-settings` (options 9-15), whose single source is the `cicd` protocol.
+**Global vs project-specific commands**: `wf-init`, `wf-refresh`, and `wf-cleanup` are installed globally with `install.sh`. `wf-onboard`, `wf-settings`, and `wf-worktree` are generated per project in Phases 6a/6b. `wf-ladder`, `wf-tdd`, `wf-orchestrator`, and `wf-sdd-trigger` are project-specific too, each conditional on its feature flag(s). `/wf-cicd` was archived; CI/CD and release-strategy re-configuration happen through `/wf-settings` (options 9–16), whose single source is the `cicd` protocol. Options 17–18 (Windsurf fix and IDE/CLI list) are handled by other protocols.
 
-**Skills 1:1** — every command in this section is also packaged as a SKILL.md, so it can be invoked as a slash command AND by natural language. Project commands are emitted by Builder B4 in the IDE's native skill path (`.claude/skills/`, `.kiro/skills/`, `.codex/skills/`, `.windsurf/skills/`, `.devin/skills/`) plus the universal `.agents/skills/<cmd>/SKILL.md` and the flat `.agents/protocols/<cmd>.md`. Global commands get the same 1:1 from `install.sh` (each detected IDE's skill path + `~/.agents/skills/`).
+**Skills 1:1** — every command in this section is also packaged as a SKILL.md, so it can be invoked as a slash command AND by natural language. Project commands are emitted by Builder B4 in the IDE's native skill path (`.claude/skills/`, `.cursor/skills/`, `.kiro/skills/`, `.codex/skills/`, `.gemini/skills/`, `.windsurf/skills/`, `.devin/skills/`) plus the universal `.agents/skills/<cmd>/SKILL.md` and the flat `.agents/protocols/<cmd>.md`. Global commands get the same 1:1 from `install.sh` (each detected IDE's skill path + `~/.agents/skills/`).
 
 **Correct paths and formats per IDE** (verified against official documentation):
 
@@ -2202,17 +2203,30 @@ Unchanged from the original criteria: no mass retrofitting of tests onto legacy 
 
 ### 9.8 `/wf-settings` — toggle optional modules after installation
 
-Once `/wf-init` has run, several decisions the developer made (TDD mode, testing extras, Decision Ladder, SDD backend) are fixed in the project — but they are not immutable, and it shouldn't require editing files by hand or re-running full `wf-init` to change them. `/wf-settings` (new standalone file, same format as `wf-onboard.md` and `wf-worktree.md`) closes that gap.
+Once `/wf-init` has run, several decisions the developer made (TDD mode, testing extras, Decision Ladder, SDD backend, CI/CD, release strategy, active IDEs/CLIs) are fixed in the project — but they are not immutable, and it shouldn't require editing files by hand or re-running full `wf-init` to change them. `/wf-settings` (new standalone file, same format as `wf-onboard.md` and `wf-worktree.md`) closes that gap.
 
-**The five things it manages**:
+**The modules it manages** (options 1–18 in `/wf-settings`):
 
 | Module | What it toggles | Risk when changing |
 |---|---|---|
-| TDD Mode | Standard ↔ Strict TDD Mode | None — both coexist in `openspec/config.yaml`, changing is instant |
-| Testing extras | Coverage targets / Visual regression / Page Object Model, each independent | Low — only config, although deactivating visual regression or POM doesn't automatically rewrite existing specs |
-| Decision Ladder | Included or not in `AGENTS.md` | Real — it's an anti-over-engineering safeguard, removing it requires additional explicit confirmation |
-| SDD persistence backend | engram ↔ openspec ↔ hybrid | Variable — migrating *to* hybrid is safe (only adds), migrating *from* hybrid implies real functionality loss and requires double confirmation |
-| IDEs/CLIs | Add/remove an active IDE — generates (satellite + commands + skills + Windsurf fix) or deletes everything related, downloading templates from the wizard's raw source | Real — creates or removes project files; requires explicit confirmation |
+| Decision Ladder (1) | `wf-ladder` enabled or not in `AGENTS.md` | Real — it's an anti-over-engineering safeguard, removing it requires additional explicit confirmation |
+| TDD (2) | Enable or disable the TDD protocol | Medium — removes or adds `wf-tdd` skill and satellite |
+| TDD Mode (3) | Standard ↔ Strict TDD Mode | None — both coexist in `openspec/config.yaml`, changing is instant |
+| Testing extras (4–6) | Coverage targets / Visual regression / Page Object Model, each independent | Low — only config, although deactivating visual regression or POM doesn't automatically rewrite existing specs |
+| SDD forcing policy (7) | `wf-sdd-trigger` active or not | Medium — turns the SDD gating mechanism on/off |
+| SDD persistence backend (8) | engram ↔ openspec ↔ hybrid | Variable — migrating *to* hybrid is safe (only adds), migrating *from* hybrid implies real functionality loss and requires double confirmation |
+| CI (9) | Enable or disable the CI quality guard | Real — adds/removes `.github/workflows/quality-guard.yml` and related files |
+| AI Reviewer (10) | GGA / Copilot / Claude Code / Gemini / None | Medium — rewrites the AI review workflow |
+| AI Review Suggestions (11) | Enable or disable auto-improve / inline suggestions | Low — config change only |
+| Dedicated Security Review (12) | Claude / Gemini / OFF | Low — config change only |
+| E2E in CI (13) | Include E2E tests in the quality guard | Low–Medium — may slow CI; no effect on local tests |
+| release-please standalone (14) | Publish releases automatically from conventional commits | Medium — requires `npm`/`package.json` or `release-type: simple` for markdown projects |
+| CD (15) | Automatic deploy to VPS | Real — writes `deploy.yml` and requires server secrets |
+| Release strategy (16) | Tag-based (`v*`) or push-to-main deploy trigger | Medium — changes how CD fires |
+| Windsurf gentle-ai fix (17) | Reapply the legacy-path bridge and `sdd-new.md` workaround | Low — safe re-sync of IDE-specific files |
+| IDEs/CLIs (18) | Add/remove an active IDE — generates (satellite + commands + skills) or deletes everything related, downloading templates from the wizard's raw source | Real — creates or removes project files; requires explicit confirmation |
+
+**Note**: Option numbering in `/wf-settings` is 1–18; options 1 and 2 map to `wf-ladder` and TDD, respectively. Option 17 is a Windsurf-only repair switch.
 
 **Interaction pattern**: the command always shows the real state first (reading `openspec/config.yaml` and `AGENTS.md` directly, never assuming what the developer remembers choosing), lets you choose one or several changes, applies and confirms each individually, and asks "anything else?" before closing with a consolidated commit — without `git push`, like the rest of this workflow.
 
@@ -2248,7 +2262,7 @@ They can be activated separately via `/wf-settings`.
 | **Conventional Commits** | Husky + commitlint enforce `feat:`, `fix:` format... | Readable history + enables automatic changelog |
 | **release-please** | Generates release PR + changelog based on commits | Traceable releases without writing changelog manually |
 
-The **AI Review** has three possible providers:
+The **AI Review** has four possible providers (plus `None`):
 - **GGA (Gentleman Guardian Angel) — recommended.** Provider-agnostic (Claude, Gemini,
   Codex, OpenCode, Ollama, LM Studio, GitHub Models). Uses your `AGENTS.md` as review
   rules. Two modes: local pre-commit hook (`gga init && gga install`) and PR review via CI
