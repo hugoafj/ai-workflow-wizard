@@ -42,15 +42,15 @@ WIZARD_BRANCH="${WIZARD_BRANCH:-main}"
 WF_RAW="${WF_RAW:-https://raw.githubusercontent.com/${WIZARD_REPO}/${WIZARD_BRANCH}}"
 
 # Source shared helpers (wf_fetch_version, wf_sha256) from /wf-init.
-source "${WF_DIR}/lib/state-helpers.sh" 2>/dev/null || true
+[ -f "${WF_DIR}/lib/state-helpers.sh" ] && source "${WF_DIR}/lib/state-helpers.sh"
 
 # Fallback portable sha256 if the shared helper is unavailable.
 if ! command -v wf_sha256 >/dev/null 2>&1; then
   wf_sha256() {
     if command -v sha256sum >/dev/null 2>&1; then
-      sha256sum "$1" | awk '{print $1}'
+      sha256sum -- "$1" | awk '{print $1}'
     else
-      shasum -a 256 "$1" | awk '{print $1}'
+      shasum -a 256 -- "$1" | awk '{print $1}'
     fi
   }
 fi
@@ -90,6 +90,7 @@ _version_norm() {
 # Supports x.y.z[-prerelease[.N]] where prerelease fields are '.'-separated.
 # Release (no prerelease) is greater than any prerelease of the same MAJ.MIN.PATCH.
 version_lte() {
+  local LC_ALL=C
   local v1 v2
   v1="$(_version_norm "$1")"
   v2="$(_version_norm "$2")"
@@ -252,7 +253,7 @@ migrate_to_0_6_8() {
   '
 
   # Ask about new optional features (idempotent: only if missing)
-  if ! jq -e '.features.routing_abc' "$WF_STATE" >/dev/null 2>&1; then
+  if ! jq -e '.features | has("routing_abc")' "$WF_STATE" >/dev/null 2>&1; then
     if _ask_yesno "Enable ABC routing pattern?"; then
       _apply_jq_filter '.features.routing_abc = true'
     else
@@ -260,7 +261,7 @@ migrate_to_0_6_8() {
     fi
   fi
 
-  if ! jq -e '.features.decision_ladder' "$WF_STATE" >/dev/null 2>&1; then
+  if ! jq -e '.features | has("decision_ladder")' "$WF_STATE" >/dev/null 2>&1; then
     if _ask_yesno "Enable decision ladder?"; then
       _apply_jq_filter '.features.decision_ladder = true'
     else
@@ -294,6 +295,12 @@ migrate_to_0_7_1() {
 migrate_state() {
   local CURRENT_VERSION="$1"
   local TARGET_VERSION="$2"
+
+  local schema_version
+  schema_version=$(jq -r '.schema_version // 0' "$WF_STATE" 2>/dev/null) || true
+  if [[ "$schema_version" -lt 3 ]]; then
+    migrate_to_0_6_8
+  fi
 
   if ! version_lt "$CURRENT_VERSION" "$TARGET_VERSION"; then
     echo "  No migration needed: $CURRENT_VERSION already >= $TARGET_VERSION"
@@ -448,7 +455,7 @@ fi
 if [[ -z "$LOCAL_VERSION" ]]; then
   LOCAL_VERSION=$(jq -r '.wizard_version // empty' "$WF_STATE" 2>/dev/null || true)
 fi
-LOCAL_VERSION="${LOCAL_VERSION:-0.1.0-beta.1}"
+LOCAL_VERSION="${LOCAL_VERSION:-0.7.1-beta.1}"
 LOCAL_VERSION="${LOCAL_VERSION#v}"
 
 echo "ℹ Local wizard version: $LOCAL_VERSION"
@@ -512,6 +519,11 @@ fi
 
 if ! jq empty "$WF_STATE" 2>/dev/null; then
   echo "✗ $WF_STATE is not valid JSON"
+  exit 1
+fi
+
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+  echo "✗ Not a git repository"
   exit 1
 fi
 
@@ -587,7 +599,7 @@ if [[ -f package.json ]] && command -v node >/dev/null 2>&1; then
   NODE_ENGINE=$(node -e "try { process.stdout.write(require('./package.json').engines?.node||'') } catch {}" 2>/dev/null || true)
 fi
 
-GIT_COMMITS=$(git log --oneline 2>/dev/null | wc -l || echo "0")
+GIT_COMMITS=$(git log --oneline 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")
 
 OLD_STACK=$(jq -r '.discovery.stack_key // ""' "$WF_STATE")
 OLD_NODE=$(jq -r '.discovery.node_engine // ""' "$WF_STATE")
@@ -629,7 +641,7 @@ source "${WF_DIR}/lib/refresh-lib.sh"
 
 echo "ℹ Checking for state migrations..."
 
-CURRENT_VERSION=$(jq -r '.wizard_version // "0.1.0-beta.1"' "$WF_STATE")
+CURRENT_VERSION=$(jq -r '.wizard_version // "0.7.1-beta.1"' "$WF_STATE")
 CURRENT_VERSION="${CURRENT_VERSION#v}"
 
 TARGET_VERSION=$(wf_fetch_version)
@@ -715,6 +727,15 @@ if [[ ! -f .wizard-refresh-baseline.json ]]; then
   exit 1
 fi
 
+# Preserve custom AGENTS.md sections and reinsert the Windsurf/Devin legacy bridge
+# into staged AGENTS.md now so R4's diff preview reflects the final content.
+if [[ -f AGENTS.md ]] && [[ -f "$STAGING/AGENTS.md" ]]; then
+  preserve_custom_agents "$STAGING"
+fi
+if [[ -f "$STAGING/AGENTS.md" ]]; then
+  reinsert_legacy_bridge "$STAGING/AGENTS.md"
+fi
+
 echo "✓ Phase R3 validation passed"
 ```
 
@@ -777,7 +798,7 @@ while IFS= read -r -d '' old_path; do
       PROJECT_HASH=$(wf_sha256 "$old_path")
       OLD_HASH=$(jq -r --arg path "$old_path" '.generated_files[] | select(.path == $path) | .hash' "$OLD_FILES_SRC" 2>/dev/null || true)
 
-      if [[ "$PROJECT_HASH" == "$OLD_HASH" ]]; then
+      if [[ -z "$OLD_HASH" ]] || [[ "$PROJECT_HASH" == "$OLD_HASH" ]]; then
         DELETED=$(jq --arg path "$old_path" --arg hash "$PROJECT_HASH" '. += [{"path": $path, "hash": $hash, "reason": "deprecated"}]' <<< "$DELETED")
       else
         DELETED_MODIFIED=$(jq --arg path "$old_path" --arg old_hash "$OLD_HASH" --arg project_hash "$PROJECT_HASH" '. += [{"path": $path, "old_hash": $old_hash, "project_hash": $project_hash, "reason": "deprecated (user modified)"}]' <<< "$DELETED_MODIFIED")
@@ -1001,6 +1022,7 @@ if [[ "$APPROVE_ADDED" == "true" ]]; then
     mkdir -p "$(dirname "$file")"
     cp "$STAGING/$file" "$file"
     [[ "$file" == *".sh" ]] && chmod +x "$file"
+    [[ "$file" == .husky/* || "$file" == .git/hooks/* ]] && chmod +x "$file"
   done < <(jq -j '.added[]?.path + "\u0000"' "$PLAN")
   echo "✓ Added files copied"
 fi
@@ -1010,6 +1032,7 @@ if [[ "$APPROVE_UPDATED" == "true" ]]; then
   while IFS= read -r -d '' file; do
     cp "$STAGING/$file" "$file"
     [[ "$file" == *".sh" ]] && chmod +x "$file"
+    [[ "$file" == .husky/* || "$file" == .git/hooks/* ]] && chmod +x "$file"
   done < <(jq -j '.updated[]?.path + "\u0000"' "$PLAN")
   echo "✓ Files updated"
 fi
@@ -1019,7 +1042,7 @@ if [[ "$APPROVE_DELETED" == "true" ]]; then
   DELETED_LIST=$(mktemp)
   jq -j '.deleted[]?.path + "\u0000"' "$PLAN" > "$DELETED_LIST"
   if [ -s "$DELETED_LIST" ]; then
-    git rm --pathspec-from-file="$DELETED_LIST" --pathspec-file-nul
+    git rm -f --ignore-unmatch --pathspec-from-file="$DELETED_LIST" --pathspec-file-nul
   fi
   rm -f "$DELETED_LIST"
   echo "✓ Files deleted"
@@ -1030,7 +1053,7 @@ if [[ "$APPROVE_DELETED_MODIFIED" == "true" ]]; then
   DELETED_MODIFIED_LIST=$(mktemp)
   jq -j '.deleted_modified[]?.path + "\u0000"' "$PLAN" > "$DELETED_MODIFIED_LIST"
   if [ -s "$DELETED_MODIFIED_LIST" ]; then
-    git rm --pathspec-from-file="$DELETED_MODIFIED_LIST" --pathspec-file-nul
+    git rm -f --ignore-unmatch --pathspec-from-file="$DELETED_MODIFIED_LIST" --pathspec-file-nul
   fi
   rm -f "$DELETED_MODIFIED_LIST"
   echo "✓ Modified-removed files deleted"
@@ -1040,18 +1063,16 @@ fi
 if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ "$APPROVE_DELETED" == "true" ]] || [[ "$APPROVE_DELETED_MODIFIED" == "true" ]]; then
   echo "ℹ Committing changes..."
 
-  # Recompute generated_files from actual staging after custom-section injection,
-  # then persist the refresh bookkeeping. This runs ONLY when at least one
-  # category was approved: a fully declined refresh must not write
-  # .wizard-managed-files.json, touch .gitignore, or update the build plan.
+  # Recompute generated_files and managed_paths from the approved plan, reading
+  # file contents from the project tree (not staging) so hashes reflect the final state.
   GENERATED_FILES="[]"
   MANAGED_PATHS="[]"
   while IFS= read -r -d '' file; do
-    REL_PATH="${file#$STAGING/}"
+    [[ -f "$file" ]] || continue
     HASH=$(wf_sha256 "$file")
-    GENERATED_FILES=$(jq --arg path "$REL_PATH" --arg hash "$HASH" '. += [{"path": $path, "hash": $hash, "managed": true}]' <<< "$GENERATED_FILES")
-    MANAGED_PATHS=$(jq --arg path "$REL_PATH" '. += [$path]' <<< "$MANAGED_PATHS")
-  done < <(find "$STAGING" -type f -print0)
+    GENERATED_FILES=$(jq --arg path "$file" --arg hash "$HASH" '. += [{"path": $path, "hash": $hash, "managed": true}]' <<< "$GENERATED_FILES")
+    MANAGED_PATHS=$(jq --arg path "$file" '. += [$path]' <<< "$MANAGED_PATHS")
+  done < <(jq -j '.added[]?, .updated[]?, .unchanged[]? | .path + "\u0000"' "$PLAN")
 
   # Write .wizard-managed-files.json with the complete set of managed files
   TARGET_VERSION=$(wf_fetch_version)
@@ -1068,14 +1089,34 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
   mv "$WF_STATE.tmp" "$WF_STATE"
 
   # Add to .gitignore (ensure a trailing newline first and use an exact line match).
-  GITIGNORE_MODIFIED=false
-  if ! grep -qxF ".wizard-managed-files.json" .gitignore 2>/dev/null; then
-    if [ -f .gitignore ] && [ "$(tail -c1 .gitignore | wc -l)" -eq 0 ]; then
-      echo >> .gitignore
+  _gi_add() {
+    local line="$1"
+    if ! grep -qxF "$line" .gitignore 2>/dev/null; then
+      if [ -f .gitignore ] && [ "$(tail -c1 .gitignore | wc -l | tr -d '[:space:]')" -eq 0 ]; then
+        echo >> .gitignore
+      fi
+      printf '%s\n' "$line" >> .gitignore
+      GITIGNORE_MODIFIED=true
     fi
-    printf '%s\n' ".wizard-managed-files.json" >> .gitignore
-    GITIGNORE_MODIFIED=true
-  fi
+  }
+
+  GITIGNORE_MODIFIED=false
+  _gi_add ".wizard-managed-files.json"
+
+  while IFS= read -r ide; do
+    case "$ide" in
+      claude-code) _gi_add "!.claude/" ;;
+      cursor) _gi_add "!.cursor/" ;;
+      windsurf) _gi_add "!.windsurf/"; _gi_add "!.devin/" ;;
+      kiro) _gi_add "!.kiro/" ;;
+      codex) _gi_add "!.codex/" ;;
+      opencode) _gi_add "!.opencode/" ;;
+      vscode-copilot)
+        _gi_add "!.github/copilot-instructions.md"
+        _gi_add "!.github/prompts/"
+        ;;
+    esac
+  done < <(jq -r '.answers.ides[]?' "$WF_STATE" 2>/dev/null)
 
   # Reflect the .gitignore change in the refresh plan so it is approved/committed explicitly.
   if [ "$GITIGNORE_MODIFIED" = true ]; then

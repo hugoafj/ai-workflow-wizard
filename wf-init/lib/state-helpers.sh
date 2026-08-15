@@ -141,7 +141,7 @@ JSON
 }
 
 # Read a field (e.g. wf_state_get '.answers.project_name')
-wf_state_get() { jq -r "$1 // empty" "$WF_STATE" 2>/dev/null; }
+wf_state_get() { jq -r "$1?" "$WF_STATE" 2>/dev/null; }
 
 # Write a field (e.g. wf_state_set '.discovery.classification' '"legacy"')
 wf_state_set() {
@@ -153,9 +153,9 @@ wf_state_set() {
 # Compute SHA256 hash of a file with portable fallback (macOS/BSD).
 wf_sha256() {
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$1" | awk '{print $1}'
+    sha256sum -- "$1" | awk '{print $1}'
   else
-    shasum -a 256 "$1" | awk '{print $1}'
+    shasum -a 256 -- "$1" | awk '{print $1}'
   fi
 }
 
