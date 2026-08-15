@@ -209,7 +209,11 @@ Read CI/CD decisions from `.wizard-state.json` → `.ci.*` and `.cd.*`.
 - Without quality guard, without AI review, without security review
 
 **If CD==true** (automatic deploy, `state.cd.enabled == true` and `state.cd.platform == 'vps'`):
-- Source: `$WF_RAW/templates/protocols/cicd/variants/deploy-<runtime>.yml.md`
+- Source: map `state.cd.vps_runtime` to the deploy template:
+  - `pm2` → `$WF_RAW/templates/protocols/cicd/variants/deploy-pm2.node.yml.md`
+  - `nginx_php_fpm` → `$WF_RAW/templates/protocols/cicd/variants/deploy-nginx-phpfpm.laravel.yml.md`
+  - `apache_php_fpm` → `$WF_RAW/templates/protocols/cicd/variants/deploy-apache-phpfpm.laravel.yml.md`
+  - `docker` → `$WF_RAW/templates/protocols/cicd/variants/deploy-docker.yml.md`
   → `{WF_STAGING}/.github/workflows/deploy.yml`
   With placeholders resolved:
   - `{{trigger_event}}` = `tags: ['v*']` or `branches: [main]`
@@ -217,7 +221,7 @@ Read CI/CD decisions from `.wizard-state.json` → `.ci.*` and `.cd.*`.
   - `{{deploy_path}}` = `state.cd.deploy_path`
   - `{{compose_file}}` = `state.cd.compose_file` (default `docker-compose.prod.yml`)
   - `{{php_version}}` = from `composer.json` `require.php` (e.g. `8.3`), fallback `8.2`
-  - `{{has_node_assets}}` = `'true'` when `state.discovery.stack_detected == 'laravel_node'`, else `'false'`
+  - `{{has_node_assets}}` = `'true'` when `state.cd.stack_detected == 'laravel_node'`, else `'false'`
 
 **Suggestion toggles** (read from state, never ask the user — this runs as a sub-agent):
 - If `gemini`: read `state.ci.auto_improve` (default true) and toggle `auto_improve` accordingly

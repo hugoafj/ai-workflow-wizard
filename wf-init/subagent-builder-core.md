@@ -141,9 +141,11 @@ frontmatter field (from `skill/SKILL.md`) — NOT necessarily the command folder
 | IDE | Skills path |
 |-----|-------------|
 | `claude-code` | `{WF_STAGING}/.claude/skills/<skill-name>/SKILL.md` |
+| `cursor` | `{WF_STAGING}/.cursor/skills/<skill-name>/SKILL.md` |
 | `kiro` | `{WF_STAGING}/.kiro/skills/<skill-name>/SKILL.md` |
 | `codex` | `{WF_STAGING}/.codex/skills/<skill-name>/SKILL.md` |
 | `windsurf` | `{WF_STAGING}/.windsurf/skills/<skill-name>/SKILL.md`, `{WF_STAGING}/.devin/skills/<skill-name>/SKILL.md` (both written for Windsurf/Devin compatibility) |
+| `gemini-cli` | `{WF_STAGING}/.gemini/skills/<skill-name>/SKILL.md` |
 
 **Universal — always emitted, regardless of `IDES`** (the 1:1 skill fallback):
 `{WF_STAGING}/.agents/skills/<skill-name>/SKILL.md` — the standard `.agents/` path read by

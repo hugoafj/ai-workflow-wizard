@@ -360,11 +360,14 @@ Do not continue or verify files until they confirm. When they reply "continue", 
 ### Verification (runs after Path A or Path B)
 
 ```bash
-ls openspec/config.yaml openspec/changes openspec/specs 2>/dev/null
-cat openspec/config.yaml
+SDD_BACKEND=$(jq -r '.sdd.backend // "hybrid"' .wizard-state.json)
+if [ "$SDD_BACKEND" = "openspec" ] || [ "$SDD_BACKEND" = "hybrid" ]; then
+  ls openspec/config.yaml openspec/changes openspec/specs 2>/dev/null
+  cat openspec/config.yaml
+fi
 ```
 
-All three must exist. Show the `config.yaml` contents to the user so they can see and confirm it reflects their choice. If there is any problem:
+For `openspec`/`hybrid` backends, all three must exist when the check runs. Show the `config.yaml` contents to the user so they can see and confirm it reflects their choice. If there is any problem:
 
 ```
 SDD initialization was not completed. Missing: <list of what's missing>.

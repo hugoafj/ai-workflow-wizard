@@ -27,13 +27,10 @@ CONFIG_FILES="AGENTS.md \
 CHANGED_REFRESH=""
 CHANGED_SDD=""
 
-# git diff HEAD~1 HEAD fails on the first commit (no HEAD~1).
-# Fallback: git diff --cached --name-only for the first commit.
-if git rev-parse HEAD~1 > /dev/null 2>&1; then
-  CHANGED=$(git diff HEAD~1 HEAD --name-only 2>/dev/null)
-else
-  CHANGED=$(git diff --cached --name-only 2>/dev/null)
-fi
+# Use git diff-tree to list files in the just-created commit.
+# This works for the first commit and after subsequent commits, unlike
+# `git diff --cached` which sees an empty index immediately post-commit.
+CHANGED=$(git diff-tree --no-commit-id --name-only -r HEAD 2>/dev/null)
 
 for f in $REFRESH_FILES; do
   if echo "$CHANGED" | grep -q "^$f$"; then

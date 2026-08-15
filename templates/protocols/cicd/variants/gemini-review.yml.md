@@ -37,7 +37,7 @@ jobs:
           github_action_config.auto_describe: "true"
           # Configurable from state.ci.auto_improve (default true). Regenerate this
           # workflow after toggling "AI Review Suggestions" in /wf-settings.
-          github_action_config.auto_improve: "{{ci.auto_improve}}"
+          github_action_config.auto_improve: "true"
 
       - name: Post failure comment on PR
         if: failure()
