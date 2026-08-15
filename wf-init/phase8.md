@@ -9,6 +9,9 @@ Only run because the user explicitly approved in Phase 7.
 ### 8.1 Promote staging files
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
 STAGING=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' .wizard-state.json)
 
 # Active IDEs (used to gate IDE-specific artifacts below)
@@ -23,8 +26,10 @@ if echo "$IDES" | grep -q "claude-code"; then
 fi
 
 # Copy the entire staging tree to the project root, preserving relative paths
-( cd "$STAGING" && find . -type f -print0 | while IFS= read -r -d '' f; do
-    dest="../${f#./}"; mkdir -p "$(dirname "$dest")"; cp "$f" "$dest";
+( set -e
+  cd "$STAGING"
+  find . -type f -print0 | while IFS= read -r -d '' f; do
+    dest="../${f#./}"; mkdir -p "$(dirname "$dest")"; cp -p "$f" "$dest";
   done )
 # Note: run from a staging whose root mirrors the project root.
 
@@ -58,6 +63,27 @@ if echo "$IDES" | grep -q "windsurf"; then
     fi
   fi
 fi
+
+# Recompute managed files after in-place edits (AGENTS.md bridge reinsert)
+GENERATED_FILES="[]"
+MANAGED_PATHS="[]"
+while IFS= read -r -d '' path; do
+  if [ -f "$path" ]; then
+    HASH=$(wf_sha256 "$path")
+    GENERATED_FILES=$(jq --arg path "$path" --arg hash "$HASH" '. += [{"path": $path, "hash": $hash, "managed": true}]' <<< "$GENERATED_FILES")
+  fi
+  MANAGED_PATHS=$(jq --arg path "$path" '. += [$path]' <<< "$MANAGED_PATHS")
+done < <(jq -j '(.build_plan.managed_paths // [])[]? + "\u0000"' .wizard-state.json)
+
+jq --argjson files "$GENERATED_FILES" --argjson paths "$MANAGED_PATHS" \
+   '.build_plan.generated_files = $files | .build_plan.managed_paths = $paths' \
+   .wizard-state.json > .wizard-state.json.tmp
+mv .wizard-state.json.tmp .wizard-state.json
+
+WIZARD_VERSION=$(jq -r '.wizard_version // "0.7.1-beta.1"' .wizard-state.json)
+GENERATED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+jq -n --arg version "$WIZARD_VERSION" --arg generated_at "$GENERATED_AT" --argjson files "$GENERATED_FILES" \
+   '{wizard_version: $version, generated_at: $generated_at, files: $files}' > .wizard-managed-files.json
 
 # Validate the AGENTS.md wf-version footer — NEVER accept "latest" or an unresolved placeholder.
 # /wf-refresh Phase -1 compares local vs remote with STRICT equality; a non-semver value like
@@ -235,18 +261,18 @@ gentle-ai has no field for them; they surface in the generated `playwright.confi
 Resolve the values from state (flat schema — `testing.coverage_threshold`, not `testing.extras.*`):
 
 ```bash
-if [ ! -f openspec/config.yaml ]; then
+if [ -f openspec/config.yaml ]; then
+  UNIT=$(jq -r '.testing.layers | index("unit") != null' .wizard-state.json)
+  INTEGRATION=$(jq -r '.testing.layers | index("integration") != null' .wizard-state.json)
+  E2E=$(jq -r '.testing.layers | index("e2e") != null' .wizard-state.json)
+  if [ "$UNIT" = "true" ] && [ "$E2E" = "true" ]; then FRAMEWORK="Vitest + Playwright"
+  elif [ "$E2E" = "true" ]; then FRAMEWORK="Playwright"
+  else FRAMEWORK="Vitest"; fi
+  COVERAGE=$(jq -r '.testing.coverage_threshold != null' .wizard-state.json)
+  COVERAGE_THRESHOLD=$(jq -r '.testing.coverage_threshold // null' .wizard-state.json)
+else
   echo "8.1d skipped — no openspec/config.yaml (engram backend or /sdd-init not run)."
-  exit 0
 fi
-UNIT=$(jq -r '.testing.layers | index("unit") != null' .wizard-state.json)
-INTEGRATION=$(jq -r '.testing.layers | index("integration") != null' .wizard-state.json)
-E2E=$(jq -r '.testing.layers | index("e2e") != null' .wizard-state.json)
-if [ "$UNIT" = "true" ] && [ "$E2E" = "true" ]; then FRAMEWORK="Vitest + Playwright"
-elif [ "$E2E" = "true" ]; then FRAMEWORK="Playwright"
-else FRAMEWORK="Vitest"; fi
-COVERAGE=$(jq -r '.testing.coverage_threshold != null' .wizard-state.json)
-COVERAGE_THRESHOLD=$(jq -r '.testing.coverage_threshold // null' .wizard-state.json)
 ```
 
 Apply the edits with `yq` (same tool Phase 4.6 already uses for `strict_tdd`) — atomic,
@@ -256,10 +282,11 @@ canonical location, so this also works when `/sdd-init` wrote a file without a t
 
 ```bash
 # Install yq if not present
-if ! command -v yq &> /dev/null; then
+if [ -f openspec/config.yaml ] && ! command -v yq &>/dev/null; then
   echo "Installing yq for safe YAML editing..."
-  brew install yq  # macOS/Linux
-  # or for Windows: scoop install yq
+  if command -v brew &>/dev/null; then
+    brew install yq 2>/dev/null || true
+  fi
 fi
 ```
 
@@ -282,41 +309,47 @@ preserving every other line byte-for-byte, and creating missing parent keys
 Then continue to the verification step below. With `yq` available, apply the edits:
 
 ```bash
-# 1. Runner (sdd-apply detects it from the testing section)
-yq eval ".testing.runner.framework = \"$FRAMEWORK\"" -i openspec/config.yaml
+if [ -f openspec/config.yaml ]; then
+  if command -v yq &>/dev/null; then
+    # 1. Runner (sdd-apply detects it from the testing section)
+    yq eval ".testing.runner.framework = \"$FRAMEWORK\"" -i openspec/config.yaml
 
-# 2. Layers capability cache (sdd-apply/verify: available + tool per layer)
-if [ "$UNIT" = "true" ] || [ "$INTEGRATION" = "true" ]; then
-  yq eval '.testing.layers.unit.available = true' -i openspec/config.yaml
-  yq eval '.testing.layers.unit.tool = "vitest"' -i openspec/config.yaml
-fi
-if [ "$INTEGRATION" = "true" ]; then
-  yq eval '.testing.layers.integration.available = true' -i openspec/config.yaml
-  yq eval '.testing.layers.integration.tool = "vitest"' -i openspec/config.yaml
-fi
-if [ "$E2E" = "true" ]; then
-  yq eval '.testing.layers.e2e.available = true' -i openspec/config.yaml
-  yq eval '.testing.layers.e2e.tool = "playwright"' -i openspec/config.yaml
-fi
+    # 2. Layers capability cache (sdd-apply/verify: available + tool per layer)
+    if [ "$UNIT" = "true" ] || [ "$INTEGRATION" = "true" ]; then
+      yq eval '.testing.layers.unit.available = true' -i openspec/config.yaml
+      yq eval '.testing.layers.unit.tool = "vitest"' -i openspec/config.yaml
+    fi
+    if [ "$INTEGRATION" = "true" ]; then
+      yq eval '.testing.layers.integration.available = true' -i openspec/config.yaml
+      yq eval '.testing.layers.integration.tool = "vitest"' -i openspec/config.yaml
+    fi
+    if [ "$E2E" = "true" ]; then
+      yq eval '.testing.layers.e2e.available = true' -i openspec/config.yaml
+      yq eval '.testing.layers.e2e.tool = "playwright"' -i openspec/config.yaml
+    fi
 
-# 3. Coverage (extra 1 — only if activated): capability cache + sdd-verify threshold
-if [ "$COVERAGE" = "true" ]; then
-  yq eval '.testing.coverage.available = true' -i openspec/config.yaml
-  yq eval '.testing.coverage.command = "npm run test:coverage"' -i openspec/config.yaml
-  yq eval ".rules.verify.coverage_threshold = $COVERAGE_THRESHOLD" -i openspec/config.yaml
-fi
+    # 3. Coverage (extra 1 — only if activated): capability cache + sdd-verify threshold
+    if [ "$COVERAGE" = "true" ]; then
+      yq eval '.testing.coverage.available = true' -i openspec/config.yaml
+      yq eval '.testing.coverage.command = "npm run test:coverage"' -i openspec/config.yaml
+      yq eval ".rules.verify.coverage_threshold = $COVERAGE_THRESHOLD" -i openspec/config.yaml
+    fi
 
-# 4. Command overrides (always when testing configured)
-yq eval '.rules.apply.test_command = "npm test"' -i openspec/config.yaml
-# npm swallows a bare --coverage flag: `npm test --coverage` runs WITHOUT coverage.
-# sdd-verify runs {test_command} --coverage (strict-tdd-verify Step 5d), so when coverage
-# is activated the verify command must be the script that already enables coverage.
-if [ "$COVERAGE" = "true" ]; then
-  yq eval '.rules.verify.test_command = "npm run test:coverage"' -i openspec/config.yaml
-else
-  yq eval '.rules.verify.test_command = "npm test"' -i openspec/config.yaml
+    # 4. Command overrides (always when testing configured)
+    yq eval '.rules.apply.test_command = "npm test"' -i openspec/config.yaml
+    # npm swallows a bare --coverage flag: `npm test --coverage` runs WITHOUT coverage.
+    # sdd-verify runs {test_command} --coverage (strict-tdd-verify Step 5d), so when coverage
+    # is activated the verify command must be the script that already enables coverage.
+    if [ "$COVERAGE" = "true" ]; then
+      yq eval '.rules.verify.test_command = "npm run test:coverage"' -i openspec/config.yaml
+    else
+      yq eval '.rules.verify.test_command = "npm test"' -i openspec/config.yaml
+    fi
+    yq eval '.rules.verify.build_command = "npm run build"' -i openspec/config.yaml
+  else
+    echo "8.1d WARNING — yq not available; apply the openspec edits manually." >&2
+  fi
 fi
-yq eval '.rules.verify.build_command = "npm run build"' -i openspec/config.yaml
 ```
 
 Never copy from `templates/protocols/sdd/config.yaml.tmpl.md` — it is a field reference, not a
@@ -331,7 +364,9 @@ Verify the edit landed — if the coverage extra was activated, the file must no
 threshold under `rules.verify`:
 
 ```bash
-grep -n "coverage_threshold" openspec/config.yaml && echo "8.1d OK — rules.verify.coverage_threshold present"
+if [ -f openspec/config.yaml ]; then
+  grep -n "coverage_threshold" openspec/config.yaml && echo "8.1d OK — rules.verify.coverage_threshold present"
+fi
 ```
 
 ### 8.1e Testing scripts + Playwright MCP registration (project files, only if testing configured)
@@ -381,11 +416,29 @@ _gi_add '.wizard-state.json'
 _gi_add '.wizard-staging/'
 
 # Exceptions for satellites that must be versioned (only generated ones, single quotes)
-_gi_add '!.cursor/'        # if applicable
-_gi_add '!.windsurf/'      # if applicable
-_gi_add '!.devin/'         # if applicable
-_gi_add '!.kiro/'          # if applicable
-_gi_add '!.github/copilot-instructions.md'   # if applicable
+if echo "$IDES" | grep -q "cursor"; then
+  _gi_add '!.cursor/'
+fi
+if echo "$IDES" | grep -qE "windsurf|devin"; then
+  _gi_add '!.windsurf/'
+  _gi_add '!.devin/'
+fi
+if echo "$IDES" | grep -q "kiro"; then
+  _gi_add '!.kiro/'
+fi
+if echo "$IDES" | grep -q "claude-code"; then
+  _gi_add '!.claude/'
+fi
+if echo "$IDES" | grep -q "codex"; then
+  _gi_add '!.codex/'
+fi
+if echo "$IDES" | grep -q "opencode"; then
+  _gi_add '!.opencode/'
+fi
+if echo "$IDES" | grep -q "vscode-copilot"; then
+  _gi_add '!.github/copilot-instructions.md'
+  _gi_add '!.github/prompts/'
+fi
 ```
 
 ### 8.3 Write .wizard-managed-files.json
@@ -393,12 +446,31 @@ _gi_add '!.github/copilot-instructions.md'   # if applicable
 After all files are promoted, write a manifest of wizard-managed files for `/wf-refresh` to use during future refreshes.
 
 ```bash
-# Get wizard version
-WIZARD_VERSION=$(jq -r '.wizard_version // "0.1.0-beta.1"' .wizard-state.json)
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
+# Recompute managed files from the actual promoted files
+GENERATED_FILES="[]"
+MANAGED_PATHS="[]"
+while IFS= read -r -d '' path; do
+  if [ -f "$path" ]; then
+    HASH=$(wf_sha256 "$path")
+    GENERATED_FILES=$(jq --arg path "$path" --arg hash "$HASH" '. += [{"path": $path, "hash": $hash, "managed": true}]' <<< "$GENERATED_FILES")
+  fi
+  MANAGED_PATHS=$(jq --arg path "$path" '. += [$path]' <<< "$MANAGED_PATHS")
+done < <(jq -j '(.build_plan.managed_paths // [])[]? + "\u0000"' .wizard-state.json)
+
+# Persist refreshed hashes to state
+jq --argjson files "$GENERATED_FILES" --argjson paths "$MANAGED_PATHS" \
+   '.build_plan.generated_files = $files | .build_plan.managed_paths = $paths' \
+   .wizard-state.json > .wizard-state.json.tmp
+mv .wizard-state.json.tmp .wizard-state.json
+
+WIZARD_VERSION=$(jq -r '.wizard_version // "0.7.1-beta.1"' .wizard-state.json)
 GENERATED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-# Build managed files list from build_plan.generated_files
-jq -n --arg version "$WIZARD_VERSION" --arg generated_at "$GENERATED_AT" --argjson files "$(jq '.build_plan.generated_files' .wizard-state.json)" '{wizard_version: $version, generated_at: $generated_at, files: $files}' > .wizard-managed-files.json
+jq -n --arg version "$WIZARD_VERSION" --arg generated_at "$GENERATED_AT" --argjson files "$GENERATED_FILES" \
+   '{wizard_version: $version, generated_at: $generated_at, files: $files}' > .wizard-managed-files.json
 
 # Add to .gitignore (so it's not committed)
 if ! grep -q "\.wizard-managed-files\.json" .gitignore 2>/dev/null; then
@@ -423,6 +495,7 @@ fi
 command -v gentle-ai &>/dev/null && gentle-ai skill-registry refresh --quiet 2>/dev/null || true
 
 git add AGENTS.md GEMINI.md 2>/dev/null || true
+[ -f ANTIGRAVITY.md ] && git add ANTIGRAVITY.md 2>/dev/null || true
 git add -f .agents/ 2>/dev/null || true
 # CLAUDE.md and .claude/ exist only when claude-code was selected (see 8.1)
 if echo "$IDES" | grep -q "claude-code"; then
@@ -441,6 +514,8 @@ git add -f .github/copilot-instructions.md .github/prompts/ 2>/dev/null || true
 # CI/CD (Block 6): workflows, conventional commits, husky, release-please, .gga
 git add -f .github/workflows/ 2>/dev/null || true
 git add -f .husky/ .commitlintrc.json .gga release-please-config.json .release-please-manifest.json 2>/dev/null || true
+[ -f package.json ] && git add package.json 2>/dev/null || true
+[ -f package-lock.json ] && git add package-lock.json 2>/dev/null || true
 # SDD artifacts (openspec/): created by /sdd-init in Phase 4.5 + targeted edit in 8.1d
 git add openspec/ 2>/dev/null || true
 git add .gitignore
@@ -455,7 +530,8 @@ git commit -m "chore: initialize AI Workflow Wizard
 - Add AGENTS.md router (thin) pointing to packaged protocols
 - Add protocols as IDE native skills + universal .agents/skills + flat files (.agents/protocols)
 - Add satellite files for configured IDEs
-- Add project commands (wf-ladder, wf-tdd, wf-orchestrator, wf-sdd-trigger, wf-onboard, wf-worktree, wf-settings)
+- Add project commands: wf-ladder, wf-tdd, wf-orchestrator, wf-sdd-trigger
+- Add project commands: wf-onboard, wf-worktree, wf-settings
 - Add post-commit hook for drift detection
 - Add CI/CD (Block 6): AI review, quality guard, conventional commits
 - Update .gitignore for AI workflow files
