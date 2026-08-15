@@ -265,7 +265,9 @@ Mark `wf_phase_done phase6 phase7` **only if the current phase_pointer is `phase
 
 ```bash
 CURRENT_PHASE=$(jq -r '.phase_pointer // empty' "{WF_STATE}")
-if [ "$CURRENT_PHASE" = "phase6" ]; then
+# phase5 advances to phase6a-agents (not phase6), so accept both pointers
+# when completing the Builder phases.
+if [ "$CURRENT_PHASE" = "phase6" ] || [ "$CURRENT_PHASE" = "phase6a-agents" ]; then
   wf_phase_done phase6 phase7
 fi
 ```

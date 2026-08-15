@@ -18,7 +18,7 @@ fi
 ```
 
 > This phase ONLY collects decisions and saves them in `state.ci` and `state.cd`.
-> File **generation** is done by the Builder in Phase 6e (to staging).
+> File **generation** is done by the Builder in Phase 6 (to staging).
 > Don't write files here.
 
 ### Precondition: read state + detect GitHub

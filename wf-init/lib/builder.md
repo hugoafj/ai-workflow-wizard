@@ -383,7 +383,9 @@ Populate `state.build_plan` with the exact list of files in staging, including S
 3. Update state (advance phase only during `wf-init`):
    ```bash
    CURRENT_PHASE=$(jq -r '.phase_pointer // empty' "$WF_STATE")
-   if [ "$CURRENT_PHASE" = "phase6" ]; then
+   # phase5 advances to phase6a-agents (not phase6), so accept both pointers
+   # when completing the Builder phases.
+   if [ "$CURRENT_PHASE" = "phase6" ] || [ "$CURRENT_PHASE" = "phase6a-agents" ]; then
      jq --argjson files "$FILES" --argjson paths "$PATHS" \
        '.build_plan.generated_files = $files |
         .build_plan.managed_paths = $paths |

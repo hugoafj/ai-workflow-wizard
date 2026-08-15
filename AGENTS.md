@@ -4,13 +4,18 @@
 
 | Command | Source template |
 |---|---|
+| `/wf-init` | `templates/commands/wf-init/_base.md` |
 | `/wf-refresh` | `templates/commands/wf-refresh/_base.md` |
 | `/wf-worktree` | `templates/commands/wf-worktree/_base.md` |
 | `/wf-settings` | `templates/commands/wf-settings/_base.md` |
 | `/wf-onboard` | `templates/commands/wf-onboard/_base.md` |
 | `/wf-cleanup` | `templates/commands/wf-cleanup/_base.md` |
+| `/wf-orchestrator` | `templates/commands/wf-orchestrator/_base.md` |
+| `/wf-sdd-trigger` | `templates/commands/wf-sdd-trigger/_base.md` |
+| `/wf-tdd` | `templates/commands/wf-tdd/_base.md` |
+| `/wf-ladder` | `templates/commands/wf-ladder/_base.md` |
 
-`/wf-refresh` and `/wf-cleanup` are installed globally by `install.sh`; `/wf-worktree`, `/wf-settings`, and `/wf-onboard` are generated per project by `/wf-init`.
+`/wf-init`, `/wf-refresh`, and `/wf-cleanup` are installed globally by `install.sh`; `/wf-worktree`, `/wf-settings`, `/wf-onboard`, `/wf-orchestrator`, `/wf-sdd-trigger`, `/wf-tdd`, and `/wf-ladder` are generated per project by `/wf-init`.
 
 ## Code Style & Conventions
 
@@ -33,9 +38,11 @@ wf-init/          — wizard phases
   subagent-*.md   — sub-agent prompts (discovery, builder-core, builder-heavy)
 ```
 
+<!-- WF: DO NOT REGENERATE -->
 ## Artifact Store
 
 This project declares **OpenSpec** as the SDD artifact store; change artifacts live in `openspec/changes/<change-name>/`.
+<!-- /WF: DO NOT REGENERATE -->
 
 ## Critical Constraints
 
@@ -62,6 +69,7 @@ This project declares **OpenSpec** as the SDD artifact store; change artifacts l
   your response with the tag `[AGENTS.md drift detected: <description>]`. Do NOT fix AGENTS.md yourself.
 
 
+<!-- WF: DO NOT REGENERATE -->
 ## Critical: AI_DEV_WORKFLOW.md Synchronization
 
 **BEFORE every commit**, if your changes affect ANY of these topics, verify and update AI_DEV_WORKFLOW.md:
@@ -75,6 +83,7 @@ This project declares **OpenSpec** as the SDD artifact store; change artifacts l
 - Documentation structure, glossary, or major sections
 
 **Rule**: If it's implemented in code/templates, it must be documented in AI_DEV_WORKFLOW.md. If you change the code, audit that section in the doc and update it if stale. Do not commit code changes without ensuring the doc reflects them accurately.
+<!-- /WF: DO NOT REGENERATE -->
 
 ---
 

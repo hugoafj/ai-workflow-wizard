@@ -125,7 +125,9 @@ Mark phases 6 and 7 as done (persistence), but **only if the current phase_point
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 CURRENT_PHASE=$(jq -r '.phase_pointer // empty' .wizard-state.json)
-if [ "$CURRENT_PHASE" = "phase6" ]; then
+# phase5 advances to phase6a-agents (not phase6), so accept both pointers
+# when completing the Builder phases.
+if [ "$CURRENT_PHASE" = "phase6" ] || [ "$CURRENT_PHASE" = "phase6a-agents" ]; then
   wf_phase_done phase6 phase7
 fi
 ```

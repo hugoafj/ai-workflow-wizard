@@ -72,7 +72,10 @@ if ! command -v wf_fetch_version >/dev/null 2>&1; then
     if [[ -z "$version" ]]; then
       version="0.7.1-beta.1"
     fi
-    printf '%s' "${version#v}"
+    # Strip a leading 'v' BEFORE the emptiness check: VERSION="v" alone would
+    # otherwise pass the -z check and printf an empty string.
+    version="${version#v}"
+    printf '%s' "${version:-0.7.1-beta.1}"
   }
 fi
 
@@ -112,14 +115,16 @@ version_lte() {
     return 1
   fi
 
-  if (( m1 != m2 )); then
-    (( m1 < m2 )) && return 0 || return 1
+  # Force base-10 arithmetic: components like "08" or "010" must not be
+  # parsed as octal (which would error and mis-order versions).
+  if (( 10#$m1 != 10#$m2 )); then
+    (( 10#$m1 < 10#$m2 )) && return 0 || return 1
   fi
-  if (( n1 != n2 )); then
-    (( n1 < n2 )) && return 0 || return 1
+  if (( 10#$n1 != 10#$n2 )); then
+    (( 10#$n1 < 10#$n2 )) && return 0 || return 1
   fi
-  if (( p1 != p2 )); then
-    (( p1 < p2 )) && return 0 || return 1
+  if (( 10#$p1 != 10#$p2 )); then
+    (( 10#$p1 < 10#$p2 )) && return 0 || return 1
   fi
 
   # No pre-release on both -> equal -> lte true
@@ -201,9 +206,20 @@ _ask_yesno() {
 # Writes a .tmp file and moves it into place.
 _apply_jq_filter() {
   local filter="${@: -1}"
-  local args=("${@:1:$#-1}")
+  local args=()
   local tmp="${WF_STATE}.tmp"
-  jq "${args[@]}" "$filter" "$WF_STATE" > "$tmp" && mv "$tmp" "$WF_STATE"
+  # zsh does NOT honor bash-style "$@" slicing ("${@:1:$#-1}" leaves the full
+  # array), so pop every arg except the last (the filter) with a portable loop.
+  # A single-argument call (filter only) falls straight through to the else.
+  if [ $# -gt 1 ]; then
+    while [ "$#" -gt 1 ]; do
+      args+=("$1")
+      shift
+    done
+    jq "${args[@]}" "$filter" "$WF_STATE" > "$tmp" && mv "$tmp" "$WF_STATE"
+  else
+    jq "$filter" "$WF_STATE" > "$tmp" && mv "$tmp" "$WF_STATE"
+  fi
 }
 
 # Migration to v0.6.8: schema v3 fields + new optional features.
@@ -352,6 +368,39 @@ preserve_custom_agents() {
   echo "  ✓ Custom sections preserved"
 }
 
+# Reinsert the "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule into
+# AGENTS.md when Windsurf/Devin is an active IDE. Mirrors phase8's safety net:
+# the staging router does not carry the rule, so a refresh must re-add it.
+# Idempotent: skips when the rule is already present (e.g. preserved via
+# DO NOT REGENERATE markers or by a previous reinsert).
+reinsert_legacy_bridge() {
+  local IDES RULE_FILE
+  IDES=$(jq -r '.answers.ides[]?' "$WF_STATE" 2>/dev/null)
+  if ! echo "$IDES" | grep -q "windsurf"; then
+    return 0
+  fi
+  RULE_FILE="${WF_DIR}/temp-files/AGENTS.md"
+  if [ ! -f "$RULE_FILE" ] || [ ! -f AGENTS.md ]; then
+    return 0
+  fi
+  if grep -q "Gentle AI — Legacy Path Bridge" AGENTS.md; then
+    echo "  ℹ Legacy path bridge already present in AGENTS.md"
+    return 0
+  fi
+  # Insert after the first line (after "# AGENTS.md — <project>") using
+  # head/cat/tail — portable on BOTH BSD (macOS) and GNU (Linux) coreutils.
+  # Wrap in DO NOT REGENERATE markers so future refreshes preserve it.
+  # temp-files/AGENTS.md has no trailing newline, so add one before the
+  # closing marker to keep it on its own line.
+  { head -n 1 AGENTS.md; printf '%s\n' "<!-- WF: DO NOT REGENERATE -->"; cat "$RULE_FILE"; printf '\n%s\n' "<!-- /WF: DO NOT REGENERATE -->"; tail -n +2 AGENTS.md; } > AGENTS.md.tmp
+  mv AGENTS.md.tmp AGENTS.md
+  if grep -q "Gentle AI — Legacy Path Bridge" AGENTS.md; then
+    echo "  ✓ Windsurf legacy path bridge rule reinserted into AGENTS.md"
+  else
+    echo "  ⚠ Windsurf legacy path bridge rule MISSING from AGENTS.md after reinsert." >&2
+  fi
+}
+
 LIBEOF
 
 chmod +x "${WF_DIR}/lib/refresh-lib.sh"
@@ -405,11 +454,13 @@ if version_lt "$LOCAL_VERSION" "$REMOTE_VERSION"; then
   read -p "Update global commands? [y/n] " -n 1 -r
   echo
   if [[ $REPLY =~ ^[Yy]$ ]]; then
-    if [[ -f install.sh ]]; then
+    # install.sh lives in the wizard repo, not in the project directory.
+    INSTALL_SH="${WF_DIR}/install.sh"
+    if curl -fsSL "${WF_RAW}/install.sh" -o "$INSTALL_SH" 2>/dev/null && [[ -s "$INSTALL_SH" ]]; then
       echo "ℹ Running install.sh..."
-      bash install.sh || echo "⚠ install.sh failed; continuing anyway"
+      bash "$INSTALL_SH" || echo "⚠ install.sh failed; continuing anyway"
     else
-      echo "⚠ install.sh not found; skipping update"
+      echo "⚠ Could not download install.sh from ${WF_RAW}/install.sh; skipping update"
     fi
   else
     echo "ℹ Skipping update; you can run install.sh manually later"
@@ -795,6 +846,55 @@ if [[ $DELETED_MODIFIED_COUNT -gt 0 ]]; then
   echo ""
 fi
 
+# Show the REAL diff before asking for approval (AGENTS.md: show me the full
+# diff and wait for my approval). Preview each category with bounded output:
+# added → staged content; updated → diff against staging; deleted/deleted_modified → current content.
+MAX_PREVIEW_LINES="${MAX_PREVIEW_LINES:-120}"
+_preview_file() {
+  local label="$1" file="$2"
+  echo "    --- $label: $file ---"
+  if [[ "$label" == "UPDATED" ]]; then
+    if diff -u "$file" "$STAGING/$file" 2>/dev/null | head -n "$MAX_PREVIEW_LINES"; then
+      :
+    else
+      true
+    fi
+  elif [[ "$label" == "ADDED" ]]; then
+    if head -n "$MAX_PREVIEW_LINES" "$STAGING/$file" 2>/dev/null; then :; fi
+  else
+    if head -n "$MAX_PREVIEW_LINES" "$file" 2>/dev/null; then :; fi
+  fi
+  echo ""
+}
+
+if [[ $ADDED_COUNT -gt 0 ]]; then
+  echo "  Previewing ADDED files (first $MAX_PREVIEW_LINES lines each):"
+  while IFS= read -r file; do
+    _preview_file "ADDED" "$file"
+  done < <(jq -r '.added[]?.path' "$PLAN")
+fi
+
+if [[ $UPDATED_COUNT -gt 0 ]]; then
+  echo "  Previewing UPDATED files (diff vs staging, first $MAX_PREVIEW_LINES lines each):"
+  while IFS= read -r file; do
+    _preview_file "UPDATED" "$file"
+  done < <(jq -r '.updated[]?.path' "$PLAN")
+fi
+
+if [[ $DELETED_COUNT -gt 0 ]]; then
+  echo "  Previewing DELETED files (current content that would be removed, first $MAX_PREVIEW_LINES lines each):"
+  while IFS= read -r file; do
+    _preview_file "DELETED" "$file"
+  done < <(jq -r '.deleted[]?.path' "$PLAN")
+fi
+
+if [[ $DELETED_MODIFIED_COUNT -gt 0 ]]; then
+  echo "  Previewing DELETED-MODIFIED files (your local content that would be removed, first $MAX_PREVIEW_LINES lines each):"
+  while IFS= read -r file; do
+    _preview_file "DELETED-MODIFIED" "$file"
+  done < <(jq -r '.deleted_modified[]?.path' "$PLAN")
+fi
+
 APPROVE_ADDED="false"
 APPROVE_UPDATED="false"
 APPROVE_DELETED="false"
@@ -878,6 +978,10 @@ if [[ "$APPROVE_UPDATED" == "true" ]] || [[ "$APPROVE_ADDED" == "true" ]]; then
     preserve_custom_agents "$STAGING"
   fi
 fi
+
+# Reinsert the Windsurf/Devin legacy path bridge (idempotent; skipped when the
+# rule is already present or Windsurf/Devin is not an active IDE).
+reinsert_legacy_bridge
 
 if [[ "$APPROVE_ADDED" == "true" ]]; then
   echo "ℹ Copying added files..."

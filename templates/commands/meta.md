@@ -9,7 +9,7 @@
   - Copilot: `.prompt.md` suffix + frontmatter `--- mode: agent ---`.
   The Builder takes the body (_base.md) and applies the IDE frontmatter using the
   `description` below when the IDE requires it (Windsurf).
-  Source: phase6c 71/141/201, phase6c2 34/102/165.
+  Source: Builder B3/B5 (command packaging).
 -->
 
 | Command | Scope | Skill (1:1) | description (Windsurf) |

@@ -32,7 +32,10 @@ wf_fetch_version() {
   fi
 
   # Final fallback
-  [ -n "$version" ] && echo "${version#v}" || echo "0.7.1-beta.1"
+  # Strip a leading 'v' AFTER the emptiness check: VERSION="v" alone would
+  # otherwise pass the -n check and echo an empty string.
+  version="${version#v}"
+  [ -n "$version" ] && echo "$version" || echo "0.7.1-beta.1"
 }
 
 # Initialize state if it doesn't exist (phase0 creates it on first run)

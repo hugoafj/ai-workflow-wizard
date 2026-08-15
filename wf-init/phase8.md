@@ -43,7 +43,10 @@ if echo "$IDES" | grep -q "windsurf"; then
       # Insert after the first line (after "# AGENTS.md — <project>") using
       # head/cat/tail — portable on BOTH BSD (macOS) and GNU (Linux) coreutils.
       # GNU-style `sed -i '1a\n...'` fails silently on macOS; never use it here.
-      { head -n 1 AGENTS.md; cat "$WF_RULE_FILE"; tail -n +2 AGENTS.md; } > AGENTS.md.tmp
+      # Wrap it in DO NOT REGENERATE markers so /wf-refresh preserves it.
+      # temp-files/AGENTS.md has no trailing newline, so add one before the
+      # closing marker to keep it on its own line.
+      { head -n 1 AGENTS.md; printf '%s\n' "<!-- WF: DO NOT REGENERATE -->"; cat "$WF_RULE_FILE"; printf '\n%s\n' "<!-- /WF: DO NOT REGENERATE -->"; tail -n +2 AGENTS.md; } > AGENTS.md.tmp
       mv AGENTS.md.tmp AGENTS.md
     fi
     # Verify the rule landed — fail loudly, never silently (the silent failure is the bug)
@@ -361,16 +364,28 @@ tell the user which files to create and with what content, and wait for confirma
 ### 8.2 Update .gitignore
 
 ```bash
-echo '.wf-status' >> .gitignore
-echo '.wizard-state.json' >> .gitignore
-echo '.wizard-staging/' >> .gitignore
+# Idempotent appends: skip lines already present so re-running /wf-init
+# does not duplicate .gitignore entries (same guard as /wf-refresh R6).
+_gi_add() {
+  local line="$1"
+  if ! grep -qxF "$line" .gitignore 2>/dev/null; then
+    if [ -f .gitignore ] && [ "$(tail -c1 .gitignore | wc -l)" -eq 0 ]; then
+      echo >> .gitignore
+    fi
+    printf '%s\n' "$line" >> .gitignore
+  fi
+}
+
+_gi_add '.wf-status'
+_gi_add '.wizard-state.json'
+_gi_add '.wizard-staging/'
 
 # Exceptions for satellites that must be versioned (only generated ones, single quotes)
-echo '!.cursor/' >> .gitignore        # if applicable
-echo '!.windsurf/' >> .gitignore      # if applicable
-echo '!.devin/' >> .gitignore         # if applicable
-echo '!.kiro/' >> .gitignore          # if applicable
-echo '!.github/copilot-instructions.md' >> .gitignore   # if applicable
+_gi_add '!.cursor/'        # if applicable
+_gi_add '!.windsurf/'      # if applicable
+_gi_add '!.devin/'         # if applicable
+_gi_add '!.kiro/'          # if applicable
+_gi_add '!.github/copilot-instructions.md'   # if applicable
 ```
 
 ### 8.3 Write .wizard-managed-files.json
@@ -416,7 +431,9 @@ if echo "$IDES" | grep -q "claude-code"; then
 fi
 git add -f .cursor/ 2>/dev/null || true
 git add -f .windsurf/ 2>/dev/null || true
-git add -f .devin/ 2>/dev/null || true
+# .devin/rules/ holds local IDE rules (not wizard artifacts) — never force-add
+# the whole .devin/ tree. Commit only the generated skills directory.
+git add -f .devin/skills/ 2>/dev/null || true
 git add -f .kiro/ 2>/dev/null || true
 git add -f .codex/ 2>/dev/null || true
 git add -f .opencode/ 2>/dev/null || true

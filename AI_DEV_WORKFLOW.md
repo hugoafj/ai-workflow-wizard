@@ -2262,7 +2262,7 @@ Workflow/config templates are a single source of truth in `templates/protocols/c
 ### How to configure
 
 `/wf-init` asks you about CI and CD in its configuration flow (Phase 4.7) and generates
-the artifacts in Phase 6e. If you already initialized the project and want to change something,
+the artifacts in Phase 6 (the Builder, to staging). If you already initialized the project and want to change something,
 use `/wf-settings` (CI options, AI Reviewer, Security Review, CD, etc.) for complete
 CI/CD block re-configuration (single source: `templates/protocols/cicd/_base.md`).
 

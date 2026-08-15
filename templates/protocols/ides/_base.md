@@ -3,7 +3,7 @@
 <!--
   SINGLE SOURCE of the multi-IDE compatibility rules. Consumed by the Builder
   (satellites + commands + protocol packaging) and by wf-refresh (derive active
-  IDEs). Source in inventory.md: phase6b (satellites), phase6c 5-18 (table),
+  IDEs). Source: Builder B3/B5 (satellites + commands + protocol packaging),
   phase2 45-55, phase5 15-21, AI_DEV_WORKFLOW 5.4 / 5.7. Satellite templates in
   templates/satellites/*.tmpl. VERBATIM tables in *.section.md.
 -->
@@ -45,7 +45,7 @@ referenced from the AGENTS.md router.
 
 ## Command routes and formats table per IDE (VERBATIM)
 
-See `routing-table.section.md` (VERBATIM phase6c 7-17). Confirmed gotchas:
+See `routing-table.section.md` (VERBATIM). Confirmed gotchas:
 - Windsurf: `description:` in frontmatter is **required** (without it, it does not appear in the menu).
 - Kiro: `inclusion: manual` turns the file into a slash command (`always` would be
   always-on = satellite, a different concept).

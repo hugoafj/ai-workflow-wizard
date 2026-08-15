@@ -1,7 +1,7 @@
 # deploy-nginx-phpfpm.laravel.yml.md
 #
 # Template: GitHub Actions deploy workflow for Laravel apps (with or without Node for frontend assets).
-# Used by phase6e when stack_detected in ('laravel', 'laravel_node') and vps_runtime == 'nginx_php_fpm'.
+# Used by the Builder (Phase 6) when stack_detected in ('laravel', 'laravel_node') and vps_runtime == 'nginx_php_fpm'.
 #
 # Placeholders:
 #   {{trigger_event}}   — 'tags:\n        - \'v*\'' or 'branches:\n        - main'

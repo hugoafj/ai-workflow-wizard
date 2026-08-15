@@ -4,6 +4,8 @@
 > Otherwise, skip to the next applicable phase.
 
 ```bash
+# WF_DIR fallback before sourcing (only phase that sourced without it).
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
 FEATURES_ROUTING=$(jq -r '.features.routing_abc // false' .wizard-state.json)

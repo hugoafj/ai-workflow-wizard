@@ -117,7 +117,7 @@ Once set up, here's what working with the AI Workflow looks like:
 In most cases, `/wf-refresh` handles updates gracefully. But if any of these apply, a clean reinstall is safer:
 
 - **Disruptive release** — Many files changed simultaneously (5+ regenerations)
-- **Deleted files** — The manifest shows files were removed and you're unsure which
+- **Deleted files** — `.wizard-managed-files.json` shows files were removed and you're unsure which
 - **Corrupted state** — File integrity check fails (content hash mismatch)
 - **Multiple releases behind** — Jumping 3+ versions risks orphaned files
 - **Broken .wizard-state.json** — State is missing or incomplete

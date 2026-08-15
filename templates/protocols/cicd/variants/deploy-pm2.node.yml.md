@@ -1,7 +1,7 @@
 # deploy-pm2.node.yml.md
 #
 # Template: GitHub Actions deploy workflow for Node.js apps with PM2.
-# Used by phase6e when stack_detected == 'node_pure' and vps_runtime == 'pm2'.
+# Used by the Builder (Phase 6) when stack_detected == 'node_pure' and vps_runtime == 'pm2'.
 #
 # Placeholders:
 #   {{trigger_event}}   — 'tags:\n        - \'v*\'' or 'branches:\n        - main'
