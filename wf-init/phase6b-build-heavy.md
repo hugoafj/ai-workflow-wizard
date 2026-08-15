@@ -161,5 +161,8 @@ Wait for user confirmation. Only then:
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
-cat "$WF_DIR/phase7.md"
+# During /wf-refresh the phase7 promotion is handled by the refresh flow, not here.
+if [ "${WF_REFRESH:-0}" != "1" ]; then
+  cat "$WF_DIR/phase7.md"
+fi
 ```

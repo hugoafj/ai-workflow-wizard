@@ -33,13 +33,13 @@ CHANGED_SDD=""
 CHANGED=$(git diff-tree --no-commit-id --name-only -r HEAD 2>/dev/null)
 
 for f in $REFRESH_FILES; do
-  if echo "$CHANGED" | grep -q "^$f$"; then
+  if echo "$CHANGED" | grep -qxF "$f"; then
     CHANGED_REFRESH="$CHANGED_REFRESH $f"
   fi
 done
 
 for f in $SDD_FILES; do
-  if echo "$CHANGED" | grep -q "^$f$"; then
+  if echo "$CHANGED" | grep -qxF "$f"; then
     CHANGED_SDD="$CHANGED_SDD $f"
   fi
 done
@@ -51,7 +51,11 @@ for pattern in $CONFIG_FILES; do
   esc_pattern=$(printf '%s' "$pattern" | sed 's/[.^$*?+[\]{}|()]/\\&/g')
   # Match exact files or any path under a directory prefix
   if echo "$CHANGED" | grep -qE "^${esc_pattern}(/|$)"; then
-    CHANGED_CONFIG="$CHANGED_CONFIG $pattern/"
+    if [ -d "$pattern" ]; then
+      CHANGED_CONFIG="$CHANGED_CONFIG $pattern/"
+    else
+      CHANGED_CONFIG="$CHANGED_CONFIG $pattern"
+    fi
   fi
 done
 
@@ -148,7 +152,7 @@ fi
 #    Protocol picks up this wizard's wf-* skills without the user having to remember
 #    to run it manually. Confirmed against gentle-ai's own source that it never scans
 #    .windsurf/skills/ or .devin/skills/; those discover project skills natively.
-if command -v gentle-ai &>/dev/null; then
+if command -v gentle-ai >/dev/null 2>&1; then
   gentle-ai skill-registry refresh --quiet >/dev/null 2>&1 || true
 fi
 

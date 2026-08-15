@@ -7,7 +7,7 @@ Apply the same pattern to each active IDE, adjusting path and extension.
 | Claude Code | `.claude/commands/` | — | `.md` |
 | Cursor | `.cursor/commands/` | — | `.md` |
 | Windsurf | `.windsurf/workflows/` | `~/.codeium/windsurf/global_workflows/` | `.md` |
-| Kiro | `.kiro/steering/` | — | `.md` (caution: mixes satellites `inclusion: always` with commands `inclusion: manual` — verify by name, don't assume) |
+| Kiro | `.kiro/steering/` | `~/.kiro/steering/` | `.md` (caution: mixes satellites `inclusion: always` with commands `inclusion: manual` — verify by name, don't assume) |
 | OpenCode | `.opencode/commands/` | — | `.md` |
 | Copilot | `.github/prompts/` | — | `.prompt.md` |
 | Codex CLI | `.codex/commands/` | `~/.codex/commands/` | `.md` |
@@ -38,7 +38,7 @@ Apply the same pattern to each active IDE, adjusting path and extension.
 | Copilot | `~/.copilot/skills/` | `.github/skills/` | — |
 | Kiro | `~/.kiro/skills/`, `~/.kiro/steering/` | `.kiro/skills/`, `.kiro/steering/` | native auto-discovery |
 | Gemini CLI | `~/.gemini/skills/` | `.gemini/skills/` | native auto-discovery; universal `.agents/skills/` + flat `.agents/protocols/` fallback |
-| Antigravity | `~/.gemini/antigravity/skills/`, `~/.gemini/antigravity-ide/skills/`, `~/.gemini/antigravity-cli/skills/` | `.agents/skills/` | see note below |
+| Antigravity | `~/.gemini/config/skills/` (canonical), `~/.gemini/antigravity-cli/builtin/skills/`, `~/.gemini/antigravity/skills/`, `~/.gemini/antigravity-ide/skills/` | `.agents/skills/` | see note below |
 
 > **Antigravity note**: `config/skills/` (`~/.gemini/config/skills/`) is the canonical
 > global path — the only one read by AGY, AGY CLI, and AGY IDE. `install.sh` installs

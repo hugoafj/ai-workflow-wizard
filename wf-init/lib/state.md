@@ -48,6 +48,7 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
     "phase47-cicd": { "status": "pending" },
     "phase6":        { "status": "pending" },
     "phase6a-agents": { "status": "pending" },
+    "phase6b-build-heavy": { "status": "pending" },
     "phase7":   { "status": "pending" },
     "phase8":   { "status": "pending" }
   },

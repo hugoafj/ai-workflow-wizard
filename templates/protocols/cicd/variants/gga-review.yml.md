@@ -10,7 +10,6 @@
 #   | claude       | @anthropic-ai/claude-code     | ANTHROPIC_API_KEY   |
 #   | gemini       | @google/gemini-cli            | GEMINI_API_KEY      |
 #   | codex        | @openai/codex                 | OPENAI_API_KEY      |
-#   | opencode     | (based on its docs)           | (based on its docs)      |
 #
 # Notes:
 #   - fetch-depth: 0 so --pr-mode can diff against the base

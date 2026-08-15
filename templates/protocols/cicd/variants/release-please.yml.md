@@ -25,24 +25,12 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       pr: ${{ steps.release.outputs.pr }}
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
-        with:
-          release-type: simple
 {{if ci.release_ai_summary}}
-
-  ai-summary:
-    needs: release-please
-    if: needs.release-please.outputs.pr
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v4
-      - name: Generate AI summary for release PR
-        run: |
-          echo "AI summary job enabled (provider: {{ci.release_ai_provider}})"
-          # {{AI_SUMMARY_JOB}}
-          echo "Project: {{answers.project_name}}"
+{{AI_SUMMARY_JOB}}
 {{/if}}

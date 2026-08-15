@@ -346,6 +346,8 @@ fi
 > Tell the user: *"Testing stack configured. Reply **continue** to continue."*
 > Wait for the response. Only when they confirm, execute in bash:
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
 wf_phase_done phase46b "$NEXT"
 echo "ℹ Next phase: $NEXT"
 cat "$WF_DIR/$NEXT.md"

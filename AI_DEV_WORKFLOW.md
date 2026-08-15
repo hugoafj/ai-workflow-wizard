@@ -70,7 +70,7 @@ Terms that appear constantly. No need to memorize them; come back to this sectio
 
 **Worktree** — Isolated git folder that shares the same repo. Useful for having multiple agents working in parallel without stepping on each other, each in their own worktree.
 
-**Wizard `/wf-init`** — Global slash command for this workflow that initializes a project: installs and verifies gentle-ai automatically (Phase 0), discovers the project (Phases 1-4), runs `/sdd-init` with backend choice showing all three modes (Phase 4.5), generates `AGENTS.md` with "📋 wf-sdd-trigger" section (Phases 6a and 6b), configures post-commit hook that detects AGENTS.md and SDD drift. Installed with `install.sh` as a global slash command. Architecture: orchestrator (`wf-init.md`) + phase files in `wf-init/` (read on-demand from disk).
+**Wizard `/wf-init`** — Global slash command for this workflow that initializes a project: installs and verifies gentle-ai automatically (Phase 0), discovers the project (Phases 1-4), runs `/sdd-init` with backend choice showing all three modes (Phase 4.5), generates `AGENTS.md` with "📋 wf-sdd-trigger" section (Phases 6a and 6b), configures post-commit hook that detects AGENTS.md and SDD drift. Installed with `install.sh` as a global slash command. Architecture: orchestrator (`templates/commands/wf-init/_base.md`) + phase files in `wf-init/` (read on-demand from disk).
 
 **Hook (git hook)** — Script that git executes automatically on certain events (commit, push). Runs only on your local machine, not on GitHub. We use it to detect drift in AGENTS.md.
 
@@ -520,7 +520,7 @@ Stack: Vite 8 + React 19.2 + TS 6 + Tailwind 4 + ESLint 9 flat config. Size: ~82
 
 ### 5.3 Wizard `/wf-init` (greenfield + legacy)
 
-Slash command that orchestrates the complete workflow bootstrap in a project. Split architecture — the orchestrator (`wf-init.md`) is the only thing attached to the chat; phases, sub-agents and lib contracts/helpers (`state.md`, `state-helpers.sh`, `builder.md`, `refresher.md`) live in `wf-init/` and the agent reads them from disk on-demand. This solves the "lost in the middle" problem a monolithic file would have: the agent only keeps the orchestrator + the active phase in context at any time.
+Slash command that orchestrates the complete workflow bootstrap in a project. Split architecture — the orchestrator (`templates/commands/wf-init/_base.md`) is the only thing attached to the chat; phases, sub-agents and lib contracts/helpers (`state.md`, `state-helpers.sh`, `builder.md`, `refresher.md`) live in `wf-init/` and the agent reads them from disk on-demand. This solves the "lost in the middle" problem a monolithic file would have: the agent only keeps the orchestrator + the active phase in context at any time.
 
 The wizard phases:
 
@@ -827,7 +827,7 @@ gentle-ai doctor
 
 #### Step 3 · Have the wizard ready
 
-The wizard lives in the `workflow-wizard` repo: the orchestrator is `wf-init.md` (85 lines) and the phase files are in `wf-init/`. Make sure you have the repo cloned on your machine. The agent detects the location automatically.
+The wizard lives in the `workflow-wizard` repo: the orchestrator is `templates/commands/wf-init/_base.md` and the phase files are in `wf-init/`. Make sure you have the repo cloned on your machine. The agent detects the location automatically.
 
 #### Step 4 · Open a new Claude Code session (or your preferred IDE/CLI)
 
@@ -842,7 +842,7 @@ claude
 
 #### Step 5 · Paste the orchestrator as the first prompt
 
-Open `wf-init.md` in another editor (it's only 85 lines). Select all (Cmd+A / Ctrl+A). Copy it. Paste it into the new AI IDE session as the first message.
+Open `templates/commands/wf-init/_base.md` in another editor. Select all (Cmd+A / Ctrl+A). Copy it. Paste it into the new AI IDE session as the first message.
 
 > Don't add anything before or after. The agent will locate the phase files on your machine and read each one as it progresses. You don't need to attach anything else.
 
@@ -2139,7 +2139,7 @@ The final design separates three decisions that are orthogonal to each other —
 
 ### 9.3 TDD Mode — how it is asked and what changes
 
-In Phase 4.6 of `wf-init.md`, immediately after choosing testing layers (unit/integration/e2e), the wizard asks:
+In Phase 4.6 of `/wf-init`, immediately after choosing testing layers (unit/integration/e2e), the wizard asks:
 
 ```
 What TDD mode do you want for this project?
@@ -2179,11 +2179,11 @@ The pattern consists of two different loops for the same tool:
 - **Explore first if**: the flow has multiple visual states, transitions or animations; it's the first time that interaction is tested; or the user explicitly asks for it.
 - **Go direct to spec if**: it's a simple known CRUD (create → appears in list, edit → updates) without complex visual states, or a similar template spec already exists.
 
-This criterion lives as its own subsection within the TDD Protocol in `AGENTS.md` (see `wf-init.md`, "Playwright Dual-loop" section), applying equally regardless of whether the project uses Standard TDD Protocol or Strict TDD Mode.
+This criterion lives as its own subsection within the TDD Protocol in `AGENTS.md` (see `/wf-init`, "Playwright Dual-loop" section), applying equally regardless of whether the project uses Standard TDD Protocol or Strict TDD Mode.
 
 ### 9.5 `data-testid` convention — mandatory when E2E is present
 
-When the project activates the E2E layer in Phase 4.6, `wf-init.md` adds to the Testing Approach section of `AGENTS.md` the requirement that every interactive element (buttons, inputs, links) receives its own `data-testid` **at component creation time**, not later when a test needs it. Format: `data-testid="<context>-<element>"` in kebab-case. The practical reason: without this, E2E specs depend on visible text or Tailwind classes, both fragile against copy or style changes that have nothing to do with the behavior the test is trying to verify.
+When the project activates the E2E layer in Phase 4.6, `/wf-init` adds to the Testing Approach section of `AGENTS.md` the requirement that every interactive element (buttons, inputs, links) receives its own `data-testid` **at component creation time**, not later when a test needs it. Format: `data-testid="<context>-<element>"` in kebab-case. The practical reason: without this, E2E specs depend on visible text or Tailwind classes, both fragile against copy or style changes that have nothing to do with the behavior the test is trying to verify.
 
 ### 9.6 Optional extras — coverage targets, visual regression, Page Object Model
 
@@ -2220,7 +2220,7 @@ Once `/wf-init` has run, several decisions the developer made (TDD mode, testing
 | AI Review Suggestions (11) | Enable or disable auto-improve / inline suggestions | Low — config change only |
 | Dedicated Security Review (12) | Claude / Gemini / OFF | Low — config change only |
 | E2E in CI (13) | Include E2E tests in the quality guard | Low–Medium — may slow CI; no effect on local tests |
-| release-please standalone (14) | Publish releases automatically from conventional commits | Medium — requires `npm`/`package.json` or `release-type: simple` for markdown projects |
+| release-please standalone (14) | Publish releases automatically from conventional commits | Medium — `release-please-config.json` now uses `release-type` resolved from `state.discovery.stack` (`node` for Node projects, `simple` default) |
 | CD (15) | Automatic deploy to VPS | Real — writes `deploy.yml` and requires server secrets |
 | Release strategy (16) | Tag-based (`v*`) or push-to-main deploy trigger | Medium — changes how CD fires |
 | Windsurf gentle-ai fix (17) | Reapply the legacy-path bridge and `sdd-new.md` workaround | Low — safe re-sync of IDE-specific files |
@@ -2232,7 +2232,7 @@ Once `/wf-init` has run, several decisions the developer made (TDD mode, testing
 
 **Why it's project-specific and not global**: just like `/wf-worktree`, its behavior depends entirely on the real state of the active repo (which backend, which extras are on) — it doesn't make sense as a global command installed once for all projects.
 
-`wf-init.md` and `wf-refresh.md` already include `wf-settings` in their `EXPECTED_COMMANDS`, so it is auto-generated in new projects and offered to add in existing projects that don't have it.
+The `/wf-init` and `/wf-refresh` slash commands already include `wf-settings` in their `EXPECTED_COMMANDS`, so it is auto-generated in new projects and offered to add in existing projects that don't have it.
 
 ---
 
@@ -2404,11 +2404,11 @@ Global paths written by `install.sh` per command:
 
 This workflow is built on top of `gentle-ai` (`github.com/Gentleman-Programming/gentle-ai`) as a mandatory foundation. It is an open source project with good traction (4.2k+ stars, 500+ forks, 190+ releases at the time of writing), but it is still maintained by a small/individual team, not by an organization with long-term support guarantees. It's worth understanding the risk and plan if something changes.
 
-**What already happened and what could happen again**: the base SDD conductor was renamed from `sdd-orchestrator` to `gentle-orchestrator` between versions (with automatic migration on `sync`). It is a real example of how an internal naming change can affect any part of this workflow that hardcodes command names, sub-agents, or gentle-ai paths — and this workflow does so in several places (`wf-init.md`, `wf-refresh.md`, section 8.3 of this document).
+**What already happened and what could happen again**: the base SDD conductor was renamed from `sdd-orchestrator` to `gentle-orchestrator` between versions (with automatic migration on `sync`). It is a real example of how an internal naming change can affect any part of this workflow that hardcodes command names, sub-agents, or gentle-ai paths — and this workflow does so in several places (`/wf-init`, `/wf-refresh`, section 8.3 of this document).
 
 **Current mitigation (no new tool required)**:
 - **Periodic manual monitoring**: check `github.com/Gentleman-Programming/gentle-ai/releases` before recommending the wizard in a new project, or when the wizard fails unexpectedly. No cron or constant monitoring needed — the natural cadence is "I check when I'm going to use it or when something breaks".
-- **Semi-automatic detection in the wizard**: Step 0.3.1 analyzes the text of gentle-ai release notes looking for risk signals near terms this workflow hardcodes, informs the developer on the spot, and leaves a draft ready to report it as an issue in this workflow's repo (see Block 4, section 8 and wf-init.md Step 0.3.1 for full detail). This does not replace manual monitoring — it complements it by detecting in situ what a real developer encounters in production.
+- **Semi-automatic detection in the wizard**: Step 0.3.1 analyzes the text of gentle-ai release notes looking for risk signals near terms this workflow hardcodes, informs the developer on the spot, and leaves a draft ready to report it as an issue in this workflow's repo (see Block 4, section 8 and `/wf-init` Step 0.3.1 for full detail). This does not replace manual monitoring — it complements it by detecting in situ what a real developer encounters in production.
 
 **What happens if gentle-ai stops being maintained or breaks compatibility severely**: Engram and OpenSpec (the actual backends behind persistent memory and SDD) are separate projects from gentle-ai — gentle-ai orchestrates them but does not replace them. An abandonment of gentle-ai would mainly affect the multi-IDE configuration layer and native sub-agents, not necessarily the memory or SDD themselves, which could continue to be used more manually. There is no detailed migration plan yet because it hasn't been necessary — it will be documented if the situation arises.
 

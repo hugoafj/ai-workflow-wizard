@@ -416,6 +416,9 @@ Continuing with project questions...
 > Tell the user: *"SDD initialized. Reply **continue** when you are ready to proceed."*
 > Wait for the response. Only when they confirm, run in bash:
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
 NEXT=
 if [ "$(jq -r '.features.tdd_protocol // false' .wizard-state.json)" = "true" ]; then
   NEXT="phase46"

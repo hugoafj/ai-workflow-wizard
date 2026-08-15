@@ -91,5 +91,8 @@ Tell the user: *"Features selected. Reply **continue** to start project discover
 Wait for the response. Only when confirmed, run in bash:
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+wf_phase_done phase0c phase1
 cat "$WF_DIR/phase1.md"
 ```

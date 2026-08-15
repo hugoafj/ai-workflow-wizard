@@ -818,7 +818,7 @@ echo "✓ Baseline snapshot written ($(jq '.managed_paths | length' "$BASELINE")
      - `{WF_STATE}` → `.wizard-state.json`
    - The helper `lib/state-helpers.sh` lives directly under `$WF_DIR/lib/`.
    - Otherwise, read `lib/builder.md` and execute B1-B6 manually.
-2. After Builder-Core completes, read `phase6b-build-heavy.md` and run Builder-Heavy (B7-B9) the same way — **execute ONLY its steps 1-4 (verify staging, delegate, fallback, validate). Do NOT execute phase6b's Step 5 tail**: no `wf_phase_done phase6 phase7`, no "Wait for user confirmation", and NO `cat "$WF_DIR/phase7.md"`. Those belong to the `/wf-init` phase 7/8 flow, not to refresh — running them would derail into wf-init's review/promotion instead of returning to Phase R4. After Builder-Heavy validates, return to Phase R4 below.
+2. After Builder-Core completes, read `phase6b-build-heavy.md` and run Builder-Heavy (B7-B9) the same way — **execute ONLY its steps 1-4 (verify staging, delegate, fallback, validate). Do NOT execute phase6b's Step 5 tail**: no `wf_phase_done phase6 phase7`, no "Wait for user confirmation", and NO `cat "$WF_DIR/phase7.md"`. Those belong to the `/wf-init` phase 7/8 flow, not to refresh — running them would derail into wf-init's review/promotion instead of returning to Phase R4. If you invoke `phase6b-build-heavy.md` through a bash wrapper, set `WF_REFRESH=1` so Step 5 guards the phase7 promotion. After Builder-Heavy validates, return to Phase R4 below.
 3. The combined result must be `.wizard-staging/` containing `AGENTS.md`, the satellite files, commands, protocols, etc.
 4. After Builder finishes, run the validation block below.
 
@@ -1236,6 +1236,7 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
 
   GITIGNORE_MODIFIED=false
   _gi_add ".wizard-managed-files.json"
+  _gi_add "!.agents/"
 
   while IFS= read -r ide; do
     case "$ide" in
@@ -1244,6 +1245,11 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
       windsurf) _gi_add "!.windsurf/"; _gi_add "!.devin/" ;;
       kiro) _gi_add "!.kiro/" ;;
       codex) _gi_add "!.codex/" ;;
+      gemini-cli)
+        _gi_add "!.gemini/"
+        _gi_add "!GEMINI.md"
+        ;;
+      antigravity) _gi_add "!ANTIGRAVITY.md" ;;
       opencode) _gi_add "!.opencode/" ;;
       vscode-copilot)
         _gi_add "!.github/copilot-instructions.md"

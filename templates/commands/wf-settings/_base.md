@@ -744,10 +744,9 @@ Which provider do you want to use with GGA?
 1. Claude (Anthropic)     → claude
 2. Gemini (Google)        → gemini
 3. Codex (OpenAI)         → codex
-4. OpenCode (open-source) → opencode
 
 Provider keys must match the `gga_provider` values supported by `gga-review.yml.md`.
-Which one? [1-4]
+Which one? [1-3]
 ```
 
 **If they choose another** (Copilot, Claude, Gemini, None): no additional provider needed.
@@ -1149,8 +1148,17 @@ Do you want to reapply the Windsurf fix now? [yes / no, skip]
 SDD_BACKEND=$(jq -r '.sdd.backend // "hybrid"' .wizard-state.json)
 WF_DIR="${WF_DIR:-/tmp/wf-settings-phases}"
 WF_RAW="${WF_RAW:-https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main}"
-SDD_PATH="$SDD_BACKEND"
-[ "$SDD_BACKEND" = "hybrid" ] && SDD_PATH="openspec"
+
+# Resolve backend-specific artifact path or Engram topic key
+if [ "$SDD_BACKEND" = "engram" ]; then
+  SDD_BACKEND_PATH="engram"
+  SDD_PROPOSAL_PATH="sdd/{change-name}/proposal"
+else
+  SDD_BACKEND_PATH="$SDD_BACKEND"
+  [ "$SDD_BACKEND" = "hybrid" ] && SDD_BACKEND_PATH="openspec"
+  SDD_PROPOSAL_PATH="$SDD_BACKEND_PATH/changes/<name>/proposal.md"
+fi
+
 mkdir -p "$WF_DIR/temp-files" .windsurf/workflows
 
 # Download the AGENTS.md bridge rule and merge it if missing
@@ -1174,8 +1182,8 @@ fi
 # Rewrite .windsurf/workflows/sdd-new.md
 [ -f "$WF_DIR/temp-files/sdd-new.md" ] || curl -fsSL "$WF_RAW/temp-files/sdd-new.md" -o "$WF_DIR/temp-files/sdd-new.md" 2>/dev/null
 cp "$WF_DIR/temp-files/sdd-new.md" .windsurf/workflows/sdd-new.md
-sed -i.bak "s|{{sdd.backend}}/changes/|$SDD_PATH/changes/|g" .windsurf/workflows/sdd-new.md
-sed -i.bak "s/{{sdd.backend}}/$SDD_BACKEND/g" .windsurf/workflows/sdd-new.md
+sed -i.bak "s|{{sdd.backend}}/changes/<name>/proposal.md|$SDD_PROPOSAL_PATH|g" .windsurf/workflows/sdd-new.md
+sed -i.bak "s/{{sdd.backend}}/$SDD_BACKEND_PATH/g" .windsurf/workflows/sdd-new.md
 rm -f .windsurf/workflows/sdd-new.md.bak
 ```
 
@@ -1228,12 +1236,15 @@ Which one? [1-9]
 
 Generate everything related for the chosen IDE, downloading from `$WF_RAW`:
 
-1. **Satellite** — `$WF_RAW/templates/satellites/<ide>.tmpl` → its destination
-   (route table in protocol `ides`): `claude-code` → `CLAUDE.md`,
-   `vscode-copilot` → `.github/copilot-instructions.md`, `cursor` → `.cursor/rules/project.mdc`,
-   `windsurf` → `.windsurf/rules/project.md`, `kiro` → `.kiro/steering/project-context.md`,
-   `gemini-cli` → `GEMINI.md`, `antigravity` → `ANTIGRAVITY.md`. Create parent
-   directories as needed.
+1. **Satellite** — `$WF_RAW/templates/satellites/<satellite>.tmpl` where the satellite
+   filename is mapped from the IDE key:
+   `claude-code` → `claude`, `vscode-copilot` → `copilot`, `gemini-cli` → `gemini`,
+   `cursor` → `cursor`, `windsurf` → `windsurf`, `kiro` → `kiro`,
+   `antigravity` → `antigravity`. Destination (route table in protocol `ides`):
+   `claude-code` → `CLAUDE.md`, `vscode-copilot` → `.github/copilot-instructions.md`,
+   `cursor` → `.cursor/rules/project.mdc`, `windsurf` → `.windsurf/rules/project.md`,
+   `kiro` → `.kiro/steering/project-context.md`, `gemini-cli` → `GEMINI.md`,
+   `antigravity` → `ANTIGRAVITY.md`. Create parent directories as needed.
 2. **Commands** — every command in the catalog (same list as Builder B7:
    `wf-worktree`, `wf-settings`, `wf-onboard`, plus `wf-ladder` if active) → the IDE's
    command directory

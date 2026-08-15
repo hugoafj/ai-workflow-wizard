@@ -270,4 +270,29 @@ On your server make sure you have:
 > - `features.ci`, `features.cd`, `features.release_please` (toggles)
 > Mark `wf_phase_done phase47-cicd phase5`.
 > Tell the user: *"CI/CD configured. Reply **continue** so I can assemble the artifacts (Builder → staging on disk, not in memory)."*
-> Wait for the response. Only when they confirm, run in bash: `cat "$WF_DIR/phase5.md"`
+> Wait for the response. Only when they confirm, run in bash:
+
+```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
+# Normalize cd.enabled / cd.platform based on the deploy platform answer (P1-12)
+FEATURES_CD=$(jq -r '.features.cd // false' .wizard-state.json)
+if [ "$FEATURES_CD" = "true" ]; then
+  VPS_RUNTIME=$(jq -r '.cd.vps_runtime // empty' .wizard-state.json)
+  if [ -n "$VPS_RUNTIME" ]; then
+    wf_state_set '.cd.enabled' 'true'
+    wf_state_set '.cd.platform' '"vps"'
+  else
+    wf_state_set '.cd.enabled' 'false'
+    wf_state_set '.cd.platform' '"skip"'
+  fi
+else
+  wf_state_set '.cd.enabled' 'false'
+  wf_state_set '.cd.platform' '"skip"'
+fi
+
+wf_phase_done phase47-cicd phase5
+echo "ℹ Next phase: phase5"
+cat "$WF_DIR/phase5.md"
+```

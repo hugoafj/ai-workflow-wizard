@@ -42,6 +42,8 @@
 
       - name: Post failure comment on PR
         if: failure()
+        env:
+          PR_NUMBER: ${{ fromJson(needs.release-please.outputs.pr).number }}
         uses: actions/github-script@v7
         with:
           script: |
@@ -57,7 +59,7 @@
             *This comment was added automatically by the CI pipeline.*`;
 
             github.rest.issues.createComment({
-              issue_number: context.issue.number,
+              issue_number: parseInt(process.env.PR_NUMBER, 10),
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: errorMsg

@@ -24,7 +24,15 @@ Then ask explicitly with these visible options:
 
 **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `discovery.classification` (`greenfield` | `legacy`). The routing below is decided by reading that field from state, not from memory.
 
-- If the user confirms **LEGACY**: `wf_phase_done phase3 phase4`, then run in bash `cat "$WF_DIR/phase4.md"`
+If the user confirms **LEGACY**, run in bash:
+
+```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+wf_phase_done phase3 phase4
+cat "$WF_DIR/phase4.md"
+```
+
 - If the project is **GREENFIELD**: mark `phases.phase4.status=skipped`, then compute the next phase based on the ALREADY SELECTED features:
 
 ```bash

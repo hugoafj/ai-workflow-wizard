@@ -335,6 +335,8 @@ details) using `$WF_ROOT/templates/protocols/cicd/` as the single source.
 - Only conventional commits: `.commitlintrc.json`, `.husky/commit-msg` (Husky v9+ without shebang).
 - Only release-please: `variants/release-please.yml.md`, `variants/release-please-config.json.md`,
   `variants/release-please-manifest.json.md`, + inject `variants/ai-summary-job.<provider>.yml.md` into `release-please.yml` if `state.ci.release_ai_summary == true`.
+  - Resolve `{{release_type}}` in `release-please-config.json` from `state.discovery.stack.primary`:
+    use `node` when the primary stack contains `node`, otherwise default to `simple`.
 - No quality guard, no AI review, no security review.
 
 **If all false**: no CI is generated.

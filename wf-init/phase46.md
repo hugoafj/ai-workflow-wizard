@@ -307,4 +307,11 @@ already writes correctly to both sources in sync.
 > **⛔ STOP HERE — don't execute anything else.**
 > **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `testing.layers` (activated layers), `testing.tdd_mode` (`standard`|`strict`), `testing.runner_detected`. Mark `wf_phase_done phase46 phase46b`.
 > Tell the user: *"Testing and TDD mode configured. Reply **continue** to review optional testing extras (coverage, visual regression, POM) and generate configs."*
-> Wait for the response. Only when they confirm, execute in bash: `cat "$WF_DIR/phase46b.md"`
+> Wait for the response. Only when they confirm, execute in bash:
+
+```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+wf_phase_done phase46 phase46b
+cat "$WF_DIR/phase46b.md"
+```

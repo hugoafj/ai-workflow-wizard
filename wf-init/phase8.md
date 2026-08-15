@@ -37,7 +37,8 @@ fi
 [ -f .git/hooks/post-commit ] && chmod +x .git/hooks/post-commit
 
 # Reinsert Windsurf rule into AGENTS.md (safety net — may have been lost in the copy from staging)
-# IDES was already read above (8.1); reuse it here.
+# Re-read active IDEs in case this block runs in a fresh shell
+IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
 if echo "$IDES" | grep -q "windsurf"; then
   WF_RULE_FILE="$WF_DIR/temp-files/AGENTS.md"
   if [ -f "$WF_RULE_FILE" ] && [ -f AGENTS.md ]; then
@@ -449,6 +450,9 @@ tell the user which files to create and with what content, and wait for confirma
 ### 8.2 Update .gitignore
 
 ```bash
+# Re-read active IDEs in case this block runs in a fresh shell
+IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
+
 # Idempotent appends: skip lines already present so re-running /wf-init
 # does not duplicate .gitignore entries (same guard as /wf-refresh R6).
 _gi_add() {
@@ -466,6 +470,7 @@ _gi_add '.wizard-state.json'
 _gi_add '.wizard-staging/'
 
 # Exceptions for satellites that must be versioned (only generated ones, single quotes)
+_gi_add '!.agents/'
 if echo "$IDES" | grep -q "cursor"; then
   _gi_add '!.cursor/'
 fi
@@ -481,6 +486,10 @@ if echo "$IDES" | grep -q "claude-code"; then
 fi
 if echo "$IDES" | grep -q "codex"; then
   _gi_add '!.codex/'
+fi
+if echo "$IDES" | grep -q "gemini-cli"; then
+  _gi_add '!.gemini/'
+  _gi_add '!GEMINI.md'
 fi
 if echo "$IDES" | grep -q "opencode"; then
   _gi_add '!.opencode/'
@@ -533,6 +542,9 @@ fi
 ### 8.4 Force track satellites/protocols and commit
 
 ```bash
+# Re-read active IDEs in case this block runs in a fresh shell
+IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
+
 # Refresh gentle-ai's skill registry so its own Skill Resolver Protocol picks up
 # this project's wf-* skills (wf-orchestrator, wf-ladder, wf-sdd-trigger, wf-tdd,
 # wf-onboard, wf-worktree, wf-settings)

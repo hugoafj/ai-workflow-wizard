@@ -114,4 +114,11 @@ keeping `EXPECTED_COMMANDS` updated is the wizard maintainer's responsibility.
 > **⛔ STOP HERE — do not execute anything else.**
 > **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `migration.prior_content_action` (migrate/replace/review) and `migration.missing_commands` (the ones detected as missing). Mark `wf_phase_done phase2 phase3`.
 > Tell the user: *"Migration reviewed. Reply **continue** when you're ready for project classification."*
-> Wait for the response. Only when they confirm, run in bash: `cat "$WF_DIR/phase3.md"`
+> Wait for the response. Only when they confirm, run in bash:
+
+```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+wf_phase_done phase2 phase3
+cat "$WF_DIR/phase3.md"
+```
