@@ -343,11 +343,11 @@ def is_wizard_managed(path):
 
 ### Optimization opportunities (deferred to iteration 2)
 
-1. **Pre-flight check** (Opción C): Download manifest of template hashes; skip Builder if nothing changed
-2. **Incremental Builder** (Opción B): Only regenerate files whose dependencies changed
+1. **Pre-flight check** (Option C): Download manifest of template hashes; skip Builder if nothing changed
+2. **Incremental Builder** (Option B): Only regenerate files whose dependencies changed
 3. **Parallel file operations**: Copy multiple files in parallel during Phase R6
 
-### Current approach (Opción A)
+### Current approach (Option A)
 
 - Full Builder re-run: ~5-10 seconds (acceptable for refresh frequency)
 - Hash-based diff: O(n) where n = number of generated files (~100-200)

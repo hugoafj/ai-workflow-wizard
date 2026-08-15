@@ -29,7 +29,7 @@
 > by `install.sh` (IDE skill paths + `~/.agents/skills/`), project ones by Builder B4 (native
 > per IDE + universal `.agents/skills/<cmd>/SKILL.md` + flat `.agents/protocols/<cmd>.md`).
 > `/wf-cicd` was archived (`templates/_archive/wf-cicd/`) — its flow is now the `cicd`
-> protocol, consumed by `/wf-settings` (options 9-14) and `/wf-init` Phase 4.7.
+> protocol, consumed by `/wf-settings` (options 9-15) and `/wf-init` Phase 4.7.
 
 ## Per-IDE generation
 

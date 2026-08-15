@@ -15,7 +15,7 @@
 | `/wf-tdd` | `templates/commands/wf-tdd/_base.md` |
 | `/wf-ladder` | `templates/commands/wf-ladder/_base.md` |
 
-`/wf-init`, `/wf-refresh`, and `/wf-cleanup` are installed globally by `install.sh`; `/wf-worktree`, `/wf-settings`, `/wf-onboard`, `/wf-orchestrator`, `/wf-sdd-trigger`, `/wf-tdd`, and `/wf-ladder` are generated per project by `/wf-init`.
+`/wf-init`, `/wf-refresh`, and `/wf-cleanup` are installed globally by `install.sh`; `/wf-worktree`, `/wf-settings`, and `/wf-onboard` are generated per project by `/wf-init`; `/wf-orchestrator`, `/wf-sdd-trigger`, `/wf-tdd`, and `/wf-ladder` are generated per project only when their feature flags are enabled (see `wf-version` footer).
 
 ## Code Style & Conventions
 
@@ -34,7 +34,7 @@ templates/        — single source of truth
   satellites/     — per-IDE context files
 wf-init/          — wizard phases
   lib/            — builder.md, state.md, state-helpers.sh, refresher.md (contracts/helpers)
-  phase*.md       — phases 0 through 8
+  phase*.md       — phases 0-8 (plus 0b, 0c, 4.5, 4.6, 4.6b, 4.7, 6a, 6b)
   subagent-*.md   — sub-agent prompts (discovery, builder-core, builder-heavy)
 ```
 

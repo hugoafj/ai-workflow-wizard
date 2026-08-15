@@ -117,7 +117,7 @@ fi
 
 ### Deprecated Files Detection
 
-`/wf-refresh` compares the previous `.wizard-managed-files.json` (derived from `.wizard-state.json` `build_plan.managed_paths`) with the newly generated staging:
+`/wf-refresh` compares the previous managed paths from `.wizard-state.json` `build_plan.managed_paths` (with `.wizard-managed-files.json` as a derived fallback) against the newly generated staging:
 
 - Files in old `managed_paths` but not in new staging → proposed for `deleted` or `deleted_modified`
 - Files with unchanged hash → classified as `deleted` (safe to delete)

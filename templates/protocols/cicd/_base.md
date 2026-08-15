@@ -3,9 +3,10 @@
 <!--
   SINGLE SOURCE of the CI/CD rules, templates, and the interactive configuration flow
   (formerly the /wf-cicd command, archived in templates/_archive/wf-cicd/). Consumed by
-  /wf-settings (options 10-14), /wf-init Phase 4.7 (phase47-cicd.md), and the Builder/hook
-  (phase6d). Source in inventory.md: wf-cicd.md (all, 42 items), phase6d 1-93, post-commit,
-  phase6a 57-59 (Programmatic Checks), AI_DEV_WORKFLOW §10. The concrete artifacts
+  /wf-settings (options 9-15), /wf-init Phase 4.7 (phase47-cicd.md), and the Builder/hook
+  (phase6b-build-heavy.md). Source: wf-cicd.md (archived, 42 items), phase47-cicd.md,
+  phase6b-build-heavy.md, hook.post-commit.tmpl.md, phase6a-agents.md 57-59
+  (Programmatic Checks), AI_DEV_WORKFLOW §10. The concrete artifacts
   (YAML/JSON/hook) are in variants/ and hook.post-commit.tmpl.md (VERBATIM from the source).
 -->
 
@@ -17,7 +18,7 @@
 ## Interactive configuration flow (formerly /wf-cicd)
 
 > The `/wf-cicd` command was archived (`templates/_archive/wf-cicd/`) to make this protocol
-> the single source. This flow is invoked from `/wf-settings` (options 10-14) and from
+> the single source. This flow is invoked from `/wf-settings` (options 9-15) and from
 > `/wf-init` Phase 4.7 (`phase47-cicd.md`). All artifacts are written VERBATIM from the
 > `variants/` templates below; edit them in the templates, never inline.
 
@@ -522,7 +523,7 @@ in the CD configuration without attempting to solve it automatically.
 
 ## Post-commit hook (drift detector) — single source
 
-- Body template: `hook.post-commit.tmpl.md` (VERBATIM phase6d 12-93). It is the ONLY
+- Body template: `hook.post-commit.tmpl.md` (VERBATIM from this template). It is the ONLY
   source of the drift logic; the repo root `post-commit` is regenerated from here.
 - Detects two drift categories and only **notifies** (never acts):
   - **AGENTS.md drift** (`REFRESH_FILES`) → suggests `/wf-refresh`.

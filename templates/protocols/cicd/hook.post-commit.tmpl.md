@@ -1,7 +1,7 @@
 ```bash
 #!/bin/bash
 # Workflow drift detector — AI Workflow Wizard
-# Detecta cambios que ameritan /wf-refresh y/o /sdd-init.
+# Detect changes that warrant /wf-refresh and/or /sdd-init.
 
 # Files that warrant /wf-refresh (general project context for AI)
 REFRESH_FILES="package.json composer.json pyproject.toml Cargo.toml tsconfig.json vite.config.ts vite.config.js next.config.ts next.config.js tailwind.config.ts tailwind.config.js"
@@ -11,7 +11,7 @@ REFRESH_FILES="package.json composer.json pyproject.toml Cargo.toml tsconfig.jso
 SDD_FILES="package.json vitest.config.ts vitest.config.js jest.config.ts jest.config.js playwright.config.ts playwright.config.js"
 # openspec/config.yaml excluded: it is the output artifact of /sdd-init, not a trigger.
 # Including it causes a loop: /sdd-init writes the file → commit → hook notifies
-# "re-corre /sdd-init" → loop garantizado.
+# re-runs /sdd-init → guaranteed loop.
 
 CHANGED_REFRESH=""
 CHANGED_SDD=""

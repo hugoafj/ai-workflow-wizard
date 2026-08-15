@@ -26,21 +26,30 @@
 
 ## Phase -1 · Check for wizard-managed files
 
-Before detection, check if there's a `.wizard-managed-files.json` from a previous `/wf-refresh`:
+Before detection, read the managed paths from `.wizard-state.json` (`build_plan.managed_paths`); fall back to `.wizard-managed-files.json` only if `.wizard-state.json` or its `build_plan.managed_paths` field is missing:
 
 ```bash
-# Check if .wizard-managed-files.json exists (from /wf-refresh)
-if [ -f ".wizard-managed-files.json" ]; then
-  echo "ℹ Found .wizard-managed-files.json (from /wf-refresh)"
+# Source of truth: .wizard-state.json build_plan.managed_paths
+MANAGED_FILES=""
+STATE_HAS_MANAGED_PATHS=false
+if [ -f ".wizard-state.json" ] && jq -e '.build_plan.managed_paths' ".wizard-state.json" >/dev/null 2>&1; then
+  STATE_HAS_MANAGED_PATHS=true
+  MANAGED_FILES=$(jq -r '.build_plan.managed_paths[] // empty' ".wizard-state.json" 2>/dev/null || echo "")
+  echo "ℹ Found wizard-managed paths in .wizard-state.json"
+fi
+
+# Fallback to .wizard-managed-files.json (legacy)
+if [ "$STATE_HAS_MANAGED_PATHS" != "true" ] && [ -f ".wizard-managed-files.json" ]; then
+  echo "ℹ Falling back to .wizard-managed-files.json"
   MANAGED_FILES=$(jq -r '.files[] | .path' ".wizard-managed-files.json" 2>/dev/null || echo "")
-  
-  if [ -n "$MANAGED_FILES" ]; then
-    echo "ℹ Wizard-managed files to be removed:"
-    echo "$MANAGED_FILES" | while read file; do
-      echo "  - $file"
-    done
-    echo ""
-  fi
+fi
+
+if [ -n "$MANAGED_FILES" ]; then
+  echo "ℹ Wizard-managed files to be removed:"
+  echo "$MANAGED_FILES" | while read file; do
+    echo "  - $file"
+  done
+  echo ""
 fi
 
 # Also check for old WIZARD_MANIFEST files (legacy)

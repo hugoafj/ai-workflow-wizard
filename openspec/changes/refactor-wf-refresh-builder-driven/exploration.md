@@ -123,7 +123,7 @@
 
 ## Assumptions and open questions
 
-1. **Opción A vs C**: User chose **Opción A** (full builder + hash diff) for MVP
+1. **Option A vs C**: User chose **Option A** (full builder + hash diff) for MVP
 2. **Wizard-managed patterns**: Files matching `wf-*/SKILL.md`, `.github/workflows/*`, etc.
 3. **CI/CD runtime setup**: Only run if missing (idempotent detection)
 4. **Custom content markers**: Already documented in `wf-refresh/_base.md` and `phase2.md`
@@ -133,12 +133,12 @@
 ### Option B: Incremental builder (only regenerate changed files)
 - **Pro**: Saves tokens by not regenerating unchanged files
 - **Con**: Requires dependency graph (template → output); complex to maintain
-- **Decision**: Defer to Opción C in future iteration
+- **Decision**: Defer to Option C in future iteration
 
 ### Option C: Pre-flight with manifest
 - **Pro**: Skip builder entirely if nothing changed
 - **Con**: Still need manifest generator; adds complexity
-- **Decision**: Defer to future iteration after Opción A is stable
+- **Decision**: Defer to future iteration after Option A is stable
 
 ## Next steps (proposal phase)
 

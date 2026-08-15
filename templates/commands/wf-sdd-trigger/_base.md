@@ -81,8 +81,8 @@ requesting** gentle-ai's SDD? See `reference/edge-cases.md` for the full rationa
 ```
 🔍 WF-SDD-TRIGGER
   - Criterion applied: [which condition matched, or "none"]
-  - Proposal: [con SDD / sin SDD]
-  - Confirm? [sí / cambiar a la otra ruta]
+  - Proposal: [with SDD / without SDD]
+  - Confirm? [yes / switch to the other path]
 ```
 
 After user confirmation (step 4), no additional checklist is required before proceeding.
