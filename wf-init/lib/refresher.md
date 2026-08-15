@@ -189,17 +189,34 @@ version_lt() {
   version_lte "$v1" "$v2"
 }
 
-# Ask a yes/no question. Returns 0 for yes, 1 for no.
-_ask_yesno() {
+# Ask a yes/no question safely in BOTH tty and non-tty (agent-driven) contexts.
+# In an interactive tty it prompts like a normal read -n 1. When stdin is EOF or
+# not a tty (agent run), a bare `read` would fail under `set -e` and abort the
+# script — here it is treated as a NO instead. Returns 0 for yes, 1 otherwise.
+_ask_yesno_safe() {
   local prompt="$1"
-  local reply
-  read -p "$prompt [y/n] " -n 1 -r reply
+  local reply leftover
+  if ! read -p "$prompt [y/n] " -n 1 -r reply; then
+    echo "(no input — treating as no)"
+    return 1
+  fi
   echo
+  # When stdin is piped (not a tty), `read -n 1` consumes only the first char and
+  # leaves the rest of the line in the buffer; drain it so the leftover '\n' does
+  # not corrupt the next question.
+  if [[ ! -t 0 ]]; then
+    read -r leftover 2>/dev/null || true
+  fi
   if [[ "$reply" =~ ^[Yy]$ ]]; then
     return 0
   else
     return 1
   fi
+}
+
+# Ask a yes/no question. Returns 0 for yes, 1 for no.
+_ask_yesno() {
+  _ask_yesno_safe "$1"
 }
 
 # Apply a single state migration block idempotently using jq.
@@ -368,23 +385,27 @@ preserve_custom_agents() {
   echo "  ✓ Custom sections preserved"
 }
 
-# Reinsert the "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule into
-# AGENTS.md when Windsurf/Devin is an active IDE. Mirrors phase8's safety net:
+# Reinsert the "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule into a
+# target file when Windsurf/Devin is an active IDE. Mirrors phase8's safety net:
 # the staging router does not carry the rule, so a refresh must re-add it.
-# Idempotent: skips when the rule is already present (e.g. preserved via
-# DO NOT REGENERATE markers or by a previous reinsert).
+# $1 (optional) is the target file to patch — defaults to AGENTS.md. In R6 the
+# caller passes "$STAGING/AGENTS.md", so the bridge is inserted into the STAGED
+# AGENTS.md before the approved copy is promoted (and only when AGENTS.md is
+# approved). Idempotent: skips when the rule is already present (e.g. preserved
+# via DO NOT REGENERATE markers or by a previous reinsert).
 reinsert_legacy_bridge() {
-  local IDES RULE_FILE
+  local IDES RULE_FILE TARGET
   IDES=$(jq -r '.answers.ides[]?' "$WF_STATE" 2>/dev/null)
   if ! echo "$IDES" | grep -q "windsurf"; then
     return 0
   fi
   RULE_FILE="${WF_DIR}/temp-files/AGENTS.md"
-  if [ ! -f "$RULE_FILE" ] || [ ! -f AGENTS.md ]; then
+  TARGET="${1:-AGENTS.md}"
+  if [ ! -f "$RULE_FILE" ] || [ ! -f "$TARGET" ]; then
     return 0
   fi
-  if grep -q "Gentle AI — Legacy Path Bridge" AGENTS.md; then
-    echo "  ℹ Legacy path bridge already present in AGENTS.md"
+  if grep -q "Gentle AI — Legacy Path Bridge" "$TARGET"; then
+    echo "  ℹ Legacy path bridge already present in $TARGET"
     return 0
   fi
   # Insert after the first line (after "# AGENTS.md — <project>") using
@@ -392,12 +413,12 @@ reinsert_legacy_bridge() {
   # Wrap in DO NOT REGENERATE markers so future refreshes preserve it.
   # temp-files/AGENTS.md has no trailing newline, so add one before the
   # closing marker to keep it on its own line.
-  { head -n 1 AGENTS.md; printf '%s\n' "<!-- WF: DO NOT REGENERATE -->"; cat "$RULE_FILE"; printf '\n%s\n' "<!-- /WF: DO NOT REGENERATE -->"; tail -n +2 AGENTS.md; } > AGENTS.md.tmp
-  mv AGENTS.md.tmp AGENTS.md
-  if grep -q "Gentle AI — Legacy Path Bridge" AGENTS.md; then
-    echo "  ✓ Windsurf legacy path bridge rule reinserted into AGENTS.md"
+  { head -n 1 "$TARGET"; printf '%s\n' "<!-- WF: DO NOT REGENERATE -->"; cat "$RULE_FILE"; printf '\n%s\n' "<!-- /WF: DO NOT REGENERATE -->"; tail -n +2 "$TARGET"; } > "$TARGET.tmp"
+  mv "$TARGET.tmp" "$TARGET"
+  if grep -q "Gentle AI — Legacy Path Bridge" "$TARGET"; then
+    echo "  ✓ Windsurf legacy path bridge rule reinserted into $TARGET"
   else
-    echo "  ⚠ Windsurf legacy path bridge rule MISSING from AGENTS.md after reinsert." >&2
+    echo "  ⚠ Windsurf legacy path bridge rule MISSING from $TARGET after reinsert." >&2
   fi
 }
 
@@ -451,9 +472,7 @@ fi
 
 if version_lt "$LOCAL_VERSION" "$REMOTE_VERSION"; then
   echo "⚠ Wizard is outdated (local: $LOCAL_VERSION, remote: $REMOTE_VERSION)"
-  read -p "Update global commands? [y/n] " -n 1 -r
-  echo
-  if [[ $REPLY =~ ^[Yy]$ ]]; then
+  if _ask_yesno_safe "Update global commands?"; then
     # install.sh lives in the wizard repo, not in the project directory.
     INSTALL_SH="${WF_DIR}/install.sh"
     if curl -fsSL "${WF_RAW}/install.sh" -o "$INSTALL_SH" 2>/dev/null && [[ -s "$INSTALL_SH" ]]; then
@@ -578,9 +597,7 @@ if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]]; th
   [[ "$OLD_STACK" != "$STACK_KEY" ]] && echo "  - Stack: $OLD_STACK → $STACK_KEY"
   [[ "$OLD_NODE" != "$NODE_ENGINE" ]] && echo "  - Node engine: $OLD_NODE → $NODE_ENGINE"
 
-  read -p "Use updated project info? [y/n] " -n 1 -r
-  echo
-  if [[ $REPLY =~ ^[Yy]$ ]]; then
+  if _ask_yesno_safe "Use updated project info?"; then
     _apply_jq_filter \
       --arg stack_key "$STACK_KEY" \
       --arg node_engine "$NODE_ENGINE" \
@@ -901,30 +918,22 @@ APPROVE_DELETED="false"
 APPROVE_DELETED_MODIFIED="false"
 
 if [[ $ADDED_COUNT -gt 0 ]]; then
-  read -p "Apply added files? [y/n] " -n 1 -r
-  echo
-  [[ $REPLY =~ ^[Yy]$ ]] && APPROVE_ADDED="true"
+  if _ask_yesno_safe "Apply added files?"; then APPROVE_ADDED="true"; fi
 fi
 
 if [[ $UPDATED_COUNT -gt 0 ]]; then
-  read -p "Apply updated files? [y/n] " -n 1 -r
-  echo
-  [[ $REPLY =~ ^[Yy]$ ]] && APPROVE_UPDATED="true"
+  if _ask_yesno_safe "Apply updated files?"; then APPROVE_UPDATED="true"; fi
 fi
 
 if [[ $DELETED_COUNT -gt 0 ]]; then
-  read -p "Delete removed files? [y/n] " -n 1 -r
-  echo
-  [[ $REPLY =~ ^[Yy]$ ]] && APPROVE_DELETED="true"
+  if _ask_yesno_safe "Delete removed files?"; then APPROVE_DELETED="true"; fi
 fi
 
 if [[ $DELETED_MODIFIED_COUNT -gt 0 ]]; then
   echo "The following files are wizard-managed but were modified by you."
   echo "Deleting them may lose your changes."
   jq -r '.deleted_modified[] | "  - \(.path)"' "$PLAN"
-  read -p "Delete these modified files? [y/n] " -n 1 -r
-  echo
-  [[ $REPLY =~ ^[Yy]$ ]] && APPROVE_DELETED_MODIFIED="true"
+  if _ask_yesno_safe "Delete these modified files?"; then APPROVE_DELETED_MODIFIED="true"; fi
 fi
 
 # Store approvals in state
@@ -977,11 +986,14 @@ if [[ "$APPROVE_UPDATED" == "true" ]] || [[ "$APPROVE_ADDED" == "true" ]]; then
   if [[ -f AGENTS.md ]] && [[ -f "$STAGING/AGENTS.md" ]]; then
     preserve_custom_agents "$STAGING"
   fi
+  # Reinsert the Windsurf/Devin legacy path bridge into the STAGED AGENTS.md so
+  # the approved copy carries it, the manifest hashes it, and a declined refresh
+  # writes nothing. Idempotent: skipped when the rule is already present (e.g.
+  # preserved via DO NOT REGENERATE markers).
+  if [[ -f "$STAGING/AGENTS.md" ]]; then
+    reinsert_legacy_bridge "$STAGING/AGENTS.md"
+  fi
 fi
-
-# Reinsert the Windsurf/Devin legacy path bridge (idempotent; skipped when the
-# rule is already present or Windsurf/Devin is not an active IDE).
-reinsert_legacy_bridge
 
 if [[ "$APPROVE_ADDED" == "true" ]]; then
   echo "ℹ Copying added files..."
@@ -1138,7 +1150,14 @@ Generated with /wf-refresh
 EOF
 )
 
-    if git diff --cached --quiet --pathspec-from-file="$COMMIT_PATHS" --pathspec-file-nul; then
+    # git diff does NOT support --pathspec-from-file (usage error 129); read the
+    # approved paths into positional arguments so the guard is portable.
+    COMMIT_PATH_ARGS=()
+    while IFS= read -r -d '' p; do
+      COMMIT_PATH_ARGS+=("$p")
+    done < "$COMMIT_PATHS"
+
+    if git diff --cached --quiet -- "${COMMIT_PATH_ARGS[@]}"; then
       echo "ℹ Approved paths have no staged changes; skipping commit"
     else
       git commit -m "$COMMIT_MSG" --pathspec-from-file="$COMMIT_PATHS" --pathspec-file-nul

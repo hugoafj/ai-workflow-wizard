@@ -183,6 +183,8 @@ echo ""
 echo "📁 Other artifacts:"
 [ -f ".wizard-state.json" ] && echo "  🗑 .wizard-state.json"
 [ -f ".wizard-managed-files.json" ] && echo "  🗑 .wizard-managed-files.json"
+[ -f "refresh-plan.json" ] && echo "  🗑 refresh-plan.json (from /wf-refresh)"
+[ -f ".wizard-refresh-baseline.json" ] && echo "  🗑 .wizard-refresh-baseline.json (from /wf-refresh R3)"
 [ -f ".wf-status" ] && echo "  🗑 .wf-status"
 [ -f ".commitlintrc.json" ] && echo "  🗑 .commitlintrc.json"
 [ -d ".husky" ] && echo "  🗑 .husky/ (conventional commits)"
@@ -345,6 +347,7 @@ Remove the remaining detected items:
 ```bash
 rm -f .wizard-state.json .wf-status .commitlintrc.json .gga .pr_agent.toml
 rm -f .wizard-managed-files.json
+rm -f refresh-plan.json .wizard-refresh-baseline.json
 rm -f release-please-config.json .release-please-manifest.json
 rm -rf .husky .wizard-staging .wizard-manifests
 rm -f .git/hooks/post-commit

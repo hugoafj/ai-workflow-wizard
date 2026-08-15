@@ -13,6 +13,8 @@ FEATURES_RELEASE=$(jq -r '.features.release_please // false' .wizard-state.json)
 if [ "$FEATURES_CI" != "true" ] && [ "$FEATURES_CD" != "true" ] && [ "$FEATURES_RELEASE" != "true" ]; then
   echo "PHASE 4.7 skipped — CI and CD not selected."
   wf_phase_done phase47 phase5
+  echo "ℹ Next phase: phase5"
+  cat "$WF_DIR/phase5.md"
   exit 0
 fi
 ```

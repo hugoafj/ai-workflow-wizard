@@ -19,6 +19,8 @@ if [ "$FEATURES_ROUTING" != "true" ] && [ "$FEATURES_TDD" != "true" ]; then
     NEXT="phase5"
   fi
   wf_phase_done phase45 "$NEXT"
+  echo "ℹ Next phase: $NEXT"
+  cat "$WF_DIR/$NEXT.md"
   exit 0
 fi
 ```

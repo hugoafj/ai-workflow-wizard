@@ -1065,7 +1065,10 @@ Do you want to reapply the Windsurf fix now? [yes / no, skip]
 1. **Merge AGENTS.md rule** — same as phase45 did:
    - Read the rule from temp-files/AGENTS.md (Gentle AI — Legacy Path Bridge section).
    - Check if it already exists in the project's AGENTS.md.
-   - If not present, insert it at the top (after title, before other content).
+   - If not present, insert it after the first line (after the title), ENVELOPED in
+     `<!-- WF: DO NOT REGENERATE -->` ... `<!-- /WF: DO NOT REGENERATE -->` (add a newline
+     before the closing marker — temp-files/AGENTS.md has no trailing newline), so future
+     refreshes preserve it.
    - If already present, skip (do not duplicate).
 
 2. **Rewrite .windsurf/workflows/sdd-new.md**:

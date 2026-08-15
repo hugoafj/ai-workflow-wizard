@@ -43,6 +43,6 @@ jobs:
       - name: Generate AI summary for release PR
         run: |
           echo "AI summary job enabled (provider: {{ci.release_ai_provider}})"
-          # AI summary implementation for {{ci.release_ai_provider}} will be injected here
+          # {{AI_SUMMARY_JOB}}
           echo "Project: {{answers.project_name}}"
 {{/if}}

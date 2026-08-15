@@ -215,10 +215,13 @@ Read CI/CD decisions from `.wizard-state.json` → `.ci.*` and `.cd.*`.
   - `{{trigger_event}}` = `tags: ['v*']` or `branches: [main]`
   - `{{node_version}}` = `state.discovery.node_engine`
   - `{{deploy_path}}` = `state.cd.deploy_path`
+  - `{{compose_file}}` = `state.cd.compose_file` (default `docker-compose.prod.yml`)
+  - `{{php_version}}` = from `composer.json` `require.php` (e.g. `8.3`), fallback `8.2`
+  - `{{has_node_assets}}` = `'true'` when `state.discovery.stack_detected == 'laravel_node'`, else `'false'`
 
-**Suggestion toggles** (ask the user BEFORE writing):
-- If `gemini`: ask if they want `auto_improve` (default true)
-- If `claude`: ask if they want `inline_suggestions` (default true)
+**Suggestion toggles** (read from state, never ask the user — this runs as a sub-agent):
+- If `gemini`: read `state.ci.auto_improve` (default true) and toggle `auto_improve` accordingly
+- If `claude`: read `state.ci.inline_suggestions` (default true) and toggle `inline_suggestions` accordingly
 
 ### B9 — Register build_plan
 
