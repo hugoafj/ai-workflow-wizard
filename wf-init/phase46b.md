@@ -335,12 +335,12 @@ Testing stack configured (in memory — everything is written in Phase 8):
 > **⛔ STOP HERE — don't execute anything else.**
 > **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `testing.coverage_threshold` (number or null, if the coverage extra was activated), `testing.visual_regression` (bool), `testing.page_object_model` (bool), `mcps` (project MCPs to configure). Mark `wf_phase_done phase46b <next>`.
 > Calculate the next phase based on features:
-> ```bash
-> if jq -e '.features.ci == true or .features.cd == true or .features.release_please == true' .wizard-state.json >/dev/null; then
->   echo "phase47-cicd"
-> else
->   echo "phase5"
-> fi
-> ```
+```bash
+if jq -e '.features.ci == true or .features.cd == true or .features.release_please == true' .wizard-state.json >/dev/null; then
+  echo "phase47-cicd"
+else
+  echo "phase5"
+fi
+```
 > Tell the user: *"Testing stack configured. Reply **continue** to continue."*
 > Wait for the response. Only when they confirm, execute in bash: `cat "$WF_DIR/$NEXT.md"`

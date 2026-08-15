@@ -68,7 +68,11 @@ SDD_PATH="$SDD_BACKEND"
 [ "$SDD_BACKEND" = "hybrid" ] && SDD_PATH="openspec"
 mkdir -p .windsurf/workflows
 cp "$WF_DIR/temp-files/sdd-new.md" .windsurf/workflows/sdd-new.md
-sed -i.bak "s|{{sdd.backend}}/changes/|$SDD_PATH/changes/|g" .windsurf/workflows/sdd-new.md
+if [ "$SDD_BACKEND" = "engram" ]; then
+  sed -i.bak "s|{{sdd.backend}}/changes/<name>/proposal.md|Engram memory:|g" .windsurf/workflows/sdd-new.md
+else
+  sed -i.bak "s|{{sdd.backend}}/changes/|$SDD_PATH/changes/|g" .windsurf/workflows/sdd-new.md
+fi
 sed -i.bak "s/{{sdd.backend}}/$SDD_BACKEND/g" .windsurf/workflows/sdd-new.md
 rm -f .windsurf/workflows/sdd-new.md.bak
 ```

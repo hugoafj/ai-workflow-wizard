@@ -10,6 +10,9 @@ Try the delegation path first (most efficient):
 
 ```bash
 # Attempt to get Builder-Core prompt for delegation
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
 BUILDER_CORE_PROMPT=$(cat "$WF_DIR/subagent-builder-core.md" 2>/dev/null)
 if [ -z "$BUILDER_CORE_PROMPT" ]; then
   echo "ERROR: Cannot read subagent-builder-core.md"
@@ -35,6 +38,9 @@ If your agent environment supports the `task` tool:
 If delegation is unavailable (older Windsurf, Devin, CI/CD contexts, or any agent without `task` tool):
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
 cat "$WF_DIR/lib/builder.md"
 ```
 
@@ -45,6 +51,9 @@ Read and execute the Builder procedure inline. It is deterministic and mechanica
 Regardless of delegation or inline execution, validate that `.wizard-staging/` was created and contains expected files:
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
 if [ ! -d .wizard-staging ]; then
   echo "ERROR: .wizard-staging/ was not created."
   echo "This means Builder-Core (B1-B6) did not complete successfully."
@@ -80,5 +89,8 @@ echo "✓ Builder-Core validation passed"
 If validation succeeds, continue with part B:
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
 cat "$WF_DIR/phase6b-build-heavy.md"
 ```

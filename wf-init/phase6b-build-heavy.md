@@ -10,6 +10,9 @@
 Builder-Core should have completed. Verify:
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
 if [ ! -d .wizard-staging ] || [ ! -f .wizard-staging/AGENTS.md ]; then
   echo "ERROR: Builder-Core staging not found or incomplete."
   echo "Phase 6a must complete successfully before running 6b."
@@ -26,6 +29,9 @@ If your agent environment supports the `task` tool:
 
 1. Read the sub-agent prompt:
    ```bash
+   WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+   source "$WF_DIR/lib/state-helpers.sh"
+
    cat "$WF_DIR/subagent-builder-heavy.md"
    ```
 
@@ -43,6 +49,9 @@ If your agent environment supports the `task` tool:
 If delegation is unavailable:
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
 cat "$WF_DIR/lib/builder.md"
 ```
 
@@ -142,5 +151,8 @@ Reply **continue** to see the full review before writing anything.
 Wait for user confirmation. Only then:
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
 cat "$WF_DIR/phase7.md"
 ```
