@@ -92,8 +92,26 @@ curl -fsSL "${WF_RAW}/wf-init/phase6b-build-heavy.md" > "${WF_DIR}/phase6b-build
 mkdir -p "${WF_DIR}/temp-files"
 curl -fsSL "${WF_RAW}/temp-files/AGENTS.md" > "${WF_DIR}/temp-files/AGENTS.md" 2>/dev/null || true
 
-if [ ! -s "${WF_DIR}/lib/refresher.md" ]; then
-  echo "✗ Could not download refresher.md from GitHub"
+REQUIRED_FILES=(
+  "${WF_DIR}/lib/refresher.md"
+  "${WF_DIR}/lib/state-helpers.sh"
+  "${WF_DIR}/lib/builder.md"
+  "${WF_DIR}/subagent-builder-core.md"
+  "${WF_DIR}/subagent-builder-heavy.md"
+  "${WF_DIR}/phase6a-agents.md"
+  "${WF_DIR}/phase6b-build-heavy.md"
+  "${WF_DIR}/temp-files/AGENTS.md"
+)
+
+missing=false
+for f in "${REQUIRED_FILES[@]}"; do
+  if [ ! -s "$f" ]; then
+    echo "✗ Could not download $(basename "$f") from GitHub" >&2
+    missing=true
+  fi
+done
+
+if [ "$missing" = true ]; then
   exit 1
 fi
 

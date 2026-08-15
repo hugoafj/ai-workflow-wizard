@@ -118,6 +118,7 @@ wf_state_init() {
     "vps_runtime": null,
     "stack_detected": null,
     "deploy_path": null,
+    "compose_file": null,
     "missing_secrets": []
   },
   "migration": {

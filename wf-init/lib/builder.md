@@ -215,15 +215,22 @@ From the SAME `build_protocol_body(name)`:
 - **The router NEVER embeds the protocols**; it only has the routing table pointing to them.
 
 ### Step B6 — Satellites (per active IDE)
-For each IDE ∈ IDES, copy its `$WF_ROOT/templates/satellites/<ide>.tmpl` to the
-corresponding destination (see protocol `ides`):
-- `claude-code` → `STAGING/CLAUDE.md`
-- `vscode-copilot` → `STAGING/.github/copilot-instructions.md`
-- `cursor` → `STAGING/.cursor/rules/project.mdc`
-- `windsurf` → `STAGING/.windsurf/rules/project.md`
-- `kiro` → `STAGING/.kiro/steering/project-context.md`
-- `gemini-cli` → `STAGING/GEMINI.md`
-- `antigravity` → `STAGING/ANTIGRAVITY.md`
+For each IDE ∈ IDES, copy the corresponding satellite template from
+`$WF_ROOT/templates/satellites/` to the destination (the template file name uses
+a short key, not the full IDE key):
+
+| IDE key | Template | Destination |
+|---|---|---|
+| `claude-code` | `satellites/claude.tmpl` | `STAGING/CLAUDE.md` |
+| `vscode-copilot` | `satellites/copilot.tmpl` | `STAGING/.github/copilot-instructions.md` |
+| `cursor` | `satellites/cursor.tmpl` | `STAGING/.cursor/rules/project.mdc` |
+| `windsurf` | `satellites/windsurf.tmpl` | `STAGING/.windsurf/rules/project.md` |
+| `kiro` | `satellites/kiro.tmpl` | `STAGING/.kiro/steering/project-context.md` |
+| `gemini-cli` | `satellites/gemini.tmpl` | `STAGING/GEMINI.md` |
+| `antigravity` | `satellites/antigravity.tmpl` | `STAGING/ANTIGRAVITY.md` |
+
+For example, for `claude-code` read `$WF_ROOT/templates/satellites/claude.tmpl`,
+not `$WF_ROOT/templates/satellites/claude-code.tmpl`.
 
 `CLAUDE.md` (and its `.claude/` satellite directory) is generated ONLY when
 `claude-code` ∈ IDES — exactly like every other IDE's satellite. No IDE is
@@ -301,17 +308,18 @@ Generate CI and CD artifacts to staging according to `state.ci` and `state.cd` (
 details) using `$WF_ROOT/templates/protocols/cicd/` as the single source.
 
 **If `CICD == true`** (full CI):
-- AI reviewer: `.gga` + `variants/gga-review.yml.md` (if gga), or `claude-review.yml.md` /
-  `gemini-review.yml.md`, or nothing (copilot/none).
+- AI reviewer: `.gga` + `variants/gga-review.yml.md` (if gga), or `variants/claude-review.yml.md` /
+  `variants/gemini-review.yml.md`, or nothing (copilot/none).
   - **If `gemini`**: also `.pr_agent.toml` from `variants/pr-agent-config.toml.md`
     (required for pr-agent to run on `synchronize` and `reopened`).
     - **Toggle `auto_improve`**: if `AUTO_IMPROVE == false`, replace
       `github_action_config.auto_improve: "true"` with `"false"` in the assembled template.
   - **If `claude`**: toggle `inline_suggestions` — if `INLINE_SUGGESTIONS == false`,
     omit the `claude_args:` block with `--allowedTools` from the assembled template.
-- `quality-guard.yml.md` ALWAYS (conditioned on real scripts). **Fill `{{node_version}}`
+- `variants/quality-guard.yml.md` ALWAYS (conditioned on real scripts). **Fill `{{node_version}}`
   with `state.discovery.node_engine` or 22 by default, and `{{npm_major}}` with
-  `state.discovery.npm_major`** — this avoids the `npm ci` lockfile out-of-sync failure.
+  `state.discovery.npm_major` or the current npm major (`npm --version | cut -d. -f1`,
+  defaulting to `8`)** — this avoids the `npm ci` lockfile out-of-sync failure.
   - **E2E toggle**: if `state.ci.e2e_in_ci == false`, do not include `npm run test:e2e` in
     the quality guard (even if `LAYERS` includes e2e). The e2e script still exists for local use.
 - `.gga`: fill `PR_BASE_BRANCH` with `state.discovery.default_branch` (uncommented).
@@ -324,19 +332,20 @@ details) using `$WF_ROOT/templates/protocols/cicd/` as the single source.
 
 **If `RELEASE == true` AND `CICD == false`** (release-please standalone):
 - Only conventional commits: `.commitlintrc.json`, `.husky/commit-msg` (Husky v9+ without shebang).
-- Only release-please: `release-please.yml.md`, `release-please-config.json.md`,
-  `release-please-manifest.json.md`, + inject `ai-summary-job.<provider>.yml.md` into `release-please.yml` if `state.ci.release_ai_summary == true`.
+- Only release-please: `variants/release-please.yml.md`, `variants/release-please-config.json.md`,
+  `variants/release-please-manifest.json.md`, + inject `variants/ai-summary-job.<provider>.yml.md` into `release-please.yml` if `state.ci.release_ai_summary == true`.
 - No quality guard, no AI review, no security review.
 
 **If all false**: no CI is generated.
 
 **If `CD == true`** (automatic deploy):
 - Select template according to `state.cd.vps_runtime`:
-  - `pm2` → `deploy-pm2.node.yml.md`
-  - `nginx_php_fpm` → `deploy-nginx-phpfpm.laravel.yml.md`
-  - `apache_php_fpm` → `deploy-apache-phpfpm.laravel.yml.md`
-  - `docker` → `deploy-docker.yml.md`
+  - `pm2` → `variants/deploy-pm2.node.yml.md`
+  - `nginx_php_fpm` → `variants/deploy-nginx-phpfpm.laravel.yml.md`
+  - `apache_php_fpm` → `variants/deploy-apache-phpfpm.laravel.yml.md`
+  - `docker` → `variants/deploy-docker.yml.md`
 - Write `STAGING/.github/workflows/deploy.yml` with placeholders replaced.
+  Resolve both `<if ...>` and `{{if ...}}` / `{{/if}}` markers in deploy templates based on state.
 - Verify secrets (`SERVER_IP`, `SSH_USER`, `SSH_KEY`).
 
 ### Step B9 — Register plan and advance
@@ -390,11 +399,13 @@ Populate `state.build_plan` with the exact list of files in staging, including S
        '.build_plan.generated_files = $files |
         .build_plan.managed_paths = $paths |
         .phases.phase6.status = "done" |
-        .phase_pointer = "phase7"' "$WF_STATE" > "$WF_STATE.tmp"
+        .phase_pointer = "phase7" |
+       .updated_at = (now | todate)' "$WF_STATE" > "$WF_STATE.tmp"
    else
      jq --argjson files "$FILES" --argjson paths "$PATHS" \
        '.build_plan.generated_files = $files |
-        .build_plan.managed_paths = $paths' "$WF_STATE" > "$WF_STATE.tmp"
+        .build_plan.managed_paths = $paths |
+       .updated_at = (now | todate)' "$WF_STATE" > "$WF_STATE.tmp"
    fi
    mv "$WF_STATE.tmp" "$WF_STATE"
    ```

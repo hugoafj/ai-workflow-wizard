@@ -524,7 +524,7 @@ in the CD configuration without attempting to solve it automatically.
 ## Post-commit hook (drift detector) — single source
 
 - Body template: `hook.post-commit.tmpl.md` (VERBATIM from this template). It is the ONLY
-  source of the drift logic; the repo root `post-commit` is regenerated from here.
+  source of the drift logic used by `/wf-init` and `/wf-refresh`.
 - Detects two drift categories and only **notifies** (never acts):
   - **AGENTS.md drift** (`REFRESH_FILES`) → suggests `/wf-refresh`.
   - **SDD drift** (`SDD_FILES`) → suggests `/sdd-init`.

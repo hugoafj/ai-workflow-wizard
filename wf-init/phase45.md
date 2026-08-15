@@ -382,4 +382,17 @@ Continuing with project questions...
 > **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `sdd.backend` (`engram`|`openspec`|`hybrid`) and `sdd.already_initialized`. Mark `wf_phase_done phase45 <next>`.
 > Calculate the next phase based on features: `phase46` if `features.tdd_protocol = true`; else `phase47-cicd` if `features.ci`, `features.cd`, or `features.release_please` is true; else `phase5`.
 > Tell the user: *"SDD initialized. Reply **continue** when you are ready to proceed."*
-> Wait for the response. Only when they confirm, read the next phase with the calculation above and run in bash: `cat "$WF_DIR/$NEXT.md"`
+> Wait for the response. Only when they confirm, run in bash:
+```bash
+NEXT=
+if [ "$(jq -r '.features.tdd_protocol // false' .wizard-state.json)" = "true" ]; then
+  NEXT="phase46"
+elif [ "$(jq -r '.features.ci // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.cd // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.release_please // false' .wizard-state.json)" = "true" ]; then
+  NEXT="phase47-cicd"
+else
+  NEXT="phase5"
+fi
+wf_phase_done phase45 "$NEXT"
+echo "ℹ Next phase: $NEXT"
+cat "$WF_DIR/$NEXT.md"
+```

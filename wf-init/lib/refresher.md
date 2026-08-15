@@ -234,9 +234,9 @@ _apply_jq_filter() {
       args+=("$1")
       shift
     done
-    jq "${args[@]}" "$filter" "$WF_STATE" > "$tmp" && mv "$tmp" "$WF_STATE"
+    jq "${args[@]}" "$filter | .updated_at = (now | todate)" "$WF_STATE" > "$tmp" && mv "$tmp" "$WF_STATE"
   else
-    jq "$filter" "$WF_STATE" > "$tmp" && mv "$tmp" "$WF_STATE"
+    jq "$filter | .updated_at = (now | todate)" "$WF_STATE" > "$tmp" && mv "$tmp" "$WF_STATE"
   fi
 }
 
@@ -415,12 +415,24 @@ reinsert_legacy_bridge() {
     echo "  ℹ Legacy path bridge already present in $TARGET"
     return 0
   fi
-  # Insert after the first line (after "# AGENTS.md — <project>") using
-  # head/cat/tail — portable on BOTH BSD (macOS) and GNU (Linux) coreutils.
+  # AGENTS.router.md may begin with leading HTML comments; find the first
+  # markdown heading ("# ") and insert after it. head/cat/tail are portable on
+  # BOTH BSD (macOS) and GNU (Linux) coreutils.
   # Wrap in DO NOT REGENERATE markers so future refreshes preserve it.
   # temp-files/AGENTS.md has no trailing newline, so add one before the
   # closing marker to keep it on its own line.
-  { head -n 1 "$TARGET"; printf '%s\n' "<!-- WF: DO NOT REGENERATE -->"; cat "$RULE_FILE"; printf '\n%s\n' "<!-- /WF: DO NOT REGENERATE -->"; tail -n +2 "$TARGET"; } > "$TARGET.tmp"
+  TITLE_LINE=$(grep -n '^# ' "$TARGET" | head -1 | cut -d: -f1)
+  if [ -z "$TITLE_LINE" ]; then
+    echo "  ⚠ Could not find $TARGET title line for Windsurf bridge injection; skipping." >&2
+    return 0
+  fi
+  {
+    head -n "$TITLE_LINE" "$TARGET"
+    printf '%s\n' "<!-- WF: DO NOT REGENERATE -->"
+    cat "$RULE_FILE"
+    printf '\n%s\n' "<!-- /WF: DO NOT REGENERATE -->"
+    tail -n +$((TITLE_LINE + 1)) "$TARGET"
+  } > "$TARGET.tmp"
   mv "$TARGET.tmp" "$TARGET"
   if grep -q "Gentle AI — Legacy Path Bridge" "$TARGET"; then
     echo "  ✓ Windsurf legacy path bridge rule reinserted into $TARGET"
@@ -558,7 +570,11 @@ else
   echo "ℹ Detected IDEs: ${IDES[*]}"
 fi
 
-IDES_JSON=$(printf '%s\n' "${IDES[@]}" | jq -R . | jq -s .)
+if [[ ${#IDES[@]} -eq 0 ]]; then
+  IDES_JSON='[]'
+else
+  IDES_JSON=$(printf '%s\n' "${IDES[@]}" | jq -R . | jq -s .)
+fi
 _apply_jq_filter --argjson ides "$IDES_JSON" '.answers.ides = $ides'
 
 echo "✓ Phase R0 complete"
@@ -599,22 +615,30 @@ if [[ -f package.json ]] && command -v node >/dev/null 2>&1; then
   NODE_ENGINE=$(node -e "try { process.stdout.write(require('./package.json').engines?.node||'') } catch {}" 2>/dev/null || true)
 fi
 
+NPM_MAJOR=""
+if command -v npm >/dev/null 2>&1; then
+  NPM_MAJOR=$(npm --version 2>/dev/null | cut -d. -f1 || true)
+fi
+
 GIT_COMMITS=$(git log --oneline 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")
 
 OLD_STACK=$(jq -r '.discovery.stack_key // ""' "$WF_STATE")
 OLD_NODE=$(jq -r '.discovery.node_engine // ""' "$WF_STATE")
+OLD_NPM=$(jq -r '.discovery.npm_major // ""' "$WF_STATE")
 
-if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]]; then
+if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || [[ "$OLD_NPM" != "$NPM_MAJOR" ]]; then
   echo "⚠ Project content drift detected:"
   [[ "$OLD_STACK" != "$STACK_KEY" ]] && echo "  - Stack: $OLD_STACK → $STACK_KEY"
   [[ "$OLD_NODE" != "$NODE_ENGINE" ]] && echo "  - Node engine: $OLD_NODE → $NODE_ENGINE"
+  [[ "$OLD_NPM" != "$NPM_MAJOR" ]] && echo "  - npm major: $OLD_NPM → $NPM_MAJOR"
 
   if _ask_yesno_safe "Use updated project info?"; then
     _apply_jq_filter \
       --arg stack_key "$STACK_KEY" \
       --arg node_engine "$NODE_ENGINE" \
+      --arg npm_major "$NPM_MAJOR" \
       --argjson git_commits "$GIT_COMMITS" \
-      '.discovery.stack_key = $stack_key | .discovery.node_engine = $node_engine | .discovery.git_commits = $git_commits'
+      '.discovery.stack_key = $stack_key | .discovery.node_engine = $node_engine | .discovery.npm_major = $npm_major | .discovery.git_commits = $git_commits'
     echo "✓ Updated discovery fields"
   else
     echo "ℹ Keeping existing discovery fields"
@@ -683,7 +707,13 @@ echo "✓ Baseline snapshot written ($(jq '.managed_paths | length' "$BASELINE")
 
 1. Use the same Builder sub-agent delegation as `/wf-init` Phase 6:
    - Read `phase6a-agents.md` first. If your environment supports it (e.g. Claude Code `task` tool, Devin `run_subagent` tool), delegate Builder-Core to a sub-agent with the prompt from `subagent-builder-core.md`.
-   - When replacing placeholders in the sub-agent prompt, use `{WF_PATH}` → `$WF_DIR` (the downloaded phase directory, e.g. `/tmp/wf-refresh-phases`). The helper `lib/state-helpers.sh` lives directly under `$WF_DIR/lib/`.
+   - When replacing placeholders in the sub-agent prompt, use:
+     - `{WF_PATH}` → `$WF_DIR` (the downloaded phase directory, e.g. `/tmp/wf-refresh-phases`)
+     - `{WF_RAW}` → `https://raw.githubusercontent.com/${WIZARD_REPO}/${WIZARD_BRANCH}`
+     - `{PROJECT_PATH}` → the current working directory
+     - `{WF_STAGING}` → the staging directory (`$STAGING` or `{PROJECT_PATH}/.wizard-staging`)
+     - `{WF_STATE}` → `.wizard-state.json`
+   - The helper `lib/state-helpers.sh` lives directly under `$WF_DIR/lib/`.
    - Otherwise, read `lib/builder.md` and execute B1-B6 manually.
 2. After Builder-Core completes, read `phase6b-build-heavy.md` and run Builder-Heavy (B7-B9) the same way — **execute ONLY its steps 1-4 (verify staging, delegate, fallback, validate). Do NOT execute phase6b's Step 5 tail**: no `wf_phase_done phase6 phase7`, no "Wait for user confirmation", and NO `cat "$WF_DIR/phase7.md"`. Those belong to the `/wf-init` phase 7/8 flow, not to refresh — running them would derail into wf-init's review/promotion instead of returning to Phase R4. After Builder-Heavy validates, return to Phase R4 below.
 3. The combined result must be `.wizard-staging/` containing `AGENTS.md`, the satellite files, commands, protocols, etc.
@@ -781,14 +811,14 @@ while IFS= read -r -d '' file; do
 done < <(find "$STAGING" -type f -print0)
 
 # Deletion baseline: the R3 Step 0 snapshot (pre-Builder). Fall back to the live
-# state only when the snapshot is missing (e.g. running R4 standalone).
+# state only when the snapshot is missing (e.g. running R4 standalone). Normalize
+# both sources to expose managed_paths and generated_files at the top level.
 BASELINE=".wizard-refresh-baseline.json"
+OLD_MANAGED=$(mktemp)
 if [[ -f "$BASELINE" ]]; then
-  OLD_MANAGED_SRC="$BASELINE"
-  OLD_FILES_SRC="$BASELINE"
+  jq '{managed_paths: (.managed_paths // []), generated_files: (.generated_files // [])}' "$BASELINE" > "$OLD_MANAGED"
 else
-  OLD_MANAGED_SRC="$WF_STATE"
-  OLD_FILES_SRC="$WF_STATE"
+  jq '{managed_paths: (.build_plan.managed_paths // []), generated_files: (.build_plan.generated_files // [])}' "$WF_STATE" > "$OLD_MANAGED"
 fi
 
 # Scan old managed paths for deletions (null-delimited for paths with spaces/newlines).
@@ -796,7 +826,7 @@ while IFS= read -r -d '' old_path; do
   if [[ ! -f "$STAGING/$old_path" ]]; then
     if [[ -f "$old_path" ]]; then
       PROJECT_HASH=$(wf_sha256 "$old_path")
-      OLD_HASH=$(jq -r --arg path "$old_path" '.generated_files[] | select(.path == $path) | .hash' "$OLD_FILES_SRC" 2>/dev/null || true)
+      OLD_HASH=$(jq -r --arg path "$old_path" '.generated_files[] | select(.path == $path) | .hash' "$OLD_MANAGED" 2>/dev/null || true)
 
       if [[ -z "$OLD_HASH" ]] || [[ "$PROJECT_HASH" == "$OLD_HASH" ]]; then
         DELETED=$(jq --arg path "$old_path" --arg hash "$PROJECT_HASH" '. += [{"path": $path, "hash": $hash, "reason": "deprecated"}]' <<< "$DELETED")
@@ -805,7 +835,8 @@ while IFS= read -r -d '' old_path; do
       fi
     fi
   fi
-done < <(jq -j '.managed_paths[]? + "\u0000"' "$OLD_MANAGED_SRC" 2>/dev/null || true)
+done < <(jq -j '.managed_paths[]? + "\u0000"' "$OLD_MANAGED" 2>/dev/null || true)
+rm -f "$OLD_MANAGED"
 
 # Write plan
 jq -n \
@@ -962,7 +993,7 @@ jq --argjson added "$APPROVE_ADDED" \
    --argjson updated "$APPROVE_UPDATED" \
    --argjson deleted "$APPROVE_DELETED" \
    --argjson deleted_modified "$APPROVE_DELETED_MODIFIED" \
-   '.build_plan.approval = {added: $added, updated: $updated, deleted: $deleted, deleted_modified: $deleted_modified}' "$WF_STATE" > "$WF_STATE.tmp"
+   '.build_plan.approval = {added: $added, updated: $updated, deleted: $deleted, deleted_modified: $deleted_modified} | .updated_at = (now | todate)' "$WF_STATE" > "$WF_STATE.tmp"
 mv "$WF_STATE.tmp" "$WF_STATE"
 
 echo "✓ Phase R5 complete"
@@ -1085,7 +1116,7 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
 
   # Update state build_plan
   jq --argjson files "$GENERATED_FILES" --argjson paths "$MANAGED_PATHS" \
-     '.build_plan.generated_files = $files | .build_plan.managed_paths = $paths' "$WF_STATE" > "$WF_STATE.tmp"
+     '.build_plan.generated_files = $files | .build_plan.managed_paths = $paths | .updated_at = (now | todate)' "$WF_STATE" > "$WF_STATE.tmp"
   mv "$WF_STATE.tmp" "$WF_STATE"
 
   # Add to .gitignore (ensure a trailing newline first and use an exact line match).

@@ -584,49 +584,103 @@ Do you want to keep or change?
 
 **If they want to change (enable)**:
 
-**Case A — release-please standalone is OFF** (no CI active):
-Full CI. Ask if they want E2E in CI (sub-option 10).
-Set `state.features.ci = true`. Run `phase47-cicd.md` to configure.
+**Case A — release-please standalone is OFF** (`features.release_please == false`):
 
-**Case B — release-please standalone is ON** (already has conventional
-commits + release-please):
-You already have release-please standalone active. Enabling full CI
-SUBSUMES your current setup:
-  - Conventional commits → stays (you already have it)
-  - release-please → stays (you already have it)
-  - ADDS: Quality Guard + AI review + Security review (optional)
-  - ADDS: E2E in CI (optional)
+```
+Enable full CI? This will add:
+  - Conventional commits + release-please
+  - Quality Guard
+  - Optional AI Reviewer, Security Review, and E2E in CI
 
-Enable full CI over your current setup? [yes / no]
+[yes / no]
+```
 
-If yes: set `state.features.ci = true`, `state.release_please = true`
-(stays). Run `phase47-cicd.md`. Ask about E2E in CI.
+If yes, update state and continue to the options 10-15 to configure AI reviewer,
+security review, and E2E. When finished, run `/wf-refresh` to regenerate the
+CI/CD artifacts and `AGENTS.md`.
+
+```bash
+jq '.features.ci = true |
+    .features.release_please = true |
+    .ci.conventional_commits = true |
+    .ci.release_please = true |
+    .ci.ai_reviewer = "none" |
+    .ci.gga_provider = "none" |
+    .ci.security_review = false |
+    .ci.e2e_in_ci = false |
+    .ci.auto_improve = true |
+    .ci.inline_suggestions = true |
+    .ci.release_ai_summary = false |
+    .ci.release_ai_provider = "none"' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+```
+
+**Case B — release-please standalone is ON** (`features.release_please == true` and `features.ci == false`):
+
+```
+You already have release-please standalone active. Enabling full CI subsumes it
+and adds Quality Guard + optional AI review and security review.
+
+Enable full CI? [yes / no]
+```
+
+If yes, update state and continue to options 10-15, then run `/wf-refresh`.
+
+```bash
+jq '.features.ci = true |
+    .features.release_please = true |
+    .ci.conventional_commits = true |
+    .ci.release_please = true' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+```
 
 **If they want to change (disable)**:
 
 ```
-CI is currently active. Do you want to migrate to release-please standalone
-(conventional commits + auto-release, without quality guard or AI review)
-or disable the entire pipeline? [migrate / disable everything]
+CI is currently active. What do you want to do?
+
+[migrate]    Keep release-please standalone (conventional commits + auto-release,
+             remove quality guard, AI review, and security review).
+[disable]    Disable the entire CI pipeline (remove all workflows and hooks).
 ```
 
-If they choose `migrate`: set `state.ci = false`, `state.release_please = true`,
-inject the release-please standalone configuration.
-If they choose `disable everything`: set both to `false`, remove the
-CI and release-please sections from `AGENTS.md`.
+**If they choose `migrate`**:
 
-**Update the footer** according to the new state.
+Set `features.ci = false`, keep `features.release_please = true`, and clear only
+the full-CI fields. Then run `/wf-refresh` to remove quality-guard/AI/security
+workflows while preserving release-please.
+
+```bash
+jq '.features.ci = false |
+    .features.release_please = true |
+    .ci.ai_reviewer = "none" |
+    .ci.gga_provider = "none" |
+    .ci.security_review = false |
+    .ci.e2e_in_ci = false |
+    .ci.auto_improve = true |
+    .ci.inline_suggestions = true |
+    .ci.release_ai_summary = false |
+    .ci.release_ai_provider = "none"' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+```
+
+**If they choose `disable everything`**:
+
+Set both CI and release-please to false and clear the `ci` object. Then run
+`/wf-refresh` to remove all CI/CD workflows.
+
+```bash
+jq '.features.ci = false |
+    .features.release_please = false |
+    .ci = {}' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+```
+
+> **Do NOT run `phase47-cicd.md` from `/wf-settings`** — that file belongs to the
+> `/wf-init` phase flow and is not downloaded in this command context. CI changes
+> are applied by updating state and running `/wf-refresh`.
 
 Confirm:
 ```
-✓ CI: <enabled / disabled / migrated to standalone>
-✓ .wizard-state.json: features.ci = <yes/no>
-✓ AGENTS.md footer updated
-```
-
-**State update**:
-```bash
-jq '.features.ci = <value>' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+✓ CI: <enabled / migrated to standalone / disabled>
+✓ .wizard-state.json: features.ci = <true/false>, features.release_please = <true/false>
+✓ CI/CD artifacts regenerated via /wf-refresh
 ```
 
 ---

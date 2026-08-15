@@ -15,7 +15,7 @@
 # Notes:
 #   - fetch-depth: 0 so --pr-mode can diff against the base
 #   - git fetch of the base branch is necessary because actions/checkout does not bring it as a local ref
-#   - GEMINI_CLI_TRUST_WORKSPACE: true requerido desde Gemini CLI v0.39.1+
+#   - GEMINI_CLI_TRUST_WORKSPACE: true required since Gemini CLI v0.39.1+
 #   - GGA posting comments: GGA automatically posts review comments,
 #     we cannot modify its format. Attribution only applies to comments that
 #     we control (e.g., ai-summary-job).

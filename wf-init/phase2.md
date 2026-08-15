@@ -24,8 +24,9 @@ If `.wizard-state.json` has `migration.prior_content_action = "migrate"`:
 
 ```bash
 # Mark in state that custom content will be wrapped with protection markers
-jq '.migration.wrap_custom_in_markers = true' .wizard-state.json > /tmp/state.tmp
-mv /tmp/state.tmp .wizard-state.json
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+wf_state_set '.migration.wrap_custom_in_markers' 'true'
 ```
 
 Inform the user:
@@ -89,13 +90,13 @@ Apply the same pattern to each active IDE, adjusting path and extension:
 
 If the `EXPECTED_COMMANDS` of this wizard version differs from the one the previous
 detected version had (for example, an upgrade that added `wf-onboard` and
-`wf-refresh` as new commands), tell the user:
+`wf-tdd` as new commands), tell the user:
 
 ```
 Command verification — <IDE>:
   ✓ wf-ladder.md
   ✗ wf-onboard.md   ← missing (new in this wizard version)
-  ✗ wf-refresh.md   ← missing (new in this wizard version)
+  ✗ wf-tdd.md       ← missing (new in this wizard version)
 
 Although the directory already existed, 2 commands from the current version are missing.
 I will add them in Phase 8 without touching the existing ones that have their own content.

@@ -29,7 +29,7 @@ This phase is optional but highly recommended. If the user prefers to configure 
 First detect if there's already a test runner configured:
 
 ```bash
-cat package.json | grep -E '"vitest|"jest|"playwright|"cypress|"testing-library' 2>/dev/null
+grep -E '"(@(playwright/test|testing-library/|vitest/)|vitest|jest|cypress|playwright)"' package.json 2>/dev/null
 ls vitest.config.ts vitest.config.js jest.config.ts playwright.config.ts 2>/dev/null
 ```
 
@@ -188,7 +188,7 @@ engram save "sdd/{project}/testing-capabilities" "## Testing Capabilities
 | ----------- | --------- | ----------- |
 | Unit        | <✅/❌>   | <tool or —> |
 | Integration | <✅/❌>   | <tool or —> |
-| E2E         | <✅/❌>   | <tool o —> |
+| E2E         | <✅/❌>   | <tool or —> |
 
 ### Coverage
 - Available: <✅/❌>
@@ -212,8 +212,15 @@ Additionally, if the detected backend is `openspec` or `hybrid`, update
 # Install yq if not present
 if ! command -v yq &> /dev/null; then
   echo "Installing yq for safe YAML editing..."
-  brew install yq  # macOS/Linux
-  # or for Windows: scoop install yq
+  if command -v brew &>/dev/null; then
+    brew install yq
+  elif command -v pip3 &>/dev/null; then
+    pip3 install yq
+  else
+    echo "ERROR: yq is required for safe YAML editing but no installer found." >&2
+    echo "Install yq (https://github.com/mikefarah/yq) or use your IDE's edit tool to set 'testing.strict_tdd: true' in openspec/config.yaml, then continue." >&2
+    exit 1
+  fi
 fi
 
 # Update testing.strict_tdd safely — preserves all other keys

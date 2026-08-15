@@ -45,13 +45,25 @@ if echo "$IDES" | grep -q "windsurf"; then
     if ! grep -q "Gentle AI — Legacy Path Bridge" AGENTS.md; then
       # The rule is the WHOLE file (title + body) — inject it in full so the
       # "Gentle AI — Legacy Path Bridge" title is present for the grep check.
-      # Insert after the first line (after "# AGENTS.md — <project>") using
-      # head/cat/tail — portable on BOTH BSD (macOS) and GNU (Linux) coreutils.
+      # AGENTS.router.md may begin with leading HTML comments; find the first
+      # markdown heading ("# ") and insert after it. head/cat/tail are
+      # portable on BOTH BSD (macOS) and GNU (Linux) coreutils.
       # GNU-style `sed -i '1a\n...'` fails silently on macOS; never use it here.
       # Wrap it in DO NOT REGENERATE markers so /wf-refresh preserves it.
       # temp-files/AGENTS.md has no trailing newline, so add one before the
       # closing marker to keep it on its own line.
-      { head -n 1 AGENTS.md; printf '%s\n' "<!-- WF: DO NOT REGENERATE -->"; cat "$WF_RULE_FILE"; printf '\n%s\n' "<!-- /WF: DO NOT REGENERATE -->"; tail -n +2 AGENTS.md; } > AGENTS.md.tmp
+      TITLE_LINE=$(grep -n '^# ' AGENTS.md | head -1 | cut -d: -f1)
+      if [ -z "$TITLE_LINE" ]; then
+        echo "8.1 ERROR — Could not find AGENTS.md title line for Windsurf bridge injection." >&2
+        exit 1
+      fi
+      {
+        head -n "$TITLE_LINE" AGENTS.md
+        printf '%s\n' "<!-- WF: DO NOT REGENERATE -->"
+        cat "$WF_RULE_FILE"
+        printf '\n%s\n' "<!-- /WF: DO NOT REGENERATE -->"
+        tail -n +$((TITLE_LINE + 1)) AGENTS.md
+      } > AGENTS.md.tmp
       mv AGENTS.md.tmp AGENTS.md
     fi
     # Verify the rule landed — fail loudly, never silently (the silent failure is the bug)
@@ -310,6 +322,16 @@ Then continue to the verification step below. With `yq` available, apply the edi
 
 ```bash
 if [ -f openspec/config.yaml ]; then
+  # Ensure yq is available; try common installers before falling back to edit tool.
+  if ! command -v yq &>/dev/null; then
+    echo "8.1d INFO — yq not found; attempting install..."
+    if command -v brew &>/dev/null; then
+      brew install yq
+    elif command -v pip3 &>/dev/null; then
+      pip3 install yq
+    fi
+  fi
+
   if command -v yq &>/dev/null; then
     # 1. Runner (sdd-apply detects it from the testing section)
     yq eval ".testing.runner.framework = \"$FRAMEWORK\"" -i openspec/config.yaml
@@ -347,7 +369,10 @@ if [ -f openspec/config.yaml ]; then
     fi
     yq eval '.rules.verify.build_command = "npm run build"' -i openspec/config.yaml
   else
-    echo "8.1d WARNING — yq not available; apply the openspec edits manually." >&2
+    echo "8.1d ERROR — yq is not available and could not be installed." >&2
+    echo "        Apply the openspec edits with your edit tool using the table above," >&2
+    echo "        then re-run this step. Do NOT continue without applying them." >&2
+    exit 1
   fi
 fi
 ```
@@ -494,8 +519,9 @@ fi
 # the filesystem instead, so running this command costs nothing but helps nothing for them.
 command -v gentle-ai &>/dev/null && gentle-ai skill-registry refresh --quiet 2>/dev/null || true
 
-git add AGENTS.md GEMINI.md 2>/dev/null || true
-[ -f ANTIGRAVITY.md ] && git add ANTIGRAVITY.md 2>/dev/null || true
+git add AGENTS.md
+[ -f GEMINI.md ] && git add GEMINI.md
+[ -f ANTIGRAVITY.md ] && git add ANTIGRAVITY.md
 git add -f .agents/ 2>/dev/null || true
 # CLAUDE.md and .claude/ exist only when claude-code was selected (see 8.1)
 if echo "$IDES" | grep -q "claude-code"; then
@@ -608,7 +634,7 @@ Next steps:
 ### 8.6 Closing
 
 ```bash
-# Limpieza del staging temporal
+# Clean up temporary staging
 STAGING=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' .wizard-state.json)
 rm -rf "$STAGING"
 ```

@@ -28,6 +28,8 @@ If your agent environment supports the `task` tool:
    - `{PROJECT_PATH}` → absolute path of the target project
    - `{WF_PATH}` → absolute path of the downloaded phase directory (`$WF_DIR`)
    - `{WF_RAW}` → `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main`
+   - `{WF_STAGING}` → `{PROJECT_PATH}/.wizard-staging`
+   - `{WF_STATE}` → `{PROJECT_PATH}/.wizard-state.json`
 
 2. Use `task` tool with `subagent_type: general` to launch Builder-Core. Wait for it.
 

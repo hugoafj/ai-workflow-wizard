@@ -27,7 +27,7 @@ cd "{PROJECT_PATH}"
 cat .wizard-state.json
 ```
 
-### B1 — Cargar estado
+### B1 — Load state
 
 Read the full `.wizard-state.json`. Verify that required fields exist. If any are missing, STOP and report what's missing — don't invent defaults.
 

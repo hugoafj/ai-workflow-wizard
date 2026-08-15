@@ -108,6 +108,7 @@ do_install() {
   echo -n "Fetching remote version... "
   local VERSION
   VERSION=$(curl -fsSL "${RAW}/VERSION" 2>/dev/null | head -1)
+  VERSION=${VERSION#v}
   echo "${VERSION}"
   echo ""
 
