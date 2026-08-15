@@ -35,9 +35,9 @@ Read the full `.wizard-state.json`. Verify that required fields exist. If any ar
 
 ```bash
 STACK=$(jq -r '.discovery.stack_key' .wizard-state.json)
-IDES=$(jq -r '.answers.ides[]' .wizard-state.json)
+IDES=$(jq -r '.answers.ides[]?' .wizard-state.json)
 TDD_MODE=$(jq -r '.testing.tdd_mode' .wizard-state.json)
-LAYERS=$(jq -r '.testing.layers[]' .wizard-state.json)
+LAYERS=$(jq -r '.testing.layers[]?' .wizard-state.json)
 LADDER=$(jq -r '.features.decision_ladder' .wizard-state.json)
 TDD=$(jq -r '.features.tdd_protocol' .wizard-state.json)
 ROUTING=$(jq -r '.features.routing_abc' .wizard-state.json)
@@ -172,7 +172,7 @@ Record each file. Don't ask — write everything directly to staging.
    - **Inference-resolved** (NO dedicated state field — derive from state + manifest, never leave the raw placeholder): `{{discovery.commands}}` (exact commands with real flags), `{{discovery.conventions.code_style}}`, `{{discovery.conventions.structure}}`, `{{testing.checks_before_done}}` (`lint + build` + test per layers), `{{mcps.table}}` (built from stack + layers).
    - **NEVER write `latest` or leave an unresolved placeholder** (e.g. `{{wizard_version}}`).
      Read the EXACT value from the state file. If the state lacks `wizard_version`, use the
-     `VERSION` file content; if that is missing too, use `0.1.0-beta.1`. A footer with `latest`
+     `VERSION` file content; if that is missing too, use `0.7.1-beta.1`. A footer with `latest`
      blocks `/wf-refresh` forever (strict version equality), so this is a hard correctness rule.
 3. Resolve `<if ...>` blocks based on state
 4. Insert testing sections if LAYERS is not empty
@@ -229,16 +229,19 @@ After all files are written to staging, register them in `state.build_plan.gener
 # For each file in staging, calculate hash and register (null-delimited for paths with spaces).
 cd "{WF_STAGING}"
 FILES_JSON="[]"
+PATHS_JSON="[]"
 while IFS= read -r -d '' file; do
   REL_PATH="${file#./}"
   HASH=$(wf_sha256 "$file")
   FILES_JSON=$(jq --arg path "$REL_PATH" --arg hash "$HASH" \
     '. += [{"path": $path, "hash": $hash, "managed": true}]' <<< "$FILES_JSON")
+  PATHS_JSON=$(jq --arg path "$REL_PATH" \
+    '. += [$path]' <<< "$PATHS_JSON")
 done < <(find . -type f -print0)
 
 # Update state
-jq --argjson files "$FILES_JSON" \
-  '.build_plan.generated_files = $files' \
+jq --argjson files "$FILES_JSON" --argjson paths "$PATHS_JSON" \
+  '.build_plan.generated_files = $files | .build_plan.managed_paths = $paths' \
   "{WF_STATE}" > "{WF_STATE}.tmp"
 mv "{WF_STATE}.tmp" "{WF_STATE}"
 

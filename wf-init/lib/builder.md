@@ -70,9 +70,9 @@ STOP and report (do not invent defaults).
 
 ### Step B2 — Resolve selection keys
 - `STACK=$(jq -r '.discovery.stack_key' .wizard-state.json)`
-- `IDES=$(jq -r '.answers.ides[]' .wizard-state.json)`
+- `IDES=$(jq -r '.answers.ides[]?' .wizard-state.json)`
 - `TDD_MODE=$(jq -r '.testing.tdd_mode' .wizard-state.json)`
-- `LAYERS=$(jq -r '.testing.layers[]' .wizard-state.json)`
+- `LAYERS=$(jq -r '.testing.layers[]?' .wizard-state.json)`
 - `LADDER=$(jq -r '.features.decision_ladder' .wizard-state.json)`
 - `TDD=$(jq -r '.features.tdd_protocol' .wizard-state.json)`
 - `ROUTING=$(jq -r '.features.routing_abc' .wizard-state.json)`
@@ -353,9 +353,9 @@ Populate `state.build_plan` with the exact list of files in staging, including S
      # Minimal fallback if WF_DIR is not set (not expected in normal use).
      wf_sha256() {
        if command -v sha256sum >/dev/null 2>&1; then
-         sha256sum "$1" | awk '{print $1}'
+         sha256sum -- "$1" | awk '{print $1}'
        else
-         shasum -a 256 "$1" | awk '{print $1}'
+         shasum -a 256 -- "$1" | awk '{print $1}'
        fi
      }
    fi
