@@ -710,8 +710,8 @@ Which AI reviewer do you want to use for your PR reviews?
 ────────────────────────────────────────────────────────────
 
 GGA — Recommended
-  Provider agnostic: Claude, Gemini, Codex, and OpenCode are pre-mapped in `gga-review.yml.md`.
-  Other providers can be used by adding the corresponding CLI/secret mapping.
+  Provider agnostic: Claude, Gemini, and Codex are pre-mapped in `gga-review.yml.md`.
+  Other providers (including OpenCode) can be used by adding the corresponding CLI/secret mapping.
   Flexible modes: local (on your machine) + CI (in GitHub Actions)
   Native integration with gentle-ai and this workflow
 
@@ -1252,8 +1252,7 @@ Generate everything related for the chosen IDE, downloading from `$WF_RAW`:
    `.opencode/commands/`, `.github/prompts/`, `.codex/commands/`), applying the per-IDE
    frontmatter (protocol `ides`, routing-table.section.md).
 3. **Skills** — the packaged protocol skills → the IDE's native skills directory
-   (`.claude/skills/`, `.kiro/skills/`, `.codex/skills/`, `.windsurf/skills/`, `.devin/skills/`,
-   `.agents/skills/`).
+   (`.claude/skills/`, `.cursor/skills/`, `.kiro/skills/`, `.codex/skills/`, `.windsurf/skills/`, `.devin/skills/`, `.gemini/skills/`, `.opencode/skills/`, `.agents/skills/`).
 4. **Windsurf fix** — ONLY if the added IDE is Windsurf/Devin: apply the same logic as
    Option 17 (AGENTS.md "Gentle AI — Legacy Path Bridge" rule + `.windsurf/workflows/sdd-new.md`).
 

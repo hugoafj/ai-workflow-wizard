@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2.37.2
+        uses: shivammathur/setup-php@2.37.2
         with:
           php-version: '{{php_version}}'
           extensions: mbstring, xml, curl, mysql, zip, gd, bcmath, dom, fileinfo

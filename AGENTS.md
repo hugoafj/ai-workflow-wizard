@@ -1,5 +1,7 @@
 # AGENTS.md — workflow-wizard
 
+IMPORTANTE! Este wizard está diseñado como prosa instructiva + snippets bash como gatillos, no como scripts autocontenidos.
+
 ## Commands
 
 This is a documentation/templates repository; there are no automated build, test, lint, or deploy commands. Run checks manually or via your IDE's Markdown tooling.

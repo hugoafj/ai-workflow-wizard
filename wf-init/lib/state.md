@@ -207,7 +207,7 @@ Available helpers:
 
 ## Resumption
 
-The orchestrator (`wf-init.md`) on startup:
+The orchestrator (the `/wf-init` skill, `templates/commands/wf-init/_base.md`) on startup:
 ```bash
 if [ -f .wizard-state.json ]; then
   PTR=$(jq -r '.phase_pointer' .wizard-state.json 2>/dev/null)

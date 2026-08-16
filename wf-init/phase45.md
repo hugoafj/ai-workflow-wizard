@@ -239,7 +239,9 @@ WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
 # Replace <chosen backend> with the value the user selected: engram / openspec / hybrid
-SDD_BACKEND=<chosen backend>
+# Use a literal placeholder that is valid bash (an empty string) — the agent
+# must substitute the real value before running, per the prose instruction above.
+SDD_BACKEND=""
 jq --arg backend "$SDD_BACKEND" \
    '.sdd.backend = $backend | .updated_at = (now | todate)' \
    .wizard-state.json > .wizard-state.json.tmp

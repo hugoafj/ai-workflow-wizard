@@ -371,7 +371,7 @@ Populate `state.build_plan` with the exact list of files in staging, including S
        fi
      }
    fi
-   cd ".wizard-staging"
+   cd ".wizard-staging" || { echo "ERROR: .wizard-staging missing — Builder stage failed" >&2; exit 1; }
    FILES="[]"
    PATHS="[]"
    while IFS= read -r -d '' file; do

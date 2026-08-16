@@ -202,7 +202,7 @@ echo "📁 Other artifacts:"
 [ -f ".git/hooks/post-commit" ] && echo "  🗑 .git/hooks/post-commit (git hook installed by the wizard)"
 [ -d ".wizard-staging" ] && echo "  🗑 .wizard-staging/ (leftover from an interrupted run)"
 [ -d "openspec" ] && echo "  ⏭ openspec/ (gentle-ai — DO NOT delete)"
-if [ -f ".gitignore" ] && grep -qE "^\.wf-status$|^\.wizard-state\.json$|^\.wizard-managed-files\.json$|^\.wizard-staging/$|^!\.cursor/$|^!\.windsurf/$|^!\.devin/$|^!\.kiro/$|^!\.claude/$|^!\.codex/$|^!\.opencode/$|^!\.github/copilot-instructions\.md$|^!\.github/prompts/$" .gitignore; then
+if [ -f ".gitignore" ] && grep -qE "^\.wf-status$|^\.wizard-state\.json$|^\.wizard-managed-files\.json$|^\.wizard-staging/$|^!\.cursor/$|^!\.windsurf/$|^!\.devin/$|^!\.kiro/$|^!\.claude/$|^!\.codex/$|^!\.opencode/$|^!\.gemini/$|^!GEMINI\.md$|^!ANTIGRAVITY\.md$|^!\.github/copilot-instructions\.md$|^!\.github/prompts/$" .gitignore; then
   echo "  🗑 .gitignore (wizard entries — review which ones to revert)"
 fi
 ```

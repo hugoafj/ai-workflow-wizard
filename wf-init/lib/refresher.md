@@ -209,7 +209,8 @@ _ask_yesno_safe() {
       return 1
     else
       echo "ERROR: non-interactive input required but WF_REFRESH_DEFAULT_ANSWER is not set." >&2
-      return 2
+      echo "  Aborting: refusing to silently default to NO. Set WF_REFRESH_DEFAULT_ANSWER=yes|no to continue non-interactively." >&2
+      exit 2
     fi
   fi
   echo
@@ -654,6 +655,22 @@ if ! git rev-parse --git-dir >/dev/null 2>&1; then
   exit 1
 fi
 
+# SKILL Phase 0 pre-checks (informational; do not block by default).
+if [[ ! -f AGENTS.md ]]; then
+  echo "⚠ No AGENTS.md found — /wf-refresh targets this file; run /wf-init first for a full setup"
+fi
+if [[ -f AGENTS.md ]] && ! grep -q 'wf-version:' AGENTS.md; then
+  echo "⚠ AGENTS.md has no 'wf-version:' footer — it may not be wizard-managed"
+fi
+if command -v gentle-ai >/dev/null 2>&1; then
+  if ! gentle-ai doctor >/dev/null 2>&1; then
+    echo "⚠ 'gentle-ai doctor' reported issues — review the Gentle AI runtime before relying on its gates"
+  fi
+fi
+if [[ -d openspec ]] && [[ ! -d openspec/changes ]]; then
+  echo "⚠ openspec/ exists but openspec/changes/ is missing — SDD pre-check may fail later"
+fi
+
 SCHEMA_VERSION=$(jq -r '.schema_version // 0' "$WF_STATE")
 if [[ "$SCHEMA_VERSION" -lt 3 ]]; then
   echo "✗ State schema is too old (v$SCHEMA_VERSION < v3)"
@@ -690,7 +707,10 @@ if [[ ${#IDES[@]} -eq 0 ]]; then
 else
   IDES_JSON=$(printf '%s\n' "${IDES[@]}" | jq -R . | jq -s .)
 fi
-_apply_jq_filter --argjson ides "$IDES_JSON" '.answers.ides = $ides'
+# Merge detected IDEs with the existing answers instead of overwriting them:
+# a previously configured IDE whose directory is temporarily absent must not be
+# dropped (its generated files would then be offered for deletion as unmanaged).
+_apply_jq_filter --argjson ides "$IDES_JSON" '.answers.ides = ((.answers.ides // []) + $ides | unique)'
 
 echo "✓ Phase R0 complete"
 ```
@@ -923,7 +943,10 @@ while IFS= read -r -d '' file; do
   else
     ADDED=$(jq --arg path "$REL_PATH" --arg hash "$STAGING_HASH" '. += [{"path": $path, "hash": $hash}]' <<< "$ADDED")
   fi
-done < <(find "$STAGING" -type f -print0)
+# Exclude git-internal files (e.g. .git/hooks/post-commit staged by the builder)
+# from the plan: git rejects them in --pathspec-from-file and they must not be
+# committed by the refresh commit.
+done < <(find "$STAGING" -type f -not -path "*/.git/*" -print0)
 
 # Deletion baseline: the R3 Step 0 snapshot (pre-Builder). Fall back to the live
 # state only when the snapshot is missing (e.g. running R4 standalone). Normalize
@@ -938,12 +961,22 @@ fi
 
 # Scan old managed paths for deletions (null-delimited for paths with spaces/newlines).
 while IFS= read -r -d '' old_path; do
+  # Never treat git-internal files as wizard-managed (defense in depth: older
+  # plans may have recorded .git/ paths before the R4 find exclusion).
+  if [[ "$old_path" == .git ]] || [[ "$old_path" == .git/* ]]; then
+    continue
+  fi
   if [[ ! -f "$STAGING/$old_path" ]]; then
     if [[ -f "$old_path" ]]; then
       PROJECT_HASH=$(wf_sha256 "$old_path")
       OLD_HASH=$(jq -r --arg path "$old_path" '.generated_files[] | select(.path == $path) | .hash' "$OLD_MANAGED" 2>/dev/null || true)
 
-      if [[ -z "$OLD_HASH" ]] || [[ "$PROJECT_HASH" == "$OLD_HASH" ]]; then
+      if [[ -z "$OLD_HASH" ]]; then
+        # No recorded hash (e.g. migrated plans with empty generated_files):
+        # we cannot prove the user did NOT modify it, so require explicit
+        # approval instead of silently classifying as plain deleted.
+        DELETED_MODIFIED=$(jq --arg path "$old_path" --arg old_hash "" --arg project_hash "$PROJECT_HASH" '. += [{"path": $path, "old_hash": $old_hash, "project_hash": $project_hash, "reason": "deprecated (no recorded hash — user may have modified)"}]' <<< "$DELETED_MODIFIED")
+      elif [[ "$PROJECT_HASH" == "$OLD_HASH" ]]; then
         DELETED=$(jq --arg path "$old_path" --arg hash "$PROJECT_HASH" '. += [{"path": $path, "hash": $hash, "reason": "deprecated"}]' <<< "$DELETED")
       else
         DELETED_MODIFIED=$(jq --arg path "$old_path" --arg old_hash "$OLD_HASH" --arg project_hash "$PROJECT_HASH" '. += [{"path": $path, "old_hash": $old_hash, "project_hash": $project_hash, "reason": "deprecated (user modified)"}]' <<< "$DELETED_MODIFIED")
@@ -1103,12 +1136,48 @@ if [[ $DELETED_MODIFIED_COUNT -gt 0 ]]; then
   if _ask_yesno_safe "Delete these modified files?"; then APPROVE_DELETED_MODIFIED="true"; fi
 fi
 
+# The refresh appends wizard-managed entries to .gitignore in R6. Mutating it
+# behind the review gate contradicts AGENTS.md ("show me the full diff and wait
+# for my approval"), so preview the exact lines that would be appended and
+# require an explicit separate approval here.
+GI_PROPOSED_LINES=(".wizard-managed-files.json" "!.agents/")
+while IFS= read -r ide; do
+  case "$ide" in
+    claude-code) GI_PROPOSED_LINES+=("!.claude/") ;;
+    cursor) GI_PROPOSED_LINES+=("!.cursor/") ;;
+    windsurf) GI_PROPOSED_LINES+=("!.windsurf/" "!.devin/") ;;
+    kiro) GI_PROPOSED_LINES+=("!.kiro/") ;;
+    codex) GI_PROPOSED_LINES+=("!.codex/") ;;
+    gemini-cli) GI_PROPOSED_LINES+=("!.gemini/" "!GEMINI.md") ;;
+    antigravity) GI_PROPOSED_LINES+=("!ANTIGRAVITY.md") ;;
+    opencode) GI_PROPOSED_LINES+=("!.opencode/") ;;
+    vscode-copilot) GI_PROPOSED_LINES+=("!.github/copilot-instructions.md" "!.github/prompts/") ;;
+  esac
+done < <(jq -r '.answers.ides[]?' "$WF_STATE" 2>/dev/null)
+
+MISSING_GI_LINES=()
+for line in "${GI_PROPOSED_LINES[@]}"; do
+  if ! grep -qxF "$line" .gitignore 2>/dev/null; then
+    MISSING_GI_LINES+=("$line")
+  fi
+done
+
+APPROVE_GITIGNORE="false"
+if [[ ${#MISSING_GI_LINES[@]} -gt 0 ]]; then
+  echo ""
+  echo "🛡️  .gitignore changes (wizard-managed entries to be appended and committed):"
+  printf '    + %s\n' "${MISSING_GI_LINES[@]}"
+  echo ""
+  if _ask_yesno_safe "Append these .gitignore entries and include them in the commit?"; then APPROVE_GITIGNORE="true"; fi
+fi
+
 # Store approvals in state
 jq --argjson added "$APPROVE_ADDED" \
    --argjson updated "$APPROVE_UPDATED" \
    --argjson deleted "$APPROVE_DELETED" \
    --argjson deleted_modified "$APPROVE_DELETED_MODIFIED" \
-   '.build_plan.approval = {added: $added, updated: $updated, deleted: $deleted, deleted_modified: $deleted_modified} | .updated_at = (now | todate)' "$WF_STATE" > "$WF_STATE.tmp"
+   --argjson gitignore "$APPROVE_GITIGNORE" \
+   '.build_plan.approval = {added: $added, updated: $updated, deleted: $deleted, deleted_modified: $deleted_modified, gitignore: $gitignore} | .updated_at = (now | todate)' "$WF_STATE" > "$WF_STATE.tmp"
 mv "$WF_STATE.tmp" "$WF_STATE"
 
 echo "✓ Phase R5 complete"
@@ -1144,6 +1213,7 @@ APPROVE_ADDED=$(jq -r '.build_plan.approval.added // false' "$WF_STATE")
 APPROVE_UPDATED=$(jq -r '.build_plan.approval.updated // false' "$WF_STATE")
 APPROVE_DELETED=$(jq -r '.build_plan.approval.deleted // false' "$WF_STATE")
 APPROVE_DELETED_MODIFIED=$(jq -r '.build_plan.approval.deleted_modified // false' "$WF_STATE")
+APPROVE_GITIGNORE=$(jq -r '.build_plan.approval.gitignore // false' "$WF_STATE")
 
 # Preserve custom AGENTS.md sections BEFORE any copy: the project AGENTS.md still
 # holds the user's custom markers here, and the staged AGENTS.md is the freshly
@@ -1206,7 +1276,7 @@ if [[ "$APPROVE_DELETED_MODIFIED" == "true" ]]; then
 fi
 
 # Git operations (only if any category was approved)
-if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ "$APPROVE_DELETED" == "true" ]] || [[ "$APPROVE_DELETED_MODIFIED" == "true" ]]; then
+if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ "$APPROVE_DELETED" == "true" ]] || [[ "$APPROVE_DELETED_MODIFIED" == "true" ]] || [[ "$APPROVE_GITIGNORE" == "true" ]]; then
   echo "ℹ Committing changes..."
 
   # Recompute generated_files and managed_paths from the approved plan, reading
@@ -1247,28 +1317,32 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
   }
 
   GITIGNORE_MODIFIED=false
-  _gi_add ".wizard-managed-files.json"
-  _gi_add "!.agents/"
+  if [[ "$APPROVE_GITIGNORE" == "true" ]]; then
+    _gi_add ".wizard-managed-files.json"
+    _gi_add "!.agents/"
 
-  while IFS= read -r ide; do
-    case "$ide" in
-      claude-code) _gi_add "!.claude/" ;;
-      cursor) _gi_add "!.cursor/" ;;
-      windsurf) _gi_add "!.windsurf/"; _gi_add "!.devin/" ;;
-      kiro) _gi_add "!.kiro/" ;;
-      codex) _gi_add "!.codex/" ;;
-      gemini-cli)
-        _gi_add "!.gemini/"
-        _gi_add "!GEMINI.md"
-        ;;
-      antigravity) _gi_add "!ANTIGRAVITY.md" ;;
-      opencode) _gi_add "!.opencode/" ;;
-      vscode-copilot)
-        _gi_add "!.github/copilot-instructions.md"
-        _gi_add "!.github/prompts/"
-        ;;
-    esac
-  done < <(jq -r '.answers.ides[]?' "$WF_STATE" 2>/dev/null)
+    while IFS= read -r ide; do
+      case "$ide" in
+        claude-code) _gi_add "!.claude/" ;;
+        cursor) _gi_add "!.cursor/" ;;
+        windsurf) _gi_add "!.windsurf/"; _gi_add "!.devin/" ;;
+        kiro) _gi_add "!.kiro/" ;;
+        codex) _gi_add "!.codex/" ;;
+        gemini-cli)
+          _gi_add "!.gemini/"
+          _gi_add "!GEMINI.md"
+          ;;
+        antigravity) _gi_add "!ANTIGRAVITY.md" ;;
+        opencode) _gi_add "!.opencode/" ;;
+        vscode-copilot)
+          _gi_add "!.github/copilot-instructions.md"
+          _gi_add "!.github/prompts/"
+          ;;
+      esac
+    done < <(jq -r '.answers.ides[]?' "$WF_STATE" 2>/dev/null)
+  else
+    echo "ℹ .gitignore changes not approved; skipping .gitignore mutation"
+  fi
 
   # Reflect the .gitignore change in the refresh plan so it is approved/committed explicitly.
   if [ "$GITIGNORE_MODIFIED" = true ]; then
@@ -1297,10 +1371,10 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
   # contains ONLY the approved paths.
   GIT_ADD_LIST=$(mktemp)
   if [[ "$APPROVE_ADDED" == "true" ]]; then
-    jq -j '.added[]?.path + "\u0000"' "$PLAN" >> "$GIT_ADD_LIST"
+    jq -j '.added[]?.path | select(. != ".git" and (startswith(".git/") | not)) + "\u0000"' "$PLAN" >> "$GIT_ADD_LIST"
   fi
   if [[ "$APPROVE_UPDATED" == "true" ]]; then
-    jq -j '.updated[]?.path + "\u0000"' "$PLAN" >> "$GIT_ADD_LIST"
+    jq -j '.updated[]?.path | select(. != ".git" and (startswith(".git/") | not)) + "\u0000"' "$PLAN" >> "$GIT_ADD_LIST"
   fi
   if [ "$GITIGNORE_MODIFIED" = true ]; then
     printf '.gitignore\0' >> "$GIT_ADD_LIST"
@@ -1314,16 +1388,16 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
   # user files stay in the index and are NOT included in this commit.
   COMMIT_PATHS=$(mktemp)
   if [[ "$APPROVE_ADDED" == "true" ]]; then
-    jq -j '.added[]?.path + "\u0000"' "$PLAN" >> "$COMMIT_PATHS"
+    jq -j '.added[]?.path | select(. != ".git" and (startswith(".git/") | not)) + "\u0000"' "$PLAN" >> "$COMMIT_PATHS"
   fi
   if [[ "$APPROVE_UPDATED" == "true" ]]; then
-    jq -j '.updated[]?.path + "\u0000"' "$PLAN" >> "$COMMIT_PATHS"
+    jq -j '.updated[]?.path | select(. != ".git" and (startswith(".git/") | not)) + "\u0000"' "$PLAN" >> "$COMMIT_PATHS"
   fi
   if [[ "$APPROVE_DELETED" == "true" ]]; then
-    jq -j '.deleted[]?.path + "\u0000"' "$PLAN" >> "$COMMIT_PATHS"
+    jq -j '.deleted[]?.path | select(. != ".git" and (startswith(".git/") | not)) + "\u0000"' "$PLAN" >> "$COMMIT_PATHS"
   fi
   if [[ "$APPROVE_DELETED_MODIFIED" == "true" ]]; then
-    jq -j '.deleted_modified[]?.path + "\u0000"' "$PLAN" >> "$COMMIT_PATHS"
+    jq -j '.deleted_modified[]?.path | select(. != ".git" and (startswith(".git/") | not)) + "\u0000"' "$PLAN" >> "$COMMIT_PATHS"
   fi
   if [ "$GITIGNORE_MODIFIED" = true ]; then
     printf '.gitignore\0' >> "$COMMIT_PATHS"

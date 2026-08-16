@@ -20,7 +20,9 @@ SDD_FILES="package.json \
 # Config/IDE files that trigger /wf-refresh (AGENTS.md, IDE settings, satellites, commands)
 CONFIG_FILES="AGENTS.md \
   .claude/settings.json .cursor/settings.json .windsurf/settings.json .kiro/settings.json .opencode/config.json \
-  .claude/commands .cursor/commands .windsurf/workflows .kiro/steering .github/copilot-instructions.md \
+  .claude/commands .cursor/commands .windsurf/workflows .kiro/steering .opencode/commands .codex/commands \
+  .github/copilot-instructions.md .github/prompts \
+  .claude/skills .cursor/skills .windsurf/skills .devin/skills .kiro/skills .codex/skills .opencode/skills .gemini/skills \
   .agents/protocols .agents/skills"
 
 CHANGED_REFRESH=""

@@ -289,7 +289,7 @@ After all files are written to staging, populate `state.build_plan.generated_fil
 
 ```bash
 # Scan the complete staging directory (null-delimited for paths with spaces).
-cd "{WF_STAGING}"
+cd "{WF_STAGING}" || { echo "ERROR: {WF_STAGING} missing — Builder stage failed" >&2; exit 1; }
 FILES_JSON="[]"
 PATHS_JSON="[]"
 while IFS= read -r -d '' file; do

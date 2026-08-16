@@ -80,5 +80,7 @@ staging manually bypassing the state — the state is the source of truth.
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
+wf_state_init
 wf_phase_done phase7 phase8
+cat "$WF_DIR/phase8.md"
 ```

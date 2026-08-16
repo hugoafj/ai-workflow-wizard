@@ -43,9 +43,9 @@ install_windsurf() {
 }
 
 install_kiro() {
-  local dir="$1" cmd="$2" content="$3" version="$4"
+  local dir="$1" cmd="$2" content="$3" desc="$4" version="$5"
   mkdir -p "$dir"
-  printf -- '---\ninclusion: manual\nversion: %s\n---\n\n%s\n' "$version" "$content" \
+  printf -- '---\ninclusion: manual\ndescription: %s\nversion: %s\n---\n\n%s\n' "$desc" "$version" "$content" \
     > "${dir}/${cmd}.md"
   echo "  ✓ ${dir}/${cmd}.md"
 }
@@ -160,7 +160,7 @@ do_install() {
       installed=$((installed + 1))
     fi
     if [[ $has_kiro -eq 1 ]]; then
-      install_kiro "$HOME/.kiro/steering" "$cmd" "$body" "$VERSION"
+      install_kiro "$HOME/.kiro/steering" "$cmd" "$body" "$desc" "$VERSION"
       installed=$((installed + 1))
     fi
     # Unconditional: .agents/skills is read by Codex, OpenCode, Gemini (AGY app),

@@ -200,7 +200,7 @@ engram save "sdd/{project}/testing-capabilities" "## Testing Capabilities
 | Linter       | <✅/❌>   | <command or —> |
 | Type checker | <✅/❌>   | <command or —> |
 | Formatter    | <✅/❌>   | <command or —> |" \
-  --project "{project-name}" --type config
+  --project "{project}" --type config
 ```
 
 > Use `--type config`, not `--type convention` as earlier versions of this wizard said — confirmed against `init-details.md`, the correct type for this observation is `config`. The project name is auto-detected from the git remote (normalized to lowercase) from Engram v1.11.0 — use `git remote get-url origin 2>/dev/null` to confirm it.

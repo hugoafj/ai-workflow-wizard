@@ -407,6 +407,7 @@ correct behavior, not a bug you should solve through another path.
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
+wf_state_init
 wf_phase_done phase0 phase0b
 cat "$WF_DIR/phase0b.md"
 ```

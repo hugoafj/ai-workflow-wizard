@@ -124,7 +124,7 @@ This ensures custom sections from the previous AGENTS.md are never accidentally 
 For each active protocol (body already built):
 
 **1. Flat file** (universal fallback):
-`{WF_STAGING}/.agents/protocols/<name>.md` = cuerpo — `<name>` is the protocol's source folder
+`{WF_STAGING}/.agents/protocols/<name>.md` = body — `<name>` is the protocol's source folder
 name (under `templates/protocols/` for pure protocols, `templates/commands/` for the 7 wizard
 commands that ship skills; the `tdd` protocol was renamed `wf-tdd`, so its flat is
 `.agents/protocols/wf-tdd.md`).
