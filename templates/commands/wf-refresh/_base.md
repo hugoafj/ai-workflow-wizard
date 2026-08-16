@@ -56,6 +56,12 @@ Download the refresh orchestrator and supporting files, then read and execute ea
 #!/bin/bash
 set -e
 
+# Signals the Builder phases that this run is a refresh: phase6b Step 5 then
+# skips the phase7 pointer promotion and phase7.md handoff (see refresher.md R3
+# and phase6b-build-heavy.md Step 5). Without it, a refresh would advance the
+# pointer to phase7 and derail into wf-init's review/promotion flow.
+export WF_REFRESH=1
+
 # Verify .wizard-state.json exists
 if [[ ! -f .wizard-state.json ]]; then
   echo "✗ .wizard-state.json not found"

@@ -143,7 +143,8 @@ source "$WF_DIR/lib/state-helpers.sh"
 
 CURRENT_PHASE=$(jq -r '.phase_pointer // empty' .wizard-state.json)
 # phase5 advances to phase6a-agents (the real key); phase6 is a backward-compatible alias.
-if [ "$CURRENT_PHASE" = "phase6" ] || [ "$CURRENT_PHASE" = "phase6a-agents" ] || [ "$CURRENT_PHASE" = "phase6b-build-heavy" ]; then
+# During /wf-refresh the phase7 promotion is handled by the refresh flow, not here.
+if [ "${WF_REFRESH:-0}" != "1" ] && { [ "$CURRENT_PHASE" = "phase6" ] || [ "$CURRENT_PHASE" = "phase6a-agents" ] || [ "$CURRENT_PHASE" = "phase6b-build-heavy" ]; }; then
   jq '.phases["phase6"].status = "done" |
       .phases["phase6a-agents"].status = "done" |
       .phases["phase6b-build-heavy"].status = "done" |

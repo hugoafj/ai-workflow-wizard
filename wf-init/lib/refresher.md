@@ -943,10 +943,16 @@ while IFS= read -r -d '' file; do
   else
     ADDED=$(jq --arg path "$REL_PATH" --arg hash "$STAGING_HASH" '. += [{"path": $path, "hash": $hash}]' <<< "$ADDED")
   fi
-# Exclude git-internal files (e.g. .git/hooks/post-commit staged by the builder)
-# from the plan: git rejects them in --pathspec-from-file and they must not be
-# committed by the refresh commit.
-done < <(find "$STAGING" -type f -not -path "*/.git/*" -print0)
+# Exclude git-internal files from the plan, with one exception: .git/hooks/post-commit
+# is staged by the builder for non-Husky projects. Git refuses to commit paths inside
+# .git/, but the refresh still must copy/chmod the hook and track it as a managed
+# side-effect. The git-add/commit filters below already skip .git/ paths.
+done < <(
+  find "$STAGING" -type f -not -path "*/.git/*" -print0
+  if [[ -f "$STAGING/.git/hooks/post-commit" ]]; then
+    printf '%s\0' "$STAGING/.git/hooks/post-commit"
+  fi
+)
 
 # Deletion baseline: the R3 Step 0 snapshot (pre-Builder). Fall back to the live
 # state only when the snapshot is missing (e.g. running R4 standalone). Normalize
@@ -1380,7 +1386,11 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
     printf '.gitignore\0' >> "$GIT_ADD_LIST"
   fi
   if [ -s "$GIT_ADD_LIST" ]; then
-    git add --pathspec-from-file="$GIT_ADD_LIST" --pathspec-file-nul
+    # Force-add: every path here was explicitly approved by the user, and some
+    # (e.g. generated dotfiles) may be gitignored. Without -f, `git add` exits 1
+    # under set -e and the trap aborts the refresh mid-flight, leaving copied
+    # files in the working tree without a commit.
+    git add -f --pathspec-from-file="$GIT_ADD_LIST" --pathspec-file-nul
   fi
   rm -f "$GIT_ADD_LIST"
 
