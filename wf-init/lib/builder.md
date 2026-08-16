@@ -360,7 +360,7 @@ Populate `state.build_plan` with the exact list of files in staging, including S
 1. Source helpers and scan `.wizard-staging/` (null-delimited to handle spaces in paths):
    ```bash
    if [ -f "${WF_DIR:-.}/lib/state-helpers.sh" ]; then
-     source "${WF_DIR}/lib/state-helpers.sh"
+     source "${WF_DIR:-.}/lib/state-helpers.sh"
    else
      # Minimal fallback if WF_DIR is not set (not expected in normal use).
      wf_sha256() {

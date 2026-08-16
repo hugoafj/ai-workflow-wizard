@@ -242,28 +242,35 @@ source "$WF_DIR/lib/state-helpers.sh"
 # Use a literal placeholder that is valid bash (an empty string) — the agent
 # must substitute the real value before running, per the prose instruction above.
 SDD_BACKEND=""
-jq --arg backend "$SDD_BACKEND" \
-   '.sdd.backend = $backend | .updated_at = (now | todate)' \
+# Guard: never persist an empty backend. If the placeholder was not substituted,
+# fall back to hybrid instead of corrupting state (jq's '//' treats '' as a
+# value, not null, so '.sdd.backend = ""' would be written as-is).
+jq --arg backend "${SDD_BACKEND:-hybrid}" \
+   '.sdd.backend = (if $backend == "" then "hybrid" else $backend end) |
+    .updated_at = (now | todate)' \
    .wizard-state.json > .wizard-state.json.tmp
 mv .wizard-state.json.tmp .wizard-state.json
 ```
 
-If Windsurf is active, generate `.windsurf/workflows/sdd-new.md` from the resolved backend:
+Only when Windsurf is active, generate `.windsurf/workflows/sdd-new.md` from the resolved backend (recompute the flag in case this block runs in a fresh shell):
 
 ```bash
-SDD_BACKEND=$(jq -r '.sdd.backend // "hybrid"' .wizard-state.json)
-WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
-SDD_PATH="$SDD_BACKEND"
-[ "$SDD_BACKEND" = "hybrid" ] && SDD_PATH="openspec"
-mkdir -p .windsurf/workflows
-cp "$WF_DIR/temp-files/sdd-new.md" .windsurf/workflows/sdd-new.md
-if [ "$SDD_BACKEND" = "engram" ]; then
-  sed -i.bak "s|{{sdd.backend}}/changes/<name>/proposal.md|Engram memory:|g" .windsurf/workflows/sdd-new.md
-else
-  sed -i.bak "s|{{sdd.backend}}/changes/|$SDD_PATH/changes/|g" .windsurf/workflows/sdd-new.md
+IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
+if echo "$IDES" | grep -q "windsurf"; then
+  SDD_BACKEND=$(jq -r '.sdd.backend // "hybrid"' .wizard-state.json)
+  WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+  SDD_PATH="$SDD_BACKEND"
+  [ "$SDD_BACKEND" = "hybrid" ] && SDD_PATH="openspec"
+  mkdir -p .windsurf/workflows
+  cp "$WF_DIR/temp-files/sdd-new.md" .windsurf/workflows/sdd-new.md
+  if [ "$SDD_BACKEND" = "engram" ]; then
+    sed -i.bak "s|{{sdd.backend}}/changes/<name>/proposal.md|Engram memory:|g" .windsurf/workflows/sdd-new.md
+  else
+    sed -i.bak "s|{{sdd.backend}}/changes/|$SDD_PATH/changes/|g" .windsurf/workflows/sdd-new.md
+  fi
+  sed -i.bak "s/{{sdd.backend}}/$SDD_BACKEND/g" .windsurf/workflows/sdd-new.md
+  rm -f .windsurf/workflows/sdd-new.md.bak
 fi
-sed -i.bak "s/{{sdd.backend}}/$SDD_BACKEND/g" .windsurf/workflows/sdd-new.md
-rm -f .windsurf/workflows/sdd-new.md.bak
 ```
 
 Then update the Windsurf status:

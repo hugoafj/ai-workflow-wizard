@@ -348,6 +348,15 @@ fi
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
+
+# Recompute NEXT in this same fence (a fresh shell does not carry variables from
+# the fence above): wf_phase_done with an empty value would corrupt the pointer.
+if jq -e '.features.ci == true or .features.cd == true or .features.release_please == true' .wizard-state.json >/dev/null 2>&1; then
+  NEXT="phase47-cicd"
+else
+  NEXT="phase5"
+fi
+
 wf_phase_done phase46b "$NEXT"
 echo "ℹ Next phase: $NEXT"
 cat "$WF_DIR/$NEXT.md"

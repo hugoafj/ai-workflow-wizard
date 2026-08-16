@@ -154,7 +154,10 @@ Detected stack: <Laravel + Node / Laravel / Node pure>
 Correct? [yes / correct]
 ```
 
-If the user corrects it, save the chosen value in `state.cd.stack_detected`.
+If the user corrects it, save the chosen value in `state.cd.stack_detected`
+(e.g. `wf_state_set '.cd.stack_detected' '"laravel_node"'`). Persist the
+detected value even when the user accepts the auto-detection, so the Builder
+can select the deploy template and resolve `{{has_node_assets}}`.
 
 #### CD questions
 
@@ -283,6 +286,24 @@ if [ "$FEATURES_CD" = "true" ]; then
   if [ -n "$VPS_RUNTIME" ]; then
     wf_state_set '.cd.enabled' 'true'
     wf_state_set '.cd.platform' '"vps"'
+    # Persist the stack detected earlier so the Builder can select the deploy
+    # template and resolve {{has_node_assets}} / {{compose_file}}.
+    STACK_DETECTED=$(jq -r '.cd.stack_detected // empty' .wizard-state.json)
+    if [ -z "$STACK_DETECTED" ]; then
+      if [ -f composer.json ] && grep -q '"laravel/framework"' composer.json && [ -f package.json ]; then
+        STACK_DETECTED="laravel_node"
+      elif [ -f composer.json ] && grep -q '"laravel/framework"' composer.json; then
+        STACK_DETECTED="laravel"
+      else
+        STACK_DETECTED="node_pure"
+      fi
+      wf_state_set '.cd.stack_detected' "\"$STACK_DETECTED\""
+    fi
+    # Persist the compose file for docker runtime (default docker-compose.prod.yml).
+    COMPOSE_FILE=$(jq -r '.cd.compose_file // empty' .wizard-state.json)
+    if [ "$VPS_RUNTIME" = "docker" ] && [ -z "$COMPOSE_FILE" ]; then
+      wf_state_set '.cd.compose_file' '"docker-compose.prod.yml"'
+    fi
   else
     wf_state_set '.cd.enabled' 'false'
     wf_state_set '.cd.platform' '"skip"'
