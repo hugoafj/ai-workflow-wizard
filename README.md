@@ -96,7 +96,7 @@ Once set up, here's what working with the AI Workflow looks like:
 | Command | Scope | Description |
 |---------|-------|-------------|
 | `/wf-init` | Global | Bootstrap wizard — initializes the workflow in a project |
-| `/wf-refresh` | Global | Updates `AGENTS.md` when the project evolves ([learn more](AI_DEV_WORKFLOW.md#55-context-auto-update)) |
+| `/wf-refresh` | Global | Re-runs the Builder (B1–B9) to regenerate all managed artifacts when the project evolves ([learn more](AI_DEV_WORKFLOW.md#55-context-auto-update)) |
 | `/wf-cleanup` | Global | Removes wizard artifacts from a project |
 | `/wf-onboard` | Project | Onboarding guide for new developers |
 | `/wf-settings` | Project | Toggle optional modules: TDD, testing extras, Decision Ladder ([learn more](AI_DEV_WORKFLOW.md#98-wf-settings--toggle-optional-modules-after-installation)) |

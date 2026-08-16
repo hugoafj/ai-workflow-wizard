@@ -4,11 +4,11 @@ Apply the same pattern to each active IDE, adjusting path and extension.
 
 | IDE | Base path (project) | Global path (install.sh) | Extension |
 |---|---|---|---|
-| Claude Code | `.claude/commands/` | — | `.md` |
-| Cursor | `.cursor/commands/` | — | `.md` |
+| Claude Code | `.claude/commands/` | `~/.claude/commands/` | `.md` |
+| Cursor | `.cursor/commands/` | `~/.cursor/commands/` | `.md` |
 | Windsurf | `.windsurf/workflows/` | `~/.codeium/windsurf/global_workflows/` | `.md` |
 | Kiro | `.kiro/steering/` | `~/.kiro/steering/` | `.md` (caution: mixes satellites `inclusion: always` with commands `inclusion: manual` — verify by name, don't assume) |
-| OpenCode | `.opencode/commands/` | — | `.md` |
+| OpenCode | `.opencode/commands/` | `~/.config/opencode/commands/` | `.md` |
 | Copilot | `.github/prompts/` | — | `.prompt.md` |
 | Codex CLI | `.codex/commands/` | `~/.codex/commands/` | `.md` |
 

@@ -1,6 +1,6 @@
 # AGENTS.md — workflow-wizard
 
-IMPORTANTE! Este wizard está diseñado como prosa instructiva + snippets bash como gatillos, no como scripts autocontenidos.
+Important! This wizard is designed as instructive prose + bash snippets as triggers, not as self-contained scripts.
 
 ## Commands
 

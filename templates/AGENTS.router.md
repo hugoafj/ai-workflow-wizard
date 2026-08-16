@@ -86,7 +86,7 @@ bloating the context. They are NOT written in full here — they live in dedicat
 | Copilot | `~/.copilot/skills/` | `.github/skills/` |
 | Kiro | `~/.kiro/skills/`, `~/.kiro/steering/` | `.kiro/skills/`, `.kiro/steering/` |
 | Gemini CLI | `~/.gemini/skills/` | `.gemini/skills/`, `.agents/skills/` (native + universal fallback) |
-| Antigravity | `~/.gemini/antigravity/skills/`, `~/.gemini/antigravity-ide/skills/`, `~/.gemini/antigravity-cli/skills/`, `~/.gemini/config/skills/` (canonical) | `.agents/skills/` |
+| Antigravity | `~/.gemini/config/skills/` (canonical), `~/.gemini/antigravity-cli/builtin/skills/`, `~/.gemini/antigravity/skills/`, `~/.gemini/antigravity-ide/skills/` | `.agents/skills/` |
 
 > The wizard's own 7 `wf-*` skills are emitted by the Builder in the project path above
 > (native auto-discovery) **plus** `.agents/skills/<n>/SKILL.md` (universal fallback) and the

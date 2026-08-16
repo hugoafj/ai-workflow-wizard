@@ -972,12 +972,14 @@ Confirm:
 ```
 ✓ release-please standalone: <enabled / disabled>
 ✓ .wizard-state.json: features.release_please = <yes/no>
+✓ .wizard-state.json: ci.release_please = <yes/no>
+✓ .wizard-state.json: ci.conventional_commits = <yes/no>
 ✓ AGENTS.md footer updated
 ```
 
 **State update**:
 ```bash
-jq '.features.release_please = <value> | .ci.release_please = <value>' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+jq '.features.release_please = <value> | .ci.release_please = <value> | .ci.conventional_commits = <value>' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
 ```
 
 ---
