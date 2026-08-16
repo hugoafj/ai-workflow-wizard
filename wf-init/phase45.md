@@ -258,6 +258,7 @@ Only when Windsurf is active, generate `.windsurf/workflows/sdd-new.md` from the
 IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
 if echo "$IDES" | grep -q "windsurf"; then
   SDD_BACKEND=$(jq -r '.sdd.backend // "hybrid"' .wizard-state.json)
+  PROJECT_NAME=$(jq -r '.answers.project_name' .wizard-state.json)
   WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
   SDD_PATH="$SDD_BACKEND"
   [ "$SDD_BACKEND" = "hybrid" ] && SDD_PATH="openspec"
@@ -269,6 +270,7 @@ if echo "$IDES" | grep -q "windsurf"; then
     sed -i.bak "s|{{sdd.backend}}/changes/|$SDD_PATH/changes/|g" .windsurf/workflows/sdd-new.md
   fi
   sed -i.bak "s/{{sdd.backend}}/$SDD_BACKEND/g" .windsurf/workflows/sdd-new.md
+  sed -i.bak "s|{project}|$PROJECT_NAME|g" .windsurf/workflows/sdd-new.md
   rm -f .windsurf/workflows/sdd-new.md.bak
 fi
 ```

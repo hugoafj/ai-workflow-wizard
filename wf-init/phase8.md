@@ -174,11 +174,12 @@ if [ "$HAS_TESTING" -gt 0 ] || [ "$HAS_CONVENTIONAL" = "true" ]; then
       if [ "$HAS_TESTING" -gt 0 ]; then
         # Check for unit/integration layers
         if jq -e '.testing.layers[] | select(. == "unit" or . == "integration")' .wizard-state.json >/dev/null 2>&1; then
-          npm install --save-dev vitest @testing-library/react @testing-library/user-event @testing-library/jest-dom @testing-library/dom jsdom @vitest/ui @vitest/coverage-v8 2>/dev/null || true
+          npm install --save-dev vitest @testing-library/react @testing-library/user-event @testing-library/jest-dom @testing-library/dom jsdom @vitest/ui @vitest/coverage-v8 @vitejs/plugin-react 2>/dev/null || true
         fi
         # Check for e2e layer
         if jq -e '.testing.layers[] | select(. == "e2e")' .wizard-state.json >/dev/null 2>&1; then
           npm install --save-dev @playwright/test 2>/dev/null || true
+          npx playwright install --with-deps chromium 2>/dev/null || true
         fi
       fi
       # commitlint for conventional commits (needed by Husky commit-msg hook)
@@ -293,19 +294,9 @@ fi
 Apply the edits with `yq` (same tool Phase 4.6 already uses for `strict_tdd`) — atomic,
 idempotent, preserves every other key byte-for-byte. `yq` creates any missing parent keys in the
 canonical location, so this also works when `/sdd-init` wrote a file without a top-level
-`testing:`/`rules:` block. First make sure `yq` is present (same guard as Phase 4.6):
+`testing:`/`rules:` block.
 
-```bash
-# Install yq if not present
-if [ -f openspec/config.yaml ] && ! command -v yq &>/dev/null; then
-  echo "Installing yq for safe YAML editing..."
-  if command -v brew &>/dev/null; then
-    brew install yq 2>/dev/null || true
-  fi
-fi
-```
-
-**If `yq` is STILL unavailable** (install failed or no package manager): do NOT skip this step and
+**If `yq` is unavailable** (install failed or no package manager): do NOT skip this step and
 do NOT tell the user to update the file by hand. Apply the same edits with your `edit` tool on
 `openspec/config.yaml` — changing ONLY the allowed leaf fields (Wizard-Allowed Field Edits),
 preserving every other line byte-for-byte, and creating missing parent keys
@@ -321,12 +312,22 @@ preserving every other line byte-for-byte, and creating missing parent keys
 | `rules.apply.test_command = "npm test"` + `rules.verify.test_command = "npm test"` + `rules.verify.build_command = "npm run build"` | always when testing configured |
 | `rules.verify.test_command = "npm run test:coverage"` **instead of** `"npm test"` | coverage activated — npm swallows a bare `--coverage` flag (`npm test --coverage` runs WITHOUT coverage), so the test_command must be a script that already enables it for sdd-verify's `{test_command} --coverage` (strict-tdd-verify Step 5d) to produce a real report |
 
-Then continue to the verification step below. With `yq` available, apply the edits:
+With `yq` available, apply the edits atomically in a single bash subshell (variables resolved + used
+in same scope):
 
 ```bash
 if [ -f openspec/config.yaml ]; then
-  # Ensure the Go mikefarah/yq binary is available.
-  # pip3's kislyuk/yq wrapper does NOT support `yq eval ... -i`.
+  # 1. Resolve values from state
+  UNIT=$(jq -r '.testing.layers | index("unit") != null' .wizard-state.json)
+  INTEGRATION=$(jq -r '.testing.layers | index("integration") != null' .wizard-state.json)
+  E2E=$(jq -r '.testing.layers | index("e2e") != null' .wizard-state.json)
+  if [ "$UNIT" = "true" ] && [ "$E2E" = "true" ]; then FRAMEWORK="Vitest + Playwright"
+  elif [ "$E2E" = "true" ]; then FRAMEWORK="Playwright"
+  else FRAMEWORK="Vitest"; fi
+  COVERAGE=$(jq -r '.testing.coverage_threshold != null' .wizard-state.json)
+  COVERAGE_THRESHOLD=$(jq -r '.testing.coverage_threshold // null' .wizard-state.json)
+
+  # 2. Ensure Go mikefarah/yq is available (pip3's kislyuk/yq does NOT support `eval -i`)
   if ! command -v yq &>/dev/null || ! yq --version 2>/dev/null | grep -q "mikefarah"; then
     if command -v yq &>/dev/null && yq --version 2>/dev/null | grep -q "kislyuk"; then
       echo "8.1d WARNING — detected Python yq wrapper (kislyuk); it does not support 'eval -i'." >&2
@@ -365,11 +366,12 @@ if [ -f openspec/config.yaml ]; then
     fi
   fi
 
+  # 3. Apply edits with yq (variables UNIT, E2E, FRAMEWORK now available in same subshell)
   if command -v yq &>/dev/null; then
-    # 1. Runner (sdd-apply detects it from the testing section)
+    # Runner: sdd-apply detects it from the testing section
     yq eval ".testing.runner.framework = \"$FRAMEWORK\"" -i openspec/config.yaml
 
-    # 2. Layers capability cache (sdd-apply/verify: available + tool per layer)
+    # Layers capability cache: sdd-apply/verify uses available + tool per layer
     if [ "$UNIT" = "true" ] || [ "$INTEGRATION" = "true" ]; then
       yq eval '.testing.layers.unit.available = true' -i openspec/config.yaml
       yq eval '.testing.layers.unit.tool = "vitest"' -i openspec/config.yaml
@@ -383,18 +385,18 @@ if [ -f openspec/config.yaml ]; then
       yq eval '.testing.layers.e2e.tool = "playwright"' -i openspec/config.yaml
     fi
 
-    # 3. Coverage (extra 1 — only if activated): capability cache + sdd-verify threshold
+    # Coverage: capability cache + sdd-verify threshold (only if activated)
     if [ "$COVERAGE" = "true" ]; then
       yq eval '.testing.coverage.available = true' -i openspec/config.yaml
       yq eval '.testing.coverage.command = "npm run test:coverage"' -i openspec/config.yaml
       yq eval ".rules.verify.coverage_threshold = $COVERAGE_THRESHOLD" -i openspec/config.yaml
     fi
 
-    # 4. Command overrides (always when testing configured)
+    # Command overrides: always when testing configured
     yq eval '.rules.apply.test_command = "npm test"' -i openspec/config.yaml
-    # npm swallows a bare --coverage flag: `npm test --coverage` runs WITHOUT coverage.
-    # sdd-verify runs {test_command} --coverage (strict-tdd-verify Step 5d), so when coverage
-    # is activated the verify command must be the script that already enables coverage.
+    # npm swallows bare --coverage: `npm test --coverage` runs WITHOUT coverage.
+    # sdd-verify runs {test_command} --coverage (strict-tdd Step 5d), so when coverage
+    # is activated the verify command must be the script that already enables it.
     if [ "$COVERAGE" = "true" ]; then
       yq eval '.rules.verify.test_command = "npm run test:coverage"' -i openspec/config.yaml
     else
@@ -572,6 +574,10 @@ if echo "$IDES" | grep -q "claude-code"; then
   git add CLAUDE.md 2>/dev/null || true
   git add -f .claude/ 2>/dev/null || true
 fi
+git add vitest.config.ts 2>/dev/null || true
+git add playwright.config.ts 2>/dev/null || true
+git add -f e2e/ 2>/dev/null || true
+git add src/test/setup.ts 2>/dev/null || true
 git add -f .cursor/ 2>/dev/null || true
 git add -f .windsurf/ 2>/dev/null || true
 # .devin/rules/ holds local IDE rules (not wizard artifacts) — never force-add

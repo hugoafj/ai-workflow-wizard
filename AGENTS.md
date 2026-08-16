@@ -1,6 +1,7 @@
 # AGENTS.md — workflow-wizard
 
-Important! This wizard is designed as instructive prose + bash snippets as triggers, not as self-contained scripts.
+## ULTRA IMPORTANT NOTE FOR AI AGENTS 
+ULTRA IMPORTANT! This wizard is designed as instructive prose (for AI agents) + bash snippets as triggers, not as self-contained scripts.
 
 ## Commands
 

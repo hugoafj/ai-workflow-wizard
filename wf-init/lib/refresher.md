@@ -252,130 +252,46 @@ _apply_jq_filter() {
   fi
 }
 
-# Migration to v0.6.8: schema v3 fields + new optional features.
-migrate_to_0_6_8() {
-  echo "  Migrating state to v0.6.8..."
+# Migrate state from CURRENT_VERSION to TARGET_VERSION.
+# Schema migration ensures required fields exist and known features have defaults.
+# Known features get false defaults (not asked again on refresh if they already exist).
+# NEW features (added in newer versions) remain absent, so Builder asks about them on re-run.
+# Interactive feature questions are handled by Builder (phase R3), which always re-runs during
+# /wf-refresh. Builder ONLY asks about features that don't exist in .features yet.
+migrate_state() {
+  local CURRENT="$1"
+  local TARGET="$2"
 
-  # Schema v3 fields
+  if ! version_lt "$CURRENT" "$TARGET"; then
+    echo "  No migration needed: $CURRENT already >= $TARGET"
+    return 0
+  fi
+
+  echo "  Upgrading state from $CURRENT to $TARGET..."
+  
+  # Ensure schema v3 required fields exist (idempotent: //= creates only if missing).
+  # Known features get false defaults so they are never re-asked if they already exist.
+  # NEW features (in future versions) remain absent, so Builder will ask about them.
   _apply_jq_filter '
     .schema_version = 3 |
-    .build_plan.generated_files //= [] |
+    .build_plan //= {} |
     .build_plan.managed_paths //= [] |
-    .build_plan.approval //= {}
-  '
-
-  # Ask about new optional features (idempotent: only if missing)
-  if ! jq -e '.features | has("routing_abc")' "$WF_STATE" >/dev/null 2>&1; then
-    if _ask_yesno "Enable ABC routing pattern?"; then
-      _apply_jq_filter '.features.routing_abc = true'
-    else
-      _apply_jq_filter '.features.routing_abc = false'
-    fi
-  fi
-
-  if ! jq -e '.features | has("decision_ladder")' "$WF_STATE" >/dev/null 2>&1; then
-    if _ask_yesno "Enable decision ladder?"; then
-      _apply_jq_filter '.features.decision_ladder = true'
-    else
-      _apply_jq_filter '.features.decision_ladder = false'
-    fi
-  fi
-
-  # Ask about remaining feature flags (default to false only in non-interactive mode)
-  for feature in tdd_protocol ci cd release_please; do
-    if ! jq -e ".features | has(\"$feature\")" "$WF_STATE" >/dev/null 2>&1; then
-      if _ask_yesno "Enable $feature?"; then
-        _apply_jq_filter ".features.$feature = true"
-      else
-        _apply_jq_filter ".features.$feature = false"
-      fi
-    fi
-  done
-
-  # CI/CD defaults
-  _apply_jq_filter '
+    .build_plan.generated_files //= [] |
+    .build_plan.approval //= {} |
+    .features //= {} |
+    .features.routing_abc //= false |
+    .features.decision_ladder //= false |
+    .features.tdd_protocol //= false |
+    .features.ci //= false |
+    .features.cd //= false |
+    .features.release_please //= false |
+    .ci //= {} |
     .ci.e2e_in_ci //= false |
     .ci.auto_improve //= true |
     .ci.inline_suggestions //= true
   '
-}
 
-# Migration to v0.7.0: no new schema fields, just version bump handled by caller.
-migrate_to_0_7_0() {
-  echo "  Migrating state to v0.7.0..."
-  # No schema changes for v0.7.0 in this release.
-  :
-}
-
-# Migration to v0.7.1: no new schema fields in this release.
-migrate_to_0_7_1() {
-  echo "  Migrating state to v0.7.1..."
-  # No schema changes for v0.7.1 in this release.
-  :
-}
-
-# Migrate state from CURRENT_VERSION to TARGET_VERSION using cumulative migrations.
-# Known migrations are listed explicitly; for versions beyond the known list, a
-# dynamically named migration function is tried (e.g. migrate_to_0_8_0). If no
-# migration exists, a warning is emitted so future versions are not silently skipped.
-migrate_state() {
-  local CURRENT_VERSION="$1"
-  local TARGET_VERSION="$2"
-
-  local schema_version
-  schema_version=$(jq -r '.schema_version // 0' "$WF_STATE" 2>/dev/null) || true
-  if [[ "$schema_version" -lt 3 ]]; then
-    migrate_to_0_6_8
-  fi
-
-  if ! version_lt "$CURRENT_VERSION" "$TARGET_VERSION"; then
-    echo "  No migration needed: $CURRENT_VERSION already >= $TARGET_VERSION"
-    return 0
-  fi
-
-  echo "  Migrating state from $CURRENT_VERSION to $TARGET_VERSION..."
-
-  local CURRENT="$CURRENT_VERSION"
-
-  # List of known migration target versions in ascending order.
-  local MIGRATIONS=("0.6.8" "0.7.0" "0.7.1-beta.1" "0.7.1")
-
-  local TO
-  for TO in "${MIGRATIONS[@]}"; do
-    if version_lt "$CURRENT" "$TO" && version_lte "$TO" "$TARGET_VERSION"; then
-      case "$TO" in
-        0.6.8) migrate_to_0_6_8 ;;
-        0.7.0) migrate_to_0_7_0 ;;
-        0.7.1-beta.1) migrate_to_0_7_1 ;;
-        0.7.1) migrate_to_0_7_1 ;;
-      esac
-      CURRENT="$TO"
-    fi
-  done
-
-  # For target versions newer than the last known migration, try a function named
-  # after the target (e.g. migrate_to_0_8_0 or migrate_to_0_8_0_beta_1).
-  if version_lt "$CURRENT" "$TARGET_VERSION"; then
-    local NORM_TARGET BASE_TARGET MIG_FUNC MIG_FOUND
-    MIG_FOUND=false
-    NORM_TARGET=$(printf '%s' "$TARGET_VERSION" | tr '.-' '_')
-    BASE_TARGET=$(printf '%s' "$TARGET_VERSION" | sed 's/-.*//' | tr '.' '_')
-    for MIG_FUNC in "migrate_to_${NORM_TARGET}" "migrate_to_${BASE_TARGET}"; do
-      if declare -F "$MIG_FUNC" >/dev/null 2>&1; then
-        "$MIG_FUNC"
-        CURRENT="$TARGET_VERSION"
-        MIG_FOUND=true
-        break
-      fi
-    done
-    if [[ "$MIG_FOUND" != "true" ]]; then
-      echo "  ⚠ No migration function defined for versions after $CURRENT up to $TARGET_VERSION" >&2
-    fi
-  fi
-
-  # Always write the exact target version at the end.
-  _apply_jq_filter ".wizard_version = \"$TARGET_VERSION\""
-  echo "  ✓ State migrated to $TARGET_VERSION"
+  echo "  ✓ State upgraded from $CURRENT to $TARGET"
 }
 
 # Ensure custom AGENTS.md sections are preserved.

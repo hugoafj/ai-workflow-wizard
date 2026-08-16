@@ -94,6 +94,11 @@ If validation succeeds, mark this phase done and continue with part B:
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
-wf_phase_done phase6a-agents phase6b-build-heavy
-cat "$WF_DIR/phase6b-build-heavy.md"
+echo "✓ Phase 6a complete"
+if [ "$WF_REFRESH" != "true" ]; then
+  wf_phase_done phase6a-agents phase6b-build-heavy
+  cat "$WF_DIR/phase6b-build-heavy.md"
+else
+  echo "ℹ Skipped phase6b — refresh mode active"
+fi
 ```
