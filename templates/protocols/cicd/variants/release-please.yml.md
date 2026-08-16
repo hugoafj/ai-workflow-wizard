@@ -31,6 +31,5 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
-{{if ci.release_ai_summary}}
-{{AI_SUMMARY_JOB}}
-{{/if}}
+
+  # {{AI_SUMMARY_JOB}}

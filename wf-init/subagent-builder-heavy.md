@@ -202,7 +202,7 @@ Read CI/CD decisions from `.wizard-state.json` → `.ci.*` and `.cd.*`.
    → `{WF_STAGING}/.release-please-manifest.json`
    If `state.ci.release_ai_summary == true`:
     Source: `$WF_RAW/templates/protocols/cicd/variants/ai-summary-job.<provider>.yml.md`
-    → INJECT into `{WF_STAGING}/.github/workflows/release-please.yml` (replace the `# {{AI_SUMMARY_JOB}}` marker — include the full comment)
+    → INJECT into `{WF_STAGING}/.github/workflows/release-please.yml` (replace the `  # {{AI_SUMMARY_JOB}}` job-level comment line with the contents of the fragment; the fragment is a second top-level job, already indented 2 spaces, so it must appear at the same nesting level as the `release-please:` job. If `state.ci.release_ai_summary == false`, remove the `  # {{AI_SUMMARY_JOB}}` marker line entirely and leave only the `release-please:` job.)
 
 **If RELEASE==true and CICD==false** (release-please standalone):
 - Conventional commits + release-please (same sources as above)
