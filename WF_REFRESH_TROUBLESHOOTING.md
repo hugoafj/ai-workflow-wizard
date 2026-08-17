@@ -190,34 +190,6 @@ fi
 
 ---
 
-## Flow: When to Recommend Cleanup
-
-In `/wf-refresh` Phase R4 (Diff and Plan):
-
-```bash
-ADDED_COUNT=$(jq '.added | length' refresh-plan.json)
-UPDATED_COUNT=$(jq '.updated | length' refresh-plan.json)
-DELETED_COUNT=$(jq '.deleted | length' refresh-plan.json)
-
-if [[ $DELETED_COUNT -gt 2 ]] || [[ $((ADDED_COUNT + UPDATED_COUNT)) -gt 5 ]]; then
-  echo "⚠ This update is complex (many additions, updates, or deletions)"
-  echo ""
-  echo "For safety, consider:"
-  echo "  1. /wf-cleanup"
-  echo "  2. /wf-init"
-  echo ""
-  echo "Continue with /wf-refresh? [yes/no]"
-  read -p "Your choice: " choice
-  
-  if [[ "$choice" != "yes" ]]; then
-    echo "Run /wf-cleanup when ready to start fresh"
-    exit 0
-  fi
-fi
-```
-
----
-
 ## Notes
 
 - **Don't force users**: Always ask, never auto-cleanup

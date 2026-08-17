@@ -274,6 +274,7 @@ migrate_state() {
   # NEW features (in future versions) remain absent, so Builder will ask about them.
   _apply_jq_filter '
     .schema_version = 3 |
+    .wizard_version = "'"$TARGET"'" |
     .build_plan //= {} |
     .build_plan.managed_paths //= [] |
     .build_plan.generated_files //= [] |
@@ -716,7 +717,7 @@ source "${WF_DIR}/lib/refresh-lib.sh"
 
 echo "ℹ Checking for state migrations..."
 
-CURRENT_VERSION=$(jq -r '.wizard_version // "0.7.1-beta.1"' "$WF_STATE")
+CURRENT_VERSION=$(jq -r '.wizard_version // "0.0.0"' "$WF_STATE")
 CURRENT_VERSION="${CURRENT_VERSION#v}"
 
 TARGET_VERSION=$(wf_fetch_version)

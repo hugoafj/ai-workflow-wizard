@@ -95,7 +95,7 @@ WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
 echo "✓ Phase 6a complete"
-if [ "$WF_REFRESH" != "true" ]; then
+if [ "$WF_REFRESH" != "1" ]; then
   wf_phase_done phase6a-agents phase6b-build-heavy
   cat "$WF_DIR/phase6b-build-heavy.md"
 else

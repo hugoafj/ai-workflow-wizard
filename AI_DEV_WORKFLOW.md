@@ -755,8 +755,10 @@ The `features` field is new and critical. It tracks which optional features of t
 4. **Custom content preservation**: Sections inside `<!-- WF: DO NOT REGENERATE -->` markers in `AGENTS.md` are preserved.
 5. **State migrations**: Schema and feature migrations are applied automatically; user is asked about new optional features.
 
-**Phases R1–R6 in detail**:
+**Phases R-1, R0, R1–R6 in detail**:
 
+- **Phase R-1 · Pre-flight state checks**: Validates `.wizard-state.json` exists and contains minimal required structure.
+- **Phase R0 · Drift detection**: Scans the project for drift in wizard-managed files and custom sections.
 - **Phase R1 · Project content drift**: Re-discovers the project (stack, node engine, etc.) and detects changes.
 - **Phase R2 · State/schema migration**: Migrates `.wizard-state.json` to current schema; asks about new optional features.
 - **Phase R3 · Builder re-run**: Re-runs B1-B9 to generate all artifacts into `.wizard-staging/` using only the Builder steps of `phase6a-agents.md` / `phase6b-build-heavy.md` (B1-B9). It **never follows the `/wf-init` phase 7/8 tail** (no `wf_phase_done phase6 phase7`, no `cat phase7.md`) — after Builder-Heavy validation it returns to Phase R4. Staging validation checks the generated artifacts (e.g. `AGENTS.md`); `.wizard-state.json` intentionally stays at the project root and is never expected inside staging. **Step 0 runs first**: it snapshots the pre-Builder `managed_paths`/`generated_files` into `.wizard-refresh-baseline.json` because the Builder overwrites `build_plan` with the new staging set.

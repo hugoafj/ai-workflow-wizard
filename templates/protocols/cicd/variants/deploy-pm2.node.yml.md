@@ -44,5 +44,5 @@ jobs:
             git pull origin main
             npm ci
             npm run build
-            npm ci --omit=dev
+            npm prune --omit=dev
             pm2 restart app

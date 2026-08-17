@@ -30,16 +30,10 @@ Is this correct? Fix any errors before continuing.
 
 ---
 > **⛔ STOP HERE — do not execute anything else.**
-> **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `discovery.conventions` (the detected/corrected conventions from reverse engineering). Mark `wf_phase_done phase4 <next>`.
-> Compute the next phase based on the ALREADY SELECTED features:
+> **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `discovery.conventions` (the detected/corrected conventions from reverse engineering). Mark `wf_phase_done phase4 phase5`.
+> Always route to Phase 5 to collect project answers (including project_name) before any conditional phases:
 > ```bash
-> if [ "$(jq -r '.features.routing_abc // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.tdd_protocol // false' .wizard-state.json)" = "true" ]; then
->   echo "phase45"
-> elif [ "$(jq -r '.features.ci // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.cd // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.release_please // false' .wizard-state.json)" = "true" ]; then
->   echo "phase47-cicd"
-> else
->   echo "phase5"
-> fi
+> echo "phase5"
 > ```
 > Wait for the response. Only when the user confirms with "yes", run in bash:
 

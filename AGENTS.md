@@ -1,7 +1,9 @@
 # AGENTS.md — workflow-wizard
 
+<!-- WF: DO NOT REGENERATE -->
 ## ULTRA IMPORTANT NOTE FOR AI AGENTS 
 ULTRA IMPORTANT! This wizard is designed as instructive prose (for AI agents) + bash snippets as triggers, not as self-contained scripts.
+<!-- /WF: DO NOT REGENERATE -->
 
 ## Commands
 

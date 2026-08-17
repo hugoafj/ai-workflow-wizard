@@ -50,7 +50,7 @@ done
 CHANGED_CONFIG=""
 for pattern in $CONFIG_FILES; do
   # Escape the pattern so dots in paths like .claude/settings.json are treated literally
-  esc_pattern=$(printf '%s' "$pattern" | sed 's/[.^$*?+{}\/[\]|()]/\\&/g')
+  esc_pattern=$(printf '%s' "$pattern" | sed 's/[][^.$*?+{}|()\\-]/\\&/g')
   # Match exact files or any path under a directory prefix
   if echo "$CHANGED" | grep -qE "^${esc_pattern}(/|$)"; then
     if [ -d "$pattern" ]; then
