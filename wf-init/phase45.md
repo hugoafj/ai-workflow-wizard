@@ -4,10 +4,14 @@
 > Otherwise, skip to the next applicable phase.
 
 ```bash
+# WF_DIR fallback before sourcing (only phase that sourced without it).
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
 FEATURES_ROUTING=$(jq -r '.features.routing_abc // false' .wizard-state.json)
 FEATURES_TDD=$(jq -r '.features.tdd_protocol // false' .wizard-state.json)
 if [ "$FEATURES_ROUTING" != "true" ] && [ "$FEATURES_TDD" != "true" ]; then
-  echo "FASE 4.5 saltada — no requiere SDD (sin Rutas ABC ni TDD Protocol)."
+  echo "Phase 4.5 skipped — SDD not required (no ABC Routing nor TDD Protocol)."
   NEXT=
   if [ "$(jq -r '.features.ci // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.cd // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.release_please // false' .wizard-state.json)" = "true" ]; then
     NEXT="phase47-cicd"
@@ -15,6 +19,8 @@ if [ "$FEATURES_ROUTING" != "true" ] && [ "$FEATURES_TDD" != "true" ]; then
     NEXT="phase5"
   fi
   wf_phase_done phase45 "$NEXT"
+  echo "ℹ Next phase: $NEXT"
+  cat "$WF_DIR/$NEXT.md"
   exit 0
 fi
 ```
@@ -39,11 +45,11 @@ fi
 
 1. **Merge the AGENTS.md rule** (read temp-files/AGENTS.md and fuse into the project's AGENTS.md):
    - If `AGENTS.md` does NOT exist (greenfield — the Builder generates it later in Phase 6):
-     copy the whole file `$WF_REPO/temp-files/AGENTS.md` → `AGENTS.md`. That file IS the
+     copy the whole file `$WF_DIR/temp-files/AGENTS.md` → `AGENTS.md`. That file IS the
      "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule and must exist before
      `/sdd-init` runs in the new Windsurf session.
    - If `AGENTS.md` already exists (legacy project): read the rule from
-     `$WF_REPO/temp-files/AGENTS.md` (the **Gentle AI — Legacy Path Bridge for Windsurf/Devin** section),
+     `$WF_DIR/temp-files/AGENTS.md` (the **Gentle AI — Legacy Path Bridge for Windsurf/Devin** section),
      insert it at the top (after the title and before other content) so it loads first, and save.
    - Verify the rule is present: `grep -q "Gentle AI — Legacy Path Bridge" AGENTS.md`.
      If it is not, fix it before continuing.
@@ -51,23 +57,18 @@ fi
    **Why**: gentle-ai installs SDD skills into Windsurf's legacy paths (`~/.codeium/windsurf/skills/`), not the Devin paths. This rule tells the agent where to find them. Without it, sdd-init will not load the skills correctly in Windsurf. Phase 45 runs BEFORE the Builder (Phase 6) creates AGENTS.md, so a greenfield project needs the rule file created here directly.
 
 2. **Create `.windsurf/workflows/sdd-new.md`** (to replace the legacy version):
-   - If `.windsurf/workflows/` does not exist, create it.
-   - Write the content from `$WF_REPO/temp-files/sdd-new.md` to `.windsurf/workflows/sdd-new.md`.
-   - Adapt the file to use the actual SDD backend chosen by the user (read from `state.sdd.backend`).
+   - This file is generated in **Phase 5**, after `answers.project_name` is collected
+     (the template needs the project name).
+   - See the "Windsurf workflow setup (if applicable)" step in `phase5.md`.
 
 Tell the user:
 
 ```
 ⚙️ Windsurf compatibility setup:
   ✓ AGENTS.md: gentle-ai Windsurf paths rule in place (created if it did not exist)
-  ✓ Created .windsurf/workflows/sdd-new.md (modern SDD workflow)
+  ⏳ `.windsurf/workflows/sdd-new.md` will be generated after you choose the SDD backend.
 
-This is a temporary workaround for a gentle-ai bug with Windsurf. The agent will now
-be able to find and run SDD skills correctly.
-
-Note: After /sdd-init runs, gentle-ai sync may overwrite .windsurf/workflows/sdd-new.md
-with the legacy version. If that happens, run /wf-settings → "Fix Windsurf gentle-ai" 
-to reapply this fix.
+This is a temporary workaround for a gentle-ai bug with Windsurf.
 ```
 
 ---
@@ -228,6 +229,49 @@ If the user switches to hybrid, use that option.
 
 ---
 
+### Persist backend and generate Windsurf `sdd-new.md`
+
+The chosen backend must be written to `.wizard-state.json` **before** any `/sdd-init` prompt or `.windsurf/workflows/sdd-new.md` templating, so the values cannot be out of sync.
+
+Map the user's answer to `engram`, `openspec`, or `hybrid` and persist it:
+
+```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
+# Replace <chosen backend> with the value the user selected: engram / openspec / hybrid
+# Use a literal placeholder that is valid bash (an empty string) — the agent
+# must substitute the real value before running, per the prose instruction above.
+SDD_BACKEND=""
+# Guard: never persist an empty backend. If the placeholder was not substituted,
+# fall back to hybrid instead of corrupting state (jq's '//' treats '' as a
+# value, not null, so '.sdd.backend = ""' would be written as-is).
+jq --arg backend "${SDD_BACKEND:-hybrid}" \
+   '.sdd.backend = (if $backend == "" then "hybrid" else $backend end) |
+    .updated_at = (now | todate)' \
+   .wizard-state.json > .wizard-state.json.tmp
+mv .wizard-state.json.tmp .wizard-state.json
+```
+
+NOTE: Windsurf workflow generation is deferred to Phase 5.
+At this point, `.answers.project_name` has not yet been collected.
+The `.windsurf/workflows/sdd-new.md` file will be generated in Phase 5 AFTER project_name is saved.
+
+Then update the Windsurf status:
+
+```
+⚙️ Windsurf compatibility setup:
+  ✓ AGENTS.md: gentle-ai Windsurf paths rule in place (created if it did not exist)
+  ⏳ `.windsurf/workflows/sdd-new.md` will be generated in Phase 5 (needs answers.project_name)
+
+This is a temporary workaround for a gentle-ai bug with Windsurf. The agent will now
+be able to find and run SDD skills correctly.
+
+Note: After /sdd-init runs, gentle-ai sync may overwrite .windsurf/workflows/sdd-new.md
+with the legacy version. If that happens, run /wf-settings → "Fix Windsurf gentle-ai"
+to reapply this fix.
+```
+
 ### Running `/sdd-init` (gentle-ai skill)
 
 `/sdd-init` is a **gentle-ai skill**, not a terminal command. `gentle-ai sdd-init` does not exist as a CLI subcommand. The wizard **does not install** `/sdd-init` as a command — it is a native gentle-ai skill.
@@ -309,11 +353,14 @@ Do not continue or verify files until they confirm. When they reply "continue", 
 ### Verification (runs after Path A or Path B)
 
 ```bash
-ls openspec/config.yaml openspec/changes openspec/specs 2>/dev/null
-cat openspec/config.yaml
+SDD_BACKEND=$(jq -r '.sdd.backend // "hybrid"' .wizard-state.json)
+if [ "$SDD_BACKEND" = "openspec" ] || [ "$SDD_BACKEND" = "hybrid" ]; then
+  ls openspec/config.yaml openspec/changes openspec/specs 2>/dev/null
+  cat openspec/config.yaml
+fi
 ```
 
-All three must exist. Show the `config.yaml` contents to the user so they can see and confirm it reflects their choice. If there is any problem:
+For `openspec`/`hybrid` backends, all three must exist when the check runs. Show the `config.yaml` contents to the user so they can see and confirm it reflects their choice. If there is any problem:
 
 ```
 SDD initialization was not completed. Missing: <list of what's missing>.
@@ -358,15 +405,22 @@ Continuing with project questions...
 ---
 > **⛔ STOP HERE — do not execute anything else.**
 > **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `sdd.backend` (`engram`|`openspec`|`hybrid`) and `sdd.already_initialized`. Mark `wf_phase_done phase45 <next>`.
-> Calculate the next phase based on features:
-> ```bash
-> if jq -e '.features.tdd_protocol == true' .wizard-state.json >/dev/null; then
->   echo "phase46"
-> elif jq -e '.features.ci == true or .features.cd == true or .features.release_please == true' .wizard-state.json >/dev/null; then
->   echo "phase47-cicd"
-> else
->   echo "phase5"
-> fi
-> ```
+> Calculate the next phase based on features: `phase46` if `features.tdd_protocol = true`; else `phase47-cicd` if `features.ci`, `features.cd`, or `features.release_please` is true; else `phase5`.
 > Tell the user: *"SDD initialized. Reply **continue** when you are ready to proceed."*
-> Wait for the response. Only when they confirm, read the next phase with the calculation above and run in bash: `cat "$WF_DIR/$NEXT.md"`
+> Wait for the response. Only when they confirm, run in bash:
+```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
+NEXT=
+if [ "$(jq -r '.features.tdd_protocol // false' .wizard-state.json)" = "true" ]; then
+  NEXT="phase46"
+elif [ "$(jq -r '.features.ci // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.cd // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.release_please // false' .wizard-state.json)" = "true" ]; then
+  NEXT="phase47-cicd"
+else
+  NEXT="phase5"
+fi
+wf_phase_done phase45 "$NEXT"
+echo "ℹ Next phase: $NEXT"
+cat "$WF_DIR/$NEXT.md"
+```

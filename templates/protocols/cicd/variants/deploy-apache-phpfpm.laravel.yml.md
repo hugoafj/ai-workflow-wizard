@@ -1,7 +1,7 @@
 # deploy-apache-phpfpm.laravel.yml.md
 #
 # Template: GitHub Actions deploy workflow for Laravel apps with Apache + PHP-FPM.
-# Used by phase6e when stack_detected in ('laravel', 'laravel_node') and vps_runtime == 'apache_php_fpm'.
+# Used by the Builder (Phase 6) when stack_detected in ('laravel', 'laravel_node') and vps_runtime == 'apache_php_fpm'.
 #
 # Placeholders:
 #   {{trigger_event}}   — 'tags:\n        - \'v*\'' or 'branches:\n        - main'
@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@2.37.2
         with:
           php-version: '{{php_version}}'
           extensions: mbstring, xml, curl, mysql, zip, gd, bcmath, dom, fileinfo
@@ -49,7 +49,7 @@ jobs:
       {{/if}}
 
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ '{{' }} secrets.SERVER_IP {{ '}}' }}
           username: ${{ '{{' }} secrets.SSH_USER {{ '}}' }}

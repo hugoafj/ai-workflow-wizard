@@ -25,8 +25,9 @@ jobs:
 
       - name: PR Agent Action
         id: pr-agent-review
-        uses: Codium-ai/pr-agent@main
+        uses: Codium-ai/pr-agent@v0.42.0
         env:
+          # PR Agent reads the Gemini key from GOOGLE_AI_STUDIO.GEMINI_API_KEY (dot notation).
           GOOGLE_AI_STUDIO.GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Change the model according to your preference. Some models require an API key with billing enabled.
@@ -35,9 +36,9 @@ jobs:
           github_action_config.pr_actions: '["opened", "synchronize", "reopened"]'
           github_action_config.auto_review: "true"
           github_action_config.auto_describe: "true"
-          # auto_improve disabled: pr-agent fails with Gemini for code suggestions
-          # (falls back to gpt-5.4-mini without an OpenAI key configured)
-          github_action_config.auto_improve: "false"
+          # Configurable from state.ci.auto_improve (default true). Regenerate this
+          # workflow after toggling "AI Review Suggestions" in /wf-settings.
+          github_action_config.auto_improve: "true"
 
       - name: Post failure comment on PR
         if: failure()

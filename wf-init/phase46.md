@@ -3,6 +3,9 @@
 > **Gate**: only runs if `features.tdd_protocol == true`.
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
 FEATURES_TDD=$(jq -r '.features.tdd_protocol // false' .wizard-state.json)
 if [ "$FEATURES_TDD" != "true" ]; then
   echo "PHASE 4.6 skipped — TDD Protocol not selected."
@@ -13,6 +16,8 @@ if [ "$FEATURES_TDD" != "true" ]; then
     NEXT="phase5"
   fi
   wf_phase_done phase46 "$NEXT"
+  echo "ℹ Next phase: $NEXT"
+  cat "$WF_DIR/$NEXT.md"
   exit 0
 fi
 ```
@@ -24,7 +29,7 @@ This phase is optional but highly recommended. If the user prefers to configure 
 First detect if there's already a test runner configured:
 
 ```bash
-cat package.json | grep -E '"vitest|"jest|"playwright|"cypress|"testing-library' 2>/dev/null
+grep -E '"(@(playwright/test|testing-library/|vitest/)|vitest|jest|cypress|playwright)"' package.json 2>/dev/null
 ls vitest.config.ts vitest.config.js jest.config.ts playwright.config.ts 2>/dev/null
 ```
 
@@ -183,7 +188,7 @@ engram save "sdd/{project}/testing-capabilities" "## Testing Capabilities
 | ----------- | --------- | ----------- |
 | Unit        | <✅/❌>   | <tool or —> |
 | Integration | <✅/❌>   | <tool or —> |
-| E2E         | <✅/❌>   | <tool o —> |
+| E2E         | <✅/❌>   | <tool or —> |
 
 ### Coverage
 - Available: <✅/❌>
@@ -195,7 +200,7 @@ engram save "sdd/{project}/testing-capabilities" "## Testing Capabilities
 | Linter       | <✅/❌>   | <command or —> |
 | Type checker | <✅/❌>   | <command or —> |
 | Formatter    | <✅/❌>   | <command or —> |" \
-  --project "{project-name}" --type config
+  --project "{project}" --type config
 ```
 
 > Use `--type config`, not `--type convention` as earlier versions of this wizard said — confirmed against `init-details.md`, the correct type for this observation is `config`. The project name is auto-detected from the git remote (normalized to lowercase) from Engram v1.11.0 — use `git remote get-url origin 2>/dev/null` to confirm it.
@@ -204,11 +209,44 @@ Additionally, if the detected backend is `openspec` or `hybrid`, update
 `openspec/config.yaml` using `yq` to ensure atomic, safe YAML modification:
 
 ```bash
-# Install yq if not present
-if ! command -v yq &> /dev/null; then
-  echo "Installing yq for safe YAML editing..."
-  brew install yq  # macOS/Linux
-  # or for Windows: scoop install yq
+# Ensure the Go mikefarah/yq binary is available.
+# pip3's kislyuk/yq wrapper does NOT support `yq eval ... -i`.
+if ! command -v yq &>/dev/null || ! yq --version 2>/dev/null | grep -q "mikefarah"; then
+  if command -v yq &>/dev/null && yq --version 2>/dev/null | grep -q "kislyuk"; then
+    echo "WARNING: detected Python yq wrapper (kislyuk); it does not support 'eval -i'." >&2
+  fi
+
+  YQ_INSTALL_DIR="${HOME}/.local/bin"
+  mkdir -p "$YQ_INSTALL_DIR"
+
+  case "$(uname -s)-$(uname -m)" in
+    Linux-x86_64)     YQ_BINARY="yq_linux_amd64" ;;
+    Linux-aarch64|Linux-arm64) YQ_BINARY="yq_linux_arm64" ;;
+    Darwin-x86_64)    YQ_BINARY="yq_darwin_amd64" ;;
+    Darwin-arm64)     YQ_BINARY="yq_darwin_arm64" ;;
+    *)
+      echo "ERROR: unsupported platform for automatic yq install ($(uname -s)-$(uname -m))." >&2
+      echo "Install Go yq from https://github.com/mikefarah/yq and re-run this step." >&2
+      exit 1
+      ;;
+  esac
+
+  echo "Installing Go yq (${YQ_BINARY}) to ${YQ_INSTALL_DIR}..."
+  if command -v curl &>/dev/null; then
+    curl -fsSL "https://github.com/mikefarah/yq/releases/latest/download/${YQ_BINARY}" -o "$YQ_INSTALL_DIR/yq"
+  elif command -v wget &>/dev/null; then
+    wget -q "https://github.com/mikefarah/yq/releases/latest/download/${YQ_BINARY}" -O "$YQ_INSTALL_DIR/yq"
+  else
+    echo "ERROR: curl or wget is required to install yq." >&2
+    exit 1
+  fi
+  chmod +x "$YQ_INSTALL_DIR/yq"
+  export PATH="$YQ_INSTALL_DIR:$PATH"
+
+  if ! command -v yq &>/dev/null; then
+    echo "ERROR: yq install to ${YQ_INSTALL_DIR} failed or the directory is not in PATH." >&2
+    exit 1
+  fi
 fi
 
 # Update testing.strict_tdd safely — preserves all other keys
@@ -269,4 +307,11 @@ already writes correctly to both sources in sync.
 > **⛔ STOP HERE — don't execute anything else.**
 > **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `testing.layers` (activated layers), `testing.tdd_mode` (`standard`|`strict`), `testing.runner_detected`. Mark `wf_phase_done phase46 phase46b`.
 > Tell the user: *"Testing and TDD mode configured. Reply **continue** to review optional testing extras (coverage, visual regression, POM) and generate configs."*
-> Wait for the response. Only when they confirm, execute in bash: `cat "$WF_DIR/phase46b.md"`
+> Wait for the response. Only when they confirm, execute in bash:
+
+```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+wf_phase_done phase46 phase46b
+cat "$WF_DIR/phase46b.md"
+```

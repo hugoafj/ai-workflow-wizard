@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.7.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.7.0-beta.1...v0.7.1-beta.1) (2026-08-15)
+
+### Bug Fixes
+
+* resolve judgment-day v0.7.0 refresh contracts bugs (C1-C3, M1-M5, B1-B9) ([f3a8801](https://github.com/hugoafj/ai-workflow-wizard/commit/f3a8801))
+* harden non-tty prompts, portable diff guard, staged bridge ([c282aa5](https://github.com/hugoafj/ai-workflow-wizard/commit/c282aa5))
+* portable hashing, safe path handling, and refresh state guards ([144b046](https://github.com/hugoafj/ai-workflow-wizard/commit/144b046))
+* complete builder-driven /wf-refresh state and refresh guards ([4d211fe](https://github.com/hugoafj/ai-workflow-wizard/commit/4d211fe))
+* resolve 25 workflow issues across refresh, init, and docs ([b84c9e1](https://github.com/hugoafj/ai-workflow-wizard/commit/b84c9e1))
+* deletion detection, approval gating, and phase7 cat gate ([93b5de9](https://github.com/hugoafj/ai-workflow-wizard/commit/93b5de9))
+* resolve /wf-refresh executability, semver migration, and AGENTS.md drift ([dbedf32](https://github.com/hugoafj/ai-workflow-wizard/commit/dbedf32))
+* stop sourcing lib/state.md as a shell script ([369c86f](https://github.com/hugoafj/ai-workflow-wizard/commit/369c86f))
+* phase file robustness and git validation ([cafebac](https://github.com/hugoafj/ai-workflow-wizard/commit/cafebac))
+* null-safe arrays and managed paths in core ([8c539c5](https://github.com/hugoafj/ai-workflow-wizard/commit/8c539c5))
+* phase 8 promotion, git handling, and manifest recompute ([1d93c65](https://github.com/hugoafj/ai-workflow-wizard/commit/1d93c65))
+* schema v3 migration, state helpers, and refresh core ([b18097a](https://github.com/hugoafj/ai-workflow-wizard/commit/b18097a))
+* resolve pre-merge audit issues across wf-init/wf-refresh ([26d68e7](https://github.com/hugoafj/ai-workflow-wizard/commit/26d68e7))
+* resolve pre-merge audit issues across wf-init, wf-refresh, templates and docs ([9e41a73](https://github.com/hugoafj/ai-workflow-wizard/commit/9e41a73))
+* apply P0 fixes from judgment-day handoff ([1cb22f9](https://github.com/hugoafj/ai-workflow-wizard/commit/1cb22f9))
+* apply P1 fixes from judgment-day handoff ([62e14e4](https://github.com/hugoafj/ai-workflow-wizard/commit/62e14e4))
+* apply P2 fixes from judgment-day handoff ([6705f99](https://github.com/hugoafj/ai-workflow-wizard/commit/6705f99))
+* correct gemini pr-agent env var and claude model after Context7 check ([ef30832](https://github.com/hugoafj/ai-workflow-wizard/commit/ef30832))
+
+### Documentation
+
+* sync AI workflow docs and translate non-English strings ([8c367f8](https://github.com/hugoafj/ai-workflow-wizard/commit/8c367f8))
+
+### Chores
+
+* add Devin agent rules for subagent delegation and CodeGraph ([93eefc0](https://github.com/hugoafj/ai-workflow-wizard/commit/93eefc0))
+* add Windsurf workspace workflow for /sdd-new ([261deb4](https://github.com/hugoafj/ai-workflow-wizard/commit/261deb4))
+* ignore .codegraph and translate temp-files/sdd-new.md to English ([3cde588](https://github.com/hugoafj/ai-workflow-wizard/commit/3cde588))
+
 ## [0.7.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.6.7-beta.1...v0.7.0-beta.1) (2026-08-13)
 
 

@@ -7,7 +7,7 @@
 #   answers.project_name — project name for release branch naming
 #
 # Notes:
-#   - release-type: node assumes package.json. For markdown-only, use release-type: simple
+#   - release-type: simple is the default for markdown/templates projects (override to `node` for Node.js projects)
 #   - The repo must allow GitHub Actions to create PRs (Settings → Actions → General → Workflow permissions)
 
 name: release-please
@@ -19,30 +19,19 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
     outputs:
       pr: ${{ steps.release.outputs.pr }}
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
-        with:
-          release-type: node
-{{if ci.release_ai_summary}}
 
-  ai-summary:
-    needs: release-please
-    if: needs.release-please.outputs.pr
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v4
-      - name: Generate AI summary for release PR
-        run: |
-          echo "AI summary job enabled (provider: {{ci.release_ai_provider}})"
-          # AI summary implementation for {{ci.release_ai_provider}} will be injected here
-          echo "Project: {{answers.project_name}}"
-{{/if}}
+  # {{AI_SUMMARY_JOB}}

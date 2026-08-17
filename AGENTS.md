@@ -1,14 +1,15 @@
 # AGENTS.md — workflow-wizard
 
+<!-- WF: DO NOT REGENERATE -->
+## ULTRA IMPORTANT NOTE FOR AI AGENTS 
+ULTRA IMPORTANT! This wizard is designed as instructive prose (for AI agents) + bash snippets as triggers, not as self-contained scripts.
+<!-- /WF: DO NOT REGENERATE -->
+
 ## Commands
 
-| Command | Path |
-|---|---|
-| `/wf-refresh` | `.claude/commands/wf-refresh.md` / `.github/prompts/wf-refresh.prompt.md` |
-| `/wf-worktree` | `.claude/commands/wf-worktree.md` |
-| `/wf-settings` | `.claude/commands/wf-settings.md` |
-| `/wf-onboard` | `.claude/commands/wf-onboard.md` |
-| `/wf-cleanup` | `.claude/commands/wf-cleanup.md` / `.github/prompts/wf-cleanup.prompt.md` |
+This is a documentation/templates repository; there are no automated build, test, lint, or deploy commands. Run checks manually or via your IDE's Markdown tooling.
+
+Wizard slash commands are documented in the README and generated from `templates/commands/`.
 
 ## Code Style & Conventions
 
@@ -26,9 +27,16 @@ templates/        — single source of truth
   protocols/      — packable protocols
   satellites/     — per-IDE context files
 wf-init/          — wizard phases
-  lib/            — builder.md, state.md (contracts)
-  phase*.md       — phases 0 through 8
+  lib/            — builder.md, state.md, state-helpers.sh, refresher.md (contracts/helpers)
+  phase*.md       — phases 0-8 (plus 0b, 0c, 4.5, 4.6, 4.6b, 4.7, 6a, 6b)
+  subagent-*.md   — sub-agent prompts (discovery, builder-core, builder-heavy)
 ```
+
+<!-- WF: DO NOT REGENERATE -->
+## Artifact Store
+
+This project declares **OpenSpec** as the SDD artifact store; change artifacts live in `openspec/changes/<change-name>/`.
+<!-- /WF: DO NOT REGENERATE -->
 
 ## Critical Constraints
 
@@ -38,7 +46,7 @@ wf-init/          — wizard phases
 
 ## Programmatic Checks
 
-`lint + build`
+Manual review and validation; no automated lint/build for this markdown-only repository.
 
 ## Project MCPs
 
@@ -55,11 +63,12 @@ wf-init/          — wizard phases
   your response with the tag `[AGENTS.md drift detected: <description>]`. Do NOT fix AGENTS.md yourself.
 
 
+<!-- WF: DO NOT REGENERATE -->
 ## Critical: AI_DEV_WORKFLOW.md Synchronization
 
 **BEFORE every commit**, if your changes affect ANY of these topics, verify and update AI_DEV_WORKFLOW.md:
 - IDE paths, detection logic, routing tables, or satellite generation
-- Builder phases (B1–B8), sub-agent roles, or staging workflow
+- Builder phases (B1–B9), sub-agent roles, or staging workflow
 - Phase numbering, phase logic, or resumption contracts
 - State machine structure (`.wizard-state.json` shape)
 - Commands (list, location per IDE, or behavior)
@@ -68,9 +77,12 @@ wf-init/          — wizard phases
 - Documentation structure, glossary, or major sections
 
 **Rule**: If it's implemented in code/templates, it must be documented in AI_DEV_WORKFLOW.md. If you change the code, audit that section in the doc and update it if stale. Do not commit code changes without ensuring the doc reflects them accurately.
+<!-- /WF: DO NOT REGENERATE -->
 
 ---
 
-<!-- No agent protocols: the project does not use Ladder, Routes ABC, or TDD. -->
+<!-- WF: DO NOT REGENERATE -->
+<!-- No agent protocols: the project does not use wf-ladder, wf-sdd-trigger, or wf-tdd. -->
+<!-- /WF: DO NOT REGENERATE -->
 
-<!-- wf-version: 0.1.0-beta.1 | source: github.com/hugoafj/ai-workflow-wizard | stack: markdown-docs | features: ladder=no, tdd=no, routing=no, ci=no, cd=no, release=yes -->
+<!-- wf-version: 0.7.1-beta.1 | source: github.com/hugoafj/ai-workflow-wizard | stack: markdown-docs | features: ladder=no, tdd=no, routing=no, ci=no, cd=no, release=yes -->

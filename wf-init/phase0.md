@@ -402,4 +402,12 @@ correct behavior, not a bug you should solve through another path.
 > **⛔ STOP HERE — do not execute anything else.**
 > **Persistence (contract `wf-init/lib/state.md`)**: before advancing, `wf_state_init` if it doesn't exist, and save in `.wizard-state.json` → `gentle_ai` (`installed`, `version`, `install_choice`, `os`, and `warning_incomplete=true` if the user chose "later"). Mark `phases.phase0.status=done` and `phase_pointer="phase0b"` (`wf_phase_done phase0 phase0b`).
 > Tell the user: *"Installation and version verified. Reply **continue** to run the gentle-ai health check."*
-> Wait for the response. Only when they confirm, execute in bash: `cat "$WF_DIR/phase0b.md"`
+> Wait for the response. Only when they confirm, execute in bash:
+
+```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+wf_state_init
+wf_phase_done phase0 phase0b
+cat "$WF_DIR/phase0b.md"
+```

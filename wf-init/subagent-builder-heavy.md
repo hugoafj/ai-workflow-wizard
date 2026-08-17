@@ -5,7 +5,7 @@ You are a Builder agent for the heavy phase. The staging ALREADY has AGENTS.md, 
 ## Context
 
 - `PROJECT_PATH`: absolute path to the target project
-- `WF_PATH`: absolute path to the workflow wizard repo
+- `WF_PATH`: absolute path to the downloaded phase directory (WF_DIR — contains `lib/` and phase files)
 - `WF_STATE`: `{PROJECT_PATH}/.wizard-state.json`
 - `WF_STAGING`: `{PROJECT_PATH}/.wizard-staging/`
 - `WF_RAW`: `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main`
@@ -24,7 +24,7 @@ Extraction formats:
 ### 0. Setup
 
 ```bash
-source "{WF_PATH}/wf-init/lib/state.md"
+source "{WF_PATH}/lib/state-helpers.sh"
 ls "{WF_STAGING}/"  # verify that builder-core already ran
 cd "{PROJECT_PATH}"
 cat .wizard-state.json
@@ -33,14 +33,16 @@ cat .wizard-state.json
 Resolve keys:
 
 ```bash
-IDES=$(jq -r '.answers.ides[]' .wizard-state.json)
+IDES=$(jq -r '.answers.ides[]?' .wizard-state.json)
 LADDER=$(jq -r '.features.decision_ladder' .wizard-state.json)
+TDD=$(jq -r '.features.tdd_protocol' .wizard-state.json)
+TDD_MODE=$(jq -r '.testing.tdd_mode // "standard"' .wizard-state.json)
 ROUTING=$(jq -r '.features.routing_abc' .wizard-state.json)
 CICD=$(jq -r '.features.ci' .wizard-state.json)
 CD=$(jq -r '.features.cd' .wizard-state.json)
 RELEASE=$(jq -r '.features.release_please' .wizard-state.json)
 BACKEND=$(jq -r '.sdd.backend' .wizard-state.json)
-LAYERS=$(jq -r '.testing.layers[]' .wizard-state.json)
+LAYERS=$(jq -r '.testing.layers[]?' .wizard-state.json)
 ```
 
 ### B7 — Commands (the heaviest part)
@@ -200,23 +202,30 @@ Read CI/CD decisions from `.wizard-state.json` → `.ci.*` and `.cd.*`.
    → `{WF_STAGING}/.release-please-manifest.json`
    If `state.ci.release_ai_summary == true`:
     Source: `$WF_RAW/templates/protocols/cicd/variants/ai-summary-job.<provider>.yml.md`
-    → INJECT into `{WF_STAGING}/.github/workflows/release-please.yml` (replace the `# {{AI_SUMMARY_JOB}}` marker — include the full comment)
+    → INJECT into `{WF_STAGING}/.github/workflows/release-please.yml` (replace the `  # {{AI_SUMMARY_JOB}}` job-level comment line with the contents of the fragment; the fragment is a second top-level job, already indented 2 spaces, so it must appear at the same nesting level as the `release-please:` job. If `state.ci.release_ai_summary == false`, remove the `  # {{AI_SUMMARY_JOB}}` marker line entirely and leave only the `release-please:` job.)
 
 **If RELEASE==true and CICD==false** (release-please standalone):
 - Conventional commits + release-please (same sources as above)
 - Without quality guard, without AI review, without security review
 
 **If CD==true** (automatic deploy, `state.cd.enabled == true` and `state.cd.platform == 'vps'`):
-- Source: `$WF_RAW/templates/protocols/cicd/variants/deploy-<runtime>.yml.md`
+- Source: map `state.cd.vps_runtime` to the deploy template:
+  - `pm2` → `$WF_RAW/templates/protocols/cicd/variants/deploy-pm2.node.yml.md`
+  - `nginx_php_fpm` → `$WF_RAW/templates/protocols/cicd/variants/deploy-nginx-phpfpm.laravel.yml.md`
+  - `apache_php_fpm` → `$WF_RAW/templates/protocols/cicd/variants/deploy-apache-phpfpm.laravel.yml.md`
+  - `docker` → `$WF_RAW/templates/protocols/cicd/variants/deploy-docker.yml.md`
   → `{WF_STAGING}/.github/workflows/deploy.yml`
   With placeholders resolved:
   - `{{trigger_event}}` = `tags: ['v*']` or `branches: [main]`
   - `{{node_version}}` = `state.discovery.node_engine`
   - `{{deploy_path}}` = `state.cd.deploy_path`
+  - `{{compose_file}}` = `state.cd.compose_file` (default `docker-compose.prod.yml`)
+  - `{{php_version}}` = from `composer.json` `require.php` (e.g. `8.3`), fallback `8.2`
+  - `{{has_node_assets}}` = `'true'` when `state.cd.stack_detected == 'laravel_node'`, else `'false'`
 
-**Suggestion toggles** (ask the user BEFORE writing):
-- If `gemini`: ask if they want `auto_improve` (default true)
-- If `claude`: ask if they want `inline_suggestions` (default true)
+**Suggestion toggles** (read from state, never ask the user — this runs as a sub-agent):
+- If `gemini`: read `state.ci.auto_improve` (default true) and toggle `auto_improve` accordingly
+- If `claude`: read `state.ci.inline_suggestions` (default true) and toggle `inline_suggestions` accordingly
 
 ### B9 — Register build_plan
 
@@ -224,32 +233,77 @@ When finished, update `.wizard-state.json` with the build plan:
 
 ```bash
 wf_state_set '.build_plan.agents_md' 'true'
-wf_state_set '.build_plan.commands' '["<list of generated command paths>"]'
 wf_state_set '.build_plan.hook' 'true'
-# Register CI/CD files if applicable
-if [ "$CICD" = "true" ]; then
-  wf_state_set '.build_plan.ci_workflows' '["<list of workflows>"]'
+
+ACTIVE_COMMANDS="[]"
+for CMD in wf-worktree wf-settings wf-onboard; do
+  ACTIVE_COMMANDS=$(jq --arg c "$CMD" '. += [$c]' <<< "$ACTIVE_COMMANDS")
+done
+[ "$LADDER" = "true" ] && ACTIVE_COMMANDS=$(jq --arg c "wf-ladder" '. += [$c]' <<< "$ACTIVE_COMMANDS")
+[ "$TDD" = "true" ] && [ -n "$LAYERS" ] && ACTIVE_COMMANDS=$(jq --arg c "wf-tdd" '. += [$c]' <<< "$ACTIVE_COMMANDS")
+{ [ "$ROUTING" = "true" ] || [ "$LADDER" = "true" ] || [ "$TDD" = "true" ]; } && ACTIVE_COMMANDS=$(jq --arg c "wf-orchestrator" '. += [$c]' <<< "$ACTIVE_COMMANDS")
+[ "$ROUTING" = "true" ] && ACTIVE_COMMANDS=$(jq --arg c "wf-sdd-trigger" '. += [$c]' <<< "$ACTIVE_COMMANDS")
+
+COMMANDS_JSON="[]"
+for IDE in $IDES; do
+  while IFS= read -r CMD; do
+    case "$IDE" in
+      claude-code)    REL=".claude/commands/${CMD}.md" ;;
+      opencode)       REL=".opencode/commands/${CMD}.md" ;;
+      cursor)         REL=".cursor/commands/${CMD}.md" ;;
+      windsurf)       REL=".windsurf/workflows/${CMD}.md" ;;
+      kiro)           REL=".kiro/steering/${CMD}.md" ;;
+      vscode-copilot) REL=".github/prompts/${CMD}.prompt.md" ;;
+      codex)          REL=".codex/commands/${CMD}.md" ;;
+      antigravity)    REL=".agents/skills/${CMD}/SKILL.md" ;;
+      *)              REL="" ;;
+    esac
+    if [ -n "$REL" ] && [ -f "{WF_STAGING}/${REL}" ]; then
+      COMMANDS_JSON=$(jq --arg p "$REL" '. += [$p]' <<< "$COMMANDS_JSON")
+    fi
+  done < <(jq -r '.[]' <<< "$ACTIVE_COMMANDS")
+done
+COMMANDS_JSON=$(jq -c <<< "$COMMANDS_JSON")
+
+wf_state_set '.build_plan.commands' "$COMMANDS_JSON"
+```
+
+Mark the Builder phases done and advance the pointer **only if the current phase_pointer is still one of the Builder phases** (skip during `/wf-refresh` so a completed project is not rewound to phase7).
+
+```bash
+CURRENT_PHASE=$(jq -r '.phase_pointer // empty' "{WF_STATE}")
+# phase5 advances to phase6a-agents (the real key); phase6 is a backward-compatible alias.
+if [ "$CURRENT_PHASE" = "phase6" ] || [ "$CURRENT_PHASE" = "phase6a-agents" ] || [ "$CURRENT_PHASE" = "phase6b-build-heavy" ]; then
+  jq '.phases["phase6"].status = "done" |
+      .phases["phase6a-agents"].status = "done" |
+      .phases["phase6b-build-heavy"].status = "done" |
+      .phase_pointer = "phase7" |
+      .updated_at = (now | todate)' "{WF_STATE}" > "{WF_STATE}.tmp"
+  mv "{WF_STATE}.tmp" "{WF_STATE}"
 fi
 ```
 
-Mark `wf_phase_done phase6 phase7`.
+## B9.5 — Register generated files and managed paths (for /wf-refresh)
 
-## B9.5 — Update managed paths (for /wf-refresh)
-
-After all files are written to staging, also populate `state.build_plan.managed_paths` with the list of paths that the wizard owns. This is used by `/wf-refresh` to detect which files can be safely deleted.
+After all files are written to staging, populate `state.build_plan.generated_files` with SHA256 hashes and `state.build_plan.managed_paths` in a single atomic update. This is used by `/wf-refresh` to detect which files changed and which can be safely deleted.
 
 ```bash
-# Build list of managed paths from staging
-cd "{WF_STAGING}"
+# Scan the complete staging directory (null-delimited for paths with spaces).
+cd "{WF_STAGING}" || { echo "ERROR: {WF_STAGING} missing — Builder stage failed" >&2; exit 1; }
+FILES_JSON="[]"
 PATHS_JSON="[]"
-for file in $(find . -type f); do
+while IFS= read -r -d '' file; do
   REL_PATH="${file#./}"
+  HASH=$(wf_sha256 "$file")
+  FILES_JSON=$(jq --arg path "$REL_PATH" --arg hash "$HASH" \
+    '. += [{"path": $path, "hash": $hash, "managed": true}]' <<< "$FILES_JSON")
   PATHS_JSON=$(jq --arg path "$REL_PATH" '. += [$path]' <<< "$PATHS_JSON")
-done
+done < <(find . -type f -print0)
 
 # Update state
-jq --argjson paths "$PATHS_JSON" \
-  '.build_plan.managed_paths = $paths' \
+jq --argjson files "$FILES_JSON" --argjson paths "$PATHS_JSON" \
+  '.build_plan.generated_files = $files |
+   .build_plan.managed_paths = $paths' \
   "{WF_STATE}" > "{WF_STATE}.tmp"
 mv "{WF_STATE}.tmp" "{WF_STATE}"
 
@@ -264,8 +318,8 @@ cd "{PROJECT_PATH}"
   - Post-commit hook: <location>
   - Testing configs: <list>
   - CI/CD: <generated workflows>
-  - build_plan registrado en estado
-  - managed_paths registrado en estado
+  - build_plan registered in state
+  - managed_paths registered in state
 ```
 
 The staging now has all files ready for review (Phase 7).

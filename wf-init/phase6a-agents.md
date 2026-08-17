@@ -10,6 +10,9 @@ Try the delegation path first (most efficient):
 
 ```bash
 # Attempt to get Builder-Core prompt for delegation
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
 BUILDER_CORE_PROMPT=$(cat "$WF_DIR/subagent-builder-core.md" 2>/dev/null)
 if [ -z "$BUILDER_CORE_PROMPT" ]; then
   echo "ERROR: Cannot read subagent-builder-core.md"
@@ -23,8 +26,10 @@ If your agent environment supports the `task` tool:
 
 1. Replace placeholders in the prompt:
    - `{PROJECT_PATH}` → absolute path of the target project
-   - `{WF_PATH}` → absolute path of the workflow wizard repo (`$WF_DIR/..`)
+   - `{WF_PATH}` → absolute path of the downloaded phase directory (`$WF_DIR`)
    - `{WF_RAW}` → `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main`
+   - `{WF_STAGING}` → `{PROJECT_PATH}/.wizard-staging`
+   - `{WF_STATE}` → `{PROJECT_PATH}/.wizard-state.json`
 
 2. Use `task` tool with `subagent_type: general` to launch Builder-Core. Wait for it.
 
@@ -35,6 +40,9 @@ If your agent environment supports the `task` tool:
 If delegation is unavailable (older Windsurf, Devin, CI/CD contexts, or any agent without `task` tool):
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
 cat "$WF_DIR/lib/builder.md"
 ```
 
@@ -45,6 +53,9 @@ Read and execute the Builder procedure inline. It is deterministic and mechanica
 Regardless of delegation or inline execution, validate that `.wizard-staging/` was created and contains expected files:
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
 if [ ! -d .wizard-staging ]; then
   echo "ERROR: .wizard-staging/ was not created."
   echo "This means Builder-Core (B1-B6) did not complete successfully."
@@ -62,8 +73,9 @@ echo "=== Staging directory created ==="
 find .wizard-staging -type f | wc -l
 echo "files in .wizard-staging/"
 
-# Verify key artifacts exist
-for artifact in AGENTS.md .wizard-state.json; do
+# Verify key artifacts exist (.wizard-state.json stays at the project root,
+# never in staging — staging holds only generated files)
+for artifact in AGENTS.md; do
   if [ ! -f ".wizard-staging/$artifact" ]; then
     echo "ERROR: Missing critical artifact: .wizard-staging/$artifact"
     echo "Builder-Core did not complete correctly. Check steps above."
@@ -74,10 +86,19 @@ done
 echo "✓ Builder-Core validation passed"
 ```
 
-### Step 5: Continue to Builder-Heavy
+### Step 5: Mark Builder-Core done and continue to Builder-Heavy
 
-If validation succeeds, continue with part B:
+If validation succeeds, mark this phase done and continue with part B:
 
 ```bash
-cat "$WF_DIR/phase6b-build-heavy.md"
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
+echo "✓ Phase 6a complete"
+if [ "$WF_REFRESH" != "1" ]; then
+  wf_phase_done phase6a-agents phase6b-build-heavy
+  cat "$WF_DIR/phase6b-build-heavy.md"
+else
+  echo "ℹ Refresh mode: Builder-Heavy (B7-B9) runs separately per refresher.md R3 — do not promote phase7 here."
+fi
 ```

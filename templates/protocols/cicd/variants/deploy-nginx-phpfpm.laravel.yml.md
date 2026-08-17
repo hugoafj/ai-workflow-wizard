@@ -1,7 +1,7 @@
 # deploy-nginx-phpfpm.laravel.yml.md
 #
 # Template: GitHub Actions deploy workflow for Laravel apps (with or without Node for frontend assets).
-# Used by phase6e when stack_detected in ('laravel', 'laravel_node') and vps_runtime == 'nginx_php_fpm'.
+# Used by the Builder (Phase 6) when stack_detected in ('laravel', 'laravel_node') and vps_runtime == 'nginx_php_fpm'.
 #
 # Placeholders:
 #   {{trigger_event}}   — 'tags:\n        - \'v*\'' or 'branches:\n        - main'
@@ -9,7 +9,6 @@
 #   {{node_version}}    — e.g. '20' (from .nvmrc or package.json engines)
 #   {{has_node_assets}} — 'true' or 'false' (true when stack_detected == 'laravel_node')
 #   {{deploy_path}}     — e.g. '/var/www/my-app/current'
-#   {{project_name}}    — used for PM2/process name or directory reference
 
 name: Deploy to Production
 
@@ -25,7 +24,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@2.37.2
         with:
           php-version: '{{php_version}}'
           extensions: mbstring, xml, curl, mysql, zip, gd, bcmath, dom, fileinfo
@@ -53,7 +52,7 @@ jobs:
         run: tar -czf deploy.tar.gz --exclude=.git --exclude=node_modules --exclude=vendor .
 
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ '{{' }} secrets.SERVER_IP {{ '}}' }}
           username: ${{ '{{' }} secrets.SSH_USER {{ '}}' }}

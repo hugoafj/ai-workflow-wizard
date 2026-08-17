@@ -23,11 +23,11 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
    pointers). Framework rules are NEVER copied here — they live in
    `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/`.
 
-## Schema (schema_version 2)
+## Schema (schema_version 3)
 
 ```json
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "wizard_version": "<auto: VERSION file in workflow-wizard>",
   "phase_pointer": "phase0",
   "started_at": "ISO-8601",
@@ -45,8 +45,10 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
     "phase45":  { "status": "pending" },
     "phase46":  { "status": "pending" },
     "phase46b": { "status": "pending" },
-    "phase47":  { "status": "pending" },
-    "phase6":   { "status": "pending" },
+    "phase47-cicd": { "status": "pending" },
+    "phase6":        { "status": "pending" },
+    "phase6a-agents": { "status": "pending" },
+    "phase6b-build-heavy": { "status": "pending" },
     "phase7":   { "status": "pending" },
     "phase8":   { "status": "pending" }
   },
@@ -120,7 +122,9 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
     "release_ai_summary": null,
     "release_ai_provider": null,
     "github_remote": null,
-    "e2e_in_ci": false
+    "e2e_in_ci": false,
+    "auto_improve": true,
+    "inline_suggestions": true
   },
 
   "cd": {
@@ -130,12 +134,14 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
     "vps_runtime": null,
     "stack_detected": null,
     "deploy_path": null,
+    "compose_file": null,
     "missing_secrets": []
   },
 
   "migration": {
     "prior_content_action": null,
-    "missing_commands": []
+    "missing_commands": [],
+    "wrap_custom_in_markers": false
   },
 
   "build_plan": {
@@ -156,7 +162,10 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
 ## Key fields
 
 - **`phase_pointer`**: current phase. On startup, the orchestrator reads it; if it is not
-  `phase0`, it offers to resume.
+  `phase0`, it offers to resume. Phase 5 advances to `phase6a-agents` (there is no
+  `phase6.md` file; `phase6` is a backward-compatible alias). Phase 6b is `phase6b-build-heavy`,
+  which advances to `phase7` when complete. Phase 47 is `phase47-cicd` (the old `phase47` key is
+  not used).
 - **`discovery.stack_key`**: normalized stack key (e.g. `node-react`, `php-laravel`,
   `python-django`). This is what the Builder uses to select `variants/<stack_key>.md`.
   **Never branch with `if stack === ...`**: the key selects a file.
@@ -171,59 +180,21 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
 
 Every phase uses these patterns. Requires `jq` (fallback documented below).
 
+The implementation lives in `wf-init/lib/state-helpers.sh`, which is a pure bash
+file meant to be sourced. Phase files and sub-agents should **not** source this
+Markdown file (`state.md`) directly.
+
 ```bash
-WF_STATE=".wizard-state.json"
-WF_RAW="https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main"
+source "$WF_DIR/lib/state-helpers.sh"
+```
 
-# Get wizard version from the repo's VERSION file
-wf_fetch_version() {
-  # Try to get the latest tag from GitHub API
-  local version
-  version=$(curl -fsSL "https://api.github.com/repos/${WIZARD_REPO}/releases/latest" 2>/dev/null | jq -r '.tag_name // empty' 2>/dev/null)
-  
-  # If no release found, try the latest tag
-  if [ -z "$version" ]; then
-    version=$(curl -fsSL "https://api.github.com/repos/${WIZARD_REPO}/tags?per_page=1" 2>/dev/null | jq -r '.[0].name // empty' 2>/dev/null)
-  fi
-  
-  # If still no version, fall back to VERSION file
-  if [ -z "$version" ]; then
-    version=$(curl -fsSL "${WF_RAW}/VERSION" 2>/dev/null | head -1)
-  fi
-  
-  # Final fallback
-  [ -n "$version" ] && echo "$version" || echo "v0.1.0-beta.1"
-}
-
-# Initialize state if it doesn't exist (phase0 creates it on first run)
-wf_state_init() {
-  [ -f "$WF_STATE" ] && return 0
-  local version
-  version=$(wf_fetch_version)
-  cat > "$WF_STATE" <<JSON
-{ "schema_version": 2, "wizard_version": "$version", "phase_pointer": "phase0",
-  "phases": {}, "gentle_ai": {}, "discovery": {}, "answers": {}, "features": {},
-  "agents": [], "sdd": {}, "testing": {}, "mcps": [], "migration": {}, "build_plan": {} }
-JSON
-}
-
-# Read a field (e.g. wf_state_get '.answers.project_name')
-wf_state_get() { jq -r "$1 // empty" "$WF_STATE" 2>/dev/null; }
-
-# Write a field (e.g. wf_state_set '.discovery.classification' '"legacy"')
-wf_state_set() {
-  local filter="$1" value="$2" tmp
-  tmp="$(mktemp)"
-  jq "$filter = $value | .updated_at = (now | todate)" "$WF_STATE" > "$tmp" && mv "$tmp" "$WF_STATE"
-}
-
-# Mark phase and advance pointer (e.g. wf_phase_done phase1 phase2)
-wf_phase_done() {
-  local done_phase="$1" next="$2" tmp
-  tmp="$(mktemp)"
-  jq ".phases[\"$done_phase\"].status = \"done\" | .phase_pointer = \"$next\" | .updated_at = (now | todate)" \
-    "$WF_STATE" > "$tmp" && mv "$tmp" "$WF_STATE"
-}
+Available helpers:
+- `wf_fetch_version` — Get wizard version from the repo `VERSION` file (fallback: local `VERSION`, GitHub releases/tags); normalized, no `v` prefix.
+- `wf_state_init` — Initialize `.wizard-state.json` if it doesn't exist.
+- `wf_sha256 <file>` — Compute SHA256 hash of a file (portable macOS/Linux fallback).
+- `wf_state_get '<jq-filter>'` — Read a field from state.
+- `wf_state_set '<jq-filter>' '<value>'` — Write a field to state.
+- `wf_phase_done <done_phase> <next>` — Mark a phase done and advance pointer.
 ```
 
 > **IMPORTANT rule**: the initial creation uses `wf_state_init` (cat >). **Updates**
@@ -236,7 +207,7 @@ wf_phase_done() {
 
 ## Resumption
 
-The orchestrator (`wf-init.md`) on startup:
+The orchestrator (the `/wf-init` skill, `templates/commands/wf-init/_base.md`) on startup:
 ```bash
 if [ -f .wizard-state.json ]; then
   PTR=$(jq -r '.phase_pointer' .wizard-state.json 2>/dev/null)

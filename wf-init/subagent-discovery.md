@@ -5,16 +5,16 @@ You are a project discovery agent. Your job is to run bash commands to analyze a
 ## Context you receive
 
 - `PROJECT_PATH`: absolute path to the target project
-- `WF_PATH`: absolute path to the workflow wizard repo
+- `WF_PATH`: absolute path to the downloaded phase directory (WF_DIR — contains `lib/` and phase files)
 - `WF_STATE`: `{PROJECT_PATH}/.wizard-state.json`
 - `WF_RAW`: `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main`
 
 ## Instructions
 
-### 1. Inicializar helpers de estado
+### 1. Initialize state helpers
 
 ```bash
-source "{WF_PATH}/wf-init/lib/state.md"
+source "{WF_PATH}/lib/state-helpers.sh"
 ```
 
 ### 2. Discovery — bash commands (phase1.md)

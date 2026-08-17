@@ -10,7 +10,8 @@
 > The `/wf-init` wizard is a **state machine with state persisted on disk**:
 >
 > - **State** (user responses + discovery) → `.wizard-state.json` at the project root
->   (contract: `wf-init/lib/state.md`). The process is resumable even if the
+>   (contract: `wf-init/lib/state.md`; read/write helpers in `wf-init/lib/state-helpers.sh`;
+>   refresh orchestrator in `wf-init/lib/refresher.md`). The process is resumable even if the
 >   conversation is lost between phases.
 > - **Permanent knowledge** (wf-ladder, wf-sdd-trigger, wf-tdd, SDD, CI/CD,
 >   Testing, IDEs, Commands, Architecture) → `templates/protocols/<module/>` as **single
@@ -69,7 +70,7 @@ Terms that appear constantly. No need to memorize them; come back to this sectio
 
 **Worktree** — Isolated git folder that shares the same repo. Useful for having multiple agents working in parallel without stepping on each other, each in their own worktree.
 
-**Wizard `/wf-init`** — Global slash command for this workflow that initializes a project: installs and verifies gentle-ai automatically (Phase 0), discovers the project (Phases 1-4), runs `/sdd-init` with backend choice showing all three modes (Phase 4.5), generates `AGENTS.md` with "📋 wf-sdd-trigger" section (Phase 6), configures post-commit hook that detects AGENTS.md and SDD drift. Installed with `install.sh` as a global slash command. Architecture: orchestrator (`wf-init.md`) + phase files in `wf-init/` (read on-demand from disk).
+**Wizard `/wf-init`** — Global slash command for this workflow that initializes a project: installs and verifies gentle-ai automatically (Phase 0), discovers the project (Phases 1-4), runs `/sdd-init` with backend choice showing all three modes (Phase 4.5), generates `AGENTS.md` with "📋 wf-sdd-trigger" section (Phases 6a and 6b), configures post-commit hook that detects AGENTS.md and SDD drift. Installed with `install.sh` as a global slash command. Architecture: orchestrator (`templates/commands/wf-init/_base.md`) + phase files in `wf-init/` (read on-demand from disk).
 
 **Hook (git hook)** — Script that git executes automatically on certain events (commit, push). Runs only on your local machine, not on GitHub. We use it to detect drift in AGENTS.md.
 
@@ -343,8 +344,8 @@ gentle-ai status   # view configured agents specifically
 ### 4.7 Update
 
 ```bash
-brew upgrade gentle-ai      # actualiza el binario
-gentle-ai upgrade           # actualiza componentes internos (skills, sub-agents, configs)
+brew upgrade gentle-ai      # upgrade the binary
+gentle-ai upgrade           # upgrade internal components (skills, sub-agents, configs)
 gentle-ai --version         # verify version
 ```
 
@@ -519,20 +520,26 @@ Stack: Vite 8 + React 19.2 + TS 6 + Tailwind 4 + ESLint 9 flat config. Size: ~82
 
 ### 5.3 Wizard `/wf-init` (greenfield + legacy)
 
-Slash command that orchestrates the complete workflow bootstrap in a project. Split architecture — the orchestrator (`wf-init.md`) is the only thing attached to the chat; phases live in `wf-init/` (10 files) and the agent reads them from disk on-demand. This solves the "lost in the middle" problem a monolithic file would have: the agent only keeps the orchestrator + the active phase in context at any time.
+Slash command that orchestrates the complete workflow bootstrap in a project. Split architecture — the orchestrator (`templates/commands/wf-init/_base.md`) is the only thing attached to the chat; phases, sub-agents and lib contracts/helpers (`state.md`, `state-helpers.sh`, `builder.md`, `refresher.md`) live in `wf-init/` and the agent reads them from disk on-demand. This solves the "lost in the middle" problem a monolithic file would have: the agent only keeps the orchestrator + the active phase in context at any time.
 
 The wizard phases:
 
 - **Phase 0** — Self-contained prerequisite. Installs/verifies gentle-ai, runs `gentle-ai doctor`, confirms active agents for this project.
+- **Phase 0b** — System health check. Verifies `gentle-ai doctor` critical checks, warns on disk space and Engram reachability.
+- **Phase 0c** — Workflow feature selection. Lets the user toggle routing, TDD, CI/CD, release-please and other optional modules before discovery.
 - **Phase 1** — Discovery (lists files, manifests, previous satellites, commits).
 - **Phase 2** — Migration of previous artifacts (if any with their own content).
 - **Phase 3** — Mode: greenfield vs legacy (auto-detect + confirmation).
 - **Phase 4** — Reverse engineering (legacy only).
-- **Phase 4.5** — SDD initialization. With the context already discovered (committers, stack, greenfield vs legacy), the wizard explains the three backends (engram / openspec / hybrid), makes a grounded recommendation, and runs `/sdd-init` with the user's choice. The wizard always shows all three modes — the user decides. For Windsurf/Devin, it also ensures the "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule is present in the project's `AGENTS.md`; on greenfield projects (where Phase 6 has not generated `AGENTS.md` yet) it creates the file directly so `/sdd-init` can load the legacy skill paths in the new session.
+- **Phase 4.5** — SDD initialization (conditional, only if routing or TDD is enabled). With the context already discovered (committers, stack, greenfield vs legacy), the wizard explains the three backends (engram / openspec / hybrid), makes a grounded recommendation, and runs `/sdd-init` with the user's choice. The wizard always shows all three modes — the user decides. For Windsurf/Devin, it also ensures the "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule is present in the project's `AGENTS.md`; on greenfield projects (where Phase 6a has not generated `AGENTS.md` yet) it creates the file directly so `/sdd-init` can load the legacy skill paths in the new session.
+- **Phase 4.6** — Testing stack setup (conditional, only if TDD is enabled). Detects or installs the selected testing layers (unit, integration, E2E) and registers the Playwright MCP when applicable.
+- **Phase 4.6b** — Testing extras and MCP registration (conditional, only if TDD is enabled). Optional coverage targets, visual regression, Page Object Model, and final MCP registration.
+- **Phase 4.7** — CI/CD configuration (conditional, only if CI, CD, or release-please is enabled). Collects AI reviewer, security review, conventional commits, release-please, E2E in CI, and tag-based deploy preferences; writes no files here.
 - **Phase 5** — Minimum questions (4-5 depending on path).
-- **Phase 6** — File generation in memory (does not write yet). The AGENTS.md includes the "📋 wf-sdd-trigger" section as part of the base template.
+- **Phase 6a** — Deterministic assembly (Builder-Core): `AGENTS.md`, packaged protocols, and per-IDE satellites into `.wizard-staging/` on disk (does not promote to the project root yet).
+- **Phase 6b** — Deterministic assembly (Builder-Heavy): per-IDE commands, post-commit hook, testing configs, and CI/CD into `.wizard-staging/`.
 - **Phase 7** — Human review gate (preview, approval).
- - **Phase 8** — Write, handle `.gitignore`, install post-commit hook (detects AGENTS.md and SDD drift in the same hook), commit. When Windsurf is active, re-inserts the "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule into `AGENTS.md` after the staging copy (portable head/tail/cat, verified with a loud failure check) — the staging router does not carry the rule. Validates the `AGENTS.md` `wf-version` footer is a concrete semver (never `latest` or an unresolved placeholder) and cross-checks it against the state's `wizard_version`, failing loudly on mismatch — a non-semver footer would block every `/wf-refresh` (strict version equality).
+- **Phase 8** — Write, handle `.gitignore`, install post-commit hook (detects AGENTS.md and SDD drift in the same hook), commit. When Windsurf is active, re-inserts the "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule into `AGENTS.md` after the staging copy (portable head/tail/cat, verified with a loud failure check) — the staging router does not carry the rule. Validates the `AGENTS.md` `wf-version` footer is a concrete semver (never `latest` or an unresolved placeholder) and fails loudly if it is not — a non-semver footer blocks every `/wf-init` and `/wf-refresh`. It also cross-checks the footer against the state's `wizard_version` and warns on mismatch (it does not abort, so a manually advanced footer does not break a refresh).
 
 **How it is invoked**: with `install.sh` it is installed as a global slash command on all detected IDEs. You invoke it with `/wf-init` from any repo. The agent detects and reads the phase files from the repo as it progresses.
 
@@ -562,6 +569,7 @@ These live in the repo. Each one connects its specific IDE to THIS project's `AG
 - `.windsurf/rules/project.md` with `trigger: always_on` (Windsurf does not read AGENTS.md).
 - `.kiro/steering/project-context.md` (Kiro partial).
 - `GEMINI.md` (Gemini CLI partial) — `ANTIGRAVITY.md` (Antigravity CLI).
+- `.devin/rules/project.mdc` (Devin local IDE rules; the wizard does not generate this — it is separate from the generated `.devin/skills/`).
 - `post-commit` hook for drift detection.
 - Exceptions in `.gitignore` so satellites are versioned.
 
@@ -694,16 +702,16 @@ Solves two different problems:
 
 **Git hooks run ONLY locally**, not on GitHub or CI. Each developer installs them on their machine. The distribution problem is solved with **Husky** (configured in the CI/CD block), which registers hooks via `package.json` so they install automatically with `npm install`.
 
-**Trigger 2 · Slash command `/wf-refresh`**. When invoked, the agent runs seven phases (builder-driven):
+**Trigger 2 · Slash command `/wf-refresh`**. When invoked, the agent runs eight phases (builder-driven, orchestrated by `wf-init/lib/refresher.md`, using `wf-init/lib/state-helpers.sh` for state access):
 
-- **Phase R-1**: Update global commands (`wf-init`, `wf-refresh`, `wf-cleanup`) if outdated
-- **Phase R0**: Validate `.wizard-state.json` and detect active IDEs
-- **Phase R1**: Re-discover project (stack, node engine, etc.) and detect drift
-- **Phase R2**: Migrate state schema and ask about new optional features
-- **Phase R3**: Re-run Builder (B1-B9) to generate all artifacts into `.wizard-staging/`
-- **Phase R4**: Compare staging with project using SHA256 hashes; classify files as add/update/delete/unchanged
+- **Phase R-1** (Global): Fetch wizard version from GitHub; skip refresh if already up-to-date
+- **Phase R0** (Validate): Validate `.wizard-state.json` structure and detect active IDEs
+- **Phase R1** (Discover): Re-discover project (stack, node engine, etc.) and detect drift
+- **Phase R2** (Migrate): Migrate state schema; ask about new optional features
+- **Phase R3**: Re-run Builder (B1-B9) to generate all artifacts into `.wizard-staging/` (first snapshots the pre-Builder managed files for deletion detection)
+- **Phase R4**: Compare the R3 baseline snapshot with staging using SHA256 hashes; classify files as add/update/delete/unchanged
 - **Phase R5**: Show grouped diff and collect user approvals
-- **Phase R6**: Apply approved changes, update state, commit, clean staging
+- **Phase R6**: Apply approved changes only; on approval update state, write `.wizard-managed-files.json`, and commit via an explicit pathspec (the user's other staged work is never unstaged); a fully declined refresh writes nothing
 
 **Trigger 3 · Rule in AGENTS.md**. The most effective. A line in "Behavior Preferences":
 
@@ -722,10 +730,10 @@ The agent already reading the code is the one who best detects inconsistencies. 
 Footer of `AGENTS.md` with version + GitHub source URL + accepted optional features:
 
 ```markdown
-<!-- wf-version: 0.1.0-beta.1 | source: github.com/hugoafj/ai-workflow-wizard | stack: vite-react-ts | optional-features: decision-ladder=yes -->
+<!-- wf-version: 0.7.1-beta.1 | source: github.com/hugoafj/ai-workflow-wizard | stack: vite-react-ts | features: ladder=no, tdd=no, routing=no, ci=no, cd=no, release=yes -->
 ```
 
-The `optional-features` field is new and critical. It tracks which optional features of the wizard the user accepted or rejected. Without it, every time the wizard ships a new feature, the system wouldn't know if the user already considered it or if it's new to them.
+The `features` field is new and critical. It tracks which optional features of the wizard the user accepted or rejected. Without it, every time the wizard ships a new feature, the system wouldn't know if the user already considered it or if it's new to them.
 
 **Three wizard distribution options**:
 
@@ -747,37 +755,41 @@ The `optional-features` field is new and critical. It tracks which optional feat
 4. **Custom content preservation**: Sections inside `<!-- WF: DO NOT REGENERATE -->` markers in `AGENTS.md` are preserved.
 5. **State migrations**: Schema and feature migrations are applied automatically; user is asked about new optional features.
 
-**Phases R1–R6 in detail**:
+**Phases R-1, R0, R1–R6 in detail**:
 
+- **Phase R-1 · Global version check**: Fetches wizard version from remote; exits early if already up-to-date.
+- **Phase R0 · Pre-flight state checks**: Validates `.wizard-state.json` exists and contains minimal required structure; detects active IDEs.
 - **Phase R1 · Project content drift**: Re-discovers the project (stack, node engine, etc.) and detects changes.
 - **Phase R2 · State/schema migration**: Migrates `.wizard-state.json` to current schema; asks about new optional features.
-- **Phase R3 · Builder re-run**: Re-runs B1-B9 to generate all artifacts into `.wizard-staging/`.
-- **Phase R4 · Hash-based diff**: Compares staging vs project; classifies files as add/update/delete/unchanged.
-- **Phase R5 · Review gate**: Shows grouped diff; collects user approvals.
-- **Phase R6 · Apply and close**: Applies approved changes, updates state, commits, cleans staging.
+- **Phase R3 · Builder re-run**: Re-runs B1-B9 to generate all artifacts into `.wizard-staging/` using only the Builder steps of `phase6a-agents.md` / `phase6b-build-heavy.md` (B1-B9). It **never follows the `/wf-init` phase 7/8 tail** (no `wf_phase_done phase6 phase7`, no `cat phase7.md`) — after Builder-Heavy validation it returns to Phase R4. Staging validation checks the generated artifacts (e.g. `AGENTS.md`); `.wizard-state.json` intentionally stays at the project root and is never expected inside staging. **Step 0 runs first**: it snapshots the pre-Builder `managed_paths`/`generated_files` into `.wizard-refresh-baseline.json` because the Builder overwrites `build_plan` with the new staging set.
+- **Phase R4 · Hash-based diff**: Compares the R3 baseline snapshot (not the live `build_plan`, which the Builder already overwrote) against staging; classifies files as add/update/delete/unchanged, with `deleted_modified` flagged when the user edited a file since the last refresh.
+- **Phase R5 · Review gate**: Shows a real content preview (added → staged content; updated → `diff -u` against staging; deleted/deleted_modified → current content), bounded by `MAX_PREVIEW_LINES` (default 120) per file, then collects user approvals.
+- **Phase R6 · Apply and close**: Applies approved changes, updates state, writes `.wizard-managed-files.json`, and commits. Bookkeeping (state, `.wizard-managed-files.json`, `.gitignore`) only runs when at least one category is approved; a declined refresh writes nothing. The commit uses an explicit pathspec (`--pathspec-from-file`, supported by `git commit`/`git add`) so it contains only approved paths and never unstages unrelated user work (`git reset --mixed` is not used); the empty-diff guard reads the approved paths into positional arguments (`git diff --cached --quiet -- <paths>`), since `git diff` does not support `--pathspec-from-file`. When Windsurf/Devin is an active IDE and the "Gentle AI — Legacy Path Bridge" rule is missing, R6 reinserts it into the STAGED `AGENTS.md` (same safety net as Phase 8) wrapped in `<!-- WF: DO NOT REGENERATE -->` markers so future refreshes preserve it — and only when `AGENTS.md` is itself approved (added/updated), so a declined refresh writes nothing.
 
 **New optional features** are handled in Phase R2:
 
 When running `/wf-refresh`, Phase R2 does the following:
 
 1. Reads `.wizard-state.json` features (e.g., `features.decision_ladder`).
-2. Detects new features in the current wizard version.
-3. **For each feature not in the local state**: asks you. Example:
+2. After `migrate_state`, checks the protocol features that can be enabled without
+   the full phase47-cicd questionnaire: `decision_ladder`, `tdd_protocol`, `routing_abc`.
+3. **For each feature not in the local state**: asks you. In non-interactive/agent
+   contexts set `WF_REFRESH_DEFAULT_ANSWER=yes|no` so the migration can proceed
+   without stdin; otherwise it fails loudly instead of silently defaulting to NO.
+   (`ci`, `cd`, and `release_please` are NOT asked here — they require the full
+   phase47-cicd questionnaire and are configured via `/wf-settings` or `/wf-init`.)
+4. Example:
 
 ```
-New optional features available:
+New optional feature available: decision_ladder
+Enable decision_ladder? [y/n]
 
-1. ABC routing pattern
-   Enables ABC routing for SDD workflows.
-   Enable? [y/n]
-
-2. Visual regression testing
-   Adds visual regression tests to your testing config.
-   Enable? [y/n]
+New optional feature available: routing_abc
+Enable routing_abc? [y/n]
 ```
 
-4. For each user response, updates `features.*` in `.wizard-state.json`.
-5. Features marked as disabled are not asked again in future refreshes.
+5. For each user response, updates `features.*` in `.wizard-state.json`.
+6. Features marked as disabled are recorded explicitly and not asked again in future refreshes.
 
 #### When refresh is NOT enough and you need to re-run the wizard
 
@@ -822,7 +834,7 @@ gentle-ai doctor
 
 #### Step 3 · Have the wizard ready
 
-The wizard lives in the `workflow-wizard` repo: the orchestrator is `wf-init.md` (85 lines) and the phase files are in `wf-init/`. Make sure you have the repo cloned on your machine. The agent detects the location automatically.
+The wizard lives in the `workflow-wizard` repo: the orchestrator is `templates/commands/wf-init/_base.md` and the phase files are in `wf-init/`. Make sure you have the repo cloned on your machine. The agent detects the location automatically.
 
 #### Step 4 · Open a new Claude Code session (or your preferred IDE/CLI)
 
@@ -837,7 +849,7 @@ claude
 
 #### Step 5 · Paste the orchestrator as the first prompt
 
-Open `wf-init.md` in another editor (it's only 85 lines). Select all (Cmd+A / Ctrl+A). Copy it. Paste it into the new AI IDE session as the first message.
+Open `templates/commands/wf-init/_base.md` in another editor. Select all (Cmd+A / Ctrl+A). Copy it. Paste it into the new AI IDE session as the first message.
 
 > Don't add anything before or after. The agent will locate the phase files on your machine and read each one as it progresses. You don't need to attach anything else.
 
@@ -847,7 +859,7 @@ The agent will process the wizard phase by phase. **Each phase ends with a PAUSE
 
 What you will see, in order:
 
-**Phase 0 — Self-contained prerequisite**. The agent checks if gentle-ai is installed. If not, it installs it automatically (asks for confirmation and explains why it is mandatory). If already installed, it compares local vs remote version and recommends whether the update is mandatory or suggested. Then runs `gentle-ai doctor` and shows you the health summary. At the end it asks which configured agents you will use in this project — that determines the satellites generated in Phase 6.
+**Phase 0 — Self-contained prerequisite**. The agent checks if gentle-ai is installed. If not, it installs it automatically (asks for confirmation and explains why it is mandatory). If already installed, it compares local vs remote version and recommends whether the update is mandatory or suggested. Then runs `gentle-ai doctor` and shows you the health summary. At the end it asks which configured agents you will use in this project — that determines the satellites generated in Phases 6a and 6b.
 
 **Phase 1 — Discovery report**. The agent lists the files it found, the detected stack, etc. Approve to continue.
 
@@ -857,9 +869,19 @@ What you will see, in order:
 
 **Phase 4 — Reverse engineering**. Legacy only. Reports detected conventions. Confirm or correct.
 
+**Phase 4.5 — SDD initialization** (conditional, only if routing or TDD is enabled). Selects the SDD backend and applies the Windsurf/Devin compatibility workaround.
+
+**Phase 4.6 — Testing stack setup** (conditional, only if TDD is enabled). Detects or installs the selected testing layers.
+
+**Phase 4.6b — Testing extras** (conditional, only if TDD is enabled). Optional coverage targets, visual regression, Page Object Model, and final MCP registration.
+
+**Phase 4.7 — CI/CD configuration** (conditional, only if CI, CD, or release-please is enabled). Collects AI reviewer, security review, conventional commits, release-please, and tag-based deploy preferences; writes no files here.
+
 **Phase 5 — Minimum questions**. 4-5 questions depending on path. Answer short and specific. The key question is **which IDEs/CLIs you will use** — that determines the custom satellites generated.
 
-**Phase 6 — In-memory generation**. The agent assembles all files but does NOT write them yet. The generated AGENTS.md includes the abbreviated SDD flow in Behavior Preferences by default.
+**Phase 6a — Staging generation (Builder-Core)**. The agent assembles `AGENTS.md`, packaged protocols, and per-IDE satellites into `.wizard-staging/` on disk but does NOT promote them to the project root yet.
+
+**Phase 6b — Staging generation (Builder-Heavy)**. The agent assembles per-IDE commands, post-commit hook, testing configs, and CI/CD into `.wizard-staging/`.
 
 **Phase 7 — Review gate**. Shows you the complete AGENTS.md and the list of files to be created. **Read them carefully**. If something doesn't fit, say "let me edit X first" and describe the change. The agent adjusts and shows again.
 
@@ -1201,7 +1223,7 @@ openspec/
 │       ├── specs/                  ← delta specs (ADDED/MODIFIED/REMOVED)
 │       ├── design.md
 │       └── tasks.md
-└── changes/archive/                ← cambios completados
+└── changes/archive/                # completed changes
     └── YYYY-MM-DD-<change-id>/
         └── (frozen artifacts as historical reference)
 ```
@@ -1290,7 +1312,7 @@ If the agent determined `wf-force-sdd` and you confirm it's trivial:
 This task is simpler than what you classified in the wf-preflight. Reclassify as wf-no-sdd and implement directly. The AGENTS.md constraints still apply.
 ```
 
-> The exact text of the "📋 wf-sdd-trigger" section lives in each project's AGENTS.md (the wizard injects it in Phase 6, and `wf-refresh` syncs it in Layer 2). This section 6.3 is only the conceptual summary.
+> The exact text of the "📋 wf-sdd-trigger" section lives in each project's AGENTS.md (the wizard injects it in Phases 6a/6b, and `/wf-refresh` re-runs the Builder in Phase R3 to keep it synced). This section 6.3 is only the conceptual summary.
 
 #### The human gate in each phase
 
@@ -1736,19 +1758,19 @@ Complete output order before implementing: 🪜 Ladder → 🔍 Preflight → �
 
 ### 7.5 Project-specific commands
 
-Commands the wizard generates in Phase 6 and writes in Phase 8. They are project-specific markdown files — live in the repo, not globally. They are used as slash commands in the IDE (correct format per IDE).
+Commands the wizard generates in Phases 6a/6b and writes in Phase 8. They are project-specific markdown files — live in the repo, not globally. They are used as slash commands in the IDE (correct format per IDE).
 
 **`/wf-ladder`** — forces explicit wf-ladder with visible `🪜` output per rung (only if `LADDER == true`).
 **`/wf-tdd`** — invokes the TDD ritual explicitly (only if `TDD == true` AND testing layers exist).
 **`/wf-orchestrator`** — single entry point for the wizard's own gate sequence (only if `ROUTING == true` OR `LADDER == true` OR `TDD == true`).
 **`/wf-sdd-trigger`** — forces the SDD classification tree (only if `ROUTING == true`).
 **`/wf-onboard`** — stub that points to `wf-onboard.md` for new developer onboarding.
-**`/wf-settings`** — toggle optional modules: CI/CD, TDD, testing extras, Decision Ladder.
+**`/wf-settings`** — toggle optional modules: TDD, testing extras, Decision Ladder, SDD backend, CI/CD, release strategy, and active IDEs/CLIs.
 **`/wf-worktree`** — git worktree management with automatic port assignment.
 
-**Global vs project-specific commands**: `wf-init`, `wf-refresh`, and `wf-cleanup` are installed globally with `install.sh`. `wf-onboard`, `wf-settings`, and `wf-worktree` are generated per project in Phase 6. `wf-ladder`, `wf-tdd`, `wf-orchestrator`, and `wf-sdd-trigger` are project-specific too, each conditional on its feature flag(s). `/wf-cicd` was archived; CI/CD re-configuration happens through `/wf-settings` (options 9-14), whose single source is the `cicd` protocol.
+**Global vs project-specific commands**: `wf-init`, `wf-refresh`, and `wf-cleanup` are installed globally with `install.sh`. `wf-onboard`, `wf-settings`, and `wf-worktree` are generated per project in Phases 6a/6b. `wf-ladder`, `wf-tdd`, `wf-orchestrator`, and `wf-sdd-trigger` are project-specific too, each conditional on its feature flag(s). `/wf-cicd` was archived; CI/CD and release-strategy re-configuration happen through `/wf-settings` (options 9–16), whose single source is the `cicd` protocol. Options 17–18 (Windsurf fix and IDE/CLI list) are handled by other protocols.
 
-**Skills 1:1** — every command in this section is also packaged as a SKILL.md, so it can be invoked as a slash command AND by natural language. Project commands are emitted by Builder B4 in the IDE's native skill path (`.claude/skills/`, `.kiro/skills/`, `.codex/skills/`, `.windsurf/skills/`, `.devin/skills/`) plus the universal `.agents/skills/<cmd>/SKILL.md` and the flat `.agents/protocols/<cmd>.md`. Global commands get the same 1:1 from `install.sh` (each detected IDE's skill path + `~/.agents/skills/`).
+**Skills 1:1** — every command in this section is also packaged as a SKILL.md, so it can be invoked as a slash command AND by natural language. Project commands are emitted by Builder B4 in the IDE's native skill path (`.claude/skills/`, `.cursor/skills/`, `.kiro/skills/`, `.codex/skills/`, `.gemini/skills/`, `.windsurf/skills/`, `.devin/skills/`) plus the universal `.agents/skills/<cmd>/SKILL.md` and the flat `.agents/protocols/<cmd>.md`. Global commands get the same 1:1 from `install.sh` (each detected IDE's skill path + `~/.agents/skills/`).
 
 **Correct paths and formats per IDE** (verified against official documentation):
 
@@ -1811,7 +1833,7 @@ Success signals:
 - **Phase 4**: final verification with status summary and project commands.
 - **Phase 5**: suggests adding a mention to `/wf-onboard` in the README if it doesn't exist.
 
-**How to use**: generated as a project-specific slash command in Phase 6 of `/wf-init`. Invoked with `/wf-onboard` from the cloned repo root.
+**How to use**: generated as a project-specific slash command in Phases 6a/6b of `/wf-init`. Invoked with `/wf-onboard` from the cloned repo root.
 
 **The project README should include**: "If you are new to this repo, run `/wf-onboard` to configure your local environment."
 
@@ -1874,7 +1896,7 @@ This is the only thing gentle-ai truly automates. If your team uses OpenCode:
 # Create a "cheap" profile for experimentation: economical model in general,
 # but a more capable model specifically for the design phase
 gentle-ai sync --profile cheap:openrouter/qwen/qwen3-30b-a3b:free
-gentle-ai sync --profile-phase cheap:sdd-design:anthropic/claude-sonnet-4-20250514
+gentle-ai sync --profile-phase cheap:sdd-design:anthropic/claude-sonnet-5
 ```
 
 You can also create via TUI: `gentle-ai` → "OpenCode SDD Profiles" → Create.
@@ -1913,7 +1935,7 @@ This is real friction compared to OpenCode, but it's the current reality of gent
 
 ### 8.4 Worktrees — `/wf-worktree` (built in this block)
 
-gentle-ai does not manage worktrees. The only thing it does is the "Incident rule" from 8.2: if it detects something went wrong with a worktree, it requires an audit before continuing — but it doesn't create, list, or clean worktrees for you. That's why the worktree wizard exists: `/wf-worktree` is a project-specific slash command generated in Phase 6.
+gentle-ai does not manage worktrees. The only thing it does is the "Incident rule" from 8.2: if it detects something went wrong with a worktree, it requires an audit before continuing — but it doesn't create, list, or clean worktrees for you. That's why the worktree wizard exists: `/wf-worktree` is a project-specific slash command generated in Phases 6a/6b.
 
 #### 8.4.1 What it solves
 
@@ -2073,7 +2095,7 @@ The command stub in `AGENTS.md` (or in the IDE's commands directory) simply indi
 
 #### 8.4.8 Installation as command (same pattern as Block 3)
 
-Same as `wf-ladder` and `wf-onboard`, `/wf-worktree` is generated in Phase 6 of `wf-init` (or added via `/wf-refresh` if the project is already initialized) for each active IDE, with the same path table and formats from section 7.5:
+Same as `wf-ladder` and `wf-onboard`, `/wf-worktree` is generated in Phases 6a/6b of `wf-init` (or added via `/wf-refresh` if the project is already initialized) for each active IDE, with the same path table and formats from section 7.5:
 
 | IDE | Path | Format |
 |---|---|---|
@@ -2086,7 +2108,7 @@ Same as `wf-ladder` and `wf-onboard`, `/wf-worktree` is generated in Phase 6 of 
 
 It is a **project-specific** command (like `wf-ladder`), not global — depends on the repo you're in, although its internal logic is generic.
 
-The complete `wf-worktree.md` file is already built as a standalone file (same format as `wf-onboard.md`): three operations (`new`, `list`, `clean`), free port detection per worktree, internal natural language mapping, and inviolable rules to never push or delete without explicit confirmation. It is included in the `EXPECTED_COMMANDS` and in the per-IDE command generation — a project running `/wf-init` from scratch receives it right away, and one already initialized receives it via `/wf-refresh` (Phase 3.5, check for missing commands).
+The complete `wf-worktree.md` file is already built as a standalone file (same format as `wf-onboard.md`): three operations (`new`, `list`, `clean`), free port detection per worktree, internal natural language mapping, and inviolable rules to never push or delete without explicit confirmation. It is included in the `EXPECTED_COMMANDS` and in the per-IDE command generation — a project running `/wf-init` from scratch receives it right away, and one already initialized receives it via `/wf-refresh` (builder-driven refresh, check for missing commands).
 
 ---
 
@@ -2124,7 +2146,7 @@ The final design separates three decisions that are orthogonal to each other —
 
 ### 9.3 TDD Mode — how it is asked and what changes
 
-In Phase 4.6 of `wf-init.md`, immediately after choosing testing layers (unit/integration/e2e), the wizard asks:
+In Phase 4.6 of `/wf-init`, immediately after choosing testing layers (unit/integration/e2e), the wizard asks:
 
 ```
 What TDD mode do you want for this project?
@@ -2164,11 +2186,11 @@ The pattern consists of two different loops for the same tool:
 - **Explore first if**: the flow has multiple visual states, transitions or animations; it's the first time that interaction is tested; or the user explicitly asks for it.
 - **Go direct to spec if**: it's a simple known CRUD (create → appears in list, edit → updates) without complex visual states, or a similar template spec already exists.
 
-This criterion lives as its own subsection within the TDD Protocol in `AGENTS.md` (see `wf-init.md`, "Playwright Dual-loop" section), applying equally regardless of whether the project uses Standard TDD Protocol or Strict TDD Mode.
+This criterion lives as its own subsection within the TDD Protocol in `AGENTS.md` (see `/wf-init`, "Playwright Dual-loop" section), applying equally regardless of whether the project uses Standard TDD Protocol or Strict TDD Mode.
 
 ### 9.5 `data-testid` convention — mandatory when E2E is present
 
-When the project activates the E2E layer in Phase 4.6, `wf-init.md` adds to the Testing Approach section of `AGENTS.md` the requirement that every interactive element (buttons, inputs, links) receives its own `data-testid` **at component creation time**, not later when a test needs it. Format: `data-testid="<context>-<element>"` in kebab-case. The practical reason: without this, E2E specs depend on visible text or Tailwind classes, both fragile against copy or style changes that have nothing to do with the behavior the test is trying to verify.
+When the project activates the E2E layer in Phase 4.6, `/wf-init` adds to the Testing Approach section of `AGENTS.md` the requirement that every interactive element (buttons, inputs, links) receives its own `data-testid` **at component creation time**, not later when a test needs it. Format: `data-testid="<context>-<element>"` in kebab-case. The practical reason: without this, E2E specs depend on visible text or Tailwind classes, both fragile against copy or style changes that have nothing to do with the behavior the test is trying to verify.
 
 ### 9.6 Optional extras — coverage targets, visual regression, Page Object Model
 
@@ -2188,23 +2210,36 @@ Unchanged from the original criteria: no mass retrofitting of tests onto legacy 
 
 ### 9.8 `/wf-settings` — toggle optional modules after installation
 
-Once `/wf-init` has run, several decisions the developer made (TDD mode, testing extras, Decision Ladder, SDD backend) are fixed in the project — but they are not immutable, and it shouldn't require editing files by hand or re-running full `wf-init` to change them. `/wf-settings` (new standalone file, same format as `wf-onboard.md` and `wf-worktree.md`) closes that gap.
+Once `/wf-init` has run, several decisions the developer made (TDD mode, testing extras, Decision Ladder, SDD backend, CI/CD, release strategy, active IDEs/CLIs) are fixed in the project — but they are not immutable, and it shouldn't require editing files by hand or re-running full `wf-init` to change them. `/wf-settings` (new standalone file, same format as `wf-onboard.md` and `wf-worktree.md`) closes that gap.
 
-**The five things it manages**:
+**The modules it manages** (options 1–18 in `/wf-settings`):
 
 | Module | What it toggles | Risk when changing |
 |---|---|---|
-| TDD Mode | Standard ↔ Strict TDD Mode | None — both coexist in `openspec/config.yaml`, changing is instant |
-| Testing extras | Coverage targets / Visual regression / Page Object Model, each independent | Low — only config, although deactivating visual regression or POM doesn't automatically rewrite existing specs |
-| Decision Ladder | Included or not in `AGENTS.md` | Real — it's an anti-over-engineering safeguard, removing it requires additional explicit confirmation |
-| SDD persistence backend | engram ↔ openspec ↔ hybrid | Variable — migrating *to* hybrid is safe (only adds), migrating *from* hybrid implies real functionality loss and requires double confirmation |
-| IDEs/CLIs | Add/remove an active IDE — generates (satellite + commands + skills + Windsurf fix) or deletes everything related, downloading templates from the wizard's raw source | Real — creates or removes project files; requires explicit confirmation |
+| Decision Ladder (1) | `wf-ladder` enabled or not in `AGENTS.md` | Real — it's an anti-over-engineering safeguard, removing it requires additional explicit confirmation |
+| TDD (2) | Enable or disable the TDD protocol | Medium — removes or adds `wf-tdd` skill and satellite |
+| TDD Mode (3) | Standard ↔ Strict TDD Mode | None — both coexist in `openspec/config.yaml`, changing is instant |
+| Testing extras (4–6) | Coverage targets / Visual regression / Page Object Model, each independent | Low — only config, although deactivating visual regression or POM doesn't automatically rewrite existing specs |
+| SDD forcing policy (7) | `wf-sdd-trigger` active or not | Medium — turns the SDD gating mechanism on/off |
+| SDD persistence backend (8) | engram ↔ openspec ↔ hybrid | Variable — migrating *to* hybrid is safe (only adds), migrating *from* hybrid implies real functionality loss and requires double confirmation |
+| CI (9) | Enable or disable the CI quality guard | Real — adds/removes `.github/workflows/quality-guard.yml` and related files |
+| AI Reviewer (10) | GGA / Copilot / Claude Code / Gemini / None | Medium — rewrites the AI review workflow |
+| AI Review Suggestions (11) | Enable or disable auto-improve / inline suggestions | Low — config change only |
+| Dedicated Security Review (12) | Claude / Gemini / OFF | Low — config change only |
+| E2E in CI (13) | Include E2E tests in the quality guard | Low–Medium — may slow CI; no effect on local tests |
+| release-please standalone (14) | Publish releases automatically from conventional commits | Medium — `release-please-config.json` now uses `release-type` resolved from `state.discovery.stack` (`node` for Node projects, `simple` default) |
+| CD (15) | Automatic deploy to VPS | Real — writes `deploy.yml` and requires server secrets |
+| Release strategy (16) | Tag-based (`v*`) or push-to-main deploy trigger | Medium — changes how CD fires |
+| Windsurf gentle-ai fix (17) | Reapply the legacy-path bridge and `sdd-new.md` workaround | Low — safe re-sync of IDE-specific files |
+| IDEs/CLIs (18) | Add/remove an active IDE — generates (satellite + commands + skills) or deletes everything related, downloading templates from the wizard's raw source | Real — creates or removes project files; requires explicit confirmation |
+
+**Note**: Option numbering in `/wf-settings` is 1–18; options 1 and 2 map to `wf-ladder` and TDD, respectively. Option 17 is a Windsurf-only repair switch.
 
 **Interaction pattern**: the command always shows the real state first (reading `openspec/config.yaml` and `AGENTS.md` directly, never assuming what the developer remembers choosing), lets you choose one or several changes, applies and confirms each individually, and asks "anything else?" before closing with a consolidated commit — without `git push`, like the rest of this workflow.
 
 **Why it's project-specific and not global**: just like `/wf-worktree`, its behavior depends entirely on the real state of the active repo (which backend, which extras are on) — it doesn't make sense as a global command installed once for all projects.
 
-`wf-init.md` and `wf-refresh.md` already include `wf-settings` in their `EXPECTED_COMMANDS`, so it is auto-generated in new projects and offered to add in existing projects that don't have it.
+The `/wf-init` and `/wf-refresh` slash commands already include `wf-settings` in their `EXPECTED_COMMANDS`, so it is auto-generated in new projects and offered to add in existing projects that don't have it.
 
 ---
 
@@ -2234,7 +2269,7 @@ They can be activated separately via `/wf-settings`.
 | **Conventional Commits** | Husky + commitlint enforce `feat:`, `fix:` format... | Readable history + enables automatic changelog |
 | **release-please** | Generates release PR + changelog based on commits | Traceable releases without writing changelog manually |
 
-The **AI Review** has three possible providers:
+The **AI Review** has four possible providers (plus `None`):
 - **GGA (Gentleman Guardian Angel) — recommended.** Provider-agnostic (Claude, Gemini,
   Codex, OpenCode, Ollama, LM Studio, GitHub Models). Uses your `AGENTS.md` as review
   rules. Two modes: local pre-commit hook (`gga init && gga install`) and PR review via CI
@@ -2262,7 +2297,7 @@ Workflow/config templates are a single source of truth in `templates/protocols/c
 ### How to configure
 
 `/wf-init` asks you about CI and CD in its configuration flow (Phase 4.7) and generates
-the artifacts in Phase 6e. If you already initialized the project and want to change something,
+the artifacts in Phases 6a/6b (the Builder, to staging). If you already initialized the project and want to change something,
 use `/wf-settings` (CI options, AI Reviewer, Security Review, CD, etc.) for complete
 CI/CD block re-configuration (single source: `templates/protocols/cicd/_base.md`).
 
@@ -2289,10 +2324,10 @@ curl -fsSL https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/ins
 | Type | Commands | Installation |
 |---|---|---|
 | **Global** | `/wf-init`, `/wf-refresh` | `install.sh` → per-IDE global paths |
-| **Project-specific** | `/wf-onboard`, `/wf-settings`, `/wf-worktree` | `/wf-init` Phase 6 → repo |
+| **Project-specific** | `/wf-onboard`, `/wf-settings`, `/wf-worktree` | `/wf-init` Phases 6a/6b → repo |
 | **Global** | `/wf-cleanup` | `install.sh` → per-IDE global paths |
-| **Project-specific** | `/wf-ladder` (LADDER), `/wf-tdd` (TDD && LAYERS) | `/wf-init` Phase 6 → repo |
-| **Project-specific** | `/wf-orchestrator` (ROUTING‖LADDER‖TDD), `/wf-sdd-trigger` (ROUTING) | `/wf-init` Phase 6 → repo |
+| **Project-specific** | `/wf-ladder` (LADDER), `/wf-tdd` (TDD && LAYERS) | `/wf-init` Phases 6a/6b → repo |
+| **Project-specific** | `/wf-orchestrator` (ROUTING‖LADDER‖TDD), `/wf-sdd-trigger` (ROUTING) | `/wf-init` Phases 6a/6b → repo |
 
 Global paths written by `install.sh` per command:
 
@@ -2317,7 +2352,7 @@ Global paths written by `install.sh` per command:
   `.cursor/rules/`, `.windsurf/rules/`, `.kiro/steering/`), flat protocols (`.agents/protocols/`),
   commands, CI/CD workflows (including `deploy.yml`), MCP settings (Playwright MCP entries),
   test configs, the `post-commit` hook (`.git/hooks/`), `.husky/`, `.gga`, `.pr_agent.toml`,
-  release-please configs, `.wizard-staging/`, `.wizard-manifests/`, and `.gitignore` entries.
+  release-please configs, `.wizard-staging/`, `.wizard-managed-files.json`, and `.gitignore` entries.
   Confirmation is free-form: after the inventory, the user writes in their own words what to
   keep, and everything wizard-owned not mentioned is deleted after a per-group confirmation.
 
@@ -2376,11 +2411,11 @@ Global paths written by `install.sh` per command:
 
 This workflow is built on top of `gentle-ai` (`github.com/Gentleman-Programming/gentle-ai`) as a mandatory foundation. It is an open source project with good traction (4.2k+ stars, 500+ forks, 190+ releases at the time of writing), but it is still maintained by a small/individual team, not by an organization with long-term support guarantees. It's worth understanding the risk and plan if something changes.
 
-**What already happened and what could happen again**: the base SDD conductor was renamed from `sdd-orchestrator` to `gentle-orchestrator` between versions (with automatic migration on `sync`). It is a real example of how an internal naming change can affect any part of this workflow that hardcodes command names, sub-agents, or gentle-ai paths — and this workflow does so in several places (`wf-init.md`, `wf-refresh.md`, section 8.3 of this document).
+**What already happened and what could happen again**: the base SDD conductor was renamed from `sdd-orchestrator` to `gentle-orchestrator` between versions (with automatic migration on `sync`). It is a real example of how an internal naming change can affect any part of this workflow that hardcodes command names, sub-agents, or gentle-ai paths — and this workflow does so in several places (`/wf-init`, `/wf-refresh`, section 8.3 of this document).
 
 **Current mitigation (no new tool required)**:
 - **Periodic manual monitoring**: check `github.com/Gentleman-Programming/gentle-ai/releases` before recommending the wizard in a new project, or when the wizard fails unexpectedly. No cron or constant monitoring needed — the natural cadence is "I check when I'm going to use it or when something breaks".
-- **Semi-automatic detection in the wizard**: Step 0.3.1 analyzes the text of gentle-ai release notes looking for risk signals near terms this workflow hardcodes, informs the developer on the spot, and leaves a draft ready to report it as an issue in this workflow's repo (see Block 4, section 8 and wf-init.md Step 0.3.1 for full detail). This does not replace manual monitoring — it complements it by detecting in situ what a real developer encounters in production.
+- **Semi-automatic detection in the wizard**: Step 0.3.1 analyzes the text of gentle-ai release notes looking for risk signals near terms this workflow hardcodes, informs the developer on the spot, and leaves a draft ready to report it as an issue in this workflow's repo (see Block 4, section 8 and `/wf-init` Step 0.3.1 for full detail). This does not replace manual monitoring — it complements it by detecting in situ what a real developer encounters in production.
 
 **What happens if gentle-ai stops being maintained or breaks compatibility severely**: Engram and OpenSpec (the actual backends behind persistent memory and SDD) are separate projects from gentle-ai — gentle-ai orchestrates them but does not replace them. An abandonment of gentle-ai would mainly affect the multi-IDE configuration layer and native sub-agents, not necessarily the memory or SDD themselves, which could continue to be used more manually. There is no detailed migration plan yet because it hasn't been necessary — it will be documented if the situation arises.
 

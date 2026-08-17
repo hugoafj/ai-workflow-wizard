@@ -1,7 +1,7 @@
 # deploy-docker.yml.md
 #
 # Template: GitHub Actions deploy workflow using Docker Compose for any stack.
-# Used by phase6e when vps_runtime == 'docker'.
+# Used by the Builder (Phase 6) when vps_runtime == 'docker'.
 #
 # Placeholders:
 #   {{trigger_event}}   — 'tags:\n        - \'v*\'' or 'branches:\n        - main'
@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ '{{' }} secrets.SERVER_IP {{ '}}' }}
           username: ${{ '{{' }} secrets.SSH_USER {{ '}}' }}

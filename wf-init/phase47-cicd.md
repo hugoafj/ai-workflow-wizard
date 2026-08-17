@@ -1,21 +1,26 @@
 ## PHASE 4.7 — CI and CD configuration — conditional
 
 > **Gate**: only runs if `features.ci == true`, `features.cd == true`, or
-> `features.release_please == true`. If not, skip to Phase 6.
+> `features.release_please == true`. If not, skip to Phase 5.
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
 FEATURES_CI=$(jq -r '.features.ci // false' .wizard-state.json)
 FEATURES_CD=$(jq -r '.features.cd // false' .wizard-state.json)
 FEATURES_RELEASE=$(jq -r '.features.release_please // false' .wizard-state.json)
 if [ "$FEATURES_CI" != "true" ] && [ "$FEATURES_CD" != "true" ] && [ "$FEATURES_RELEASE" != "true" ]; then
   echo "PHASE 4.7 skipped — CI and CD not selected."
-  wf_phase_done phase47 phase6a-agents
+  wf_phase_done phase47-cicd phase5
+  echo "ℹ Next phase: phase5"
+  cat "$WF_DIR/phase5.md"
   exit 0
 fi
 ```
 
 > This phase ONLY collects decisions and saves them in `state.ci` and `state.cd`.
-> File **generation** is done by the Builder in Phase 6e (to staging).
+> File **generation** is done by the Builder in Phase 6 (to staging).
 > Don't write files here.
 
 ### Precondition: read state + detect GitHub
@@ -149,7 +154,10 @@ Detected stack: <Laravel + Node / Laravel / Node pure>
 Correct? [yes / correct]
 ```
 
-If the user corrects it, save the chosen value in `state.cd.stack_detected`.
+If the user corrects it, save the chosen value in `state.cd.stack_detected`
+(e.g. `wf_state_set '.cd.stack_detected' '"laravel_node"'`). Persist the
+detected value even when the user accepts the auto-detection, so the Builder
+can select the deploy template and resolve `{{has_node_assets}}`.
 
 #### CD questions
 
@@ -263,6 +271,57 @@ On your server make sure you have:
 > - `ci` (all CI decisions + `github_remote`)
 > - `cd` (all CD decisions)
 > - `features.ci`, `features.cd`, `features.release_please` (toggles)
-> Mark `wf_phase_done phase47 phase5`.
+> Mark `wf_phase_done phase47-cicd phase5`.
 > Tell the user: *"CI/CD configured. Reply **continue** so I can assemble the artifacts (Builder → staging on disk, not in memory)."*
-> Wait for the response. Only when they confirm, run in bash: `cat "$WF_DIR/phase5.md"`
+> Wait for the response. Only when they confirm, run in bash:
+
+```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
+# Normalize cd.enabled / cd.platform based on the deploy platform answer (P1-12)
+FEATURES_CD=$(jq -r '.features.cd // false' .wizard-state.json)
+if [ "$FEATURES_CD" = "true" ]; then
+  VPS_RUNTIME=$(jq -r '.cd.vps_runtime // empty' .wizard-state.json)
+  if [ -n "$VPS_RUNTIME" ]; then
+    wf_state_set '.cd.enabled' 'true'
+    wf_state_set '.cd.platform' '"vps"'
+    # Persist the stack detected earlier so the Builder can select the deploy
+    # template and resolve {{has_node_assets}} / {{compose_file}}.
+    STACK_DETECTED=$(jq -r '.cd.stack_detected // empty' .wizard-state.json)
+    if [ -z "$STACK_DETECTED" ]; then
+      if [ -f composer.json ] && grep -q '"laravel/framework"' composer.json && [ -f package.json ]; then
+        STACK_DETECTED="laravel_node"
+      elif [ -f composer.json ] && grep -q '"laravel/framework"' composer.json; then
+        STACK_DETECTED="laravel"
+      else
+        STACK_DETECTED="node_pure"
+      fi
+      wf_state_set '.cd.stack_detected' "\"$STACK_DETECTED\""
+    fi
+    # Persist the compose file for docker runtime (default docker-compose.prod.yml).
+    COMPOSE_FILE=$(jq -r '.cd.compose_file // empty' .wizard-state.json)
+    if [ "$VPS_RUNTIME" = "docker" ] && [ -z "$COMPOSE_FILE" ]; then
+      wf_state_set '.cd.compose_file' '"docker-compose.prod.yml"'
+    fi
+  else
+    wf_state_set '.cd.enabled' 'false'
+    wf_state_set '.cd.platform' '"skip"'
+  fi
+else
+  wf_state_set '.cd.enabled' 'false'
+  wf_state_set '.cd.platform' '"skip"'
+fi
+
+PHASE5_DONE=$(jq -r '.phases.phase5.status // "not-started"' .wizard-state.json)
+if [ "$PHASE5_DONE" = "done" ]; then
+  NEXT="phase6a-agents"
+  echo "ℹ Phase 5 already completed (resume case); moving to Builder"
+else
+  NEXT="phase5"
+  echo "ℹ Next: Phase 5 for project details"
+fi
+wf_phase_done phase47-cicd "$NEXT"
+echo "ℹ Next phase: $NEXT"
+cat "$WF_DIR/$NEXT.md"
+```

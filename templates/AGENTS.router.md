@@ -80,13 +80,13 @@ bloating the context. They are NOT written in full here — they live in dedicat
 |---|---|---|
 | Claude Code | `~/.claude/skills/` | `.claude/skills/` |
 | OpenCode | `~/.config/opencode/skills/` | `.opencode/skills/`, `.claude/skills/`, `.agents/skills/` |
-| Cursor | `~/.cursor/skills/` | `.cursor/skills/` |
+| Cursor | `~/.cursor/skills/` | `.cursor/skills/`, `.agents/skills/` (native + universal fallback) |
 | Windsurf/Devin | `~/.codeium/windsurf/skills/`, `~/.config/devin/skills/` | `.windsurf/skills/`, `.devin/skills/` |
 | Codex CLI | `~/.codex/skills/` | `.codex/skills/` |
 | Copilot | `~/.copilot/skills/` | `.github/skills/` |
 | Kiro | `~/.kiro/skills/`, `~/.kiro/steering/` | `.kiro/skills/`, `.kiro/steering/` |
-| Gemini CLI | `~/.gemini/skills/` | `.gemini/skills/`, `.agents/skills/` |
-| Antigravity | `~/.gemini/antigravity/skills/`, `~/.gemini/antigravity-ide/skills/`, `~/.gemini/antigravity-cli/skills/`, `~/.gemini/config/skills/` (canonical) | `.agents/skills/` |
+| Gemini CLI | `~/.gemini/skills/` | `.gemini/skills/`, `.agents/skills/` (native + universal fallback) |
+| Antigravity | `~/.gemini/config/skills/` (canonical), `~/.gemini/antigravity-cli/builtin/skills/`, `~/.gemini/antigravity/skills/`, `~/.gemini/antigravity-ide/skills/` | `.agents/skills/` |
 
 > The wizard's own 7 `wf-*` skills are emitted by the Builder in the project path above
 > (native auto-discovery) **plus** `.agents/skills/<n>/SKILL.md` (universal fallback) and the
@@ -132,7 +132,9 @@ bloating the context. They are NOT written in full here — they live in dedicat
 </if>
 </if>
 <if not state.features.routing_abc and not state.features.decision_ladder and not state.features.tdd_protocol>
+<!-- WF: DO NOT REGENERATE -->
 <!-- No agent protocols: the project does not use wf-ladder, wf-sdd-trigger, or wf-tdd. -->
+<!-- /WF: DO NOT REGENERATE -->
 </if>
 
 <!-- The following HTML comment is mandatory and must remain as the LAST LINE of the

@@ -7,6 +7,9 @@
 Read the current state (in case of resumption):
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
 if [ -f .wizard-state.json ] && [ "$(jq -r '.phases.phase0c.status // "pending"' .wizard-state.json)" = "done" ]; then
   echo "Phase 0c already completed — skipping to Phase 1."
   wf_phase_done phase0c phase1
@@ -63,7 +66,7 @@ Parse the selected features and proceed.
 ### Combination validations
 
 - If they choose 4 and 6: "Release-please standalone is included in CI. Should I remove 6 and keep only 4? [yes / no]"
-- If they choose 3 without 1: "ABC Routing includes full Local Orchestration but not the Ladder. If you want anti-over-engineering rungs, also add option 1. Should I add 1? [yes / no]"
+- If they choose 3 without 1: "ABC Routing activates the full SDD-forcing policy (wf-sdd-trigger + wf-preflight) but not the Ladder. If you want anti-over-engineering rungs, also add option 1. Should I add 1? [yes / no]"
 - If they choose 5 without 4: "CD without CI works, but you won't have Quality Guard or AI review on your PRs. Do you confirm only CD? [yes / no]"
 
 ### Persistence
@@ -88,5 +91,8 @@ Tell the user: *"Features selected. Reply **continue** to start project discover
 Wait for the response. Only when confirmed, run in bash:
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+wf_phase_done phase0c phase1
 cat "$WF_DIR/phase1.md"
 ```

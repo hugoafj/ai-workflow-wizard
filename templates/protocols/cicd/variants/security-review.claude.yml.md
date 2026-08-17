@@ -24,7 +24,7 @@ jobs:
 
       - name: Claude Code Security Review
         id: claude-review
-        uses: anthropics/claude-code-security-review@main
+        uses: anthropics/claude-code-security-review@0c6a49f1fa56a1d472575da86a94dbc1edb78eda
         with:
           claude-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
 

@@ -125,4 +125,11 @@ Continuing with project discovery...
 > **⛔ STOP HERE — do not execute anything else.**
 > **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `gentle_ai.doctor` (doctor result), `answers.ides` (final confirmed agent list). Mark `wf_phase_done phase0b phase0c`.
 > Tell the user: *"Phase 0 completed. Reply **continue** to choose which features to configure."*
-> Wait for the response. Only when confirmed, run in bash: `cat "$WF_DIR/phase0c.md"`
+> Wait for the response. Only when confirmed, run in bash:
+
+```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+wf_phase_done phase0b phase0c
+cat "$WF_DIR/phase0c.md"
+```

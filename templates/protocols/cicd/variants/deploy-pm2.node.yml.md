@@ -1,7 +1,7 @@
 # deploy-pm2.node.yml.md
 #
 # Template: GitHub Actions deploy workflow for Node.js apps with PM2.
-# Used by phase6e when stack_detected == 'node_pure' and vps_runtime == 'pm2'.
+# Used by the Builder (Phase 6) when stack_detected == 'node_pure' and vps_runtime == 'pm2'.
 #
 # Placeholders:
 #   {{trigger_event}}   — 'tags:\n        - \'v*\'' or 'branches:\n        - main'
@@ -33,14 +33,16 @@ jobs:
         run: npm run build
 
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ '{{' }} secrets.SERVER_IP {{ '}}' }}
           username: ${{ '{{' }} secrets.SSH_USER {{ '}}' }}
           key: ${{ '{{' }} secrets.SSH_KEY {{ '}}' }}
           script: |
+            set -euo pipefail
             cd {{deploy_path}}
             git pull origin main
-            npm ci --production
+            npm ci
             npm run build
+            npm prune --omit=dev
             pm2 restart app

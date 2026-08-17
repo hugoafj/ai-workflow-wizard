@@ -25,7 +25,7 @@
   Body follows the LLM-first structure from gentle-ai's own docs/skill-style-guide.md (Activation
   Contract, Hard Rules, Decision Gates, Execution Steps, Output Contract, References). Extended
   rationale/examples live in reference/edge-cases.md, not inline, to stay within the 1000-token
-  hard budget. Consumed by: Builder (B3/B5), wf-refresh (Layer 2, mandatory).
+  hard budget. Consumed by: Builder (B3/B5), wf-refresh (R3, mandatory).
 -->
 
 ## Activation Contract
@@ -81,8 +81,8 @@ requesting** gentle-ai's SDD? See `reference/edge-cases.md` for the full rationa
 ```
 🔍 WF-SDD-TRIGGER
   - Criterion applied: [which condition matched, or "none"]
-  - Proposal: [con SDD / sin SDD]
-  - Confirm? [sí / cambiar a la otra ruta]
+  - Proposal: [with SDD / without SDD]
+  - Confirm? [yes / switch to the other path]
 ```
 
 After user confirmation (step 4), no additional checklist is required before proceeding.

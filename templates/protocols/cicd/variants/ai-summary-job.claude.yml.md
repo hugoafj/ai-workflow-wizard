@@ -32,7 +32,7 @@
             -H "Content-Type: application/json" \
             -d "$(jq -n \
               --arg text "Summarize these changes for humans, highlighting benefits for the end user. Keep the Markdown format.\n\n${PR_BODY}" \
-              '{model:"claude-sonnet-4-20250514", max_tokens:1024, messages:[{role:"user", content:$text}]}')" \
+              '{model:"claude-sonnet-5", max_tokens:1024, messages:[{role:"user", content:$text}]}')" \
             | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['content'][0]['text'])" 2>/dev/null \
             || echo "_Could not generate automatic summary._")
 
@@ -43,6 +43,8 @@
 
       - name: Post failure comment on PR
         if: failure()
+        env:
+          PR_NUMBER: ${{ fromJson(needs.release-please.outputs.pr).number }}
         uses: actions/github-script@v7
         with:
           script: |
@@ -58,7 +60,7 @@
             *This comment was added automatically by the CI pipeline.*`;
 
             github.rest.issues.createComment({
-              issue_number: context.issue.number,
+              issue_number: parseInt(process.env.PR_NUMBER, 10),
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: errorMsg

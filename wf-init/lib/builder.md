@@ -23,6 +23,13 @@
 - `.wizard-state.json` (state; see `lib/state.md`).
 - `$WF_ROOT/templates/` from the wizard repo (single source of knowledge and templates).
 
+> **`WF_ROOT` definition**: `WF_ROOT` is the wizard repository base URL
+> (`https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main`), the same
+> value as `WF_RAW`. Template files are fetched on demand from
+> `$WF_ROOT/templates/...`; they are NOT downloaded to disk by `/wf-init` (only
+> the `wf-init/` phase files are). Every `$WF_ROOT/templates/<path>` reference
+> below means "fetch that raw URL", never a local filesystem path.
+
 ## Output
 
 - Staging at `state.build_plan.staging_dir` (default `.wizard-staging/`) within the
@@ -41,7 +48,7 @@
 >
 > **Template formats and how to extract them**:
 > - `.tmpl.md` → extract from ```` ```typescript ````, ```` ```yaml ````, or ```` ```bash ````
-> - `.yml.md` / `.json.md` in `variants/` → extract from ```` ```yaml ```` or ```` ```json ````
+> - `.yml.md` / `.json.md` in `variants/` → if the file is wrapped in a markdown code fence, extract from inside it; otherwise use the file raw (CI/CD variant files are raw YAML/JSON and do not need fence extraction)
 > - `.md` without code fence → use the file AS-IS (raw content, but strip `#` prose header lines if they exist)
 >
 > **Target types**:
@@ -63,9 +70,9 @@ STOP and report (do not invent defaults).
 
 ### Step B2 — Resolve selection keys
 - `STACK=$(jq -r '.discovery.stack_key' .wizard-state.json)`
-- `IDES=$(jq -r '.answers.ides[]' .wizard-state.json)`
+- `IDES=$(jq -r '.answers.ides[]?' .wizard-state.json)`
 - `TDD_MODE=$(jq -r '.testing.tdd_mode' .wizard-state.json)`
-- `LAYERS=$(jq -r '.testing.layers[]' .wizard-state.json)`
+- `LAYERS=$(jq -r '.testing.layers[]?' .wizard-state.json)`
 - `LADDER=$(jq -r '.features.decision_ladder' .wizard-state.json)`
 - `TDD=$(jq -r '.features.tdd_protocol' .wizard-state.json)`
 - `ROUTING=$(jq -r '.features.routing_abc' .wizard-state.json)`
@@ -148,9 +155,11 @@ From the SAME `build_protocol_body(name)`:
    | IDE | Skills path |
    |-----|-------------|
    | `claude-code` | `STAGING/.claude/skills/<skill-name>/SKILL.md` |
+   | `cursor` | `STAGING/.cursor/skills/<skill-name>/SKILL.md` |
    | `kiro` | `STAGING/.kiro/skills/<skill-name>/SKILL.md` |
    | `codex` | `STAGING/.codex/skills/<skill-name>/SKILL.md` |
    | `windsurf` | `STAGING/.windsurf/skills/<skill-name>/SKILL.md`, `STAGING/.devin/skills/<skill-name>/SKILL.md` (both for Windsurf/Devin compatibility) |
+   | `gemini-cli` | `STAGING/.gemini/skills/<skill-name>/SKILL.md` |
 
    **Universal — always emitted, regardless of `IDES`** (the 1:1 skill fallback):
    `STAGING/.agents/skills/<skill-name>/SKILL.md` — the standard `.agents/` path read by
@@ -161,8 +170,7 @@ From the SAME `build_protocol_body(name)`:
    `wf-tdd` command folder packages as skill folder `wf-tdd/`. Every user/model-facing skill
    name is `wf-`-prefixed and unambiguous.
 
-   **Note on Cursor**: Cursor does not support native SKILL.md files in projects. For Cursor, only
-   the universal `.agents/skills/` copy and the flat `.agents/protocols/` fallback are emitted.
+   **Note on Cursor and Gemini CLI**: both support native project `SKILL.md` paths (`STAGING/.cursor/skills/<skill-name>/SKILL.md` and `STAGING/.gemini/skills/<skill-name>/SKILL.md`, respectively). The Builder emits the native copy for each active IDE plus the universal `.agents/skills/` copy and the flat `.agents/protocols/` fallback.
 
    If the IDE is not in the table, only the universal `.agents/skills/` copy and the flat file
    fallback are emitted.
@@ -179,11 +187,27 @@ From the SAME `build_protocol_body(name)`:
 - Replace `{{answers.*}}`, `{{discovery.*}}`, `{{testing.*}}`, `{{mcps.table}}`,
   `{{wizard_version}}` with values from `.wizard-state.json` (deterministic).
   `{{wizard_version}}` is resolved from the root field `wizard_version` of the state.
+
+> **Inference-resolved placeholders**: the following five placeholders have NO
+> dedicated state field and are intentionally resolved by the Builder's LLM
+> inference from the state + manifest (they cannot be captured as flat JSON
+> fields):
+> - `{{discovery.commands}}` — exact commands with real flags detected from the manifest (e.g. `npm run lint`, `npm run build`).
+> - `{{discovery.conventions.code_style}}` — non-obvious conventions from `state.discovery.conventions` (when present) + reverse engineering.
+> - `{{discovery.conventions.structure}}` — short tree of main folders and their purpose.
+> - `{{testing.checks_before_done}}` — `lint + build` (+ `test` / `test:e2e` per `state.testing.layers`).
+> - `{{mcps.table}}` — the MCPs table built from `state.discovery.stack` + `state.testing.layers` (see protocol `architecture`).
+> Never leave the raw placeholder unresolved — always emit real content derived
+> from the state.
 - Resolve `<if ...>` blocks based on state (testing active, backend, etc.).
 - Insert testing sections (`testing-approach.section.md`, `checks.section.md`,
   `data-testid.section.md`) according to `LAYERS`.
 - Build the MCPs table based on `STACK` + `LAYERS` (see protocol `architecture`).
 - Resolve `{{features.*_yesno}}` to `yes`/`no` based on each boolean feature.
+- Validate the final `AGENTS.md`: the `wf-version` footer comment must contain the exact
+  `.wizard-state.json` `wizard_version` and the `features` list must reflect the actual
+  selected booleans (`routing_abc`, `decision_ladder`, `tdd_protocol`, `ci`, `cd`,
+  `release_please`). If any `{{...}}` placeholder or `latest` remains in the footer, fail.
 - Footer `wf-version` with `STACK` and `features: ladder={{yes/no}}, tdd={{yes/no}}, routing={{yes/no}}, ci={{yes/no}}, cd={{yes/no}}, release={{yes/no}}` (ALWAYS the last line). Field names in the
   footer are kept as-is for backward compatibility with existing projects/wf-refresh parsing;
   `routing=yes` now means "wf-sdd-trigger is active" (this wizard's own SDD-forcing policy, not
@@ -192,15 +216,22 @@ From the SAME `build_protocol_body(name)`:
 - **The router NEVER embeds the protocols**; it only has the routing table pointing to them.
 
 ### Step B6 — Satellites (per active IDE)
-For each IDE ∈ IDES, copy its `$WF_ROOT/templates/satellites/<ide>.tmpl` to the
-corresponding destination (see protocol `ides`):
-- `claude-code` → `STAGING/CLAUDE.md`
-- `vscode-copilot` → `STAGING/.github/copilot-instructions.md`
-- `cursor` → `STAGING/.cursor/rules/project.mdc`
-- `windsurf` → `STAGING/.windsurf/rules/project.md`
-- `kiro` → `STAGING/.kiro/steering/project-context.md`
-- `gemini-cli` → `STAGING/GEMINI.md`
-- `antigravity` → `STAGING/ANTIGRAVITY.md`
+For each IDE ∈ IDES, copy the corresponding satellite template from
+`$WF_ROOT/templates/satellites/` to the destination (the template file name uses
+a short key, not the full IDE key):
+
+| IDE key | Template | Destination |
+|---|---|---|
+| `claude-code` | `satellites/claude.tmpl` | `STAGING/CLAUDE.md` |
+| `vscode-copilot` | `satellites/copilot.tmpl` | `STAGING/.github/copilot-instructions.md` |
+| `cursor` | `satellites/cursor.tmpl` | `STAGING/.cursor/rules/project.mdc` |
+| `windsurf` | `satellites/windsurf.tmpl` | `STAGING/.windsurf/rules/project.md` |
+| `kiro` | `satellites/kiro.tmpl` | `STAGING/.kiro/steering/project-context.md` |
+| `gemini-cli` | `satellites/gemini.tmpl` | `STAGING/GEMINI.md` |
+| `antigravity` | `satellites/antigravity.tmpl` | `STAGING/ANTIGRAVITY.md` |
+
+For example, for `claude-code` read `$WF_ROOT/templates/satellites/claude.tmpl`,
+not `$WF_ROOT/templates/satellites/claude-code.tmpl`.
 
 `CLAUDE.md` (and its `.claude/` satellite directory) is generated ONLY when
 `claude-code` ∈ IDES — exactly like every other IDE's satellite. No IDE is
@@ -278,17 +309,18 @@ Generate CI and CD artifacts to staging according to `state.ci` and `state.cd` (
 details) using `$WF_ROOT/templates/protocols/cicd/` as the single source.
 
 **If `CICD == true`** (full CI):
-- AI reviewer: `.gga` + `variants/gga-review.yml.md` (if gga), or `claude-review.yml.md` /
-  `gemini-review.yml.md`, or nothing (copilot/none).
+- AI reviewer: `.gga` + `variants/gga-review.yml.md` (if gga), or `variants/claude-review.yml.md` /
+  `variants/gemini-review.yml.md`, or nothing (copilot/none).
   - **If `gemini`**: also `.pr_agent.toml` from `variants/pr-agent-config.toml.md`
     (required for pr-agent to run on `synchronize` and `reopened`).
     - **Toggle `auto_improve`**: if `AUTO_IMPROVE == false`, replace
       `github_action_config.auto_improve: "true"` with `"false"` in the assembled template.
   - **If `claude`**: toggle `inline_suggestions` — if `INLINE_SUGGESTIONS == false`,
     omit the `claude_args:` block with `--allowedTools` from the assembled template.
-- `quality-guard.yml.md` ALWAYS (conditioned on real scripts). **Fill `{{node_version}}`
+- `variants/quality-guard.yml.md` ALWAYS (conditioned on real scripts). **Fill `{{node_version}}`
   with `state.discovery.node_engine` or 22 by default, and `{{npm_major}}` with
-  `state.discovery.npm_major`** — this avoids the `npm ci` lockfile out-of-sync failure.
+  `state.discovery.npm_major` or the current npm major (`npm --version | cut -d. -f1`,
+  defaulting to `8`)** — this avoids the `npm ci` lockfile out-of-sync failure.
   - **E2E toggle**: if `state.ci.e2e_in_ci == false`, do not include `npm run test:e2e` in
     the quality guard (even if `LAYERS` includes e2e). The e2e script still exists for local use.
 - `.gga`: fill `PR_BASE_BRANCH` with `state.discovery.default_branch` (uncommented).
@@ -301,31 +333,57 @@ details) using `$WF_ROOT/templates/protocols/cicd/` as the single source.
 
 **If `RELEASE == true` AND `CICD == false`** (release-please standalone):
 - Only conventional commits: `.commitlintrc.json`, `.husky/commit-msg` (Husky v9+ without shebang).
-- Only release-please: `release-please.yml.md`, `release-please-config.json.md`,
-  `release-please-manifest.json.md`, + inject `ai-summary-job.<provider>.yml.md` into `release-please.yml` if `state.ci.release_ai_summary == true`.
+- Only release-please: `variants/release-please.yml.md`, `variants/release-please-config.json.md`,
+  `variants/release-please-manifest.json.md`, + inject `variants/ai-summary-job.<provider>.yml.md` into `release-please.yml` if `state.ci.release_ai_summary == true`.
+  - Resolve `{{release_type}}` in `release-please-config.json` from `state.discovery.stack.primary`:
+    use `node` when the primary stack contains `node`, otherwise default to `simple`.
 - No quality guard, no AI review, no security review.
 
 **If all false**: no CI is generated.
 
 **If `CD == true`** (automatic deploy):
 - Select template according to `state.cd.vps_runtime`:
-  - `pm2` → `deploy-pm2.node.yml.md`
-  - `nginx_php_fpm` → `deploy-nginx-phpfpm.laravel.yml.md`
-  - `apache_php_fpm` → `deploy-apache-phpfpm.laravel.yml.md`
-  - `docker` → `deploy-docker.yml.md`
+  - `pm2` → `variants/deploy-pm2.node.yml.md`
+  - `nginx_php_fpm` → `variants/deploy-nginx-phpfpm.laravel.yml.md`
+  - `apache_php_fpm` → `variants/deploy-apache-phpfpm.laravel.yml.md`
+  - `docker` → `variants/deploy-docker.yml.md`
 - Write `STAGING/.github/workflows/deploy.yml` with placeholders replaced.
+  Resolve both `<if ...>` and `{{if ...}}` / `{{/if}}` markers in deploy templates based on state.
 - Verify secrets (`SERVER_IP`, `SSH_USER`, `SSH_KEY`).
 
 ### Step B9 — Register plan and advance
 
-Populate `state.build_plan` with the exact list of files in staging, including SHA256 hashes for each file. Mark `phases.phase6.status = done`, `phase_pointer = phase7`.
+Populate `state.build_plan` with the exact list of files in staging, including SHA256 hashes for each file. Mark `phases.phase6.status = done`, `phase_pointer = "phase7"` **only if the current pointer is still `phase6`** (this avoids rewinding state when the Builder is reused by `/wf-refresh`).
 
 **Process**:
 
-1. For each file in `.wizard-staging/`:
-   - Calculate SHA256 hash: `sha256sum <file> | awk '{print $1}'`
-   - Add to `build_plan.generated_files[]`: `{ path, hash, managed: true }`
-   - Add path to `build_plan.managed_paths[]`
+1. Source helpers and scan `.wizard-staging/` (null-delimited to handle spaces in paths):
+   ```bash
+   if [ -f "${WF_DIR:-.}/lib/state-helpers.sh" ]; then
+     source "${WF_DIR:-.}/lib/state-helpers.sh"
+   else
+     # Minimal fallback if WF_DIR is not set (not expected in normal use).
+     wf_sha256() {
+       if command -v sha256sum >/dev/null 2>&1; then
+         sha256sum -- "$1" | awk '{print $1}'
+       else
+         shasum -a 256 -- "$1" | awk '{print $1}'
+       fi
+     }
+   fi
+   cd ".wizard-staging" || { echo "ERROR: .wizard-staging missing — Builder stage failed" >&2; exit 1; }
+   FILES="[]"
+   PATHS="[]"
+   while IFS= read -r -d '' file; do
+     REL="${file#./}"
+     HASH=$(wf_sha256 "$file")
+     FILES=$(jq --arg path "$REL" --arg hash "$HASH" \
+       '. += [{"path": $path, "hash": $hash, "managed": true}]' <<< "$FILES")
+     PATHS=$(jq --arg path "$REL" \
+       '. += [$path]' <<< "$PATHS")
+   done < <(find . -type f -print0)
+   cd ..
+   ```
 
 2. Preserve custom AGENTS.md sections:
    - If `AGENTS.md` exists in project root:
@@ -334,12 +392,33 @@ Populate `state.build_plan` with the exact list of files in staging, including S
        - Re-inject custom sections at same relative location
    - If no existing `AGENTS.md`: use generated version as-is
 
-3. Update state:
+3. Update state (advance phase only during `wf-init`):
    ```bash
-   jq '.build_plan.generated_files = $files |
-       .build_plan.managed_paths = $paths |
-       .phases.phase6.status = "done" |
-       .phase_pointer = "phase7"' "$WF_STATE" > "$WF_STATE.tmp"
+   CURRENT_PHASE=$(jq -r '.phase_pointer // empty' "$WF_STATE")
+   # phase5 advances to phase6a-agents (the real key); phase6 is a backward-compatible alias.
+   if [ "$CURRENT_PHASE" = "phase6" ] || [ "$CURRENT_PHASE" = "phase6a-agents" ]; then
+     jq --argjson files "$FILES" --argjson paths "$PATHS" \
+       '.build_plan.generated_files = $files |
+        .build_plan.managed_paths = $paths |
+        .phases["phase6"].status = "done" |
+        .phases["phase6a-agents"].status = "done" |
+        .phase_pointer = "phase6b-build-heavy" |
+       .updated_at = (now | todate)' "$WF_STATE" > "$WF_STATE.tmp"
+   elif [ "$CURRENT_PHASE" = "phase6b-build-heavy" ]; then
+     jq --argjson files "$FILES" --argjson paths "$PATHS" \
+       '.build_plan.generated_files = $files |
+        .build_plan.managed_paths = $paths |
+        .phases["phase6"].status = "done" |
+        .phases["phase6a-agents"].status = "done" |
+        .phases["phase6b-build-heavy"].status = "done" |
+        .phase_pointer = "phase7" |
+       .updated_at = (now | todate)' "$WF_STATE" > "$WF_STATE.tmp"
+   else
+     jq --argjson files "$FILES" --argjson paths "$PATHS" \
+       '.build_plan.generated_files = $files |
+        .build_plan.managed_paths = $paths |
+       .updated_at = (now | todate)' "$WF_STATE" > "$WF_STATE.tmp"
+   fi
    mv "$WF_STATE.tmp" "$WF_STATE"
    ```
 

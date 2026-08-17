@@ -1,6 +1,6 @@
 # /wf-refresh — Builder-driven refresh
 
-⚡ **AUTOMATION**: Phases R-1 and R0 run automatically. Phases R1–R6 are interactive (you approve changes before applying).
+⚡ **AUTOMATION**: Phases R-1 and R0 run automatically. R1, R2, and R5 prompt you (drift/feature approvals); R3/R4/R6 run autonomously.
 
 ---
 
@@ -18,10 +18,10 @@ Detects project drift and applies updates safely:
 2. **Phase R0**: Validate `.wizard-state.json` and detect active IDEs
 3. **Phase R1**: Re-discover project (stack, node engine, etc.) and detect drift
 4. **Phase R2**: Migrate state schema and ask about new optional features
-5. **Phase R3**: Re-run Builder (B1-B9) to generate all artifacts into `.wizard-staging/`
-6. **Phase R4**: Compare staging with project using SHA256 hashes; classify files as add/update/delete/unchanged
-7. **Phase R5**: Show grouped diff and collect your approvals
-8. **Phase R6**: Apply approved changes, update state, commit, clean staging
+5. **Phase R3**: Re-run Builder (B1-B9) to generate all artifacts into `.wizard-staging/` (first snapshots the pre-Builder `managed_paths`/`generated_files` into `.wizard-refresh-baseline.json`)
+6. **Phase R4**: Compare the R3 baseline snapshot with staging using SHA256 hashes; classify files as add/update/delete/unchanged, with `deleted_modified` flagged when the user edited a file since the last refresh
+7. **Phase R5**: Show a real content preview (added → staged content; updated → `diff -u` against staging; deleted/deleted_modified → current content) and collect your approvals
+8. **Phase R6**: Apply approved changes only; on approval update state, write `.wizard-managed-files.json`, and commit via an explicit pathspec; a fully declined refresh writes nothing
 
 ---
 
@@ -50,11 +50,17 @@ Detects project drift and applies updates safely:
 
 ## Implementation
 
-Source the refresher library and execute phases in order:
+Download the refresh orchestrator and supporting files, then read and execute each phase in `refresher.md` in order. **Do NOT `source` Markdown files** — read them as instructions and execute the fenced bash blocks one at a time.
 
 ```bash
 #!/bin/bash
 set -e
+
+# Signals the Builder phases that this run is a refresh: phase6b Step 5 then
+# skips the phase7 pointer promotion and phase7.md handoff (see refresher.md R3
+# and phase6b-build-heavy.md Step 5). Without it, a refresh would advance the
+# pointer to phase7 and derail into wf-init's review/promotion flow.
+export WF_REFRESH=1
 
 # Verify .wizard-state.json exists
 if [[ ! -f .wizard-state.json ]]; then
@@ -63,49 +69,64 @@ if [[ ! -f .wizard-state.json ]]; then
   exit 1
 fi
 
-# Source refresher library
-source wf-init/lib/refresher.md
-
-# Execute phases in order
-echo "ℹ Starting refresh..."
-echo ""
-
-refresh_phase_r_minus_1 || exit 1
-echo ""
-
-refresh_phase_r0 || exit 1
-echo ""
-
-refresh_phase_r1 || exit 1
-echo ""
-
-refresh_phase_r2 || exit 1
-echo ""
-
-refresh_phase_r3 || exit 1
-echo ""
-
-refresh_phase_r4 || exit 1
-echo ""
-
-refresh_phase_r5 || exit 1
-echo ""
-
-# Check if user approved any changes
-APPROVE_ADDED=$(jq -r '.build_plan.approval.added // false' .wizard-state.json)
-APPROVE_UPDATED=$(jq -r '.build_plan.approval.updated // false' .wizard-state.json)
-APPROVE_DELETED=$(jq -r '.build_plan.approval.deleted // false' .wizard-state.json)
-
-if [[ "$APPROVE_ADDED" != "true" ]] && [[ "$APPROVE_UPDATED" != "true" ]] && [[ "$APPROVE_DELETED" != "true" ]]; then
-  echo "ℹ No changes approved; exiting"
-  exit 0
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+  echo "✗ Not a git repository"
+  exit 1
 fi
 
-refresh_phase_r6 || exit 1
-echo ""
+# Wizard repository
+WIZARD_REPO="hugoafj/ai-workflow-wizard"
+WIZARD_BRANCH="main"
+WF_RAW="https://raw.githubusercontent.com/${WIZARD_REPO}/${WIZARD_BRANCH}"
 
-echo "✓ Refresh completed successfully"
+# Local directory for downloaded refresh files (temporary, can be cleaned later)
+WF_DIR="/tmp/wf-refresh-phases"
+mkdir -p "$WF_DIR"
+mkdir -p "$WF_DIR/lib"
+
+echo "Downloading refresh files from GitHub..."
+echo "Source: ${WIZARD_REPO}@${WIZARD_BRANCH}/wf-init/"
+
+curl -fsSL "${WF_RAW}/wf-init/lib/refresher.md" > "${WF_DIR}/lib/refresher.md" 2>/dev/null || true
+curl -fsSL "${WF_RAW}/wf-init/lib/state.md" > "${WF_DIR}/lib/state.md" 2>/dev/null || true
+curl -fsSL "${WF_RAW}/wf-init/lib/state-helpers.sh" > "${WF_DIR}/lib/state-helpers.sh" 2>/dev/null || true
+curl -fsSL "${WF_RAW}/wf-init/lib/builder.md" > "${WF_DIR}/lib/builder.md" 2>/dev/null || true
+curl -fsSL "${WF_RAW}/wf-init/subagent-builder-core.md" > "${WF_DIR}/subagent-builder-core.md" 2>/dev/null || true
+curl -fsSL "${WF_RAW}/wf-init/subagent-builder-heavy.md" > "${WF_DIR}/subagent-builder-heavy.md" 2>/dev/null || true
+curl -fsSL "${WF_RAW}/wf-init/phase6a-agents.md" > "${WF_DIR}/phase6a-agents.md" 2>/dev/null || true
+curl -fsSL "${WF_RAW}/wf-init/phase6b-build-heavy.md" > "${WF_DIR}/phase6b-build-heavy.md" 2>/dev/null || true
+mkdir -p "${WF_DIR}/temp-files"
+curl -fsSL "${WF_RAW}/temp-files/AGENTS.md" > "${WF_DIR}/temp-files/AGENTS.md" 2>/dev/null || true
+
+REQUIRED_FILES=(
+  "${WF_DIR}/lib/refresher.md"
+  "${WF_DIR}/lib/state-helpers.sh"
+  "${WF_DIR}/lib/builder.md"
+  "${WF_DIR}/subagent-builder-core.md"
+  "${WF_DIR}/subagent-builder-heavy.md"
+  "${WF_DIR}/phase6a-agents.md"
+  "${WF_DIR}/phase6b-build-heavy.md"
+  "${WF_DIR}/temp-files/AGENTS.md"
+)
+
+missing=false
+for f in "${REQUIRED_FILES[@]}"; do
+  if [ ! -s "$f" ]; then
+    echo "✗ Could not download $(basename "$f") from GitHub" >&2
+    missing=true
+  fi
+done
+
+if [ "$missing" = true ]; then
+  exit 1
+fi
+
+echo "✓ Refresh files downloaded to: ${WF_DIR}"
 ```
+
+Now read the orchestrator and execute each phase in order:
+
+**Next step**: open `${WF_DIR}/lib/refresher.md` and execute the bash blocks under each **Phase** heading in sequence, pausing for user approval at Phase R5.
 
 ---
 
@@ -156,7 +177,8 @@ Each file in staging is compared with the project using SHA256 hashes:
 - **Unchanged**: Hash matches → file is skipped (not re-copied)
 - **Updated**: Hash differs → file is proposed for update
 - **Added**: File only in staging → proposed for addition
-- **Deleted**: File only in project and marked as wizard-managed → proposed for deletion
+- **Deleted**: File only in project and marked as wizard-managed, unchanged → proposed for deletion
+- **Deleted-modified**: File in old `managed_paths`, not in new staging, but project hash differs from recorded hash → flagged for explicit approval
 
 ### Wizard-managed files
 

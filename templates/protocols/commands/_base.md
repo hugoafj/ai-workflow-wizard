@@ -3,7 +3,7 @@
 <!--
   SINGLE SOURCE of truth for the commands catalog rules. Consumed by the Builder
   (command generation), phase2/wf-refresh (missing command verification).
-  Source in inventory.md: phase6c/phase6c2 (templates), phase2 19-75, wf-refresh
+  Source: Builder B3/B5 (command generation), phase2 19-75, wf-refresh
   684-739, phase8 110. Each command has its template at
   https://github.com/hugoafj/ai-workflow-wizard/tree/main/templates/commands/.
 -->
@@ -24,12 +24,12 @@
 | `/wf-settings` | project-specific (Phase 6) | ✓ | `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-settings/` |
 
 > Only `/wf-init`, `/wf-refresh`, and `/wf-cleanup` are global (installed with `install.sh`).
-> The rest are generated per project in Phase 6 of `/wf-init`.
+> The rest are generated per project in Phases 6a/6b of `/wf-init`.
 > **Skill 1:1** — every command in this catalog is also packaged as a SKILL.md: global ones
 > by `install.sh` (IDE skill paths + `~/.agents/skills/`), project ones by Builder B4 (native
 > per IDE + universal `.agents/skills/<cmd>/SKILL.md` + flat `.agents/protocols/<cmd>.md`).
 > `/wf-cicd` was archived (`templates/_archive/wf-cicd/`) — its flow is now the `cicd`
-> protocol, consumed by `/wf-settings` (options 9-14) and `/wf-init` Phase 4.7.
+> protocol, consumed by `/wf-settings` (options 9–16: CI/CD and release strategy) and `/wf-init` Phase 4.7.
 
 ## Per-IDE generation
 

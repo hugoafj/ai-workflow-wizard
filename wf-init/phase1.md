@@ -13,7 +13,7 @@
 
 2. Replace the placeholders in the prompt:
    - `{PROJECT_PATH}` → absolute path of the target project
-   - `{WF_PATH}` → absolute path of the workflow wizard repo (`$WF_DIR/..`)
+   - `{WF_PATH}` → absolute path of the downloaded phase directory (`$WF_DIR`)
    - `{WF_RAW}` → `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main`
 
 3. Use the `task` tool with `subagent_type: general` to launch the sub-agent
@@ -56,7 +56,8 @@ Tell the user: *"Discovery completed. Reply **continue** to review any previous 
 Wait for the response. Only when confirmed, run in bash:
 
 ```bash
-source "$WF_DIR/lib/state.md"
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
 wf_phase_done phase1 phase2
 cat "$WF_DIR/phase2.md"
 ```

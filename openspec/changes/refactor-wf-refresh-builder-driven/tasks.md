@@ -4,6 +4,12 @@
 **Status**: Tasks  
 **Created**: 2026-08-13
 
+> **ARCHIVED — historical artifact.** This change has been archived and the
+> implementation shipped in 0.7.0-beta.1. The plan below is kept for record only;
+> two planned files were never created as separate files: schema migrations live
+> inside `wf-init/lib/refresher.md` (migration functions), and there is no
+> `wf-init/lib/migrations.md`. Do not re-create either file from this plan.
+
 ## Work units (reviewable, independent)
 
 ### WU-1: Extend state schema and migrations
@@ -36,7 +42,7 @@
 - Use existing helper functions from builder.md
 
 **Acceptance criteria**:
-- [ ] All 7 phases (R-1 to R6) implemented
+- [ ] All 8 phases (R-1 to R6) implemented
 - [ ] Each phase has clear input/output documentation
 - [ ] Error handling for each phase
 - [ ] Syntax check passes (bash -n)

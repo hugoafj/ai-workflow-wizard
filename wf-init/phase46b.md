@@ -3,6 +3,9 @@
 > **Gate**: only runs if `features.tdd_protocol == true`. If phase46 was executed, this phase also applies.
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
 FEATURES_TDD=$(jq -r '.features.tdd_protocol // false' .wizard-state.json)
 if [ "$FEATURES_TDD" != "true" ]; then
   echo "PHASE 4.6b skipped — TDD Protocol not selected."
@@ -13,6 +16,8 @@ if [ "$FEATURES_TDD" != "true" ]; then
     NEXT="phase5"
   fi
   wf_phase_done phase46b "$NEXT"
+  echo "ℹ Next phase: $NEXT"
+  cat "$WF_DIR/$NEXT.md"
   exit 0
 fi
 ```
@@ -330,12 +335,29 @@ Testing stack configured (in memory — everything is written in Phase 8):
 > **⛔ STOP HERE — don't execute anything else.**
 > **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `testing.coverage_threshold` (number or null, if the coverage extra was activated), `testing.visual_regression` (bool), `testing.page_object_model` (bool), `mcps` (project MCPs to configure). Mark `wf_phase_done phase46b <next>`.
 > Calculate the next phase based on features:
-> ```bash
-> if jq -e '.features.ci == true or .features.cd == true or .features.release_please == true' .wizard-state.json >/dev/null; then
->   echo "phase47-cicd"
-> else
->   echo "phase5"
-> fi
-> ```
+```bash
+NEXT=
+if jq -e '.features.ci == true or .features.cd == true or .features.release_please == true' .wizard-state.json >/dev/null; then
+  NEXT="phase47-cicd"
+else
+  NEXT="phase5"
+fi
+```
 > Tell the user: *"Testing stack configured. Reply **continue** to continue."*
-> Wait for the response. Only when they confirm, execute in bash: `cat "$WF_DIR/$NEXT.md"`
+> Wait for the response. Only when they confirm, execute in bash:
+```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
+# Recompute NEXT in this same fence (a fresh shell does not carry variables from
+# the fence above): wf_phase_done with an empty value would corrupt the pointer.
+if jq -e '.features.ci == true or .features.cd == true or .features.release_please == true' .wizard-state.json >/dev/null 2>&1; then
+  NEXT="phase47-cicd"
+else
+  NEXT="phase5"
+fi
+
+wf_phase_done phase46b "$NEXT"
+echo "ℹ Next phase: $NEXT"
+cat "$WF_DIR/$NEXT.md"
+```

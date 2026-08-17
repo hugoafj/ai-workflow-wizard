@@ -46,12 +46,14 @@ WIZARD_BRANCH="main"
 # Local directory for downloaded phase files (temporary, can be cleaned up later)
 WF_DIR="/tmp/wf-init-phases"
 mkdir -p "$WF_DIR"
+mkdir -p "$WF_DIR/lib"
 
 echo "Downloading phase files from GitHub..."
 echo "Source: ${WIZARD_REPO}@${WIZARD_BRANCH}/wf-init/"
 
 PHASES=(
   "lib/state.md"
+  "lib/state-helpers.sh"
   "lib/builder.md"
   "phase0.md"
   "phase0b.md"
@@ -60,11 +62,11 @@ PHASES=(
   "phase2.md"
   "phase3.md"
   "phase4.md"
-  "phase5.md"
   "phase45.md"
   "phase46.md"
   "phase46b.md"
   "phase47-cicd.md"
+  "phase5.md"
   "phase6a-agents.md"
   "phase6b-build-heavy.md"
   "subagent-discovery.md"
@@ -80,8 +82,29 @@ for phase in "${PHASES[@]}"; do
   curl -fsSL "${WF_RAW}/wf-init/${phase}" > "${WF_DIR}/${phase}" 2>/dev/null
 done
 
-if [ ! -s "${WF_DIR}/phase0.md" ]; then
-  echo "Error: could not download phase0.md from GitHub."
+mkdir -p "$WF_DIR/temp-files"
+curl -fsSL "${WF_RAW}/temp-files/AGENTS.md" > "${WF_DIR}/temp-files/AGENTS.md" 2>/dev/null
+curl -fsSL "${WF_RAW}/temp-files/sdd-new.md" > "${WF_DIR}/temp-files/sdd-new.md" 2>/dev/null
+
+missing=false
+for phase in "${PHASES[@]}"; do
+  if [ ! -s "${WF_DIR}/${phase}" ]; then
+    echo "Error: could not download ${phase} from GitHub." >&2
+    missing=true
+  fi
+done
+
+if [ ! -s "$WF_DIR/temp-files/AGENTS.md" ]; then
+  echo "Error: could not download temp-files/AGENTS.md from GitHub." >&2
+  missing=true
+fi
+
+if [ ! -s "$WF_DIR/temp-files/sdd-new.md" ]; then
+  echo "Error: could not download temp-files/sdd-new.md from GitHub." >&2
+  missing=true
+fi
+
+if [ "$missing" = true ]; then
   exit 1
 fi
 

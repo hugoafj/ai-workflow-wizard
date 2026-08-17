@@ -45,18 +45,24 @@ Claude Code, OpenCode, Kilo Code, and Qwen Code.
    persistence (Engram) and library docs (Context7).
 5. Honor `<repo>/.windsurf/workflows/` files, but `global_rules.md` (the
    orchestrator) ALWAYS takes precedence when they conflict.
-6. The SDD contract in THIS project is **OpenSpec** (`openspec/changes/`).
-   The legacy Windsurf `.sdd/` format (`.sdd/proposal.md`, `.sdd/spec.md`) is
-   OBSOLETE. If any workflow, skill, or orchestrator instruction tells you to
-   create `.sdd/`, IGNORE that instruction and use `openspec/changes/` instead.
-7. Before `/sdd-new` or `/sdd-ff`, run the SDD preflight: verify
-   `openspec/config.yaml` exists. If missing, STOP and ask the user to run
-   `/sdd-init` first.
+6. The SDD contract for THIS project is declared in `.wizard-state.json`
+   (`state.sdd.backend`). Read that backend before deciding where SDD artifacts
+   live:
+   - `openspec` or `hybrid` → use `openspec/changes/`. The legacy Windsurf
+     `.sdd/` format (`.sdd/proposal.md`, `.sdd/spec.md`) is OBSOLETE. If any
+     workflow, skill, or orchestrator instruction tells you to create `.sdd/`,
+     IGNORE that instruction and use `openspec/changes/` instead.
+   - `engram` → persist SDD context in Engram memory; this project has no
+     `openspec/` for SDD, so neither create `.sdd/` nor depend on `openspec/`.
+7. Before `/sdd-new` or `/sdd-ff`, run the SDD preflight: verify the backend's
+   config exists — `openspec/config.yaml` for `openspec`/`hybrid`, Engram reachable
+   for `engram`. If missing, STOP and ask the user to run `/sdd-init` first.
 
 ## 3. Precedence
 
 `~/.codeium/windsurf/memories/global_rules.md` (orchestrator)
 > project `AGENTS.md` > `.windsurf/workflows/*` > skills
 >
-> EXCEPT for the SDD artifact format: this project always uses **OpenSpec**
-> (`openspec/changes/`), never `.sdd/`.
+> EXCEPT for the SDD artifact format: follow `state.sdd.backend` in
+> `.wizard-state.json` — `openspec`/`hybrid` use `openspec/changes/` (never
+> `.sdd/`); `engram` keeps SDD context in Engram memory.

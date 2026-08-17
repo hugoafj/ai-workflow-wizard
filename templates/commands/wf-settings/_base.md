@@ -3,7 +3,8 @@
 > **When to use**: when you want to change something you chose during
 > `/wf-init` and are no longer happy with — enable or disable strict TDD
 > mode, add or remove a testing extra, enable or disable the Decision
-> Ladder, or change the SDD persistence backend.
+> Ladder, change the SDD persistence backend, toggle CI/CD, choose the
+> release strategy, or add/remove an IDE/CLI.
 >
 > **Difference from `/wf-refresh`**: `wf-refresh` updates your AGENTS.md
 > when the *wizard template* changed (new version) or the *project*
@@ -584,49 +585,103 @@ Do you want to keep or change?
 
 **If they want to change (enable)**:
 
-**Case A — release-please standalone is OFF** (no CI active):
-Full CI. Ask if they want E2E in CI (sub-option 10).
-Set `state.features.ci = true`. Run `phase47-cicd.md` to configure.
+**Case A — release-please standalone is OFF** (`features.release_please == false`):
 
-**Case B — release-please standalone is ON** (already has conventional
-commits + release-please):
-You already have release-please standalone active. Enabling full CI
-SUBSUMES your current setup:
-  - Conventional commits → stays (you already have it)
-  - release-please → stays (you already have it)
-  - ADDS: Quality Guard + AI review + Security review (optional)
-  - ADDS: E2E in CI (optional)
+```
+Enable full CI? This will add:
+  - Conventional commits + release-please
+  - Quality Guard
+  - Optional AI Reviewer, Security Review, and E2E in CI
 
-Enable full CI over your current setup? [yes / no]
+[yes / no]
+```
 
-If yes: set `state.features.ci = true`, `state.release_please = true`
-(stays). Run `phase47-cicd.md`. Ask about E2E in CI.
+If yes, update state and continue to the options 10-15 to configure AI reviewer,
+security review, and E2E. When finished, run `/wf-refresh` to regenerate the
+CI/CD artifacts and `AGENTS.md`.
+
+```bash
+jq '.features.ci = true |
+    .features.release_please = true |
+    .ci.conventional_commits = true |
+    .ci.release_please = true |
+    .ci.ai_reviewer = "none" |
+    .ci.gga_provider = "none" |
+    .ci.security_review = false |
+    .ci.e2e_in_ci = false |
+    .ci.auto_improve = true |
+    .ci.inline_suggestions = true |
+    .ci.release_ai_summary = false |
+    .ci.release_ai_provider = "none"' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+```
+
+**Case B — release-please standalone is ON** (`features.release_please == true` and `features.ci == false`):
+
+```
+You already have release-please standalone active. Enabling full CI subsumes it
+and adds Quality Guard + optional AI review and security review.
+
+Enable full CI? [yes / no]
+```
+
+If yes, update state and continue to options 10-15, then run `/wf-refresh`.
+
+```bash
+jq '.features.ci = true |
+    .features.release_please = true |
+    .ci.conventional_commits = true |
+    .ci.release_please = true' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+```
 
 **If they want to change (disable)**:
 
 ```
-CI is currently active. Do you want to migrate to release-please standalone
-(conventional commits + auto-release, without quality guard or AI review)
-or disable the entire pipeline? [migrate / disable everything]
+CI is currently active. What do you want to do?
+
+[migrate]    Keep release-please standalone (conventional commits + auto-release,
+             remove quality guard, AI review, and security review).
+[disable]    Disable the entire CI pipeline (remove all workflows and hooks).
 ```
 
-If they choose `migrate`: set `state.ci = false`, `state.release_please = true`,
-inject the release-please standalone configuration.
-If they choose `disable everything`: set both to `false`, remove the
-CI and release-please sections from `AGENTS.md`.
+**If they choose `migrate`**:
 
-**Update the footer** according to the new state.
+Set `features.ci = false`, keep `features.release_please = true`, and clear only
+the full-CI fields. Then run `/wf-refresh` to remove quality-guard/AI/security
+workflows while preserving release-please.
+
+```bash
+jq '.features.ci = false |
+    .features.release_please = true |
+    .ci.ai_reviewer = "none" |
+    .ci.gga_provider = "none" |
+    .ci.security_review = false |
+    .ci.e2e_in_ci = false |
+    .ci.auto_improve = true |
+    .ci.inline_suggestions = true |
+    .ci.release_ai_summary = false |
+    .ci.release_ai_provider = "none"' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+```
+
+**If they choose `disable everything`**:
+
+Set both CI and release-please to false and clear the `ci` object. Then run
+`/wf-refresh` to remove all CI/CD workflows.
+
+```bash
+jq '.features.ci = false |
+    .features.release_please = false |
+    .ci = {}' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+```
+
+> **Do NOT run `phase47-cicd.md` from `/wf-settings`** — that file belongs to the
+> `/wf-init` phase flow and is not downloaded in this command context. CI changes
+> are applied by updating state and running `/wf-refresh`.
 
 Confirm:
 ```
-✓ CI: <enabled / disabled / migrated to standalone>
-✓ .wizard-state.json: features.ci = <yes/no>
-✓ AGENTS.md footer updated
-```
-
-**State update**:
-```bash
-jq '.features.ci = <value>' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+✓ CI: <enabled / migrated to standalone / disabled>
+✓ .wizard-state.json: features.ci = <true/false>, features.release_please = <true/false>
+✓ CI/CD artifacts regenerated via /wf-refresh
 ```
 
 ---
@@ -655,7 +710,8 @@ Which AI reviewer do you want to use for your PR reviews?
 ────────────────────────────────────────────────────────────
 
 GGA — Recommended
-  Provider agnostic: can use Claude, Gemini, Codex, OpenAI, Ollama, etc.
+  Provider agnostic: Claude, Gemini, and Codex are pre-mapped in `gga-review.yml.md`.
+  Other providers (including OpenCode) can be used by adding the corresponding CLI/secret mapping.
   Flexible modes: local (on your machine) + CI (in GitHub Actions)
   Native integration with gentle-ai and this workflow
 
@@ -685,13 +741,12 @@ Which one do you prefer?
 ```
 Which provider do you want to use with GGA?
 
-1. Claude (Anthropic)
-2. Gemini (Google)
-3. Codex (OpenAI)
-4. OpenAI (GPT)
-5. Ollama (local)
+1. Claude (Anthropic)     → claude
+2. Gemini (Google)        → gemini
+3. Codex (OpenAI)         → codex
 
-Which one? [1-5]
+Provider keys must match the `gga_provider` values supported by `gga-review.yml.md`.
+Which one? [1-3]
 ```
 
 **If they choose another** (Copilot, Claude, Gemini, None): no additional provider needed.
@@ -835,7 +890,7 @@ Which one do you prefer?
 ```
 
 **If they choose Claude or Gemini**: generate/update
-`https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/cicd/variants/security-review.<provider>.yml` as
+`https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/cicd/variants/security-review.<provider>.yml.md` as
 `.github/workflows/security-review.yml`. Use PR-Agent with the selected
 provider.
 
@@ -917,12 +972,14 @@ Confirm:
 ```
 ✓ release-please standalone: <enabled / disabled>
 ✓ .wizard-state.json: features.release_please = <yes/no>
+✓ .wizard-state.json: ci.release_please = <yes/no>
+✓ .wizard-state.json: ci.conventional_commits = <yes/no>
 ✓ AGENTS.md footer updated
 ```
 
 **State update**:
 ```bash
-jq '.features.release_please = <value> | .ci.release_please = <value>' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+jq '.features.release_please = <value> | .ci.release_please = <value> | .ci.conventional_commits = <value>' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
 ```
 
 ---
@@ -951,7 +1008,8 @@ Correct? [yes / correct]
 
 Then ask about trigger, platform, runtime (Nginx/Apache/Docker/PM2) and deploy path
 (same questions as phase47 PART B). Set `state.cd.enabled = true` and the corresponding
-fields. Run `phase47-cicd.md` to configure if needed.
+fields, then run `/wf-refresh` to regenerate `.github/workflows/deploy.yml`.
+Do NOT run `phase47-cicd.md` from `/wf-settings` — that file belongs to the `/wf-init` phase flow.
 
 **If they want to change (disable)**:
 
@@ -1012,8 +1070,9 @@ When does the deploy execute?
 To use tags you need release-please to generate them
 automatically. Should I activate it too? [yes / no]
 ```
-If yes: set `state.ci.release_please = true`,
-`state.ci.conventional_commits = true`, and `state.cd.trigger = 'tag'`.
+If yes: set `state.features.release_please = true`,
+`state.ci.conventional_commits = true`, `state.ci.release_please = true`,
+and `state.cd.trigger = 'tag'`. Update the AGENTS.md footer to `release=yes`.
 If no: do not change the trigger (stays as push to main).
 
 **If they choose push a main (2)**: no restrictions. Set `state.cd.trigger = 'push_main'`.
@@ -1034,12 +1093,22 @@ Confirm:
 ```
 ✓ Release strategy changed to: <tag v* / push a main>
 ✓ .wizard-state.json: cd.trigger = <tag / push_main>
+✓ <if release-please activated> .features.release_please = true, .ci.conventional_commits = true, .ci.release_please = true
+✓ <if release-please activated> AGENTS.md footer updated to release=yes
 ✓ <if CD ON> .github/workflows/deploy.yml regenerated
 ✓ <if CD OFF> Instructions for configuring your external CD
 ```
 
 **State update**:
 ```bash
+# For tag trigger without release-please:
+jq '.features.release_please = true |
+    .ci.conventional_commits = true |
+    .ci.release_please = true |
+    .cd.trigger = "tag"' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+sed -i.bak -E 's/(features: [^|]*release=)[a-z]*/\1yes/' AGENTS.md && rm AGENTS.md.bak
+
+# For push_main trigger (or when release-please is already active):
 jq '.cd.trigger = "<new_trigger>"' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
 ```
 
@@ -1065,7 +1134,10 @@ Do you want to reapply the Windsurf fix now? [yes / no, skip]
 1. **Merge AGENTS.md rule** — same as phase45 did:
    - Read the rule from temp-files/AGENTS.md (Gentle AI — Legacy Path Bridge section).
    - Check if it already exists in the project's AGENTS.md.
-   - If not present, insert it at the top (after title, before other content).
+   - If not present, insert it after the first line (after the title), ENVELOPED in
+     `<!-- WF: DO NOT REGENERATE -->` ... `<!-- /WF: DO NOT REGENERATE -->` (add a newline
+     before the closing marker — temp-files/AGENTS.md has no trailing newline), so future
+     refreshes preserve it.
    - If already present, skip (do not duplicate).
 
 2. **Rewrite .windsurf/workflows/sdd-new.md**:
@@ -1073,6 +1145,49 @@ Do you want to reapply the Windsurf fix now? [yes / no, skip]
    - If it matches the legacy version (check for "legacy" string or old content), replace it.
    - Write the modern version from temp-files/sdd-new.md.
    - Adapt the backend reference to match `state.sdd.backend`.
+
+```bash
+SDD_BACKEND=$(jq -r '.sdd.backend // "hybrid"' .wizard-state.json)
+WF_DIR="${WF_DIR:-/tmp/wf-settings-phases}"
+WF_RAW="${WF_RAW:-https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main}"
+
+# Resolve backend-specific artifact path or Engram topic key
+if [ "$SDD_BACKEND" = "engram" ]; then
+  SDD_BACKEND_PATH="engram"
+  SDD_PROPOSAL_PATH="sdd/{change-name}/proposal"
+else
+  SDD_BACKEND_PATH="$SDD_BACKEND"
+  [ "$SDD_BACKEND" = "hybrid" ] && SDD_BACKEND_PATH="openspec"
+  SDD_PROPOSAL_PATH="$SDD_BACKEND_PATH/changes/<name>/proposal.md"
+fi
+
+mkdir -p "$WF_DIR/temp-files" .windsurf/workflows
+
+# Download the AGENTS.md bridge rule and merge it if missing
+[ -f "$WF_DIR/temp-files/AGENTS.md" ] || curl -fsSL "$WF_RAW/temp-files/AGENTS.md" -o "$WF_DIR/temp-files/AGENTS.md" 2>/dev/null
+if [ -f "$WF_DIR/temp-files/AGENTS.md" ] && [ -f AGENTS.md ]; then
+  if ! grep -q "Gentle AI — Legacy Path Bridge" AGENTS.md; then
+    TITLE_LINE=$(grep -n '^# ' AGENTS.md | head -1 | cut -d: -f1)
+    if [ -n "$TITLE_LINE" ]; then
+      {
+        head -n "$TITLE_LINE" AGENTS.md
+        printf '%s\n' "<!-- WF: DO NOT REGENERATE -->"
+        cat "$WF_DIR/temp-files/AGENTS.md"
+        printf '\n%s\n' "<!-- /WF: DO NOT REGENERATE -->"
+        tail -n +$((TITLE_LINE + 1)) AGENTS.md
+      } > AGENTS.md.tmp
+      mv AGENTS.md.tmp AGENTS.md
+    fi
+  fi
+fi
+
+# Rewrite .windsurf/workflows/sdd-new.md
+[ -f "$WF_DIR/temp-files/sdd-new.md" ] || curl -fsSL "$WF_RAW/temp-files/sdd-new.md" -o "$WF_DIR/temp-files/sdd-new.md" 2>/dev/null
+cp "$WF_DIR/temp-files/sdd-new.md" .windsurf/workflows/sdd-new.md
+sed -i.bak "s|{{sdd.backend}}/changes/<name>/proposal.md|$SDD_PROPOSAL_PATH|g" .windsurf/workflows/sdd-new.md
+sed -i.bak "s/{{sdd.backend}}/$SDD_BACKEND_PATH/g" .windsurf/workflows/sdd-new.md
+rm -f .windsurf/workflows/sdd-new.md.bak
+```
 
 Confirm:
 ```
@@ -1123,12 +1238,15 @@ Which one? [1-9]
 
 Generate everything related for the chosen IDE, downloading from `$WF_RAW`:
 
-1. **Satellite** — `$WF_RAW/templates/satellites/<ide>.tmpl` → its destination
-   (route table in protocol `ides`): `claude-code` → `CLAUDE.md`,
-   `vscode-copilot` → `.github/copilot-instructions.md`, `cursor` → `.cursor/rules/project.mdc`,
-   `windsurf` → `.windsurf/rules/project.md`, `kiro` → `.kiro/steering/project-context.md`,
-   `gemini-cli` → `GEMINI.md`, `antigravity` → `ANTIGRAVITY.md`. Create parent
-   directories as needed.
+1. **Satellite** — `$WF_RAW/templates/satellites/<satellite>.tmpl` where the satellite
+   filename is mapped from the IDE key:
+   `claude-code` → `claude`, `vscode-copilot` → `copilot`, `gemini-cli` → `gemini`,
+   `cursor` → `cursor`, `windsurf` → `windsurf`, `kiro` → `kiro`,
+   `antigravity` → `antigravity`. Destination (route table in protocol `ides`):
+   `claude-code` → `CLAUDE.md`, `vscode-copilot` → `.github/copilot-instructions.md`,
+   `cursor` → `.cursor/rules/project.mdc`, `windsurf` → `.windsurf/rules/project.md`,
+   `kiro` → `.kiro/steering/project-context.md`, `gemini-cli` → `GEMINI.md`,
+   `antigravity` → `ANTIGRAVITY.md`. Create parent directories as needed.
 2. **Commands** — every command in the catalog (same list as Builder B7:
    `wf-worktree`, `wf-settings`, `wf-onboard`, plus `wf-ladder` if active) → the IDE's
    command directory
@@ -1136,8 +1254,7 @@ Generate everything related for the chosen IDE, downloading from `$WF_RAW`:
    `.opencode/commands/`, `.github/prompts/`, `.codex/commands/`), applying the per-IDE
    frontmatter (protocol `ides`, routing-table.section.md).
 3. **Skills** — the packaged protocol skills → the IDE's native skills directory
-   (`.claude/skills/`, `.kiro/skills/`, `.codex/skills/`, `.windsurf/skills/`, `.devin/skills/`,
-   `.agents/skills/`).
+   (`.claude/skills/`, `.cursor/skills/`, `.kiro/skills/`, `.codex/skills/`, `.windsurf/skills/`, `.devin/skills/`, `.gemini/skills/`, `.opencode/skills/`, `.agents/skills/`).
 4. **Windsurf fix** — ONLY if the added IDE is Windsurf/Devin: apply the same logic as
    Option 17 (AGENTS.md "Gentle AI — Legacy Path Bridge" rule + `.windsurf/workflows/sdd-new.md`).
 

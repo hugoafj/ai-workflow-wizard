@@ -40,7 +40,7 @@ Make `/wf-refresh` a **safe, deterministic migration runner** that:
 
 ### Excluded
 
-- Pre-flight optimization (Opción C: skip builder if nothing changed) — deferred to iteration 2
+- Pre-flight optimization (Option C: skip builder if nothing changed) — deferred to iteration 2
 - Changes to `/wf-cleanup` or `/wf-settings` beyond compatibility fixes
 - Refactoring existing Builder logic (only extend it)
 
@@ -74,7 +74,7 @@ Make `/wf-refresh` a **safe, deterministic migration runner** that:
 | Explicit deletion approval | Never auto-delete; user controls what goes away |
 | Preserve `<!-- WF: DO NOT REGENERATE -->` | Respects custom AGENTS.md rules and user skills |
 | Deprecate `WIZARD_MANIFEST.json` | Dead code once refresh is builder-driven |
-| Opción A for MVP | Full builder + hash diff is simple and correct; Opción C (pre-flight) deferred |
+| Option A for MVP | Full builder + hash diff is simple and correct; Option C (pre-flight) deferred |
 
 ## Files to create/modify
 
@@ -108,7 +108,7 @@ Make `/wf-refresh` a **safe, deterministic migration runner** that:
 
 ## Assumptions
 
-1. **Opción A is chosen**: Full builder + hash diff for MVP (Opción C deferred)
+1. **Option A is chosen**: Full builder + hash diff for MVP (Option C deferred)
 2. **Wizard-managed patterns**: Files matching `wf-*/SKILL.md`, `.github/workflows/*`, `.husky/*`, etc.
 3. **Custom content markers**: Already documented in `wf-refresh/_base.md` and `phase2.md`
 4. **`.wizard-staging/` is available**: Confirmed it is deleted at end of `/wf-init` (phase8.md line 500)
@@ -116,8 +116,8 @@ Make `/wf-refresh` a **safe, deterministic migration runner** that:
 
 ## Open questions
 
-1. **Pre-flight optimization**: Should we implement Opción C (skip builder if nothing changed) in this iteration or defer to iteration 2?
-   - **Decision**: Defer to iteration 2; Opción A is simpler and correct for MVP
+1. **Pre-flight optimization**: Should we implement Option C (skip builder if nothing changed) in this iteration or defer to iteration 2?
+   - **Decision**: Defer to iteration 2; Option A is simpler and correct for MVP
 2. **Manifest deprecation timeline**: Should we delete `WIZARD_MANIFEST.json` and `.wizard-manifests/` immediately or keep as historical artifacts?
    - **Decision**: Keep as historical artifacts; remove in follow-up PR after proving no external dependency
 3. **CI/CD runtime setup**: Should `npm install` / `husky init` / `gga install` be auto-run or require explicit confirmation?
@@ -144,4 +144,4 @@ Make `/wf-refresh` a **safe, deterministic migration runner** that:
 
 ---
 
-**Approval gate**: ¿Apruebas este plan de implementación?
+**Approval gate**: Do you approve this implementation plan?

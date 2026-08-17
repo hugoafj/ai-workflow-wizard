@@ -44,10 +44,10 @@
 ## Phase routing (canonical order, do not alter)
 
 `phase0 → phase0b → phase1 → phase2 → phase3 → (legacy: phase4) → phase45 → phase46 →
-phase46b → phase47 (CI/CD) → phase5 → phase6 (Builder: 6a/6b/6c/6c2/6d/6e) → phase7 → phase8`.
+phase46b → phase47 (CI/CD) → phase5 → phase6a → phase6b (Builder) → phase7 → phase8`.
 
-- CI/CD (Block 6) is part of the /wf-init flow: questions in phase47, generation in 6e.
-  It is not optional. Re-configuration happens through `/wf-settings` (options 9-14),
+- CI/CD (Block 6) is part of the /wf-init flow: questions in phase47, generation in phase6b.
+  It is not optional. Re-configuration happens through `/wf-settings` (options 9–16: CI/CD and release strategy),
   whose single source is the `cicd` protocol (`templates/protocols/cicd/_base.md`).
 
 - The only conditional branch: in `phase3`, if `classification == greenfield` it skips

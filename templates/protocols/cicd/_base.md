@@ -3,9 +3,10 @@
 <!--
   SINGLE SOURCE of the CI/CD rules, templates, and the interactive configuration flow
   (formerly the /wf-cicd command, archived in templates/_archive/wf-cicd/). Consumed by
-  /wf-settings (options 10-14), /wf-init Phase 4.7 (phase47-cicd.md), and the Builder/hook
-  (phase6d). Source in inventory.md: wf-cicd.md (all, 42 items), phase6d 1-93, post-commit,
-  phase6a 57-59 (Programmatic Checks), AI_DEV_WORKFLOW §10. The concrete artifacts
+  /wf-settings (options 9–16: CI/CD and release strategy), /wf-init Phase 4.7 (phase47-cicd.md), and the Builder/hook
+  (phase6b-build-heavy.md). Source: wf-cicd.md (archived, 42 items), phase47-cicd.md,
+  phase6b-build-heavy.md, hook.post-commit.tmpl.md, phase6a-agents.md 57-59
+  (Programmatic Checks), AI_DEV_WORKFLOW §10. The concrete artifacts
   (YAML/JSON/hook) are in variants/ and hook.post-commit.tmpl.md (VERBATIM from the source).
 -->
 
@@ -17,7 +18,7 @@
 ## Interactive configuration flow (formerly /wf-cicd)
 
 > The `/wf-cicd` command was archived (`templates/_archive/wf-cicd/`) to make this protocol
-> the single source. This flow is invoked from `/wf-settings` (options 10-14) and from
+> the single source. This flow is invoked from `/wf-settings` (options 9–16: CI/CD and release strategy) and from
 > `/wf-init` Phase 4.7 (`phase47-cicd.md`). All artifacts are written VERBATIM from the
 > `variants/` templates below; edit them in the templates, never inline.
 
@@ -28,7 +29,7 @@ Phases at a glance: [PHASE 0 — Detect current state](#phase-0--detect-current-
 [PHASE 4 — Conventional commits](#phase-4--conventional-commits-husky--commitlint) ·
 [PHASE 5 — release-please](#phase-5--release-please) ·
 [PHASE 6 — Branch rules / final commit](#phase-6--branch-rules-and-final-commit) ·
-[PHASE 6 — CD](#phase-6--cd-continuous-delivery)
+[PHASE 7 — CD](#phase-7--cd-continuous-delivery)
 
 > **Note about GGA (Gentleman Guardian Angel)**: `gga`
 > as an installable tool (repo `Gentleman-Programming/gentleman-guardian-angel`,
@@ -382,18 +383,19 @@ from `package.json`:
 
 > **Single source**: write this artifact VERBATIM from `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/cicd/variants/release-please-manifest.json.md`. Do not edit it inline here; if it changes, change it in the template.
 
-Ask about the optional AI summary step (requires the same
-`GEMINI_API_KEY` from previous phases, if configured):
+Ask about the optional AI summary step (requires the same provider API key
+from previous phases if configured — `ANTHROPIC_API_KEY` for Claude,
+`GEMINI_API_KEY` for Gemini, or `OPENAI_API_KEY` for OpenAI):
 
 ```
 Do you want the release PR to include an AI-generated natural language
 summary (in addition to the automatic conventional commits changelog)?
-Requires GEMINI_API_KEY. [yes / no]
+Requires the configured provider's API key. [yes / no]
 ```
 
 If confirmed, add a second job to the same workflow:
 
-> **Single source**: write this artifact VERBATIM from `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/cicd/variants/ai-summary-job.<provider>.yml.md` (according to `state.cicd.release_ai_provider`). Do not edit it inline here; if it changes, change it in the template.
+> **Single source**: write this artifact VERBATIM from `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/cicd/variants/ai-summary-job.<provider>.yml.md` (according to `state.ci.release_ai_provider`). Do not edit it inline here; if it changes, change it in the template.
 
 > This action (`steven0351/publish-gemini-release-notes`) is third-party, not
 > from Google or Anthropic — review its code before giving it access to a
@@ -464,10 +466,10 @@ Commit: chore: configure CI/CD pipeline (Block 6)
 
 ---
 
-### PHASE 6 — CD (Continuous Delivery)
+### PHASE 7 — CD (Continuous Delivery)
 
 > **Implemented**. CD is configured as an independent feature in `/wf-init` (Phase 4.7
-> PART B) and in `/wf-settings` option 14. The wizard detects the project stack and generates
+> PART B) and in `/wf-settings` option 15. The wizard detects the project stack and generates
 > the corresponding deploy workflow.
 
 #### How it works
@@ -522,13 +524,17 @@ in the CD configuration without attempting to solve it automatically.
 
 ## Post-commit hook (drift detector) — single source
 
-- Body template: `hook.post-commit.tmpl.md` (VERBATIM phase6d 12-93). It is the ONLY
-  source of the drift logic; the repo root `post-commit` is regenerated from here.
-- Detects two drift categories and only **notifies** (never acts):
+- Body template: `hook.post-commit.tmpl.md` (VERBATIM from this template). It is the ONLY
+  source of the drift logic used by `/wf-init`, `/wf-refresh`, and the root `post-commit`
+  file (which is the extracted bash body of the template).
+- Detects three drift categories and only **notifies** (never acts):
   - **AGENTS.md drift** (`REFRESH_FILES`) → suggests `/wf-refresh`.
   - **SDD drift** (`SDD_FILES`) → suggests `/sdd-init`.
+  - **Config/IDE drift** (`CONFIG_FILES`: `AGENTS.md`, IDE settings, satellites, commands) → suggests `/wf-refresh`.
 - `openspec/config.yaml` **excluded** (it is the output of /sdd-init; avoids loop).
 - Writes persistent `.wf-status` between sessions + macOS notification (osascript).
+- Refreshes gentle-ai's skill registry opportunistically (non-blocking, silent) so new
+  wizard skills are picked up without manual intervention.
 
 ### Hook location: `.git/hooks/` vs `.husky/` (Block 6 migration)
 

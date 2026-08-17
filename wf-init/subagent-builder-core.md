@@ -5,11 +5,10 @@ You are a Builder agent. Your job is to assemble AGENTS.md router, packaged prot
 ## Context
 
 - `PROJECT_PATH`: absolute path to the target project
-- `WF_PATH`: absolute path to the workflow wizard repo
+- `WF_PATH`: absolute path to the downloaded phase directory (WF_DIR — contains `lib/` and phase files)
 - `WF_STATE`: `{PROJECT_PATH}/.wizard-state.json`
 - `WF_STAGING`: `{PROJECT_PATH}/.wizard-staging/`
 - `WF_RAW`: `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main`
-- `TEMPLATES`: `{WF_PATH}/templates/`
 
 ## Universal extraction rule
 
@@ -22,13 +21,13 @@ Exception: `.tmpl.md` templates WITHOUT code fence (like `vitest.config.tmpl.md`
 ### 0. Setup
 
 ```bash
-source "{WF_PATH}/wf-init/lib/state.md"
+source "{WF_PATH}/lib/state-helpers.sh"
 mkdir -p "{WF_STAGING}"
 cd "{PROJECT_PATH}"
 cat .wizard-state.json
 ```
 
-### B1 — Cargar estado
+### B1 — Load state
 
 Read the full `.wizard-state.json`. Verify that required fields exist. If any are missing, STOP and report what's missing — don't invent defaults.
 
@@ -36,9 +35,9 @@ Read the full `.wizard-state.json`. Verify that required fields exist. If any ar
 
 ```bash
 STACK=$(jq -r '.discovery.stack_key' .wizard-state.json)
-IDES=$(jq -r '.answers.ides[]' .wizard-state.json)
+IDES=$(jq -r '.answers.ides[]?' .wizard-state.json)
 TDD_MODE=$(jq -r '.testing.tdd_mode' .wizard-state.json)
-LAYERS=$(jq -r '.testing.layers[]' .wizard-state.json)
+LAYERS=$(jq -r '.testing.layers[]?' .wizard-state.json)
 LADDER=$(jq -r '.features.decision_ladder' .wizard-state.json)
 TDD=$(jq -r '.features.tdd_protocol' .wizard-state.json)
 ROUTING=$(jq -r '.features.routing_abc' .wizard-state.json)
@@ -107,7 +106,7 @@ whenever either of the other two is, since it is only a sequencing pointer betwe
 
 If Phase 2 detected custom content to migrate:
 
-1. Read the migrated custom content from `.wizard-state.json` (field: `migration.prior_artifacts_content`)
+1. Read the custom content to preserve from the project's current files (e.g. the existing `AGENTS.md`, `CLAUDE.md`). The state only records the migration decision — `migration.prior_content_action`, `migration.wrap_custom_in_markers`, `migration.missing_commands` — it does NOT store the content (`migration.prior_artifacts_content` does not exist).
 2. When writing to AGENTS.md, wrap preserved sections:
    ```markdown
    <!-- WF: DO NOT REGENERATE -->
@@ -125,7 +124,7 @@ This ensures custom sections from the previous AGENTS.md are never accidentally 
 For each active protocol (body already built):
 
 **1. Flat file** (universal fallback):
-`{WF_STAGING}/.agents/protocols/<name>.md` = cuerpo — `<name>` is the protocol's source folder
+`{WF_STAGING}/.agents/protocols/<name>.md` = body — `<name>` is the protocol's source folder
 name (under `templates/protocols/` for pure protocols, `templates/commands/` for the 7 wizard
 commands that ship skills; the `tdd` protocol was renamed `wf-tdd`, so its flat is
 `.agents/protocols/wf-tdd.md`).
@@ -142,9 +141,11 @@ frontmatter field (from `skill/SKILL.md`) — NOT necessarily the command folder
 | IDE | Skills path |
 |-----|-------------|
 | `claude-code` | `{WF_STAGING}/.claude/skills/<skill-name>/SKILL.md` |
+| `cursor` | `{WF_STAGING}/.cursor/skills/<skill-name>/SKILL.md` |
 | `kiro` | `{WF_STAGING}/.kiro/skills/<skill-name>/SKILL.md` |
 | `codex` | `{WF_STAGING}/.codex/skills/<skill-name>/SKILL.md` |
 | `windsurf` | `{WF_STAGING}/.windsurf/skills/<skill-name>/SKILL.md`, `{WF_STAGING}/.devin/skills/<skill-name>/SKILL.md` (both written for Windsurf/Devin compatibility) |
+| `gemini-cli` | `{WF_STAGING}/.gemini/skills/<skill-name>/SKILL.md` |
 
 **Universal — always emitted, regardless of `IDES`** (the 1:1 skill fallback):
 `{WF_STAGING}/.agents/skills/<skill-name>/SKILL.md` — the standard `.agents/` path read by
@@ -164,17 +165,40 @@ Record each file. Don't ask — write everything directly to staging.
 
 1. Download `$WF_RAW/templates/AGENTS.router.md`
 2. Replace ALL `{{...}}` placeholders with values from `.wizard-state.json`:
-   - `{{answers.*}}`, `{{discovery.*}}`, `{{testing.*}}`, `{{features.*_yesno}}`
+   - `{{answers.*}}`, `{{discovery.*}}`, `{{testing.*}}`
+   - For each `{{features.<name>_yesno}}` placeholder (e.g. `decision_ladder_yesno`, `tdd_protocol_yesno`, `routing_abc_yesno`, `ci_yesno`, `cd_yesno`, `release_please_yesno`), read `.features.<name>` and convert:
+     - `true` → `yes`
+     - `false` or `null` → `no`
+     Then replace `{{features.<name>_yesno}}` with the resulting `yes`/`no`.
    - `{{wizard_version}}` → from the root field `wizard_version`
+   - **Inference-resolved** (NO dedicated state field — derive from state + manifest, never leave the raw placeholder): `{{discovery.commands}}` (exact commands with real flags), `{{discovery.conventions.code_style}}`, `{{discovery.conventions.structure}}`, `{{testing.checks_before_done}}` (`lint + build` + test per layers), `{{mcps.table}}` (built from stack + layers).
    - **NEVER write `latest` or leave an unresolved placeholder** (e.g. `{{wizard_version}}`).
      Read the EXACT value from the state file. If the state lacks `wizard_version`, use the
-     `VERSION` file content; if that is missing too, use `0.1.0-beta.1`. A footer with `latest`
+     `VERSION` file content; if that is missing too, use `0.7.1-beta.1`. A footer with `latest`
      blocks `/wf-refresh` forever (strict version equality), so this is a hard correctness rule.
 3. Resolve `<if ...>` blocks based on state
 4. Insert testing sections if LAYERS is not empty
 5. Build MCPs table based on STACK + LAYERS
 6. Write to `{WF_STAGING}/AGENTS.md`
 7. Footer: last line with `wf-version` + stack + all features as flags
+
+### B5b — Preserve existing custom AGENTS.md sections
+
+**If the project already has an `AGENTS.md`** (e.g. during `/wf-refresh` or a
+re-run), preserve its user-maintained sections BEFORE finalizing the staged
+`AGENTS.md`:
+
+1. Read the existing `{PROJECT_PATH}/AGENTS.md`.
+2. Extract every block between `<!-- WF: DO NOT REGENERATE -->` and
+   `<!-- /WF: DO NOT REGENERATE -->` markers (inclusive).
+3. Re-inject those blocks into `{WF_STAGING}/AGENTS.md` at the same relative
+   location (before the first `## ` heading, or append at the end if there is
+   none).
+4. If `{WF_STAGING}/AGENTS.md` already contains the marker (Builder preserved it
+   earlier), do NOT inject again — the operation is idempotent.
+
+This guarantees `/wf-refresh` never destroys user-maintained sections, even when
+the Builder runs through delegation.
 
 ### B6 — Satellites per IDE (only selected)
 
@@ -204,19 +228,22 @@ For each IDE in IDES, download template and write:
 After all files are written to staging, register them in `state.build_plan.generated_files` with SHA256 hashes. This is used by `/wf-refresh` to detect which files changed.
 
 ```bash
-# For each file in staging, calculate hash and register
+# For each file in staging, calculate hash and register (null-delimited for paths with spaces).
 cd "{WF_STAGING}"
 FILES_JSON="[]"
-for file in $(find . -type f); do
+PATHS_JSON="[]"
+while IFS= read -r -d '' file; do
   REL_PATH="${file#./}"
-  HASH=$(sha256sum "$file" | awk '{print $1}')
+  HASH=$(wf_sha256 "$file")
   FILES_JSON=$(jq --arg path "$REL_PATH" --arg hash "$HASH" \
     '. += [{"path": $path, "hash": $hash, "managed": true}]' <<< "$FILES_JSON")
-done
+  PATHS_JSON=$(jq --arg path "$REL_PATH" \
+    '. += [$path]' <<< "$PATHS_JSON")
+done < <(find . -type f -print0)
 
 # Update state
-jq --argjson files "$FILES_JSON" \
-  '.build_plan.generated_files = $files' \
+jq --argjson files "$FILES_JSON" --argjson paths "$PATHS_JSON" \
+  '.build_plan.generated_files = $files | .build_plan.managed_paths = $paths' \
   "{WF_STATE}" > "{WF_STATE}.tmp"
 mv "{WF_STATE}.tmp" "{WF_STATE}"
 
@@ -226,7 +253,7 @@ cd "{PROJECT_PATH}"
 ## Expected output
 
 ```
-✓ Builder-Core completado:
+✓ Builder-Core completed:
   - Packaged protocols: N (flat) + M (skills)
   - AGENTS.md router ready
   - Satellites generated: N

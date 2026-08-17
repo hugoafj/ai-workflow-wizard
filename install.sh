@@ -43,9 +43,9 @@ install_windsurf() {
 }
 
 install_kiro() {
-  local dir="$1" cmd="$2" content="$3" version="$4"
+  local dir="$1" cmd="$2" content="$3" desc="$4" version="$5"
   mkdir -p "$dir"
-  printf -- '---\ninclusion: manual\nversion: %s\n---\n\n%s\n' "$version" "$content" \
+  printf -- '---\ninclusion: manual\ndescription: %s\nversion: %s\n---\n\n%s\n' "$desc" "$version" "$content" \
     > "${dir}/${cmd}.md"
   echo "  ✓ ${dir}/${cmd}.md"
 }
@@ -108,13 +108,14 @@ do_install() {
   echo -n "Fetching remote version... "
   local VERSION
   VERSION=$(curl -fsSL "${RAW}/VERSION" 2>/dev/null | head -1)
+  VERSION=${VERSION#v}
   echo "${VERSION}"
   echo ""
 
-  # Descriptions for Windsurf/Antigravity frontmatter
-  local desc_init="Wizard de bootstrap del AI Workflow Wizard — inicializa el workflow en un repo nuevo"
-  local desc_refresh="Refresh Wizard — actualiza AGENTS.md cuando el proyecto evolucionó — 3 capas de drift"
-  local desc_cleanup="Uninstaller global del AI Workflow Wizard — elimina artefactos del wizard de un proyecto"
+  # Descriptions for Windsurf/Antigravity frontmatter (must match templates/commands/meta.md)
+  local desc_init="AI Workflow Wizard bootstrap — initializes the workflow in a new repo"
+  local desc_refresh="Updates AGENTS.md when the project has evolved — builder-driven refresh"
+  local desc_cleanup="Removes wizard artifacts from a project (safe — preserves user code)"
 
   local installed=0
 
@@ -159,7 +160,7 @@ do_install() {
       installed=$((installed + 1))
     fi
     if [[ $has_kiro -eq 1 ]]; then
-      install_kiro "$HOME/.kiro/steering" "$cmd" "$body" "$VERSION"
+      install_kiro "$HOME/.kiro/steering" "$cmd" "$body" "$desc" "$VERSION"
       installed=$((installed + 1))
     fi
     # Unconditional: .agents/skills is read by Codex, OpenCode, Gemini (AGY app),

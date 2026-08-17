@@ -26,26 +26,30 @@
 
 ## Phase -1 · Check for wizard-managed files
 
-Before detection, check if there's a `.wizard-managed-files.json` from a previous `/wf-refresh`:
+Before detection, read the managed paths from `.wizard-state.json` (`build_plan.managed_paths`); fall back to `.wizard-managed-files.json` only if `.wizard-state.json` or its `build_plan.managed_paths` field is missing:
 
 ```bash
-# Check if .wizard-managed-files.json exists (from /wf-refresh)
-if [ -f ".wizard-managed-files.json" ]; then
-  echo "ℹ Found .wizard-managed-files.json (from /wf-refresh)"
-  MANAGED_FILES=$(jq -r '.files[] | .path' ".wizard-managed-files.json" 2>/dev/null || echo "")
-  
-  if [ -n "$MANAGED_FILES" ]; then
-    echo "ℹ Wizard-managed files to be removed:"
-    echo "$MANAGED_FILES" | while read file; do
-      echo "  - $file"
-    done
-    echo ""
-  fi
+# Source of truth: .wizard-state.json build_plan.managed_paths
+MANAGED_FILES=""
+STATE_HAS_MANAGED_PATHS=false
+if [ -f ".wizard-state.json" ] && jq -e '.build_plan.managed_paths' ".wizard-state.json" >/dev/null 2>&1; then
+  STATE_HAS_MANAGED_PATHS=true
+  MANAGED_FILES=$(jq -r '.build_plan.managed_paths[] // empty' ".wizard-state.json" 2>/dev/null || echo "")
+  echo "ℹ Found wizard-managed paths in .wizard-state.json"
 fi
 
-# Also check for old WIZARD_MANIFEST files (legacy)
-if [ -f "WIZARD_MANIFEST.json" ] || [ -f ".wizard-manifests/WIZARD_MANIFEST-*.json" ]; then
-  echo "ℹ Found legacy WIZARD_MANIFEST files (will be removed as wizard artifacts)"
+# Fallback to .wizard-managed-files.json (legacy)
+if [ "$STATE_HAS_MANAGED_PATHS" != "true" ] && [ -f ".wizard-managed-files.json" ]; then
+  echo "ℹ Falling back to .wizard-managed-files.json"
+  MANAGED_FILES=$(jq -r '.files[] | .path' ".wizard-managed-files.json" 2>/dev/null || echo "")
+fi
+
+if [ -n "$MANAGED_FILES" ]; then
+  echo "ℹ Wizard-managed files to be removed:"
+  echo "$MANAGED_FILES" | while read file; do
+    echo "  - $file"
+  done
+  echo ""
 fi
 ```
 
@@ -61,7 +65,7 @@ echo ""
 
 # 1. Wizard skills (Do NOT confuse with gentle-ai skills)
 echo "📦 Wizard skills:"
-for dir in .claude/skills .agents/skills .kiro/skills .codex/skills .windsurf/skills .devin/skills; do
+for dir in .claude/skills .cursor/skills .gemini/skills .agents/skills .kiro/skills .codex/skills .opencode/skills .windsurf/skills .devin/skills; do
   if [ -d "$dir" ]; then
     for skill in "$dir"/*/; do
       skill_name=$(basename "$skill")
@@ -89,7 +93,10 @@ for dir in .claude/commands .cursor/commands .windsurf/workflows .kiro/steering 
   if [ -d "$dir" ]; then
     for cmd in "$dir"/*; do
       cmd_name=$(basename "$cmd")
-      case "$cmd_name" in
+      # Normalize filenames: command files use .md or .prompt.md extensions
+      cmd_base=${cmd_name%.prompt.md}
+      cmd_base=${cmd_base%.md}
+      case "$cmd_base" in
         wf-init|wf-refresh|wf-onboard|wf-settings|wf-worktree|wf-cicd|wf-cleanup|wf-ladder|wf-tdd|tdd|wf-orchestrator|wf-sdd-trigger)
           echo "  🗑 $cmd (wizard)"
           ;;
@@ -182,6 +189,9 @@ done
 echo ""
 echo "📁 Other artifacts:"
 [ -f ".wizard-state.json" ] && echo "  🗑 .wizard-state.json"
+[ -f ".wizard-managed-files.json" ] && echo "  🗑 .wizard-managed-files.json"
+[ -f "refresh-plan.json" ] && echo "  🗑 refresh-plan.json (from /wf-refresh)"
+[ -f ".wizard-refresh-baseline.json" ] && echo "  🗑 .wizard-refresh-baseline.json (from /wf-refresh R3)"
 [ -f ".wf-status" ] && echo "  🗑 .wf-status"
 [ -f ".commitlintrc.json" ] && echo "  🗑 .commitlintrc.json"
 [ -d ".husky" ] && echo "  🗑 .husky/ (conventional commits)"
@@ -191,9 +201,8 @@ echo "📁 Other artifacts:"
 [ -f ".release-please-manifest.json" ] && echo "  🗑 .release-please-manifest.json"
 [ -f ".git/hooks/post-commit" ] && echo "  🗑 .git/hooks/post-commit (git hook installed by the wizard)"
 [ -d ".wizard-staging" ] && echo "  🗑 .wizard-staging/ (leftover from an interrupted run)"
-[ -d ".wizard-manifests" ] && echo "  🗑 .wizard-manifests/ (manifest history)"
 [ -d "openspec" ] && echo "  ⏭ openspec/ (gentle-ai — DO NOT delete)"
-if [ -f ".gitignore" ] && grep -qE "^\.wf-status$|^\.wizard-state\.json$|^\.wizard-staging/$|^!\.cursor/$|^!\.windsurf/$|^!\.devin/$|^!\.kiro/$|^!\.github/copilot-instructions\.md$" .gitignore; then
+if [ -f ".gitignore" ] && grep -qE "^\.wf-status$|^\.wizard-state\.json$|^\.wizard-managed-files\.json$|^\.wizard-staging/$|^!\.cursor/$|^!\.windsurf/$|^!\.devin/$|^!\.kiro/$|^!\.claude/$|^!\.codex/$|^!\.opencode/$|^!\.gemini/$|^!GEMINI\.md$|^!ANTIGRAVITY\.md$|^!\.github/copilot-instructions\.md$|^!\.github/prompts/$" .gitignore; then
   echo "  🗑 .gitignore (wizard entries — review which ones to revert)"
 fi
 ```
@@ -276,12 +285,21 @@ Remove each wizard skill directory detected in Phase 0 (only wizard ones — nev
 rm -rf .claude/skills/wf-ladder .claude/skills/wf-tdd \
        .claude/skills/wf-orchestrator .claude/skills/wf-sdd-trigger \
        .claude/skills/wf-onboard .claude/skills/wf-worktree .claude/skills/wf-settings \
+       .cursor/skills/wf-ladder .cursor/skills/wf-tdd \
+       .cursor/skills/wf-orchestrator .cursor/skills/wf-sdd-trigger \
+       .cursor/skills/wf-onboard .cursor/skills/wf-worktree .cursor/skills/wf-settings \
+       .gemini/skills/wf-ladder .gemini/skills/wf-tdd \
+       .gemini/skills/wf-orchestrator .gemini/skills/wf-sdd-trigger \
+       .gemini/skills/wf-onboard .gemini/skills/wf-worktree .gemini/skills/wf-settings \
        .kiro/skills/wf-ladder .kiro/skills/wf-tdd \
        .kiro/skills/wf-orchestrator .kiro/skills/wf-sdd-trigger \
        .kiro/skills/wf-onboard .kiro/skills/wf-worktree .kiro/skills/wf-settings \
        .codex/skills/wf-ladder .codex/skills/wf-tdd \
        .codex/skills/wf-orchestrator .codex/skills/wf-sdd-trigger \
        .codex/skills/wf-onboard .codex/skills/wf-worktree .codex/skills/wf-settings \
+       .opencode/skills/wf-ladder .opencode/skills/wf-tdd \
+       .opencode/skills/wf-orchestrator .opencode/skills/wf-sdd-trigger \
+       .opencode/skills/wf-onboard .opencode/skills/wf-worktree .opencode/skills/wf-settings \
        .windsurf/skills/wf-ladder .windsurf/skills/wf-tdd \
        .windsurf/skills/wf-orchestrator .windsurf/skills/wf-sdd-trigger \
        .windsurf/skills/wf-onboard .windsurf/skills/wf-worktree .windsurf/skills/wf-settings \
@@ -343,8 +361,10 @@ Remove the remaining detected items:
 
 ```bash
 rm -f .wizard-state.json .wf-status .commitlintrc.json .gga .pr_agent.toml
+rm -f .wizard-managed-files.json
+rm -f refresh-plan.json .wizard-refresh-baseline.json
 rm -f release-please-config.json .release-please-manifest.json
-rm -rf .husky .wizard-staging .wizard-manifests
+rm -rf .husky .wizard-staging
 rm -f .git/hooks/post-commit
 ```
 

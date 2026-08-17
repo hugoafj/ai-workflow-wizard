@@ -96,7 +96,7 @@ Once set up, here's what working with the AI Workflow looks like:
 | Command | Scope | Description |
 |---------|-------|-------------|
 | `/wf-init` | Global | Bootstrap wizard — initializes the workflow in a project |
-| `/wf-refresh` | Global | Updates `AGENTS.md` when the project evolves ([learn more](AI_DEV_WORKFLOW.md#55-context-auto-update)) |
+| `/wf-refresh` | Global | Re-runs the Builder (B1–B9) to regenerate all managed artifacts when the project evolves ([learn more](AI_DEV_WORKFLOW.md#55-context-auto-update)) |
 | `/wf-cleanup` | Global | Removes wizard artifacts from a project |
 | `/wf-onboard` | Project | Onboarding guide for new developers |
 | `/wf-settings` | Project | Toggle optional modules: TDD, testing extras, Decision Ladder ([learn more](AI_DEV_WORKFLOW.md#98-wf-settings--toggle-optional-modules-after-installation)) |
@@ -109,7 +109,7 @@ Once set up, here's what working with the AI Workflow looks like:
 > Every command is also packaged as a SKILL.md (1:1): project ones by the Builder (native
 > per IDE + `.agents/skills/` universal + flat fallback), global ones by `install.sh`.
 
-> CI/CD re-configuration lives in `/wf-settings` (options 9-14), sourced from the `cicd`
+> CI/CD re-configuration lives in `/wf-settings` (options 9–16: CI/CD and release strategy), sourced from the `cicd`
 > protocol (`templates/protocols/cicd/_base.md`).
 
 ## When to Use /wf-cleanup + /wf-init Instead of /wf-refresh
@@ -117,7 +117,7 @@ Once set up, here's what working with the AI Workflow looks like:
 In most cases, `/wf-refresh` handles updates gracefully. But if any of these apply, a clean reinstall is safer:
 
 - **Disruptive release** — Many files changed simultaneously (5+ regenerations)
-- **Deleted files** — The manifest shows files were removed and you're unsure which
+- **Deleted files** — `.wizard-managed-files.json` shows files were removed and you're unsure which
 - **Corrupted state** — File integrity check fails (content hash mismatch)
 - **Multiple releases behind** — Jumping 3+ versions risks orphaned files
 - **Broken .wizard-state.json** — State is missing or incomplete
@@ -137,7 +137,7 @@ See [WF_REFRESH_TROUBLESHOOTING.md](WF_REFRESH_TROUBLESHOOTING.md) for detailed 
 Enable via `/wf-settings` after initial setup:
 
 - **TDD** — test-first development with strict or standard mode ([learn more](AI_DEV_WORKFLOW.md#9-block-5--tdd-pro--playwright-integrated))
-- **wf-ladder (Decision Ladder)** — structured decision-making protocol for complex architectural choices ([learn more](AI_DEV_WORKFLOW.md#58-optional-behavior-improvements--decision-ladder))
+- **wf-ladder (Decision Ladder)** — structured decision-making protocol for complex architectural choices ([learn more](AI_DEV_WORKFLOW.md#58-optional-behavior-improvements--wf-ladder))
 - **CI/CD extras** — GGA review, security scanning, AI summary jobs ([learn more](AI_DEV_WORKFLOW.md#10-block-6--cicd-pipeline--gga))
 
 ## Architecture

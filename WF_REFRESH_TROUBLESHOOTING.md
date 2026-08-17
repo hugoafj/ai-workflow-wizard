@@ -92,11 +92,11 @@ This ensures no orphaned or conflicting files.
 `/wf-refresh` uses SHA256 hashes to compare the Builder's staging output with the project:
 
 ```bash
-# For each file in .wizard-staging/
-STAGING_HASH=$(sha256sum ".wizard-staging/$file" | awk '{print $1}')
+# For each file in .wizard-staging/ (use wf_sha256 for macOS/BSD compatibility)
+STAGING_HASH=$(wf_sha256 ".wizard-staging/$file")
 
 if [[ -f "$file" ]]; then
-  PROJECT_HASH=$(sha256sum "$file" | awk '{print $1}')
+  PROJECT_HASH=$(wf_sha256 "$file")
   if [[ "$STAGING_HASH" == "$PROJECT_HASH" ]]; then
     echo "unchanged: $file"
   else
@@ -107,32 +107,37 @@ else
 fi
 ```
 
-If the project file's hash differs from the staging hash:
-- File was modified outside `/wf-refresh`
-- Regeneration might conflict
-- `/wf-refresh` will show a diff and ask for approval
+| Classification | Meaning |
+|---------------|---------|
+| `added` | File only in staging |
+| `updated` | File in project and staging, but hash differs |
+| `deleted` | Old managed file, no longer in staging, and project hash matches the recorded hash |
+| `deleted_modified` | Old managed file, no longer in staging, but project hash differs (user edited it) |
+| `unchanged` | File in project and staging with the same hash (skipped) |
 
 ### Deprecated Files Detection
 
-`/wf-refresh` compares the previous `.wizard-managed-files.json` with the newly generated staging:
+`/wf-refresh` compares the previous managed paths from the R3 snapshot `.wizard-refresh-baseline.json` (falling back to `.wizard-state.json` `build_plan.managed_paths` if the baseline is missing) against the newly generated staging:
 
-- Files in old `managed_paths` but not in new staging → proposed for deletion
-- Files with unchanged hash → safe to delete
-- Files with modified hash → user is warned and must approve explicitly
+- Files in old `managed_paths` but not in new staging → proposed for `deleted` or `deleted_modified`
+- Files with unchanged hash → classified as `deleted` (safe to delete)
+- Files with modified hash → classified as `deleted_modified` (user is warned and must approve explicitly)
 
 ### Multi-Version Detection
 
-In `/wf-refresh` Phase R-1:
+In `/wf-refresh` Phase R-1, versions are compared with a proper semver helper, not lexicographically:
 
 ```bash
-LOCAL_VERSION=$(grep "wf-version:" AGENTS.md | sed 's/.*wf-version: //' | cut -d' ' -f1)
-REMOTE_VERSION=$(curl -s https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/VERSION)
+LOCAL_VERSION=$(sed -n 's/.*wf-version: \([^ |]*\).*/\1/p' AGENTS.md | tail -1)
+REMOTE_VERSION=$(curl -fsSL https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/VERSION)
 
-if [[ "$LOCAL_VERSION" < "$REMOTE_VERSION" ]]; then
+if version_lt "$LOCAL_VERSION" "$REMOTE_VERSION"; then
   echo "⚠ Wizard is outdated (local: $LOCAL_VERSION, remote: $REMOTE_VERSION)"
-  read -p "Update global commands? [y/n] " -n 1 -r
+  read -p "Update global commands? [y/n] " -r
 fi
 ```
+
+`version_lt` handles `x.y.z[-prerelease[.N]]` correctly, so `0.10.0` is detected as greater than `0.6.8-beta` and `0.6.10` is greater than `0.6.8`.
 
 ---
 
@@ -181,34 +186,6 @@ fi
 │
 └─ State is broken/missing?
    └─ Run: /wf-cleanup && /wf-init
-```
-
----
-
-## Flow: When to Recommend Cleanup
-
-In `/wf-refresh` Phase R4 (Diff and Plan):
-
-```bash
-ADDED_COUNT=$(jq '.added | length' refresh-plan.json)
-UPDATED_COUNT=$(jq '.updated | length' refresh-plan.json)
-DELETED_COUNT=$(jq '.deleted | length' refresh-plan.json)
-
-if [[ $DELETED_COUNT -gt 2 ]] || [[ $((ADDED_COUNT + UPDATED_COUNT)) -gt 5 ]]; then
-  echo "⚠ This update is complex (many additions, updates, or deletions)"
-  echo ""
-  echo "For safety, consider:"
-  echo "  1. /wf-cleanup"
-  echo "  2. /wf-init"
-  echo ""
-  echo "Continue with /wf-refresh? [yes/no]"
-  read -p "Your choice: " choice
-  
-  if [[ "$choice" != "yes" ]]; then
-    echo "Run /wf-cleanup when ready to start fresh"
-    exit 0
-  fi
-fi
 ```
 
 ---

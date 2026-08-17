@@ -24,8 +24,9 @@ If `.wizard-state.json` has `migration.prior_content_action = "migrate"`:
 
 ```bash
 # Mark in state that custom content will be wrapped with protection markers
-jq '.migration.wrap_custom_in_markers = true' .wizard-state.json > /tmp/state.tmp
-mv /tmp/state.tmp .wizard-state.json
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+wf_state_set '.migration.wrap_custom_in_markers' 'true'
 ```
 
 Inform the user:
@@ -71,7 +72,7 @@ EXPECTED_COMMANDS="wf-ladder wf-tdd wf-orchestrator wf-sdd-trigger wf-onboard wf
 # active IDE, adjusting directory and extension based on its format:
 for cmd in $EXPECTED_COMMANDS; do
   if [ ! -f ".claude/commands/${cmd}.md" ]; then
-    echo "FALTA: .claude/commands/${cmd}.md"
+    echo "MISSING: .claude/commands/${cmd}.md"
   fi
 done
 ```
@@ -86,16 +87,18 @@ Apply the same pattern to each active IDE, adjusting path and extension:
 | Kiro | `.kiro/steering/` | `.md` (caution: this directory mixes satellites `inclusion: always` with commands `inclusion: manual` — verify by filename, don't assume everything there is a satellite) |
 | OpenCode | `.opencode/commands/` | `.md` |
 | Copilot | `.github/prompts/` | `.prompt.md` |
+| Codex CLI | `.codex/commands/` | `.md` |
+| Antigravity | `.agents/skills/<cmd>/` | `SKILL.md` |
 
 If the `EXPECTED_COMMANDS` of this wizard version differs from the one the previous
 detected version had (for example, an upgrade that added `wf-onboard` and
-`wf-refresh` as new commands), tell the user:
+`wf-tdd` as new commands), tell the user:
 
 ```
 Command verification — <IDE>:
   ✓ wf-ladder.md
   ✗ wf-onboard.md   ← missing (new in this wizard version)
-  ✗ wf-refresh.md   ← missing (new in this wizard version)
+  ✗ wf-tdd.md       ← missing (new in this wizard version)
 
 Although the directory already existed, 2 commands from the current version are missing.
 I will add them in Phase 8 without touching the existing ones that have their own content.
@@ -111,4 +114,11 @@ keeping `EXPECTED_COMMANDS` updated is the wizard maintainer's responsibility.
 > **⛔ STOP HERE — do not execute anything else.**
 > **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `migration.prior_content_action` (migrate/replace/review) and `migration.missing_commands` (the ones detected as missing). Mark `wf_phase_done phase2 phase3`.
 > Tell the user: *"Migration reviewed. Reply **continue** when you're ready for project classification."*
-> Wait for the response. Only when they confirm, run in bash: `cat "$WF_DIR/phase3.md"`
+> Wait for the response. Only when they confirm, run in bash:
+
+```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+wf_phase_done phase2 phase3
+cat "$WF_DIR/phase3.md"
+```
