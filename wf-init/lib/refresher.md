@@ -253,11 +253,10 @@ _apply_jq_filter() {
 }
 
 # Migrate state from CURRENT_VERSION to TARGET_VERSION.
-# Schema migration ensures required fields exist and known features have defaults.
-# Known features get false defaults (not asked again on refresh if they already exist).
-# NEW features (added in newer versions) remain absent, so Builder asks about them on re-run.
-# Interactive feature questions are handled by Builder (phase R3), which always re-runs during
-# /wf-refresh. Builder ONLY asks about features that don't exist in .features yet.
+# Schema migration ensures required fields exist. Feature defaults are NOT set
+# here: Phase R2 asks the user about protocol features missing from .features
+# (decision_ladder, tdd_protocol, routing_abc) using _ask_yesno_safe. Features
+# already present in state are never re-asked.
 migrate_state() {
   local CURRENT="$1"
   local TARGET="$2"
@@ -270,8 +269,7 @@ migrate_state() {
   echo "  Upgrading state from $CURRENT to $TARGET..."
   
   # Ensure schema v3 required fields exist (idempotent: //= creates only if missing).
-  # Do NOT set default values for known features here.
-  # NEW features should remain absent so Builder asks about them.
+  # Do NOT set default values for features here — Phase R2 asks instead.
   _apply_jq_filter '
     .schema_version = 3 |
     .wizard_version = "'"$TARGET"'" |
@@ -721,6 +719,24 @@ echo "ℹ Current state version: $CURRENT_VERSION"
 echo "ℹ Target version: $TARGET_VERSION"
 
 migrate_state "$CURRENT_VERSION" "$TARGET_VERSION"
+
+# Ask about new optional protocol features that are not present in the local
+# state yet (features added by newer wizard versions). ci/cd/release_please are
+# NOT asked here: they require the full phase47-cicd questionnaire and are
+# configured via /wf-settings or /wf-init. Disabled features are recorded
+# explicitly so they are never re-asked.
+for FEATURE in decision_ladder tdd_protocol routing_abc; do
+  if ! jq -e ".features.$FEATURE != null" "$WF_STATE" >/dev/null 2>&1; then
+    echo "New optional feature available: $FEATURE"
+    if _ask_yesno_safe "Enable $FEATURE?"; then
+      jq ".features.$FEATURE = true | .updated_at = (now | todate)" "$WF_STATE" > "$WF_STATE.tmp" && mv "$WF_STATE.tmp" "$WF_STATE"
+      echo "✓ $FEATURE enabled"
+    else
+      jq ".features.$FEATURE = false | .updated_at = (now | todate)" "$WF_STATE" > "$WF_STATE.tmp" && mv "$WF_STATE.tmp" "$WF_STATE"
+      echo "✗ $FEATURE disabled"
+    fi
+  fi
+done
 
 echo "✓ Phase R2 complete"
 ```

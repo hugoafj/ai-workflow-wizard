@@ -316,10 +316,10 @@ fi
 PHASE5_DONE=$(jq -r '.phases.phase5.status // "not-started"' .wizard-state.json)
 if [ "$PHASE5_DONE" = "done" ]; then
   NEXT="phase6a-agents"
-  echo "ℹ Phase 5 already completed; moving to Builder"
+  echo "ℹ Phase 5 already completed (resume case); moving to Builder"
 else
   NEXT="phase5"
-  echo "ℹ Back to Phase 5 for project details"
+  echo "ℹ Next: Phase 5 for project details"
 fi
 wf_phase_done phase47-cicd "$NEXT"
 echo "ℹ Next phase: $NEXT"

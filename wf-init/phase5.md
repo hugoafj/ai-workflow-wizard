@@ -27,18 +27,12 @@ Examples: "don't install dependencies without approval", "never touch src/legacy
 
 Save in `.wizard-state.json` → `answers.project_name`, `answers.stack_versions`, `answers.critical_constraints`.
 
-Compute the next phase based on ALREADY SELECTED features:
-```bash
-if [ "$(jq -r '.features.routing_abc // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.tdd_protocol // false' .wizard-state.json)" = "true" ]; then
-  NEXT="phase45"
-elif [ "$(jq -r '.features.ci // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.cd // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.release_please // false' .wizard-state.json)" = "true" ]; then
-  NEXT="phase47-cicd"
-else
-  NEXT="phase6a-agents"
-fi
-```
+Phase 5 always advances to `phase6a-agents`. Every conditional phase (4.5, 4.6,
+4.6b, 4.7) already ran BEFORE Phase 5 in the wizard flow, so there is no routing
+decision left to make here — routing back to a completed conditional phase would
+re-run it (regression: phase5↔phase45 / phase5↔phase47-cicd loop).
 
-Mark `wf_phase_done phase5 $NEXT`.
+Mark `wf_phase_done phase5 phase6a-agents`.
 
 Tell the user: *"Questions completed. Reply **continue** so I can assemble the artifacts (Builder → staging on disk, not in memory)."
 
@@ -72,6 +66,6 @@ Wait for the response. Only when confirmed, run in bash:
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
-wf_phase_done phase5 "$NEXT"
-cat "$WF_DIR/$NEXT.md"
+wf_phase_done phase5 phase6a-agents
+cat "$WF_DIR/phase6a-agents.md"
 ```

@@ -1,6 +1,6 @@
 # /wf-refresh — Builder-driven refresh
 
-⚡ **AUTOMATION**: Phases R-1 and R0 run automatically. Phases R1–R6 are interactive (you approve changes before applying).
+⚡ **AUTOMATION**: Phases R-1 and R0 run automatically. R1, R2, and R5 prompt you (drift/feature approvals); R3/R4/R6 run autonomously.
 
 ---
 

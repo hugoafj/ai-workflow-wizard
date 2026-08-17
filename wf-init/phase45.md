@@ -57,8 +57,9 @@ fi
    **Why**: gentle-ai installs SDD skills into Windsurf's legacy paths (`~/.codeium/windsurf/skills/`), not the Devin paths. This rule tells the agent where to find them. Without it, sdd-init will not load the skills correctly in Windsurf. Phase 45 runs BEFORE the Builder (Phase 6) creates AGENTS.md, so a greenfield project needs the rule file created here directly.
 
 2. **Create `.windsurf/workflows/sdd-new.md`** (to replace the legacy version):
-   - This file is generated **after** the backend selection below, once `state.sdd.backend` is resolved.
-   - See the "Generate `.windsurf/workflows/sdd-new.md`" step in the `/sdd-init` section.
+   - This file is generated in **Phase 5**, after `answers.project_name` is collected
+     (the template needs the project name).
+   - See the "Windsurf workflow setup (if applicable)" step in `phase5.md`.
 
 Tell the user:
 
@@ -261,7 +262,7 @@ Then update the Windsurf status:
 ```
 ⚙️ Windsurf compatibility setup:
   ✓ AGENTS.md: gentle-ai Windsurf paths rule in place (created if it did not exist)
-  ✓ Created `.windsurf/workflows/sdd-new.md` (backend: <SDD_BACKEND>)
+  ⏳ `.windsurf/workflows/sdd-new.md` will be generated in Phase 5 (needs answers.project_name)
 
 This is a temporary workaround for a gentle-ai bug with Windsurf. The agent will now
 be able to find and run SDD skills correctly.

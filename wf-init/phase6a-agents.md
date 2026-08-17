@@ -99,6 +99,6 @@ if [ "$WF_REFRESH" != "1" ]; then
   wf_phase_done phase6a-agents phase6b-build-heavy
   cat "$WF_DIR/phase6b-build-heavy.md"
 else
-  echo "ℹ Skipped phase6b — refresh mode active"
+  echo "ℹ Refresh mode: Builder-Heavy (B7-B9) runs separately per refresher.md R3 — do not promote phase7 here."
 fi
 ```

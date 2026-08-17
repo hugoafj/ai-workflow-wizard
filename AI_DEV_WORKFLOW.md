@@ -759,7 +759,6 @@ The `features` field is new and critical. It tracks which optional features of t
 
 - **Phase R-1 · Global version check**: Fetches wizard version from remote; exits early if already up-to-date.
 - **Phase R0 · Pre-flight state checks**: Validates `.wizard-state.json` exists and contains minimal required structure; detects active IDEs.
-- **Phase R0b · Drift detection**: Scans the project for drift in wizard-managed files and custom sections.
 - **Phase R1 · Project content drift**: Re-discovers the project (stack, node engine, etc.) and detects changes.
 - **Phase R2 · State/schema migration**: Migrates `.wizard-state.json` to current schema; asks about new optional features.
 - **Phase R3 · Builder re-run**: Re-runs B1-B9 to generate all artifacts into `.wizard-staging/` using only the Builder steps of `phase6a-agents.md` / `phase6b-build-heavy.md` (B1-B9). It **never follows the `/wf-init` phase 7/8 tail** (no `wf_phase_done phase6 phase7`, no `cat phase7.md`) — after Builder-Heavy validation it returns to Phase R4. Staging validation checks the generated artifacts (e.g. `AGENTS.md`); `.wizard-state.json` intentionally stays at the project root and is never expected inside staging. **Step 0 runs first**: it snapshots the pre-Builder `managed_paths`/`generated_files` into `.wizard-refresh-baseline.json` because the Builder overwrites `build_plan` with the new staging set.
@@ -772,24 +771,25 @@ The `features` field is new and critical. It tracks which optional features of t
 When running `/wf-refresh`, Phase R2 does the following:
 
 1. Reads `.wizard-state.json` features (e.g., `features.decision_ladder`).
-2. Detects new features in the current wizard version.
-3. **For each feature not in the local state**: asks you. In non-interactive/agent contexts set `WF_REFRESH_DEFAULT_ANSWER=yes|no` so the migration can proceed without stdin; otherwise it fails loudly instead of silently defaulting to NO.
+2. After `migrate_state`, checks the protocol features that can be enabled without
+   the full phase47-cicd questionnaire: `decision_ladder`, `tdd_protocol`, `routing_abc`.
+3. **For each feature not in the local state**: asks you. In non-interactive/agent
+   contexts set `WF_REFRESH_DEFAULT_ANSWER=yes|no` so the migration can proceed
+   without stdin; otherwise it fails loudly instead of silently defaulting to NO.
+   (`ci`, `cd`, and `release_please` are NOT asked here — they require the full
+   phase47-cicd questionnaire and are configured via `/wf-settings` or `/wf-init`.)
 4. Example:
 
 ```
-New optional features available:
+New optional feature available: decision_ladder
+Enable decision_ladder? [y/n]
 
-1. ABC routing pattern
-   Enables ABC routing for SDD workflows.
-   Enable? [y/n]
-
-2. Visual regression testing
-   Adds visual regression tests to your testing config.
-   Enable? [y/n]
+New optional feature available: routing_abc
+Enable routing_abc? [y/n]
 ```
 
 5. For each user response, updates `features.*` in `.wizard-state.json`.
-6. Features marked as disabled are not asked again in future refreshes.
+6. Features marked as disabled are recorded explicitly and not asked again in future refreshes.
 
 #### When refresh is NOT enough and you need to re-run the wizard
 
