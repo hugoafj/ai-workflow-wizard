@@ -704,10 +704,10 @@ Solves two different problems:
 
 **Trigger 2 · Slash command `/wf-refresh`**. When invoked, the agent runs eight phases (builder-driven, orchestrated by `wf-init/lib/refresher.md`, using `wf-init/lib/state-helpers.sh` for state access):
 
-- **Phase R-1**: Update global commands (`wf-init`, `wf-refresh`, `wf-cleanup`) if outdated
-- **Phase R0**: Validate `.wizard-state.json` and detect active IDEs
-- **Phase R1**: Re-discover project (stack, node engine, etc.) and detect drift
-- **Phase R2**: Migrate state schema and ask about new optional features
+- **Phase R-1** (Global): Fetch wizard version from GitHub; skip refresh if already up-to-date
+- **Phase R0** (Validate): Validate `.wizard-state.json` structure and detect active IDEs
+- **Phase R1** (Discover): Re-discover project (stack, node engine, etc.) and detect drift
+- **Phase R2** (Migrate): Migrate state schema; ask about new optional features
 - **Phase R3**: Re-run Builder (B1-B9) to generate all artifacts into `.wizard-staging/` (first snapshots the pre-Builder managed files for deletion detection)
 - **Phase R4**: Compare the R3 baseline snapshot with staging using SHA256 hashes; classify files as add/update/delete/unchanged
 - **Phase R5**: Show grouped diff and collect user approvals
@@ -757,8 +757,9 @@ The `features` field is new and critical. It tracks which optional features of t
 
 **Phases R-1, R0, R1–R6 in detail**:
 
-- **Phase R-1 · Pre-flight state checks**: Validates `.wizard-state.json` exists and contains minimal required structure.
-- **Phase R0 · Drift detection**: Scans the project for drift in wizard-managed files and custom sections.
+- **Phase R-1 · Global version check**: Fetches wizard version from remote; exits early if already up-to-date.
+- **Phase R0 · Pre-flight state checks**: Validates `.wizard-state.json` exists and contains minimal required structure; detects active IDEs.
+- **Phase R0b · Drift detection**: Scans the project for drift in wizard-managed files and custom sections.
 - **Phase R1 · Project content drift**: Re-discovers the project (stack, node engine, etc.) and detects changes.
 - **Phase R2 · State/schema migration**: Migrates `.wizard-state.json` to current schema; asks about new optional features.
 - **Phase R3 · Builder re-run**: Re-runs B1-B9 to generate all artifacts into `.wizard-staging/` using only the Builder steps of `phase6a-agents.md` / `phase6b-build-heavy.md` (B1-B9). It **never follows the `/wf-init` phase 7/8 tail** (no `wf_phase_done phase6 phase7`, no `cat phase7.md`) — after Builder-Heavy validation it returns to Phase R4. Staging validation checks the generated artifacts (e.g. `AGENTS.md`); `.wizard-state.json` intentionally stays at the project root and is never expected inside staging. **Step 0 runs first**: it snapshots the pre-Builder `managed_paths`/`generated_files` into `.wizard-refresh-baseline.json` because the Builder overwrites `build_plan` with the new staging set.

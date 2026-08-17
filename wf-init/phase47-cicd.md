@@ -313,7 +313,15 @@ else
   wf_state_set '.cd.platform' '"skip"'
 fi
 
-wf_phase_done phase47-cicd phase5
-echo "ℹ Next phase: phase5"
-cat "$WF_DIR/phase5.md"
+PHASE5_DONE=$(jq -r '.phases.phase5.status // "not-started"' .wizard-state.json)
+if [ "$PHASE5_DONE" = "done" ]; then
+  NEXT="phase6a-agents"
+  echo "ℹ Phase 5 already completed; moving to Builder"
+else
+  NEXT="phase5"
+  echo "ℹ Back to Phase 5 for project details"
+fi
+wf_phase_done phase47-cicd "$NEXT"
+echo "ℹ Next phase: $NEXT"
+cat "$WF_DIR/$NEXT.md"
 ```

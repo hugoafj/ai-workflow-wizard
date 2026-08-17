@@ -30,8 +30,8 @@ Is this correct? Fix any errors before continuing.
 
 ---
 > **⛔ STOP HERE — do not execute anything else.**
-> **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `discovery.conventions` (the detected/corrected conventions from reverse engineering). Mark `wf_phase_done phase4 phase5`.
-> Always route to Phase 5 to collect project answers (including project_name) before any conditional phases:
+> **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `discovery.conventions` (the detected/corrected conventions from reverse engineering). Mark `wf_phase_done phase4 <next>`.
+> Compute the next phase based on ALREADY SELECTED features. If any have been activated, route to the relevant conditional phase; otherwise phase5:
 > ```bash
 > echo "phase5"
 > ```

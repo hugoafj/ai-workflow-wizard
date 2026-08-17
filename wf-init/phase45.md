@@ -252,28 +252,9 @@ jq --arg backend "${SDD_BACKEND:-hybrid}" \
 mv .wizard-state.json.tmp .wizard-state.json
 ```
 
-Only when Windsurf is active, generate `.windsurf/workflows/sdd-new.md` from the resolved backend (recompute the flag in case this block runs in a fresh shell):
-
-```bash
-IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
-if echo "$IDES" | grep -q "windsurf"; then
-  SDD_BACKEND=$(jq -r '.sdd.backend // "hybrid"' .wizard-state.json)
-  PROJECT_NAME=$(jq -r '.answers.project_name' .wizard-state.json)
-  WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
-  SDD_PATH="$SDD_BACKEND"
-  [ "$SDD_BACKEND" = "hybrid" ] && SDD_PATH="openspec"
-  mkdir -p .windsurf/workflows
-  cp "$WF_DIR/temp-files/sdd-new.md" .windsurf/workflows/sdd-new.md
-  if [ "$SDD_BACKEND" = "engram" ]; then
-    sed -i.bak "s|{{sdd.backend}}/changes/<name>/proposal.md|Engram memory:|g" .windsurf/workflows/sdd-new.md
-  else
-    sed -i.bak "s|{{sdd.backend}}/changes/|$SDD_PATH/changes/|g" .windsurf/workflows/sdd-new.md
-  fi
-  sed -i.bak "s/{{sdd.backend}}/$SDD_BACKEND/g" .windsurf/workflows/sdd-new.md
-  sed -i.bak "s|{project}|$PROJECT_NAME|g" .windsurf/workflows/sdd-new.md
-  rm -f .windsurf/workflows/sdd-new.md.bak
-fi
-```
+NOTE: Windsurf workflow generation is deferred to Phase 5.
+At this point, `.answers.project_name` has not yet been collected.
+The `.windsurf/workflows/sdd-new.md` file will be generated in Phase 5 AFTER project_name is saved.
 
 Then update the Windsurf status:
 

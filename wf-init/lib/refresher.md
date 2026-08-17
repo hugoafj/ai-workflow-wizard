@@ -270,8 +270,8 @@ migrate_state() {
   echo "  Upgrading state from $CURRENT to $TARGET..."
   
   # Ensure schema v3 required fields exist (idempotent: //= creates only if missing).
-  # Known features get false defaults so they are never re-asked if they already exist.
-  # NEW features (in future versions) remain absent, so Builder will ask about them.
+  # Do NOT set default values for known features here.
+  # NEW features should remain absent so Builder asks about them.
   _apply_jq_filter '
     .schema_version = 3 |
     .wizard_version = "'"$TARGET"'" |
@@ -280,12 +280,6 @@ migrate_state() {
     .build_plan.generated_files //= [] |
     .build_plan.approval //= {} |
     .features //= {} |
-    .features.routing_abc //= false |
-    .features.decision_ladder //= false |
-    .features.tdd_protocol //= false |
-    .features.ci //= false |
-    .features.cd //= false |
-    .features.release_please //= false |
     .ci //= {} |
     .ci.e2e_in_ci //= false |
     .ci.auto_improve //= true |
