@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.5-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.4-beta.1...v0.8.5-beta.1) (2026-08-18)
+
+
+### Bug Fixes
+
+* **wf-refresh:** restore spec satellites, nested stack_key, layers-aware checks and staging writes ([#96](https://github.com/hugoafj/ai-workflow-wizard/issues/96)) ([3cf4fa1](https://github.com/hugoafj/ai-workflow-wizard/commit/3cf4fa14ffe8bbdef7fcb5be0adb94499db44a5c))
+
 ## [0.8.4-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.3-beta.1...v0.8.4-beta.1) (2026-08-18)
 
 
