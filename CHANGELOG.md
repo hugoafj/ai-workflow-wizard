@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.2-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.1-beta.1...v0.8.2-beta.1) (2026-08-18)
+
+
+### Bug Fixes
+
+* **wf-refresh:** atomic state in staging, explicit R5 gate, safe commit msg ([#90](https://github.com/hugoafj/ai-workflow-wizard/issues/90)) ([b2ce9ab](https://github.com/hugoafj/ai-workflow-wizard/commit/b2ce9ab8a7213b9763976241b09a97560430a19f))
+
 ## [0.8.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.0-beta.1...v0.8.1-beta.1) (2026-08-18)
 
 
