@@ -762,19 +762,19 @@ echo "✓ Baseline snapshot written ($(jq '.managed_paths | length' "$BASELINE")
 
 **Instructions for the agent:**
 
-1. Use the same Builder sub-agent delegation as `/wf-init` Phase 6:
-   - Read `phase6a-agents.md` first. If your environment supports it (e.g. Claude Code `task` tool, Devin `run_subagent` tool), delegate Builder-Core to a sub-agent with the prompt from `subagent-builder-core.md`.
-   - When replacing placeholders in the sub-agent prompt, use:
-     - `{WF_PATH}` → `$WF_DIR` (the downloaded phase directory, e.g. `/tmp/wf-refresh-phases`)
-     - `{WF_RAW}` → `https://raw.githubusercontent.com/${WIZARD_REPO}/${WIZARD_BRANCH}`
-     - `{PROJECT_PATH}` → the current working directory
-     - `{WF_STAGING}` → the staging directory (`$STAGING` or `{PROJECT_PATH}/.wizard-staging`)
-     - `{WF_STATE}` → `.wizard-staging/wizard-state.json`  **← staging copy for refresh**
-   - The helper `lib/state-helpers.sh` lives directly under `$WF_DIR/lib/`.
-   - Otherwise, read `lib/builder.md` and execute B1-B6 manually.
-2. After Builder-Core completes, read `phase6b-build-heavy.md` and run Builder-Heavy (B7-B9) the same way — **execute ONLY its steps 1-4 (verify staging, delegate, fallback, validate). Do NOT execute phase6b's Step 5 tail**: no `wf_phase_done phase6 phase7`, no "Wait for user confirmation", and NO `cat "$WF_DIR/phase7.md"`. Those belong to the `/wf-init` phase 7/8 flow, not to refresh — running them would derail into wf-init's review/promotion instead of returning to Phase R4. If you invoke `phase6b-build-heavy.md` through a bash wrapper, set `WF_REFRESH=1` so Step 5 guards the phase7 promotion. After Builder-Heavy validates, return to Phase R4 below.
+1. Run Builder-Core (B1-B6) deterministically:
+   ```bash
+   python3 "$WF_DIR/lib/builder-core.py" --state "$STAGING_STATE" --staging "$STAGING" --raw "${WF_RAW}" --wf-dir "$WF_DIR"
+   ```
+   - `STAGING=".wizard-staging"`, `STAGING_STATE="$STAGING/wizard-state.json"`.
+   - `WF_RAW` is built from `WIZARD_REPO`/`WIZARD_BRANCH` (see `_base.md`).
+   - The scripts are deterministic: no sub-agent delegation, no placeholder guessing.
+2. Run Builder-Heavy (B7-B9) deterministically:
+   ```bash
+   python3 "$WF_DIR/lib/builder-heavy.py" --state "$STAGING_STATE" --staging "$STAGING" --raw "${WF_RAW}" --wf-dir "$WF_DIR"
+   ```
 3. The combined result must be `.wizard-staging/` containing `AGENTS.md`, the satellite files, commands, protocols, etc.
-4. After Builder finishes, run the validation block below.
+4. After Builder finishes, run the validation block below (including the dynamic `EXPECTED[]` check).
 
 > **Important:** `lib/refresher.md`, `lib/builder.md`, `phase6a-agents.md`, and `phase6b-build-heavy.md` are **Markdown instruction files**, not bash scripts. Do not `source` them.
 
@@ -825,6 +825,38 @@ if [[ -f AGENTS.md ]] && [[ -f "$STAGING/AGENTS.md" ]]; then
   preserve_custom_agents "$STAGING"
 fi
 reinsert_legacy_bridge "$STAGING"
+
+# Dynamic EXPECTED[] validation: every artifact the features imply must exist in
+# staging. A missing file means Builder-Core or Builder-Heavy did not run fully.
+EXPECTED=()
+IDES=$(jq -r '.answers.ides[]?' "$STAGING_STATE")
+LADDER=$(jq -r '.features.decision_ladder' "$STAGING_STATE"); TDD=$(jq -r '.features.tdd_protocol' "$STAGING_STATE")
+ROUTING=$(jq -r '.features.routing_abc' "$STAGING_STATE"); CI=$(jq -r '.features.ci' "$STAGING_STATE")
+CD=$(jq -r '.features.cd' "$STAGING_STATE"); RELEASE=$(jq -r '.features.release_please' "$STAGING_STATE")
+LAYERS=$(jq -r '.testing.layers[]?' "$STAGING_STATE")
+[ "$LADDER" = "true" ] && EXPECTED+=(.agents/skills/wf-ladder/SKILL.md .agents/protocols/wf-ladder.md)
+[ "$TDD" = "true" ] && [ -n "$LAYERS" ] && EXPECTED+=(.agents/skills/wf-tdd/SKILL.md .agents/protocols/wf-tdd.md)
+[ "$ROUTING" = "true" ] && EXPECTED+=(.agents/skills/wf-sdd-trigger/SKILL.md .agents/protocols/wf-sdd-trigger.md)
+# always-included commands are always present
+EXPECTED+=(.agents/skills/wf-worktree/SKILL.md .agents/skills/wf-settings/SKILL.md .agents/skills/wf-onboard/SKILL.md)
+for IDE in $IDES; do
+  case "$IDE" in
+    claude-code) EXPECTED+=(.claude/commands/wf-worktree.md .claude/commands/wf-settings.md .claude/commands/wf-onboard.md) ;;
+    opencode)    EXPECTED+=(.opencode/commands/wf-worktree.md .opencode/commands/wf-settings.md .opencode/commands/wf-onboard.md) ;;
+    cursor)      EXPECTED+=(.cursor/commands/wf-worktree.md .cursor/commands/wf-settings.md .cursor/commands/wf-onboard.md) ;;
+    windsurf)    EXPECTED+=(.windsurf/workflows/wf-worktree.md .windsurf/workflows/wf-settings.md .windsurf/workflows/wf-onboard.md) ;;
+    kiro)        EXPECTED+=(.kiro/steering/wf-worktree.md .kiro/steering/wf-settings.md .kiro/steering/wf-onboard.md) ;;
+    vscode-copilot) EXPECTED+=(.github/prompts/wf-worktree.prompt.md .github/prompts/wf-settings.prompt.md .github/prompts/wf-onboard.prompt.md) ;;
+    codex)       EXPECTED+=(.codex/commands/wf-worktree.md .codex/commands/wf-settings.md .codex/commands/wf-onboard.md) ;;
+  esac
+done
+[ "$CI" = "true" ] && EXPECTED+=(.github/workflows/quality-guard.yml)
+[ "$RELEASE" = "true" ] && EXPECTED+=(.github/workflows/release-please.yml release-please-config.json .release-please-manifest.json .commitlintrc.json)
+[ -n "$LAYERS" ] && EXPECTED+=(vitest.config.ts playwright.config.ts)
+for f in "${EXPECTED[@]}"; do
+  [ -f "$STAGING/$f" ] || { echo "✗ FAIL: missing $STAGING/$f — Builder-Core/Heavy did not run or failed"; exit 1; }
+done
+echo "✓ EXPECTED[] validation passed (${#EXPECTED[@]} artifacts)"
 
 echo "✓ Phase R3 validation passed"
 ```
@@ -916,6 +948,23 @@ while IFS= read -r -d '' old_path; do
   fi
 done < <(jq -j '.managed_paths[]? + "\u0000"' "$OLD_MANAGED" 2>/dev/null || true)
 rm -f "$OLD_MANAGED"
+
+# Explicit deprecated-path cleanup (Fix 3): these global-only command artifacts
+# (installed by install.sh, never part of a project) must be removed even when
+# they are NOT in the managed_paths baseline.
+DEPRECATED_PATHS=(.windsurf/workflows/wf-cicd.md .windsurf/workflows/wf-cleanup.md .windsurf/workflows/wf-refresh.md .windsurf/workflows/wf-init.md
+                  .claude/commands/wf-cicd.md .claude/commands/wf-cleanup.md .claude/commands/wf-refresh.md .claude/commands/wf-init.md
+                  .cursor/commands/wf-cicd.md .cursor/commands/wf-cleanup.md .cursor/commands/wf-refresh.md .cursor/commands/wf-init.md
+                  .opencode/commands/wf-cicd.md .opencode/commands/wf-cleanup.md .opencode/commands/wf-refresh.md .opencode/commands/wf-init.md
+                  .codex/commands/wf-cicd.md .codex/commands/wf-cleanup.md .codex/commands/wf-refresh.md .codex/commands/wf-init.md
+                  .kiro/steering/wf-cicd.md .kiro/steering/wf-cleanup.md .kiro/steering/wf-refresh.md .kiro/steering/wf-init.md
+                  .github/prompts/wf-cicd.prompt.md .github/prompts/wf-cleanup.prompt.md .github/prompts/wf-refresh.prompt.md .github/prompts/wf-init.prompt.md
+                  .agents/protocols/wf-cicd.md .agents/skills/wf-cicd/SKILL.md .agents/skills/wf-cleanup/SKILL.md .agents/skills/wf-refresh/SKILL.md .agents/skills/wf-init/SKILL.md)
+for dp in "${DEPRECATED_PATHS[@]}"; do
+  if [ -f "$dp" ] && [ ! -f "$STAGING/$dp" ]; then
+    DELETED=$(jq --arg path "$dp" --arg reason "deprecated command" '. += [{"path": $path, "reason": $reason}]' <<< "$DELETED")
+  fi
+done
 
 # Write plan
 jq -n \

@@ -91,8 +91,8 @@ curl -fsSL "${WF_RAW}/wf-init/lib/refresher.md" > "${WF_DIR}/lib/refresher.md" 2
 curl -fsSL "${WF_RAW}/wf-init/lib/state.md" > "${WF_DIR}/lib/state.md" 2>/dev/null || true
 curl -fsSL "${WF_RAW}/wf-init/lib/state-helpers.sh" > "${WF_DIR}/lib/state-helpers.sh" 2>/dev/null || true
 curl -fsSL "${WF_RAW}/wf-init/lib/builder.md" > "${WF_DIR}/lib/builder.md" 2>/dev/null || true
-curl -fsSL "${WF_RAW}/wf-init/subagent-builder-core.md" > "${WF_DIR}/subagent-builder-core.md" 2>/dev/null || true
-curl -fsSL "${WF_RAW}/wf-init/subagent-builder-heavy.md" > "${WF_DIR}/subagent-builder-heavy.md" 2>/dev/null || true
+curl -fsSL "${WF_RAW}/wf-init/lib/builder-core.py" > "${WF_DIR}/lib/builder-core.py" 2>/dev/null || true
+curl -fsSL "${WF_RAW}/wf-init/lib/builder-heavy.py" > "${WF_DIR}/lib/builder-heavy.py" 2>/dev/null || true
 curl -fsSL "${WF_RAW}/wf-init/phase6a-agents.md" > "${WF_DIR}/phase6a-agents.md" 2>/dev/null || true
 curl -fsSL "${WF_RAW}/wf-init/phase6b-build-heavy.md" > "${WF_DIR}/phase6b-build-heavy.md" 2>/dev/null || true
 mkdir -p "${WF_DIR}/temp-files"
@@ -102,8 +102,8 @@ REQUIRED_FILES=(
   "${WF_DIR}/lib/refresher.md"
   "${WF_DIR}/lib/state-helpers.sh"
   "${WF_DIR}/lib/builder.md"
-  "${WF_DIR}/subagent-builder-core.md"
-  "${WF_DIR}/subagent-builder-heavy.md"
+  "${WF_DIR}/lib/builder-core.py"
+  "${WF_DIR}/lib/builder-heavy.py"
   "${WF_DIR}/phase6a-agents.md"
   "${WF_DIR}/phase6b-build-heavy.md"
   "${WF_DIR}/temp-files/AGENTS.md"

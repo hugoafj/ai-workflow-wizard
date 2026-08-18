@@ -55,6 +55,8 @@ PHASES=(
   "lib/state.md"
   "lib/state-helpers.sh"
   "lib/builder.md"
+  "lib/builder-core.py"
+  "lib/builder-heavy.py"
   "phase0.md"
   "phase0b.md"
   "phase0c.md"
@@ -70,8 +72,6 @@ PHASES=(
   "phase6a-agents.md"
   "phase6b-build-heavy.md"
   "subagent-discovery.md"
-  "subagent-builder-core.md"
-  "subagent-builder-heavy.md"
   "phase7.md"
   "phase8.md"
 )
@@ -130,18 +130,16 @@ ls "$WF_DIR"
 | 4.6 | `phase46.md` | Testing stack configuration (layers + TDD mode) — **only if TDD active** |
 | 4.6b | `phase46b.md` | Optional testing extras — **only if TDD active** |
 | 4.7 | `phase47-cicd.md` | CI/CD configuration — **only if CI/CD or release-please active** |
-| 6a | `phase6a-agents.md` | **Delegates to Builder-Core sub-agent**: B1-B6 (AGENTS.md, protocols, satellites → staging) |
-| 6b | `phase6b-build-heavy.md` | **Delegates to Builder-Heavy sub-agent**: B7-B9 (commands × IDEs, CI/CD, hook, testing configs → staging) |
+| 6a | `phase6a-agents.md` | Runs deterministic Builder-Core: B1-B6 (AGENTS.md, protocols, satellites → staging) |
+| 6b | `phase6b-build-heavy.md` | Runs deterministic Builder-Heavy: B7-B9 (commands × IDEs, CI/CD, hook, testing configs → staging) |
 | — | `subagent-discovery.md` | Prompt for sub-agent 1: phases 1-4 (detection + classification) |
-| — | `subagent-builder-core.md` | Prompt for sub-agent 2: Builder B1-B6 |
-| — | `subagent-builder-heavy.md` | Prompt for sub-agent 3: Builder B7-B9 |
 | 7 | `phase7.md` | Human review gate — reads staging from disk (explicit approval) |
 | 8 | `phase8.md` | Promote staging to final destination and commit |
 
-> Phases 6a-6b delegate the Builder to specialized sub-agents to avoid
-> exhausting the main agent's tokens. Each sub-agent reads `.wizard-state.json` as the
-> single source of truth and writes to `.wizard-staging/`. The state on disk is the
-> only storage; wizard templates are downloaded on demand.
+> Phases 6a-6b run the deterministic Builder scripts (`lib/builder-core.py` + `lib/builder-heavy.py`).
+> Each script reads `.wizard-state.json` as the single source of truth and writes to
+> `.wizard-staging/`. The state on disk is the only storage; wizard templates are
+> downloaded on demand.
 
 ---
 

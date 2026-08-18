@@ -16,7 +16,7 @@
 > - **Permanent knowledge** (wf-ladder, wf-sdd-trigger, wf-tdd, SDD, CI/CD,
 >   Testing, IDEs, Commands, Architecture) → `templates/protocols/<module/>` as **single
 >   source of truth**, packaged as skills for each IDE (installed via `install.sh`).
-> - **Assembly** → Deterministic Builder (`wf-init/lib/builder.md`) that assembles artifacts
+> - **Assembly** → Deterministic Builder (`wf-init/lib/builder-core.py` B1-B6 + `wf-init/lib/builder-heavy.py` B7-B9; `wf-init/lib/builder.md` is the specification reference) that assembles artifacts
 >   from state + templates to a staging area on disk. No "in-memory generation".
 > - **AGENTS.md** → thin router that points to protocols, no longer embeds them.
 
@@ -520,7 +520,7 @@ Stack: Vite 8 + React 19.2 + TS 6 + Tailwind 4 + ESLint 9 flat config. Size: ~82
 
 ### 5.3 Wizard `/wf-init` (greenfield + legacy)
 
-Slash command that orchestrates the complete workflow bootstrap in a project. Split architecture — the orchestrator (`templates/commands/wf-init/_base.md`) is the only thing attached to the chat; phases, sub-agents and lib contracts/helpers (`state.md`, `state-helpers.sh`, `builder.md`, `refresher.md`) live in `wf-init/` and the agent reads them from disk on-demand. This solves the "lost in the middle" problem a monolithic file would have: the agent only keeps the orchestrator + the active phase in context at any time.
+Slash command that orchestrates the complete workflow bootstrap in a project. Split architecture — the orchestrator (`templates/commands/wf-init/_base.md`) is the only thing attached to the chat; phases, deterministic Builder scripts and lib contracts/helpers (`state.md`, `state-helpers.sh`, `builder.md`, `builder-core.py`, `builder-heavy.py`, `refresher.md`) live in `wf-init/` and the agent reads them from disk on-demand. This solves the "lost in the middle" problem a monolithic file would have: the agent only keeps the orchestrator + the active phase in context at any time.
 
 The wizard phases:
 
@@ -536,8 +536,8 @@ The wizard phases:
 - **Phase 4.6b** — Testing extras and MCP registration (conditional, only if TDD is enabled). Optional coverage targets, visual regression, Page Object Model, and final MCP registration.
 - **Phase 4.7** — CI/CD configuration (conditional, only if CI, CD, or release-please is enabled). Collects AI reviewer, security review, conventional commits, release-please, E2E in CI, and tag-based deploy preferences; writes no files here.
 - **Phase 5** — Minimum questions (4-5 depending on path).
-- **Phase 6a** — Deterministic assembly (Builder-Core): `AGENTS.md`, packaged protocols, and per-IDE satellites into `.wizard-staging/` on disk (does not promote to the project root yet).
-- **Phase 6b** — Deterministic assembly (Builder-Heavy): per-IDE commands, post-commit hook, testing configs, and CI/CD into `.wizard-staging/`.
+- **Phase 6a** — Deterministic assembly (Builder-Core): `AGENTS.md`, packaged protocols, and per-IDE satellites into `.wizard-staging/` on disk (does not promote to the project root yet). Runs the deterministic script `wf-init/lib/builder-core.py` (`python3 "$WF_DIR/lib/builder-core.py" --state .wizard-state.json --staging .wizard-staging --raw "$WF_RAW" --wf-dir "$WF_DIR"`); it hard-fails on unresolved placeholders instead of guessing.
+- **Phase 6b** — Deterministic assembly (Builder-Heavy): per-IDE commands, post-commit hook, testing configs, and CI/CD into `.wizard-staging/`. Runs the deterministic script `wf-init/lib/builder-heavy.py` with the same argument contract (B7-B9).
 - **Phase 7** — Human review gate (preview, approval).
 - **Phase 8** — Write, handle `.gitignore`, install post-commit hook (detects AGENTS.md and SDD drift in the same hook), commit. When Windsurf is active, re-inserts the "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule into `AGENTS.md` after the staging copy (portable head/tail/cat, verified with a loud failure check) — the staging router does not carry the rule. Validates the `AGENTS.md` `wf-version` footer is a concrete semver (never `latest` or an unresolved placeholder) and fails loudly if it is not — a non-semver footer blocks every `/wf-init` and `/wf-refresh`. It also cross-checks the footer against the state's `wizard_version` and warns on mismatch (it does not abort, so a manually advanced footer does not break a refresh).
 
@@ -708,7 +708,7 @@ Solves two different problems:
 - **Phase R0** (Validate): Validate `.wizard-state.json` structure and detect active IDEs
 - **Phase R1** (Discover): Re-discover project (stack, node engine, etc.) and detect drift
 - **Phase R2** (Migrate): Migrate state schema; ask about new optional features
-- **Phase R3**: Re-run Builder (B1-B9) to generate all artifacts into `.wizard-staging/` (first snapshots the pre-Builder managed files for deletion detection)
+- **Phase R3**: Re-run Builder (B1-B9) to generate all artifacts into `.wizard-staging/` via the deterministic scripts `lib/builder-core.py` + `lib/builder-heavy.py` (first snapshots the pre-Builder managed files for deletion detection)
 - **Phase R4**: Compare the R3 baseline snapshot with staging using SHA256 hashes; classify files as add/update/delete/unchanged
 - **Phase R5**: Show grouped diff and collect user approvals
 - **Phase R6**: Apply approved changes only; on approval update state, write `.wizard-managed-files.json`, and commit via an explicit pathspec (the user's other staged work is never unstaged); a fully declined refresh writes nothing
@@ -749,7 +749,7 @@ The `features` field is new and critical. It tracks which optional features of t
 
 **Key concepts**:
 
-1. **Single source of truth**: The Builder (B1-B9) is the only rendering engine. No parallel template logic in `/wf-refresh`.
+1. **Single source of truth**: The Builder (B1-B9) is the only rendering engine, implemented as the deterministic scripts `lib/builder-core.py` (B1-B6) and `lib/builder-heavy.py` (B7-B9). No parallel template logic in `/wf-refresh`.
 2. **Hash-based diff**: Each file is compared using SHA256 hashes. Unchanged files are skipped; only changed files are proposed.
 3. **Explicit approval**: User approves adds, updates, and deletions separately before any changes are applied.
 4. **Custom content preservation**: Sections inside `<!-- WF: DO NOT REGENERATE -->` markers in `AGENTS.md` are preserved.
@@ -761,8 +761,8 @@ The `features` field is new and critical. It tracks which optional features of t
 - **Phase R0 · Pre-flight state checks**: Validates `.wizard-state.json` exists and contains minimal required structure; detects active IDEs.
 - **Phase R1 · Project content drift**: Re-discovers the project (stack, node engine, etc.) and detects changes.
 - **Phase R2 · State/schema migration**: Migrates `.wizard-state.json` to current schema; asks about new optional features.
-- **Phase R3 · Builder re-run**: Re-runs B1-B9 to generate all artifacts into `.wizard-staging/` using only the Builder steps of `phase6a-agents.md` / `phase6b-build-heavy.md` (B1-B9). It **never follows the `/wf-init` phase 7/8 tail** (no `wf_phase_done phase6 phase7`, no `cat phase7.md`) — after Builder-Heavy validation it returns to Phase R4. Staging validation checks the generated artifacts (e.g. `AGENTS.md`); `.wizard-state.json` intentionally stays at the project root and is never expected inside staging. **Step 0 runs first**: it snapshots the pre-Builder `managed_paths`/`generated_files` into `.wizard-refresh-baseline.json` because the Builder overwrites `build_plan` with the new staging set.
-- **Phase R4 · Hash-based diff**: Compares the R3 baseline snapshot (not the live `build_plan`, which the Builder already overwrote) against staging; classifies files as add/update/delete/unchanged, with `deleted_modified` flagged when the user edited a file since the last refresh.
+- **Phase R3 · Builder re-run**: Re-runs B1-B9 to generate all artifacts into `.wizard-staging/` by executing the deterministic scripts directly — `python3 "$WF_DIR/lib/builder-core.py"` (B1-B6) then `python3 "$WF_DIR/lib/builder-heavy.py"` (B7-B9), both with `--state .wizard-staging/wizard-state.json --staging .wizard-staging --raw "$WF_RAW" --wf-dir "$WF_DIR"` (the `--raw` base and `--wf-dir` come from `wf-refresh/_base.md`). No sub-agent delegation. It **never follows the `/wf-init` phase 7/8 tail** (no `wf_phase_done phase6 phase7`, no `cat phase7.md`) — after Builder-Heavy validation it returns to Phase R4. Staging validation checks the generated artifacts (e.g. `AGENTS.md`); `.wizard-state.json` intentionally stays at the project root and is never expected inside staging. **Step 0 runs first**: it snapshots the pre-Builder `managed_paths`/`generated_files` into `.wizard-refresh-baseline.json` because the Builder overwrites `build_plan` with the new staging set. After `preserve_custom_agents` and `reinsert_legacy_bridge`, R3 runs a **dynamic `EXPECTED[]` validation** built from the state features (active ladder/tdd/routing skills+protocols, the always-included commands per active IDE, quality-guard when CI, release-please+commitlint when release, vitest/playwright when testing layers) — a missing artifact fails the phase loudly.
+- **Phase R4 · Hash-based diff**: Compares the R3 baseline snapshot (not the live `build_plan`, which the Builder already overwrote) against staging; classifies files as add/update/delete/unchanged, with `deleted_modified` flagged when the user edited a file since the last refresh. An explicit `DEPRECATED_PATHS` list (global-only command artifacts: `wf-cicd`, `wf-cleanup`, `wf-refresh`, `wf-init` per IDE plus their skills/protocols) is deleted even when absent from the baseline, because those files are installed globally by `install.sh` and never belong in a project.
 - **Phase R5 · Review gate**: Shows a real content preview (added → staged content; updated → `diff -u` against staging; deleted/deleted_modified → current content), bounded by `MAX_PREVIEW_LINES` (default 120) per file, then collects user approvals.
 - **Phase R6 · Apply and close**: Applies approved changes, updates state, writes `.wizard-managed-files.json`, and commits. Bookkeeping (state, `.wizard-managed-files.json`, `.gitignore`) only runs when at least one category is approved; a declined refresh writes nothing. The commit uses an explicit pathspec (`--pathspec-from-file`, supported by `git commit`/`git add`) so it contains only approved paths and never unstages unrelated user work (`git reset --mixed` is not used); the empty-diff guard reads the approved paths into positional arguments (`git diff --cached --quiet -- <paths>`), since `git diff` does not support `--pathspec-from-file`. When Windsurf/Devin is an active IDE and the "Gentle AI — Legacy Path Bridge" rule is missing, R6 reinserts it into the STAGED `AGENTS.md` (same safety net as Phase 8) wrapped in `<!-- WF: DO NOT REGENERATE -->` markers so future refreshes preserve it — and only when `AGENTS.md` is itself approved (added/updated), so a declined refresh writes nothing.
 
@@ -879,9 +879,9 @@ What you will see, in order:
 
 **Phase 5 — Minimum questions**. 4-5 questions depending on path. Answer short and specific. The key question is **which IDEs/CLIs you will use** — that determines the custom satellites generated.
 
-**Phase 6a — Staging generation (Builder-Core)**. The agent assembles `AGENTS.md`, packaged protocols, and per-IDE satellites into `.wizard-staging/` on disk but does NOT promote them to the project root yet.
+**Phase 6a — Staging generation (Builder-Core)**. Runs the deterministic script `wf-init/lib/builder-core.py` (B1-B6), which assembles `AGENTS.md`, packaged protocols, and per-IDE satellites into `.wizard-staging/` on disk but does NOT promote them to the project root yet.
 
-**Phase 6b — Staging generation (Builder-Heavy)**. The agent assembles per-IDE commands, post-commit hook, testing configs, and CI/CD into `.wizard-staging/`.
+**Phase 6b — Staging generation (Builder-Heavy)**. Runs the deterministic script `wf-init/lib/builder-heavy.py` (B7-B9), which assembles per-IDE commands, post-commit hook, testing configs, and CI/CD into `.wizard-staging/`.
 
 **Phase 7 — Review gate**. Shows you the complete AGENTS.md and the list of files to be created. **Read them carefully**. If something doesn't fit, say "let me edit X first" and describe the change. The agent adjusts and shows again.
 

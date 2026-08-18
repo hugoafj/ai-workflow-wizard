@@ -23,41 +23,42 @@ fi
 echo "✓ Builder-Core staging verified"
 ```
 
-### Step 2: Attempt delegation (preferred path)
+### Step 2: Run Builder-Heavy (deterministic script)
 
-If your agent environment supports the `task` tool:
-
-1. Read the sub-agent prompt:
-   ```bash
-   WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
-   source "$WF_DIR/lib/state-helpers.sh"
-
-   cat "$WF_DIR/subagent-builder-heavy.md"
-   ```
-
-2. Replace placeholders:
-   - `{PROJECT_PATH}` → absolute path of the target project
-   - `{WF_PATH}` → absolute path of the downloaded phase directory (`$WF_DIR`)
-   - `{WF_RAW}` → `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main`
-   - `{WF_STAGING}` → `{PROJECT_PATH}/.wizard-staging`
-   - `{WF_STATE}` → `{PROJECT_PATH}/.wizard-state.json`
-
-3. Use `task` tool with `subagent_type: general` to launch Builder-Heavy. Wait for it.
-
-4. Once finished, jump to **Step 4: Validation** below.
-
-### Step 3: Fallback — inline Builder execution
-
-If delegation is unavailable:
+Builder-Heavy is a deterministic Python script — no sub-agent delegation, no inline fallback:
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
-cat "$WF_DIR/lib/builder.md"
+python3 "$WF_DIR/lib/builder-heavy.py" \
+  --state ".wizard-state.json" \
+  --staging ".wizard-staging" \
+  --raw "${WF_RAW:-https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main}" \
+  --wf-dir "$WF_DIR"
 ```
 
-Read and execute the Builder procedure inline for operations B7-B9 (add per-IDE commands, post-commit hook, testing configs, CI/CD). It is deterministic — follow the steps for writing to `.wizard-staging/`.
+- `--state` → `.wizard-state.json` (project root; the script writes back `build_plan` and advances the phase pointer).
+- `--staging` → `.wizard-staging`.
+- `--raw` → the wizard raw base (same as `WF_RAW` used by `/wf-init`).
+- `--wf-dir` → the downloaded phase directory (`$WF_DIR`).
+- The script implements B7-B9: per-IDE commands, post-commit hook, testing configs, CI/CD, registration + advance. It exits non-zero on any unresolved placeholder or missing template.
+
+If Builder-Core did not run yet (no `AGENTS.md` in staging), run it first:
+
+```bash
+python3 "$WF_DIR/lib/builder-core.py" \
+  --state ".wizard-state.json" \
+  --staging ".wizard-staging" \
+  --raw "${WF_RAW:-https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main}" \
+  --wf-dir "$WF_DIR"
+```
+
+### Step 3: (removed — deterministic script replaces the inline fallback)
+
+Builder-Heavy is executed exclusively via the Python script in Step 2. There is no
+sub-agent or manual inline path anymore; `lib/builder.md` is kept only as a
+specification reference.
 
 ### Step 4: Validation — verify complete staging
 
@@ -85,46 +86,63 @@ for artifact in AGENTS.md; do
   fi
 done
 
-# Check that command files were actually generated for the active IDEs
+# Check that the always-included command files were generated for each active IDE
+# (Builder-Heavy writes wf-worktree/wf-settings/wf-onboard unconditionally).
 IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
-FOUND=0
+FAILED=0
 for IDE in $IDES; do
   case "$IDE" in
     claude-code)
-      [ -n "$(find .wizard-staging/.claude/commands -maxdepth 1 -name 'wf-*.md' -print -quit 2>/dev/null)" ] && FOUND=$((FOUND + 1))
+      for cmd in wf-worktree wf-settings wf-onboard; do
+        [ -f ".wizard-staging/.claude/commands/$cmd.md" ] || { echo "ERROR: missing .claude/commands/$cmd.md"; FAILED=1; }
+      done
       ;;
     opencode)
-      [ -n "$(find .wizard-staging/.opencode/commands -maxdepth 1 -name 'wf-*.md' -print -quit 2>/dev/null)" ] && FOUND=$((FOUND + 1))
+      for cmd in wf-worktree wf-settings wf-onboard; do
+        [ -f ".wizard-staging/.opencode/commands/$cmd.md" ] || { echo "ERROR: missing .opencode/commands/$cmd.md"; FAILED=1; }
+      done
       ;;
     cursor)
-      [ -n "$(find .wizard-staging/.cursor/commands -maxdepth 1 -name 'wf-*.md' -print -quit 2>/dev/null)" ] && FOUND=$((FOUND + 1))
+      for cmd in wf-worktree wf-settings wf-onboard; do
+        [ -f ".wizard-staging/.cursor/commands/$cmd.md" ] || { echo "ERROR: missing .cursor/commands/$cmd.md"; FAILED=1; }
+      done
       ;;
     windsurf)
-      [ -n "$(find .wizard-staging/.windsurf/workflows -maxdepth 1 -name 'wf-*.md' -print -quit 2>/dev/null)" ] && FOUND=$((FOUND + 1))
+      for cmd in wf-worktree wf-settings wf-onboard; do
+        [ -f ".wizard-staging/.windsurf/workflows/$cmd.md" ] || { echo "ERROR: missing .windsurf/workflows/$cmd.md"; FAILED=1; }
+      done
       ;;
     kiro)
-      [ -n "$(find .wizard-staging/.kiro/steering -maxdepth 1 -name 'wf-*.md' -print -quit 2>/dev/null)" ] && FOUND=$((FOUND + 1))
+      for cmd in wf-worktree wf-settings wf-onboard; do
+        [ -f ".wizard-staging/.kiro/steering/$cmd.md" ] || { echo "ERROR: missing .kiro/steering/$cmd.md"; FAILED=1; }
+      done
       ;;
     vscode-copilot)
-      [ -n "$(find .wizard-staging/.github/prompts -maxdepth 1 -name 'wf-*.prompt.md' -print -quit 2>/dev/null)" ] && FOUND=$((FOUND + 1))
+      for cmd in wf-worktree wf-settings wf-onboard; do
+        [ -f ".wizard-staging/.github/prompts/$cmd.prompt.md" ] || { echo "ERROR: missing .github/prompts/$cmd.prompt.md"; FAILED=1; }
+      done
       ;;
     codex)
-      [ -n "$(find .wizard-staging/.codex/commands -maxdepth 1 -name 'wf-*.md' -print -quit 2>/dev/null)" ] && FOUND=$((FOUND + 1))
+      for cmd in wf-worktree wf-settings wf-onboard; do
+        [ -f ".wizard-staging/.codex/commands/$cmd.md" ] || { echo "ERROR: missing .codex/commands/$cmd.md"; FAILED=1; }
+      done
       ;;
     gemini-cli)
-      [ -f ".wizard-staging/GEMINI.md" ] && FOUND=$((FOUND + 1))
+      [ -f ".wizard-staging/GEMINI.md" ] || { echo "ERROR: missing GEMINI.md"; FAILED=1; }
       ;;
     antigravity)
-      [ -n "$(find .wizard-staging/.agents/skills -maxdepth 2 -name 'SKILL.md' -print -quit 2>/dev/null)" ] && FOUND=$((FOUND + 1))
+      for cmd in wf-worktree wf-settings wf-onboard; do
+        [ -d ".wizard-staging/.agents/skills/$cmd" ] || { echo "ERROR: missing .agents/skills/$cmd"; FAILED=1; }
+      done
       ;;
   esac
 done
-if [ "$FOUND" -eq 0 ]; then
+if [ "$FAILED" -ne 0 ]; then
   IDE_COUNT=$(jq -r '(.answers.ides // []) | length' .wizard-state.json)
   if [ "$IDE_COUNT" -eq 0 ]; then
     echo "WARNING: No active IDE/CLI selected — skipping command file validation."
   else
-    echo "ERROR: No generated command files found in .wizard-staging for the active IDEs."
+    echo "ERROR: Missing generated command files in .wizard-staging for the active IDEs."
     echo "Builder-Heavy may have skipped or failed. Check .wizard-state.json answers.ides[] and command generation logs."
     exit 1
   fi
