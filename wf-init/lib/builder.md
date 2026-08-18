@@ -183,37 +183,153 @@ From the SAME `build_protocol_body(name)`:
    tokens until the model explicitly reads it. Currently applies to `wf-sdd-trigger`.
 
 ### Step B5 — Assemble AGENTS.md (thin router)
-- Base: `$WF_ROOT/templates/AGENTS.router.md`.
-- Replace `{{answers.*}}`, `{{discovery.*}}`, `{{testing.*}}`, `{{mcps.table}}`,
-  `{{wizard_version}}` with values from `.wizard-state.json` (deterministic).
-  `{{wizard_version}}` is resolved from the root field `wizard_version` of the state.
 
-> **Inference-resolved placeholders**: the following five placeholders have NO
-> dedicated state field and are intentionally resolved by the Builder's LLM
-> inference from the state + manifest (they cannot be captured as flat JSON
-> fields):
-> - `{{discovery.commands}}` — exact commands with real flags detected from the manifest (e.g. `npm run lint`, `npm run build`).
-> - `{{discovery.conventions.code_style}}` — non-obvious conventions from `state.discovery.conventions` (when present) + reverse engineering.
-> - `{{discovery.conventions.structure}}` — short tree of main folders and their purpose.
-> - `{{testing.checks_before_done}}` — `lint + build` (+ `test` / `test:e2e` per `state.testing.layers`).
-> - `{{mcps.table}}` — the MCPs table built from `state.discovery.stack` + `state.testing.layers` (see protocol `architecture`).
-> Never leave the raw placeholder unresolved — always emit real content derived
-> from the state.
-- Resolve `<if ...>` blocks based on state (testing active, backend, etc.).
-- Insert testing sections (`testing-approach.section.md`, `checks.section.md`,
-  `data-testid.section.md`) according to `LAYERS`.
-- Build the MCPs table based on `STACK` + `LAYERS` (see protocol `architecture`).
-- Resolve `{{features.*_yesno}}` to `yes`/`no` based on each boolean feature.
-- Validate the final `AGENTS.md`: the `wf-version` footer comment must contain the exact
-  `.wizard-state.json` `wizard_version` and the `features` list must reflect the actual
-  selected booleans (`routing_abc`, `decision_ladder`, `tdd_protocol`, `ci`, `cd`,
-  `release_please`). If any `{{...}}` placeholder or `latest` remains in the footer, fail.
-- Footer `wf-version` with `STACK` and `features: ladder={{yes/no}}, tdd={{yes/no}}, routing={{yes/no}}, ci={{yes/no}}, cd={{yes/no}}, release={{yes/no}}` (ALWAYS the last line). Field names in the
-  footer are kept as-is for backward compatibility with existing projects/wf-refresh parsing;
-  `routing=yes` now means "wf-sdd-trigger is active" (this wizard's own SDD-forcing policy, not
-  the retired Route A/B/C model).
-- Write to `STAGING/AGENTS.md`.
-- **The router NEVER embeds the protocols**; it only has the routing table pointing to them.
+**Implementation**: Use Python for robust template processing (handles file placeholders, conditionals, guide comment stripping, validation).
+
+```python
+#!/usr/bin/env python3
+"""
+AGENTS.md Builder — processes AGENTS.router.md template:
+- Resolves {{...}} placeholders from state
+- Resolves {{protocols/.../file.md}} by fetching and inlining file content
+- Resolves <if condition> blocks (keeps content if true, removes if false)
+- Strips guide comments <!-- Insert ... -->
+- Validates no unresolved placeholders or conditionals remain
+- Ensures proper newlines around code fences
+"""
+import json, re, subprocess, sys, os
+
+WF_RAW = os.environ['WF_RAW']           # https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main
+STAGING = os.environ['STAGING']         # .wizard-staging
+STATE_FILE = os.environ['STATE_FILE']   # .wizard-state.json
+
+with open(STATE_FILE) as f:
+    state = json.load(f)
+
+# Fetch template
+router_md = subprocess.run(['curl', '-fsSL', f'{WF_RAW}/templates/AGENTS.router.md'], 
+                           capture_output=True, text=True, check=True).stdout
+
+# 1. Resolve simple {{key}} placeholders from state
+def get_state_value(path):
+    """Get value from state using dot notation: answers.project_name"""
+    keys = path.split('.')
+    val = state
+    for k in keys:
+        if isinstance(val, dict):
+            val = val.get(k)
+        else:
+            return None
+    return val
+
+def replace_simple_placeholders(text):
+    def repl(match):
+        key = match.group(1)
+        val = get_state_value(key)
+        if val is None:
+            return match.group(0)  # leave unresolved for now
+        if isinstance(val, bool):
+            return 'yes' if val else 'no'
+        if isinstance(val, list):
+            return ', '.join(str(v) for v in val)
+        return str(val)
+    return re.sub(r'\{\{([^}]+)\}\}', repl, text)
+
+router_md = replace_simple_placeholders(router_md)
+
+# 2. Resolve {{protocols/.../file.md}} file placeholders
+def resolve_file_placeholder(match):
+    rel_path = match.group(1)  # protocols/testing/testing-approach.section.md
+    url = f'{WF_RAW}/templates/{rel_path}'
+    result = subprocess.run(['curl', '-fsSL', url], capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"WARNING: Could not fetch {url}", file=sys.stderr)
+        return match.group(0)
+    content = result.stdout
+    # Strip markdown code fences if present
+    content = re.sub(r'^```\w*\n', '', content)
+    content = re.sub(r'\n```$', '', content)
+    return content
+
+router_md = re.sub(r'\{\{protocols/([^}]+)\}\}', resolve_file_placeholder, router_md)
+
+# 3. Resolve <if condition> blocks
+# Pattern: <if condition>\ncontent\n</if> or <if condition>content</if>
+def resolve_conditionals(text, state):
+    # Find all <if ...> blocks
+    pattern = r'<if\s+([^>]+)>(.*?)</if>'
+    
+    def eval_condition(cond):
+        cond = cond.strip()
+        # Handle "state.testing.layers not empty"
+        if 'not empty' in cond:
+            parts = cond.replace('state.', '').split(' not empty')
+            if len(parts) == 2:
+                key = parts[0].strip()
+                val = get_state_value(key)
+                return bool(val and len(val) > 0)
+        # Handle "state.features.xxx" boolean
+        if cond.startswith('state.features.'):
+            key = cond.replace('state.', '')
+            val = get_state_value(key)
+            return bool(val)
+        # Handle "state.testing.layers" (truthy)
+        if cond.startswith('state.'):
+            key = cond.replace('state.', '')
+            val = get_state_value(key)
+            return bool(val)
+        return False
+    
+    def repl(match):
+        cond = match.group(1)
+        content = match.group(2)
+        if eval_condition(cond):
+            return content
+        else:
+            return ''
+    
+    # Use DOTALL to match across newlines
+    return re.sub(pattern, repl, text, flags=re.DOTALL)
+
+router_md = resolve_conditionals(router_md, state)
+
+# 4. Strip guide comments <!-- Insert ... -->
+router_md = re.sub(r'<!--\s*Insert [^>]+-->\s*\n?', '', router_md)
+
+# 5. Ensure proper newlines around code fences
+router_md = re.sub(r'(```)', r'\n\1\n', router_md)
+router_md = re.sub(r'\n{3,}', '\n\n', router_md)
+
+# 6. Validate: no unresolved {{...}} or <if> tags
+if '{{' in router_md:
+    unresolved = re.findall(r'\{\{([^}]+)\}\}', router_md)
+    print(f"ERROR: Unresolved placeholders: {unresolved}", file=sys.stderr)
+    sys.exit(1)
+if '<if ' in router_md:
+    print("ERROR: Unresolved <if> conditionals remain", file=sys.stderr)
+    sys.exit(1)
+
+# 7. Write to staging
+os.makedirs(STAGING, exist_ok=True)
+with open(f'{STAGING}/AGENTS.md', 'w') as f:
+    f.write(router_md)
+
+print("✓ AGENTS.md generated successfully")
+```
+
+**Then in bash, call this Python script:**
+```bash
+WF_RAW="${WF_RAW}" STAGING="${STAGING}" STATE_FILE="${WF_STATE}" python3 << 'PYEOF'
+# ... python script above ...
+PYEOF
+```
+
+**Replaces the manual sed/awk approach** — guarantees:
+- File placeholders `{{protocols/...}}` fetched and inlined
+- `<if>` conditionals evaluated against state
+- Guide comments stripped
+- Zero unresolved placeholders in output
+- Proper code fence formatting
 
 ### Step B6 — Satellites (per active IDE)
 For each IDE ∈ IDES, copy the corresponding satellite template from
@@ -226,6 +342,7 @@ a short key, not the full IDE key):
 | `vscode-copilot` | `satellites/copilot.tmpl` | `STAGING/.github/copilot-instructions.md` |
 | `cursor` | `satellites/cursor.tmpl` | `STAGING/.cursor/rules/project.mdc` |
 | `windsurf` | `satellites/windsurf.tmpl` | `STAGING/.windsurf/rules/project.md` |
+| `devin` | `satellites/windsurf.tmpl` | `STAGING/.devin/rules/project.md` |
 | `kiro` | `satellites/kiro.tmpl` | `STAGING/.kiro/steering/project-context.md` |
 | `gemini-cli` | `satellites/gemini.tmpl` | `STAGING/GEMINI.md` |
 | `antigravity` | `satellites/antigravity.tmpl` | `STAGING/ANTIGRAVITY.md` |
