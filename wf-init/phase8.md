@@ -160,7 +160,7 @@ will fail if these don't exist. This section is stack-aware: Node installs npm p
 PHP would install composer packages, etc.
 
 ```bash
-STACK_KEY=$(jq -r '.discovery.stack_key // "unknown"' .wizard-state.json)
+STACK_KEY=$(jq -r '.discovery.stack.stack_key // .discovery.stack_key // "unknown"' .wizard-state.json)
 HAS_TESTING=$(jq -r '.testing.layers[]?' .wizard-state.json 2>/dev/null | wc -l)
 HAS_CONVENTIONAL=$(jq -r '.ci.conventional_commits // false' .wizard-state.json)
 

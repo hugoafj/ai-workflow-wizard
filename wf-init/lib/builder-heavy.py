@@ -79,19 +79,35 @@ def active_command_names(state):
 
 
 def command_description(raw, cmd):
-    """Read the description from templates/commands/meta.md."""
+    """Read the description from templates/commands/meta.md.
+
+    The description column is located by header name, not hardcoded index:
+    meta.md grew a 4th column (scope | category | description) in eddd218,
+    which broke the old cells[2] lookup.
+    """
     meta_url = builder_core.base_url(raw, "templates/commands/meta.md")
     try:
         meta = builder_core.fetch_with_retries(meta_url)
     except RuntimeError:
         return cmd
-    # meta.md format: | command | description | ... rows
-    for line in meta.splitlines():
+    lines = meta.splitlines()
+    desc_col = None
+    for line in lines:
+        if "|" not in line:
+            continue
+        cells = [c.strip().lower() for c in line.split("|")]
+        if any("description" in c for c in cells):
+            desc_col = next((i for i, c in enumerate(cells) if "description" in c), None)
+            break
+    for line in lines:
         if "|" not in line or cmd not in line:
             continue
         cells = [c.strip() for c in line.split("|")]
-        if len(cells) >= 3 and cells[1] == cmd:
-            return cells[2]
+        if len(cells) >= 2 and cells[1] == cmd:
+            if desc_col is not None and desc_col < len(cells):
+                return cells[desc_col]
+            # No header found: fall back to the last non-empty cell.
+            return next((c for c in reversed(cells) if c), cmd)
     return cmd
 
 
@@ -191,9 +207,7 @@ def write_hook(raw, state, staging):
 def write_testing_configs(raw, state, staging):
     """Write vitest/playwright configs with fragment injection (B8 testing)."""
     created = []
-    layers = builder_core.get_state_value(state, "testing.layers", []) or []
-    if not isinstance(layers, list):
-        layers = [layers]
+    layers = builder_core.normalize_layers(state)
 
     # Vitest (unit/integration layers).
     if "unit" in layers or "integration" in layers:
@@ -234,6 +248,21 @@ def write_testing_configs(raw, state, staging):
 # ---------------------------------------------------------------------------
 # B8b. CI/CD
 # ---------------------------------------------------------------------------
+
+def read_package_version():
+    """Read the version field from package.json in the project root (cwd).
+
+    Returns the version string, or None when package.json is absent, invalid,
+    or has no version field.
+    """
+    try:
+        with open(os.path.join(os.getcwd(), "package.json"), "r", encoding="utf-8") as fh:
+            pkg = json.load(fh)
+        version = pkg.get("version")
+        return str(version) if version else None
+    except (OSError, ValueError):
+        return None
+
 
 def resolve_cicd_placeholder(state, key):
     """Resolve CI/CD specific placeholders."""
@@ -424,10 +453,10 @@ def write_cicd(raw, state, staging):
             builder_core.base_url(raw, "templates/protocols/cicd/variants/release-please-manifest.json.md"))
         rel_manifest = builder_core.extract_block(rel_manifest, "json")
         # {{version}} resolves to the current package version when the project has
-        # one, otherwise the release-please bootstrap version 0.1.0.
-        manifest_version = builder_core.get_state_value(state, "answers.stack_versions", None)
-        if isinstance(manifest_version, dict):
-            manifest_version = manifest_version.get("project", None)
+        # one, otherwise the release-please bootstrap version 0.1.0. It must NOT
+        # come from answers.stack_versions (a human-readable "React 19.2.4, ..."
+        # string, not a semver).
+        manifest_version = read_package_version()
         if not manifest_version:
             manifest_version = "0.1.0"
         rel_manifest = rel_manifest.replace("{{version}}", str(manifest_version))
@@ -482,10 +511,16 @@ def register_build_plan(state, staging, created_files):
     build["builder_heavy"] = {
         "generated": sorted(created_files),
     }
-    existing = set(build.get("generated_files", []))
-    build["generated_files"] = sorted(existing.union(created_files))
-    existing_m = set(build.get("managed_paths", []))
-    build["managed_paths"] = sorted(existing_m.union(created_files))
+
+    def _path_of(entry):
+        # Legacy refresh states may store path objects ({path, sha256, ...})
+        # instead of plain path strings; normalize before set-union.
+        return entry.get("path") if isinstance(entry, dict) else entry
+
+    existing = [_path_of(e) for e in build.get("generated_files", [])]
+    build["generated_files"] = sorted(set(p for p in existing if p) | set(created_files))
+    existing_m = [_path_of(e) for e in build.get("managed_paths", [])]
+    build["managed_paths"] = sorted(set(p for p in existing_m if p) | set(created_files))
 
     # SHA256 scan of the staged tree.
     shas = {}

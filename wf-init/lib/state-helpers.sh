@@ -55,8 +55,7 @@ wf_state_init() {
     "warning_incomplete": false
   },
   "discovery": {
-    "stack": { "primary": null, "framework": null, "detected_from": null },
-    "stack_key": null,
+    "stack": { "primary": null, "framework": null, "detected_from": null, "stack_key": null },
     "node_engine": null,
     "npm_major": null,
     "default_branch": null,

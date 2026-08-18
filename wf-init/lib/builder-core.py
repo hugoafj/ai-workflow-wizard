@@ -261,9 +261,7 @@ def eval_semantic_cond(cond, state, raw=None):
         return bool(get_state_value(state, cond[len("state."):], False))
 
     # Known semantic phrases used in templates.
-    layers = get_state_value(state, "testing.layers", []) or []
-    if not isinstance(layers, list):
-        layers = [layers]
+    layers = normalize_layers(state)
     c = cond.lower()
 
     if "at least one layer" in c or "any layer" in c:
@@ -362,21 +360,62 @@ def eval_boolean(expr, state):
         raise ValueError("failed to evaluate condition %r: %s" % (expr, exc)) from exc
 
 
+def normalize_layers(state):
+    """Normalize testing.layers into a list of active layer names.
+
+    Accepts the current array shape, the legacy dict shape
+    ({"unit": true, "integration": false, ...}), or a comma string.
+    """
+    layers = get_state_value(state, "testing.layers", None)
+    if layers is None:
+        return []
+    if isinstance(layers, dict):
+        return [k for k, v in layers.items() if v]
+    if isinstance(layers, str):
+        return [x.strip() for x in layers.split(",") if x.strip()]
+    if isinstance(layers, list):
+        return [x for x in layers if isinstance(x, str)]
+    return []
+
+
+def detect_package_scripts():
+    """Detect npm scripts from package.json in the project root (cwd).
+
+    Returns a comma-joined command list, or None when the project has no
+    package.json / no scripts. Used to re-discover `discovery.commands`
+    during refresh instead of guessing from the stack key.
+    """
+    try:
+        with open(os.path.join(os.getcwd(), "package.json"), "r", encoding="utf-8") as fh:
+            pkg = json.load(fh)
+        scripts = pkg.get("scripts", {})
+    except (OSError, ValueError):
+        return None
+    if not isinstance(scripts, dict) or not scripts:
+        return None
+    # Prefer the conventional build script; otherwise join the first few names.
+    if "build" in scripts:
+        return "npm run build"
+    names = sorted(scripts.keys())
+    return ", ".join("npm run %s" % n for n in names[:6])
+
+
 def infer_placeholder(state, key):
     """Resolve placeholders that have no state field, deterministically.
 
     These five are documented as inference-resolved from state + manifest in
     openspec/changes/fix-judgment-day-v070/tasks.md.
     """
-    layers = get_state_value(state, "testing.layers", []) or []
-    if not isinstance(layers, list):
-        layers = [layers]
+    layers = normalize_layers(state)
 
     if key == "discovery.commands":
-        # Commands discovered in phase1; fall back to stack-aware defaults.
+        # Commands discovered in phase1; re-detect from package.json on refresh.
         commands = get_state_value(state, "discovery.commands", None)
         if commands is not None:
             return commands if isinstance(commands, str) else ", ".join(commands)
+        detected = detect_package_scripts()
+        if detected:
+            return detected
         return "npm run build"
 
     if key == "discovery.conventions.code_style":
@@ -392,15 +431,15 @@ def infer_placeholder(state, key):
         return "flat"
 
     if key == "testing.checks_before_done":
-        checks = []
-        if bool_feature(state, "testing"):
-            checks.append("lint")
-            checks.append("build")
-            if "unit" in layers or "integration" in layers:
-                checks.append("test")
-            if "e2e" in layers:
-                checks.append("test:e2e")
-        return ", ".join(checks) if checks else "lint, build"
+        # Gate on the active test layers, not features.testing (which the state
+        # schema does not define). lint + build are always part of the done gate;
+        # test / test:e2e follow the unit/integration/e2e layers.
+        checks = ["lint", "build"]
+        if "unit" in layers or "integration" in layers:
+            checks.append("test")
+        if "e2e" in layers:
+            checks.append("test:e2e")
+        return ", ".join(checks)
 
     if key == "mcps.table":
         mcps = get_state_value(state, "mcps", []) or []
@@ -429,6 +468,11 @@ def resolve_placeholder(state, key):
     if key.endswith("_yesno"):
         base = key[: -len("_yesno")]
         return "yes" if truthy(get_state_value(state, base)) else "no"
+    if key in ("discovery.stack_key", "discovery.stack.stack_key"):
+        # Defensive alias: resolve through the nested-first helper so BOTH the
+        # legacy flat and the nested schema forms follow the canonical key
+        # (Bug 2, PR #88). Legacy states may carry only one of the two shapes.
+        return stack_key(state)
     value = get_state_value(state, key, None)
     if value is not None:
         if isinstance(value, (dict, list)):
@@ -537,6 +581,48 @@ def resolve_router_ifs(text, state):
     return "".join(out)
 
 
+def testing_approach_section(state):
+    """Generate the Testing Approach section body from the active test layers.
+
+    Replaces inlining the raw `testing-approach.section.md` instruction
+    fragment: the resolved section is derived from `testing.layers`, so the
+    shipped AGENTS.md always shows the tests that actually exist. The router
+    already provides the `## Testing Approach` heading, so this returns the
+    body only (no duplicate heading).
+    """
+    layers = normalize_layers(state)
+    has_unit = "unit" in layers or "integration" in layers
+    has_e2e = "e2e" in layers
+    lines = []
+    if has_unit:
+        lines += [
+            "### Unit & Integration",
+            "",
+            "Run the unit/integration suite before considering a change done:",
+            "",
+            "```bash",
+            "npm run test",
+            "```",
+        ]
+    if has_e2e:
+        lines += [
+            "",
+            "### E2E",
+            "",
+            "Run the end-to-end suite (specs by flow) before merge:",
+            "",
+            "```bash",
+            "npm run test:e2e",
+            "```",
+        ]
+    if not has_unit and not has_e2e:
+        lines += [
+            "No automated test layers are active. Follow `testing.checks_before_done` "
+            "for the manual done-gate instead.",
+        ]
+    return "\n".join(lines).strip()
+
+
 def render_router(raw, state):
     """Render templates/AGENTS.router.md with full placeholder and <if> resolution."""
     router = fetch_with_retries(base_url(raw, "templates/AGENTS.router.md"))
@@ -547,6 +633,10 @@ def render_router(raw, state):
     # Step 2: resolve {{protocols/...}} includes.
     def _proto_repl(m):
         spec = m.group(1).strip()
+        # testing-approach.section.md is an instruction fragment, not a
+        # template body: generate the resolved section from the active layers.
+        if spec == "testing/testing-approach.section.md":
+            return testing_approach_section(state)
         # spec may be "templates/commands/wf-ladder/_base.md (protocol-header)"
         # or "testing/testing-approach.section.md" (fragment file). The regex
         # stripped the leading "protocols/" from the include name, so re-add it
@@ -729,19 +819,26 @@ def write_flat_protocols(raw, state, staging):
 
 
 def write_satellites(raw, state, staging):
-    """Write per-IDE satellite files (B6)."""
+    """Write per-IDE satellite files (B6).
+
+    Destinations follow the spec in `wf-init/lib/builder.md` (Step B6 satellite
+    table), restored after the 17c5d95 regression introduced `wizard.md`
+    destinations and dropped devin. opencode/codex are not in the spec table
+    and keep their code-introduced destinations.
+    """
     created = []
     sat_map = {
-        "claude-code": ("claude.tmpl", ".claude/CLAUDE.md"),
+        "claude-code": ("claude.tmpl", "CLAUDE.md"),
         "opencode": ("opencode.tmpl", ".opencode/AGENTS.md"),
-        "cursor": ("cursor.tmpl", ".cursor/rules/wizard.md"),
+        "cursor": ("cursor.tmpl", ".cursor/rules/project.mdc"),
         "codex": ("codex.tmpl", ".codex/AGENTS.md"),
-        "windsurf": ("windsurf.tmpl", ".windsurf/rules/wizard.md"),
-        "kiro": ("kiro.tmpl", ".kiro/steering/wizard.md"),
-        "vscode-copilot": ("copilot.tmpl", ".github/instructions/wizard.md"),
-        "antigravity": ("antigravity.tmpl", ".agents/AGENTS.md"),
+        "windsurf": ("windsurf.tmpl", ".windsurf/rules/project.md"),
+        "kiro": ("kiro.tmpl", ".kiro/steering/project-context.md"),
+        "vscode-copilot": ("copilot.tmpl", ".github/copilot-instructions.md"),
+        "antigravity": ("antigravity.tmpl", "ANTIGRAVITY.md"),
     }
-    for ide in active_ides(state):
+    ides = active_ides(state)
+    for ide in ides:
         if ide not in sat_map:
             continue
         tmpl_name, rel = sat_map[ide]
@@ -756,6 +853,21 @@ def write_satellites(raw, state, staging):
         with open(target, "w", encoding="utf-8") as fh:
             fh.write(rendered + "\n")
         created.append(rel)
+    # Devin follows the windsurf satellite (spec: .devin/rules/project.md)
+    # whenever windsurf is active; it has no IDE_PATHS entry of its own.
+    if "windsurf" in ides:
+        url = base_url(raw, "templates/satellites/windsurf.tmpl")
+        try:
+            text = fetch_with_retries(url)
+        except RuntimeError:
+            text = None
+        if text:
+            rendered = render_satellite(text, state)
+            target = os.path.join(staging, ".devin/rules/project.md")
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            with open(target, "w", encoding="utf-8") as fh:
+                fh.write(rendered + "\n")
+            created.append(os.path.relpath(target, staging))
     return created
 
 
@@ -785,8 +897,16 @@ def record_build_plan(state, staging, core_created, skills_created, wf_dir, phas
         "core_generated": sorted(core_created),
         "core_skills": sorted(skills_created),
     }
-    build["generated_files"] = sorted(set(build.get("generated_files", []) + core_created + skills_created))
-    build["managed_paths"] = sorted(set(build.get("managed_paths", []) + core_created + skills_created))
+
+    def _path_of(entry):
+        # Legacy refresh states may store path objects ({path, sha256, ...})
+        # instead of plain path strings; normalize before set-union.
+        return entry.get("path") if isinstance(entry, dict) else entry
+
+    existing = [_path_of(e) for e in build.get("generated_files", [])]
+    build["generated_files"] = sorted(set(p for p in existing if p) | set(core_created) | set(skills_created))
+    existing_m = [_path_of(e) for e in build.get("managed_paths", [])]
+    build["managed_paths"] = sorted(set(p for p in existing_m if p) | set(core_created) | set(skills_created))
     build["phase_now"] = phase_now
     build["stack_key"] = stack_key(state)
 
