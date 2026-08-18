@@ -38,6 +38,20 @@
 
 ## Procedure (deterministic)
 
+> **⚠️ EXECUTION NOTE**: The real execution path is the deterministic scripts
+> `wf-init/lib/builder-core.py` (B1-B6) and `wf-init/lib/builder-heavy.py` (B7-B9).
+> This document is the specification reference for what those scripts implement.
+> Run them directly:
+>
+> ```bash
+> python3 "$WF_DIR/lib/builder-core.py"  --state "$WF_STATE" --staging "$WF_STAGING" --raw "$WF_RAW" --wf-dir "$WF_DIR"
+> python3 "$WF_DIR/lib/builder-heavy.py" --state "$WF_STATE" --staging "$WF_STAGING" --raw "$WF_RAW" --wf-dir "$WF_DIR"
+> ```
+>
+> Do NOT hand-execute the steps below in a sub-agent; the scripts are the
+> single source of deterministic behavior (they hard-fail on unresolved
+> placeholders instead of guessing).
+
 > **⚠️ UNIVERSAL EXTRACTION RULE**: ALL template files
 > (`.tmpl.md`, `.yml.md`, `.json.md`, or any `.md` in `$WF_ROOT/templates/`)
 > may contain code wrapped in markdown code blocks (```` ```yaml ````,
@@ -422,7 +436,7 @@ For each command in the catalog (protocol `commands`) and each IDE ∈ IDES:
   **field reference**, not a file to copy.
 
 ### Step B8b — CI and CD (Block 6, from `state.ci` and `state.cd`)
-Generate CI and CD artifacts to staging according to `state.ci` and `state.cd` (see subagent-builder-heavy.md for
+Generate CI and CD artifacts to staging according to `state.ci` and `state.cd` (see `_archive/subagent-builder-heavy.md` for
 details) using `$WF_ROOT/templates/protocols/cicd/` as the single source.
 
 **If `CICD == true`** (full CI):

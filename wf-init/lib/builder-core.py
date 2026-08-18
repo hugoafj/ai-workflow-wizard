@@ -1,0 +1,845 @@
+#!/usr/bin/env python3
+"""
+builder-core.py — Deterministic wizard builder: B1-B6 + core build_plan registration.
+
+Replaces the builder-core sub-agent with a deterministic inline pipeline so that
+wf-refresh runs B1-B6 exactly the same way every time.
+
+Usage:
+  python3 builder-core.py --state <path> --staging <path> --raw <WF_RAW> --wf-dir <WF_DIR>
+
+Exit codes:
+  0  success
+  1  unrecoverable error (missing state, unresolved placeholder, failed download)
+
+Stdlib only. No sub-agent delegation.
+"""
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import sys
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# ---------------------------------------------------------------------------
+# B1. State loading
+# ---------------------------------------------------------------------------
+
+def load_state(path):
+    """Load the wizard state JSON. Hard-fail when absent or malformed."""
+    with open(path, "r", encoding="utf-8") as fh:
+        state = json.load(fh)
+    if not isinstance(state, dict):
+        raise ValueError("state root must be a JSON object")
+    return state
+
+
+def get_state_value(state, dot_path, default=None):
+    """Resolve a dot-path against the state dict (e.g. 'discovery.stack_key')."""
+    node = state
+    for part in dot_path.split("."):
+        if not isinstance(node, dict) or part not in node:
+            return default
+        node = node[part]
+    return node
+
+
+def stack_key(state):
+    """Resolve the stack key with the nested fallback (Bug 2, PR #88)."""
+    return get_state_value(state, "discovery.stack.stack_key") or \
+           get_state_value(state, "discovery.stack_key") or ""
+
+
+def stack_primary(state):
+    """Primary stack from discovery.stack.primary (list or string)."""
+    primary = get_state_value(state, "discovery.stack.primary")
+    if isinstance(primary, list):
+        return primary[0] if primary else ""
+    if isinstance(primary, str):
+        return primary
+    return ""
+
+
+def bool_feature(state, name):
+    """Resolve a features.<name> boolean safely (None -> False)."""
+    return bool(get_state_value(state, "features.%s" % name, False))
+
+
+# ---------------------------------------------------------------------------
+# Remote file helpers
+# ---------------------------------------------------------------------------
+
+def fetch_text(url):
+    """Fetch a UTF-8 text file. Hard-fail on HTTP errors or network failure."""
+    if url.startswith("file://"):
+        path = url[len("file://"):]
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                return fh.read()
+        except OSError as exc:
+            raise RuntimeError("failed to fetch %s: %s" % (url, exc)) from exc
+    req = urllib.request.Request(url, headers={"User-Agent": "wf-builder/0.8"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return resp.read().decode("utf-8")
+    except Exception as exc:  # HTTPError, URLError, timeout, decode errors
+        raise RuntimeError("failed to fetch %s: %s" % (url, exc)) from exc
+
+
+def fetch_with_retries(url, attempts=3):
+    """Fetch with bounded retries; the last failure propagates as RuntimeError."""
+    last = None
+    for i in range(attempts):
+        try:
+            return fetch_text(url)
+        except RuntimeError as exc:
+            last = exc
+    if last is None:
+        raise RuntimeError("failed to fetch %s (no attempts made)" % url)
+    raise last
+
+
+# ---------------------------------------------------------------------------
+# Template extraction helpers
+# ---------------------------------------------------------------------------
+
+def strip_internal_comment(text):
+    """Remove the leading internal HTML comment block from a template body."""
+    # Remove a leading `<!-- ... -->` block together with surrounding blank lines.
+    return re.sub(r"^\s*<!--.*?-->\s*", "", text, count=1, flags=re.DOTALL).strip()
+
+
+def extract_block(text, lang="markdown"):
+    """Extract the content of the first fenced code block; if none, return raw text."""
+    m = re.search(r"```" + re.escape(lang) + r"\s*\n(.*?)\n```", text, flags=re.DOTALL)
+    if m:
+        return m.group(1)
+    return text.strip()
+
+
+def strip_prose_header(text):
+    """Remove leading `#` prose header lines from a variant file (CI/CD files)."""
+    lines = text.splitlines()
+    out = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if line.startswith("#") or not line.strip():
+            i += 1
+            continue
+        break
+    return "\n".join(lines[i:]).strip()
+
+
+def sha256_text(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def unresolved_placeholders(text):
+    """Return leftover `{{...}}` that are NOT legitimate `${{ ... }}` expressions."""
+    return re.findall(r"(?<!\$)\{\{[^}]*\}\}", text)
+
+
+# ---------------------------------------------------------------------------
+# B3. Protocol body construction
+# ---------------------------------------------------------------------------
+
+# SPLIT protocols live under templates/commands/; pure protocols under templates/protocols/.
+SPLIT_PROTOCOLS = {"wf-ladder", "wf-tdd", "wf-orchestrator", "wf-sdd-trigger"}
+# Maintenance commands also live under templates/commands/ and ship skills.
+MAINTENANCE_COMMANDS = ["wf-onboard", "wf-worktree", "wf-settings"]
+# Everything resolved from templates/commands/ (SPLIT + maintenance).
+COMMAND_PROTOCOLS = SPLIT_PROTOCOLS | set(MAINTENANCE_COMMANDS)
+PURE_PROTOCOLS = {
+    "architecture", "cicd", "commands", "ides", "sdd", "testing", "workflow",
+}
+
+
+def base_url(raw, rel):
+    """Join a wizard base dir (http/https/file path) with a relative template path."""
+    if raw.startswith(("http://", "https://", "file://")):
+        return "%s/%s" % (raw.rstrip("/"), rel.lstrip("/"))
+    return "%s/%s" % (raw.rstrip("/"), rel.lstrip("/"))
+
+
+def protocol_base_url(raw, name):
+    """Return the URL of the base template for a protocol name."""
+    if name in COMMAND_PROTOCOLS:
+        return base_url(raw, "templates/commands/%s/_base.md" % name)
+    if name in PURE_PROTOCOLS:
+        return base_url(raw, "templates/protocols/%s/_base.md" % name)
+    raise ValueError("unknown protocol: %s" % name)
+
+
+def build_protocol_body(raw, name, state):
+    """Build the assembled protocol body for a protocol name (B3)."""
+    proto_url = protocol_base_url(raw, name)
+    body = fetch_with_retries(proto_url)
+    body = strip_internal_comment(body)
+
+    if name == "wf-ladder":
+        # protocol-header.md + body from the first '## ' heading onward.
+        header_url = base_url(raw, "templates/commands/wf-ladder/protocol-header.md")
+        try:
+            header = strip_internal_comment(fetch_with_retries(header_url))
+        except RuntimeError:
+            header = ""
+        m = re.search(r"^## ", body, flags=re.MULTILINE)
+        rest = body[m.start():] if m else body
+        return (header + "\n\n" + rest).strip()
+
+    if name == "wf-tdd":
+        tdd_mode = get_state_value(state, "answers.tdd_mode") or \
+                   get_state_value(state, "testing.tdd_mode") or "standard"
+        variant_url = base_url(raw, "templates/commands/wf-tdd/variants/%s.md" % (tdd_mode))
+        try:
+            variant = fetch_with_retries(variant_url)
+        except RuntimeError:
+            variant = ""
+        # Replace the TDD_MODE_VARIANT marker (HTML comment form) with the variant body.
+        body = re.sub(
+            r"<!--\s*\{\{TDD_MODE_VARIANT[^}]*\}\}.*?-->",
+            lambda m: variant.strip(),
+            body,
+            flags=re.DOTALL,
+        )
+        # Resolve semantic <if ...>: blocks against layers.
+        body = resolve_if_blocks(body, state, raw)
+        return body.strip()
+
+    return body
+
+
+# ---------------------------------------------------------------------------
+# Semantic <if ...>: block resolution (wf-tdd, quality-guard)
+# ---------------------------------------------------------------------------
+
+def resolve_if_blocks(text, state, raw=None):
+    """Resolve `<if CONDITION>:` blocks (marker line + block) from semantic text.
+
+    The marker form is `<if CONDITION>:` on its own line; the block ends at the
+    next marker line or a non-indented line, whichever comes first.
+    """
+    lines = text.splitlines(keepends=True)
+    out = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        m = re.match(r"^\s*<if (.+)>:\s*\n$", line)
+        if m:
+            cond = m.group(1).strip()
+            block_start = i + 1
+            j = block_start
+            while j < len(lines):
+                nxt = lines[j]
+                if re.match(r"^\s*<if .+>:\s*\n$", nxt):
+                    break
+                if nxt.strip() and not nxt.startswith((" ", "\t")):
+                    break
+                j += 1
+            block = "".join(lines[block_start:j])
+            if eval_semantic_cond(cond, state, raw):
+                out.append(block)
+            i = j
+            continue
+        out.append(line)
+        i += 1
+    return "".join(out)
+
+
+def eval_semantic_cond(cond, state, raw=None):
+    """Evaluate a semantic condition string used in <if> markers.
+
+    Supports both `state.a.b` paths and known semantic phrases.
+    """
+    cond = cond.strip()
+    # state.path conditions -> boolean path lookup.
+    if cond.startswith("state."):
+        return bool(get_state_value(state, cond[len("state."):], False))
+
+    # Known semantic phrases used in templates.
+    layers = get_state_value(state, "testing.layers", []) or []
+    if not isinstance(layers, list):
+        layers = [layers]
+    c = cond.lower()
+
+    if "at least one layer" in c or "any layer" in c:
+        return bool(layers)
+    if "e2e layer active" in c or "e2e layer is active" in c or "e2e layer" in c:
+        return "e2e" in layers
+    if "unit or integration layer is active" in c or "unit or integration" in c:
+        return ("unit" in layers) or ("integration" in layers)
+    if "type-check script or tsconfig.json exists" in c:
+        if raw:
+            # `raw` points at the wizard repo; the project root is not available
+            # from a deterministic script, so fall back to layers/state evidence.
+            pass
+        return bool(get_state_value(state, "discovery.has_typescript", True))
+    if "test:sanitization script exists" in c:
+        return bool(get_state_value(state, "testing.has_sanitization", False))
+
+    # Fallback: boolean literal phrases.
+    if c in ("true", "yes", "1"):
+        return True
+    if c in ("false", "no", "0"):
+        return False
+    raise ValueError("unrecognized semantic condition: %s" % cond)
+
+
+# ---------------------------------------------------------------------------
+# B5. AGENTS.md router rendering (full boolean evaluator)
+# ---------------------------------------------------------------------------
+
+def truthy(value):
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        return value.lower() not in ("", "false", "no", "0", "null", "none")
+    if isinstance(value, (list, dict, tuple)):
+        return len(value) > 0
+    return bool(value)
+
+
+def eval_boolean(expr, state):
+    """Evaluate a boolean expression over state paths.
+
+    Supports `or`, `and`, `not`, `!= null`, `not empty`, and parenthesized
+    sub-expressions.  Every `state.a.b` token resolves through truthy().
+    """
+    # Normalize tokens into a Python-safe expression.
+    safe = expr
+
+    # Replace `X != null` / `X == null` with raw-value null checks.
+    def _ne_null_repl(m):
+        return "__GV_RAW('%s') is not None" % m.group(1)
+
+    def _eq_null_repl(m):
+        return "__GV_RAW('%s') is None" % m.group(1)
+
+    safe = re.sub(r"state\.([A-Za-z0-9_.]+)\s*!=\s*null\b", _ne_null_repl, safe)
+    safe = re.sub(r"state\.([A-Za-z0-9_.]+)\s*==\s*null\b", _eq_null_repl, safe)
+
+    # Replace `X not empty` phrase with a callable emptiness check.
+    def _not_empty_repl(m):
+        return "__NE__('%s')" % m.group(1)
+
+    safe = re.sub(r"state\.([A-Za-z0-9_.]+)\s+not empty\b", _not_empty_repl, safe)
+
+    # Replace state paths with a lookup call.
+    def _path_repl(m):
+        path = m.group(1)
+        return "__GV('%s')" % path
+
+    safe = re.sub(r"state\.([A-Za-z0-9_.]+)", _path_repl, safe)
+
+    # Replace operators.
+    safe = safe.replace("__NE_NULL__", "is not None")
+    safe = safe.replace("__EQ_NULL__", "is None")
+
+    # Guard: allow only whitelisted tokens.
+    allowed = re.compile(r"^[A-Za-z0-9_\.'\(\)\s\|\&!<>=+\-\*/]+$")
+    if not allowed.match(safe):
+        raise ValueError("unsafe boolean expression: %s" % expr)
+
+    namespace = {
+        "__GV": lambda p: truthy(get_state_value(state, p)),
+        "__GV_RAW": lambda p: get_state_value(state, p, None),
+        "__NE__": lambda p: bool(get_state_value(state, p, None)),
+        "None": None,
+        "True": True,
+        "False": False,
+    }
+    try:
+        return bool(eval(safe, {"__builtins__": {}}, namespace))
+    except Exception as exc:
+        raise ValueError("failed to evaluate condition %r: %s" % (expr, exc)) from exc
+
+
+def infer_placeholder(state, key):
+    """Resolve placeholders that have no state field, deterministically.
+
+    These five are documented as inference-resolved from state + manifest in
+    openspec/changes/fix-judgment-day-v070/tasks.md.
+    """
+    layers = get_state_value(state, "testing.layers", []) or []
+    if not isinstance(layers, list):
+        layers = [layers]
+
+    if key == "discovery.commands":
+        # Commands discovered in phase1; fall back to stack-aware defaults.
+        commands = get_state_value(state, "discovery.commands", None)
+        if commands is not None:
+            return commands if isinstance(commands, str) else ", ".join(commands)
+        return "npm run build"
+
+    if key == "discovery.conventions.code_style":
+        naming = get_state_value(state, "discovery.conventions.naming", None)
+        if naming:
+            return naming
+        return "camelCase"
+
+    if key == "discovery.conventions.structure":
+        structure = get_state_value(state, "discovery.conventions.structure", None)
+        if structure:
+            return structure
+        return "flat"
+
+    if key == "testing.checks_before_done":
+        checks = []
+        if bool_feature(state, "testing"):
+            checks.append("lint")
+            checks.append("build")
+            if "unit" in layers or "integration" in layers:
+                checks.append("test")
+            if "e2e" in layers:
+                checks.append("test:e2e")
+        return ", ".join(checks) if checks else "lint, build"
+
+    if key == "mcps.table":
+        mcps = get_state_value(state, "mcps", []) or []
+        if not isinstance(mcps, list):
+            mcps = [mcps]
+        if not mcps:
+            return "None configured"
+        rows = []
+        for mcp in mcps:
+            if isinstance(mcp, dict):
+                name = mcp.get("name", "?")
+                active = mcp.get("active", True)
+                rows.append("| %s | %s |" % (name, "yes" if active else "no"))
+            else:
+                rows.append("| %s | yes |" % str(mcp))
+        return "\n".join(["| MCP | Active |", "|---|---|"] + rows)
+
+    return None
+
+
+def resolve_placeholder(state, key):
+    """Resolve a single {{key}} placeholder, including _yesno suffix and inference."""
+    if key == "PLACEHOLDERS":
+        # Documental keyword in the router header, not a state placeholder.
+        return "placeholders"
+    if key.endswith("_yesno"):
+        base = key[: -len("_yesno")]
+        return "yes" if truthy(get_state_value(state, base)) else "no"
+    value = get_state_value(state, key, None)
+    if value is not None:
+        if isinstance(value, (dict, list)):
+            return json.dumps(value)
+        return str(value)
+    inferred = infer_placeholder(state, key)
+    if inferred is not None:
+        return inferred
+    raise ValueError("unresolved placeholder: %s" % key)
+
+
+def resolve_gh_escapes(text, resolve=None):
+    """Resolve `${{ '{{' }}X{{ '}}' }}` GH-Actions escape patterns.
+
+    The inner X may be:
+      - a literal `secrets.<NAME>` reference      -> wrapped as `${{ secrets.<NAME> }}`
+      - a wizard placeholder `{{key}}`            -> resolved, then kept literal
+      - a bare placeholder name (`provider_cli`)  -> resolved through `resolve`
+
+    `resolve` is an optional callable mapping a placeholder name to its value;
+    unknown names should raise KeyError.
+    """
+    def _repl(m):
+        inner = m.group(1).strip()
+        resolver = resolve
+        if resolver is not None:
+            # Resolve nested {{key}} placeholders inside the inner text.
+            def _nested(mm):
+                return str(resolver(mm.group(1)))
+
+            inner = re.sub(r"\{\{([A-Za-z0-9_.]+)\}\}", _nested, inner)
+        if inner.startswith("secrets."):
+            return "${{ %s }}" % inner
+        # Bare placeholder name (template pattern like `provider_cli`).
+        if resolver is not None and re.match(r"^[A-Za-z0-9_.]+$", inner):
+            try:
+                return str(resolver(inner))
+            except KeyError:
+                pass
+        return inner
+
+    return re.sub(r"\$\{\{\s*'\{\{'\s*\}\}(.*?)\{\{\s*'\}\}'\s*\}\}", _repl, text, flags=re.DOTALL)
+
+
+def resolve_router_ifs(text, state):
+    """Resolve nested `<if COND>...</if>` blocks with a stack parser.
+
+    Supports arbitrary nesting (e.g. routing wrapping tdd, inline table cells).
+    """
+    stack = []  # list of [condition, buffer]
+    out = []
+    i = 0
+    n = len(text)
+    while i < n:
+        m_open = re.match(r"<if\s+(.+?)>", text[i:])
+        m_close = re.match(r"</if>", text[i:])
+        if m_open is None:
+            if m_close is None:
+                ch = text[i]
+                if stack:
+                    stack[-1][1].append(ch)
+                else:
+                    out.append(ch)
+                i += 1
+                continue
+            # Only a closing tag here.
+            if not stack:
+                raise ValueError("unbalanced </if> in router")
+            cond, buf = stack.pop()
+            body = "".join(buf)
+            kept = body if eval_boolean(cond, state) else ""
+            if stack:
+                stack[-1][1].append(kept)
+            else:
+                out.append(kept)
+            i += m_close.end()
+            continue
+        # m_open is not None.
+        cond_text = m_open.group(1)
+        if m_close is not None and m_close.end() < m_open.end():
+            # Closing tag appears before the opener ends; treat as close.
+            if not stack:
+                raise ValueError("unbalanced </if> in router")
+            cond, buf = stack.pop()
+            body = "".join(buf)
+            kept = body if eval_boolean(cond, state) else ""
+            if stack:
+                stack[-1][1].append(kept)
+            else:
+                out.append(kept)
+            i += m_close.end()
+            continue
+        if "state." in cond_text:
+            stack.append([cond_text.strip(), []])
+            i += m_open.end()
+            continue
+        # Not a real conditional (documentation mention like `<if ...>`);
+        # emit it literally.
+        if stack:
+            stack[-1][1].append(text[i:i + m_open.end()])
+        else:
+            out.append(text[i:i + m_open.end()])
+        i += m_open.end()
+    if stack:
+        raise ValueError("unbalanced <if> in router")
+    return "".join(out)
+
+
+def render_router(raw, state):
+    """Render templates/AGENTS.router.md with full placeholder and <if> resolution."""
+    router = fetch_with_retries(base_url(raw, "templates/AGENTS.router.md"))
+
+    # Step 1: resolve nested <if CONDITION> ... </if> blocks.
+    router = resolve_router_ifs(router, state)
+
+    # Step 2: resolve {{protocols/...}} includes.
+    def _proto_repl(m):
+        spec = m.group(1).strip()
+        # spec may be "templates/commands/wf-ladder/_base.md (protocol-header)"
+        # or "testing/testing-approach.section.md" (fragment file). The regex
+        # stripped the leading "protocols/" from the include name, so re-add it
+        # for relative fragment paths.
+        if spec.startswith(("commands/", "protocols/")):
+            rel = "templates/%s" % spec.lstrip("/")
+        elif "/" in spec:
+            rel = "templates/protocols/%s" % spec.lstrip("/")
+        else:
+            rel = None
+        if rel:
+            try:
+                return fetch_with_retries(base_url(raw, rel))
+            except RuntimeError:
+                pass
+        name_m = re.match(r"templates/(?:commands|protocols)/([^/]+?)/", spec)
+        if name_m:
+            name = name_m.group(1)
+            return build_protocol_body(raw, name, state)
+        raise ValueError("cannot parse protocol include: %s" % spec)
+
+    router = re.sub(r"\{\{protocols/([^}]+)\}\}", _proto_repl, router)
+
+    # Step 3: resolve remaining {{key}} placeholders.
+    def _ph_repl(m):
+        return resolve_placeholder(state, m.group(1).strip())
+
+    router = re.sub(r"\{\{([A-Za-z0-9_.]+)\}\}", _ph_repl, router)
+
+    # Step 4: collapse GH Action escape wrappers (placeholder text resolved first,
+    # so inner `secrets.X` references are already literal).
+    def _router_resolver(key):
+        try:
+            return resolve_placeholder(state, key)
+        except ValueError:
+            raise KeyError(key)
+
+    router = resolve_gh_escapes(router, _router_resolver)
+
+    # Step 5: strip internal insert markers.
+    router = re.sub(r"<!--\s*Insert\s+.*?-->", "", router, flags=re.DOTALL)
+
+    # Step 6: hard-fail on any leftover {{ or }} placeholder residue.
+    if re.search(r"\{\{|\}\}", router):
+        left = re.findall(r"\{\{[^}]*\}\}", router)[:5]
+        raise ValueError("unresolved placeholders remain in AGENTS.md: %s" % left)
+
+    return router
+
+
+# ---------------------------------------------------------------------------
+# B4. Flat protocols + skills
+# ---------------------------------------------------------------------------
+
+IDE_PATHS = {
+    "claude-code": ".claude/protocols/",
+    "opencode": ".opencode/protocols/",
+    "cursor": ".cursor/protocols/",
+    "codex": ".codex/protocols/",
+    "windsurf": ".windsurf/protocols/",
+    "kiro": ".kiro/protocols/",
+    "vscode-copilot": ".github/protocols/",
+    "antigravity": ".agents/protocols/",
+}
+
+SKILL_PATHS = {
+    "claude-code": ".claude/skills/",
+    "opencode": ".opencode/skills/",
+    "cursor": ".cursor/skills/",
+    "codex": ".codex/skills/",
+    "windsurf": ".windsurf/skills/",
+    "kiro": ".kiro/skills/",
+    "vscode-copilot": ".github/skills/",
+    "antigravity": ".agents/skills/",
+}
+
+DEVIN_SKILLS = ".devin/skills/"
+
+
+def active_ides(state):
+    """Return the list of active IDE keys from answers.ides."""
+    ides = get_state_value(state, "answers.ides", []) or []
+    if not isinstance(ides, list):
+        ides = [ides]
+    return [ide for ide in ides if ide in IDE_PATHS]
+
+
+def active_protocols(state):
+    """Return the ordered list of active protocol names."""
+    out = []
+    # Pure protocols are always active.
+    for name in ["architecture", "cicd", "commands", "ides", "testing", "workflow"]:
+        out.append(name)
+    # sdd is active when a backend was selected.
+    backend = get_state_value(state, "sdd.backend", None)
+    if backend:
+        out.append("sdd")
+    # wf protocols follow features.
+    ladder = bool_feature(state, "decision_ladder")
+    tdd = bool_feature(state, "tdd_protocol")
+    routing = bool_feature(state, "routing_abc")
+    if ladder:
+        out.append("wf-ladder")
+    if tdd and (get_state_value(state, "testing.layers", None) or bool_feature(state, "testing")):
+        out.append("wf-tdd")
+    if routing or ladder or tdd:
+        out.append("wf-orchestrator")
+    if routing:
+        out.append("wf-sdd-trigger")
+    return out
+
+
+def parse_skill_frontmatter(skill_text):
+    """Extract name from the SKILL.md frontmatter; default to None."""
+    m = re.match(r"^---\s*\n(.*?)\n---", skill_text, flags=re.DOTALL)
+    if not m:
+        return None
+    fm = m.group(1)
+    name_m = re.search(r"^name:\s*(.+)$", fm, flags=re.MULTILINE)
+    return name_m.group(1).strip() if name_m else None
+
+
+def write_skills(raw, state, staging):
+    """Write skills for every active wizard command that ships a SKILL.md (B4)."""
+    commands = [c for c in SPLIT_PROTOCOLS] + MAINTENANCE_COMMANDS
+    # Filter SPLIT commands by active protocols; maintenance always ship.
+    active = set(active_protocols(state))
+    skills_created = []
+
+    for cmd in commands:
+        if cmd in SPLIT_PROTOCOLS and cmd not in active:
+            continue
+        skill_url = base_url(raw, "templates/commands/%s/skill/SKILL.md" % (cmd))
+        try:
+            skill_text = fetch_with_retries(skill_url)
+        except RuntimeError:
+            continue  # presence-driven: no SKILL.md -> no skill
+        name = parse_skill_frontmatter(skill_text)
+        if not name:
+            continue
+        body = build_protocol_body(raw, cmd, state)
+        # Replace {{PROTOCOL_BODY: ...}} marker.
+        rendered = re.sub(
+            r"\{\{PROTOCOL_BODY:[^}]*\}\}",
+            lambda m: body,
+            skill_text,
+            flags=re.DOTALL,
+        )
+        rendered = strip_internal_comment(rendered)
+        # NOTE: remaining `{{...}}` in the body are RUNTIME literals of the
+        # command itself (e.g. `{{sdd.backend}}` used as a sed pattern by
+        # wf-settings), not builder placeholders. They must stay verbatim.
+
+        # Universal skill dir (always) + per-IDE dirs.
+        targets = [os.path.join(staging, ".agents", "skills", name)]
+        for ide in active_ides(state):
+            targets.append(os.path.join(staging, SKILL_PATHS[ide], name))
+        if "windsurf" in active_ides(state):
+            targets.append(os.path.join(staging, DEVIN_SKILLS, name))
+        for tgt in dict.fromkeys(targets):
+            os.makedirs(tgt, exist_ok=True)
+            with open(os.path.join(tgt, "SKILL.md"), "w", encoding="utf-8") as fh:
+                fh.write(rendered)
+            skills_created.append(os.path.relpath(os.path.join(tgt, "SKILL.md"), staging))
+    return skills_created
+
+
+def write_flat_protocols(raw, state, staging):
+    """Write flat .agents/protocols/<name>.md files for active protocols (B4)."""
+    flat_dir = os.path.join(staging, ".agents", "protocols")
+    os.makedirs(flat_dir, exist_ok=True)
+    created = []
+    for name in active_protocols(state):
+        body = build_protocol_body(raw, name, state)
+        rel = os.path.join(".agents", "protocols", "%s.md" % name)
+        with open(os.path.join(staging, rel), "w", encoding="utf-8") as fh:
+            fh.write(body + "\n")
+        created.append(rel)
+    return created
+
+
+def write_satellites(raw, state, staging):
+    """Write per-IDE satellite files (B6)."""
+    created = []
+    sat_map = {
+        "claude-code": ("claude.tmpl", ".claude/CLAUDE.md"),
+        "opencode": ("opencode.tmpl", ".opencode/AGENTS.md"),
+        "cursor": ("cursor.tmpl", ".cursor/rules/wizard.md"),
+        "codex": ("codex.tmpl", ".codex/AGENTS.md"),
+        "windsurf": ("windsurf.tmpl", ".windsurf/rules/wizard.md"),
+        "kiro": ("kiro.tmpl", ".kiro/steering/wizard.md"),
+        "vscode-copilot": ("copilot.tmpl", ".github/instructions/wizard.md"),
+        "antigravity": ("antigravity.tmpl", ".agents/AGENTS.md"),
+    }
+    for ide in active_ides(state):
+        if ide not in sat_map:
+            continue
+        tmpl_name, rel = sat_map[ide]
+        url = base_url(raw, "templates/satellites/%s" % (tmpl_name))
+        try:
+            text = fetch_with_retries(url)
+        except RuntimeError:
+            continue
+        rendered = render_satellite(text, state)
+        target = os.path.join(staging, rel)
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with open(target, "w", encoding="utf-8") as fh:
+            fh.write(rendered + "\n")
+        created.append(rel)
+    return created
+
+
+def render_satellite(text, state):
+    """Resolve placeholders inside a satellite template; fail on leftovers."""
+    def _repl(m):
+        return resolve_placeholder(state, m.group(1).strip())
+
+    rendered = re.sub(r"\{\{([A-Za-z0-9_.]+)\}\}", _repl, text)
+    if re.search(r"\{\{|\}\}", rendered):
+        raise ValueError("unresolved placeholders in satellite")
+    return rendered.strip()
+
+
+# ---------------------------------------------------------------------------
+# Main pipeline
+# ---------------------------------------------------------------------------
+
+def record_build_plan(state, staging, core_created, skills_created, wf_dir, phase_now):
+    """B6.5: record core build_plan facts into the staged state."""
+    build = state.setdefault("build_plan", {})
+    build["builder_core"] = {
+        "scripts": [
+            os.path.relpath(os.path.join(wf_dir, "lib", "builder-core.py")),
+            os.path.relpath(os.path.join(wf_dir, "lib", "builder-heavy.py")),
+        ],
+        "core_generated": sorted(core_created),
+        "core_skills": sorted(skills_created),
+    }
+    build["generated_files"] = sorted(set(build.get("generated_files", []) + core_created + skills_created))
+    build["managed_paths"] = sorted(set(build.get("managed_paths", []) + core_created + skills_created))
+    build["phase_now"] = phase_now
+    build["stack_key"] = stack_key(state)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Deterministic wizard builder core (B1-B6)")
+    parser.add_argument("--state", required=True, help="path to .wizard-state.json")
+    parser.add_argument("--staging", required=True, help="staging directory to write files into")
+    parser.add_argument("--raw", required=True, help="raw wizard dir (base URL or local path)")
+    parser.add_argument("--wf-dir", required=True, help="WF_DIR (wizard install dir)")
+    parser.add_argument("--phase-now", default="phase6", help="current phase label for build_plan")
+    args = parser.parse_args(argv)
+
+    state = load_state(args.state)
+    staging = args.staging
+    raw = args.raw
+    wf_dir = args.wf_dir
+    os.makedirs(staging, exist_ok=True)
+
+    # B2: keys.
+    sk = stack_key(state)
+    sp = stack_primary(state)
+
+    # B3+B4: flat protocols and skills.
+    flat_created = write_flat_protocols(raw, state, staging)
+    skills_created = write_skills(raw, state, staging)
+
+    # B5: AGENTS.md (router).
+    router_text = render_router(raw, state)
+    agents_rel = os.path.join("AGENTS.md")
+    with open(os.path.join(staging, agents_rel), "w", encoding="utf-8") as fh:
+        fh.write(router_text + "\n")
+    core_created = flat_created + [agents_rel]
+
+    # B6: satellites.
+    satellites = write_satellites(raw, state, staging)
+    core_created += satellites
+
+    # B6.5: record.
+    record_build_plan(state, staging, core_created, skills_created, wf_dir, args.phase_now)
+
+    # Persist the updated state back into staging.
+    with open(args.state, "w", encoding="utf-8") as fh:
+        json.dump(state, fh, indent=2, ensure_ascii=False)
+
+    print("builder-core: stack_key=%s primary=%s flat=%d skills=%d satellites=%d" % (
+        sk, sp, len(flat_created), len(skills_created), len(satellites)))
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as exc:  # noqa: BLE001 - deterministic hard-fail contract
+        print("builder-core ERROR: %s" % exc, file=sys.stderr)
+        sys.exit(1)

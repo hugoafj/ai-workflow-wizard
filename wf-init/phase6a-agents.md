@@ -1,56 +1,38 @@
 ## PHASE 6 — Deterministic assembly (part A: Builder-Core)
 
 > This phase assembles operations B1-B6: AGENTS.md, packaged protocols, and per-IDE
-> satellites into `.wizard-staging/`. **Preferred**: delegate to sub-agent to save tokens.
-> **Fallback**: run Builder inline if delegation is unavailable (older IDEs, certain contexts).
+> satellites into `.wizard-staging/`. Builder-Core is a deterministic Python script —
+> no sub-agent delegation, no inline fallback.
 
-### Step 1: Check if delegation is available
-
-Try the delegation path first (most efficient):
-
-```bash
-# Attempt to get Builder-Core prompt for delegation
-WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
-source "$WF_DIR/lib/state-helpers.sh"
-
-BUILDER_CORE_PROMPT=$(cat "$WF_DIR/subagent-builder-core.md" 2>/dev/null)
-if [ -z "$BUILDER_CORE_PROMPT" ]; then
-  echo "ERROR: Cannot read subagent-builder-core.md"
-  exit 1
-fi
-```
-
-### Step 2: Attempt delegation (preferred path)
-
-If your agent environment supports the `task` tool:
-
-1. Replace placeholders in the prompt:
-   - `{PROJECT_PATH}` → absolute path of the target project
-   - `{WF_PATH}` → absolute path of the downloaded phase directory (`$WF_DIR`)
-   - `{WF_RAW}` → `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main`
-   - `{WF_STAGING}` → `{PROJECT_PATH}/.wizard-staging`
-   - `{WF_STATE}` → `{PROJECT_PATH}/.wizard-state.json`
-
-2. Use `task` tool with `subagent_type: general` to launch Builder-Core. Wait for it.
-
-3. Once finished, jump to **Step 4: Validation** below.
-
-### Step 3: Fallback — inline Builder execution
-
-If delegation is unavailable (older Windsurf, Devin, CI/CD contexts, or any agent without `task` tool):
+### Step 1: Run Builder-Core (deterministic script)
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
-cat "$WF_DIR/lib/builder.md"
+python3 "$WF_DIR/lib/builder-core.py" \
+  --state ".wizard-state.json" \
+  --staging ".wizard-staging" \
+  --raw "${WF_RAW:-https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main}" \
+  --wf-dir "$WF_DIR"
 ```
 
-Read and execute the Builder procedure inline. It is deterministic and mechanical — no decisions required, just follow the steps for B1-B6 (Load state, Resolve keys, Assemble protocols, Build artifacts, Write to staging).
+- `--state` → `.wizard-state.json` (project root; the script writes back `build_plan`).
+- `--staging` → `.wizard-staging`.
+- `--raw` → the wizard raw base (same as `WF_RAW` used by `/wf-init`).
+- `--wf-dir` → the downloaded phase directory (`$WF_DIR`).
+- The script implements B1-B6: AGENTS.md router, protocols, skills, satellites.
+  It exits non-zero on any unresolved placeholder or missing template.
 
-### Step 4: Validation — verify staging was populated
+### Step 2: (removed — deterministic script replaces delegation)
 
-Regardless of delegation or inline execution, validate that `.wizard-staging/` was created and contains expected files:
+Builder-Core is executed exclusively via the Python script in Step 1. There is no
+sub-agent or manual inline path anymore; `_archive/subagent-builder-core.md` and
+`lib/builder.md` are kept only as specification references.
+
+### Step 3: Validation — verify staging was populated
+
+Validate that `.wizard-staging/` was created and contains expected files:
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
@@ -62,8 +44,7 @@ if [ ! -d .wizard-staging ]; then
   echo ""
   echo "Troubleshooting:"
   echo "  1. Check .wizard-state.json is valid: cat .wizard-state.json | jq ."
-  echo "  2. If delegated: check sub-agent output above for errors"
-  echo "  3. If inline: check that you followed all steps in lib/builder.md"
+  echo "  2. Re-run the Step 1 script and check stderr for unresolved placeholders"
   echo ""
   echo "Re-run with: cat \"$WF_DIR/phase6a-agents.md\""
   exit 1
@@ -86,7 +67,7 @@ done
 echo "✓ Builder-Core validation passed"
 ```
 
-### Step 5: Mark Builder-Core done and continue to Builder-Heavy
+### Step 4: Mark Builder-Core done and continue to Builder-Heavy
 
 If validation succeeds, mark this phase done and continue with part B:
 

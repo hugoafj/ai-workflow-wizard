@@ -122,7 +122,7 @@ activation command (run AFTER the files exist):
 if [ "$(jq -r '.ci.conventional_commits' .wizard-state.json)" = "true" ]; then
   command -v npx >/dev/null 2>&1 && npx husky init 2>/dev/null || true
   # Migrate the drift hook into Husky: when the builder ran on a project WITHOUT
-  # .husky/ it wrote .git/hooks/post-commit (subagent-builder-heavy.md B8). After
+  # .husky/ it wrote .git/hooks/post-commit (builder-heavy.py B8). After
   # `npx husky init` core.hooksPath points to .husky, so the old hook would be
   # silently ignored. Only migrate when Husky actually initialized.
   if [ -d .husky ] && [ -f .git/hooks/post-commit ] && [ ! -f .husky/post-commit ]; then
@@ -586,7 +586,7 @@ git add -f .codex/ 2>/dev/null || true
 git add -f .opencode/ 2>/dev/null || true
 # gemini-cli (when selected): builder emits .gemini/skills/<skill>/SKILL.md (see builder.md B7)
 git add -f .gemini/ 2>/dev/null || true
-# PR Agent config staged by the builder (subagent-builder-heavy.md) — commit it too
+# PR Agent config staged by the builder (builder-heavy.py) — commit it too
 [ -f .pr_agent.toml ] && git add -f .pr_agent.toml 2>/dev/null || true
 git add -f .github/copilot-instructions.md .github/prompts/ 2>/dev/null || true
 # CI/CD (Block 6): workflows, conventional commits, husky, release-please, .gga
