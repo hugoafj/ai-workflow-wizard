@@ -163,24 +163,146 @@ Record each file. Don't ask — write everything directly to staging.
 
 ### B5 — Assemble AGENTS.md (thin router)
 
-1. Download `$WF_RAW/templates/AGENTS.router.md`
-2. Replace ALL `{{...}}` placeholders with values from `.wizard-state.json`:
-   - `{{answers.*}}`, `{{discovery.*}}`, `{{testing.*}}`
-   - For each `{{features.<name>_yesno}}` placeholder (e.g. `decision_ladder_yesno`, `tdd_protocol_yesno`, `routing_abc_yesno`, `ci_yesno`, `cd_yesno`, `release_please_yesno`), read `.features.<name>` and convert:
-     - `true` → `yes`
-     - `false` or `null` → `no`
-     Then replace `{{features.<name>_yesno}}` with the resulting `yes`/`no`.
-   - `{{wizard_version}}` → from the root field `wizard_version`
-   - **Inference-resolved** (NO dedicated state field — derive from state + manifest, never leave the raw placeholder): `{{discovery.commands}}` (exact commands with real flags), `{{discovery.conventions.code_style}}`, `{{discovery.conventions.structure}}`, `{{testing.checks_before_done}}` (`lint + build` + test per layers), `{{mcps.table}}` (built from stack + layers).
-   - **NEVER write `latest` or leave an unresolved placeholder** (e.g. `{{wizard_version}}`).
-     Read the EXACT value from the state file. If the state lacks `wizard_version`, use the
-     `VERSION` file content; if that is missing too, use `0.7.1-beta.1`. A footer with `latest`
-     blocks `/wf-refresh` forever (strict version equality), so this is a hard correctness rule.
-3. Resolve `<if ...>` blocks based on state
-4. Insert testing sections if LAYERS is not empty
-5. Build MCPs table based on STACK + LAYERS
-6. Write to `{WF_STAGING}/AGENTS.md`
-7. Footer: last line with `wf-version` + stack + all features as flags
+**Implementation**: Use Python for robust template processing (handles file placeholders, conditionals, guide comment stripping, validation).
+
+```python
+#!/usr/bin/env python3
+"""
+AGENTS.md Builder — processes AGENTS.router.md template:
+- Resolves {{...}} placeholders from state
+- Resolves {{protocols/.../file.md}} by fetching and inlining file content
+- Resolves <if condition> blocks (keeps content if true, removes if false)
+- Strips guide comments <!-- Insert ... -->
+- Validates no unresolved placeholders or conditionals remain
+- Ensures proper newlines around code fences
+"""
+import json, re, subprocess, sys, os
+
+WF_RAW = os.environ['WF_RAW']           # https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main
+WF_STAGING = os.environ['WF_STAGING']   # .wizard-staging
+WF_STATE = os.environ['WF_STATE']       # .wizard-state.json
+
+with open(WF_STATE) as f:
+    state = json.load(f)
+
+# Fetch template
+router_md = subprocess.run(['curl', '-fsSL', f'{WF_RAW}/templates/AGENTS.router.md'], 
+                           capture_output=True, text=True, check=True).stdout
+
+# 1. Resolve simple {{key}} placeholders from state
+def get_state_value(path):
+    """Get value from state using dot notation: answers.project_name"""
+    keys = path.split('.')
+    val = state
+    for k in keys:
+        if isinstance(val, dict):
+            val = val.get(k)
+        else:
+            return None
+    return val
+
+def replace_simple_placeholders(text):
+    def repl(match):
+        key = match.group(1)
+        val = get_state_value(key)
+        if val is None:
+            return match.group(0)  # leave unresolved for now
+        if isinstance(val, bool):
+            return 'yes' if val else 'no'
+        if isinstance(val, list):
+            return ', '.join(str(v) for v in val)
+        return str(val)
+    return re.sub(r'\{\{([^}]+)\}\}', repl, text)
+
+router_md = replace_simple_placeholders(router_md)
+
+# 2. Resolve {{protocols/.../file.md}} file placeholders
+def resolve_file_placeholder(match):
+    rel_path = match.group(1)  # protocols/testing/testing-approach.section.md
+    url = f'{WF_RAW}/templates/{rel_path}'
+    result = subprocess.run(['curl', '-fsSL', url], capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"WARNING: Could not fetch {url}", file=sys.stderr)
+        return match.group(0)
+    content = result.stdout
+    # Strip markdown code fences if present
+    content = re.sub(r'^```\w*\n', '', content)
+    content = re.sub(r'\n```$', '', content)
+    return content
+
+router_md = re.sub(r'\{\{protocols/([^}]+)\}\}', resolve_file_placeholder, router_md)
+
+# 3. Resolve <if condition> blocks
+def resolve_conditionals(text, state):
+    pattern = r'<if\s+([^>]+)>(.*?)</if>'
+    
+    def eval_condition(cond):
+        cond = cond.strip()
+        if 'not empty' in cond:
+            parts = cond.replace('state.', '').split(' not empty')
+            if len(parts) == 2:
+                key = parts[0].strip()
+                val = get_state_value(key)
+                return bool(val and len(val) > 0)
+        if cond.startswith('state.features.'):
+            key = cond.replace('state.', '')
+            val = get_state_value(key)
+            return bool(val)
+        if cond.startswith('state.'):
+            key = cond.replace('state.', '')
+            val = get_state_value(key)
+            return bool(val)
+        return False
+    
+    def repl(match):
+        cond = match.group(1)
+        content = match.group(2)
+        if eval_condition(cond):
+            return content
+        else:
+            return ''
+    
+    return re.sub(pattern, repl, text, flags=re.DOTALL)
+
+router_md = resolve_conditionals(router_md, state)
+
+# 4. Strip guide comments <!-- Insert ... -->
+router_md = re.sub(r'<!--\s*Insert [^>]+-->\s*\n?', '', router_md)
+
+# 5. Ensure proper newlines around code fences
+router_md = re.sub(r'(```)', r'\n\1\n', router_md)
+router_md = re.sub(r'\n{3,}', '\n\n', router_md)
+
+# 6. Validate: no unresolved {{...}} or <if> tags
+if '{{' in router_md:
+    unresolved = re.findall(r'\{\{([^}]+)\}\}', router_md)
+    print(f"ERROR: Unresolved placeholders: {unresolved}", file=sys.stderr)
+    sys.exit(1)
+if '<if ' in router_md:
+    print("ERROR: Unresolved <if> conditionals remain", file=sys.stderr)
+    sys.exit(1)
+
+# 7. Write to staging
+os.makedirs(WF_STAGING, exist_ok=True)
+with open(f'{WF_STAGING}/AGENTS.md', 'w') as f:
+    f.write(router_md)
+
+print("✓ AGENTS.md generated successfully")
+```
+
+**Execute in bash:**
+```bash
+WF_RAW="${WF_RAW}" WF_STAGING="${WF_STAGING}" WF_STATE="${WF_STATE}" python3 << 'PYEOF'
+# ... python script above ...
+PYEOF
+```
+
+**Replaces manual sed/awk** — guarantees:
+- File placeholders `{{protocols/...}}` fetched and inlined
+- `<if>` conditionals evaluated against state
+- Guide comments stripped
+- Zero unresolved placeholders in output
+- Proper code fence formatting
 
 ### B5b — Preserve existing custom AGENTS.md sections
 
@@ -214,6 +336,7 @@ For each IDE in IDES, download template and write:
 | `vscode-copilot` | `satellites/copilot.tmpl` | `{WF_STAGING}/.github/copilot-instructions.md` | Only if in IDES |
 | `cursor` | `satellites/cursor.tmpl` | `{WF_STAGING}/.cursor/rules/project.mdc` | Only if in IDES |
 | `windsurf` | `satellites/windsurf.tmpl` | `{WF_STAGING}/.windsurf/rules/project.md` | Only if in IDES |
+| `devin` | `satellites/windsurf.tmpl` | `{WF_STAGING}/.devin/rules/project.md` | Only if in IDES |
 | `kiro` | `satellites/kiro.tmpl` | `{WF_STAGING}/.kiro/steering/project-context.md` | Only if in IDES |
 | `gemini-cli` | `satellites/gemini.tmpl` | `{WF_STAGING}/GEMINI.md` | Only if in IDES |
 | `antigravity` | `satellites/antigravity.tmpl` | `{WF_STAGING}/ANTIGRAVITY.md` | Only if in IDES |

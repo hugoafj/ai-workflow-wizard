@@ -417,53 +417,54 @@ preserve_custom_agents() {
   echo "  ✓ Custom sections preserved"
 }
 
-# Reinsert the "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule into a
-# target file when Windsurf/Devin is an active IDE. Mirrors phase8's safety net:
-# the staging router does not carry the rule, so a refresh must re-add it.
-# $1 (optional) is the target file to patch — defaults to AGENTS.md. In R6 the
-# caller passes "$STAGING/AGENTS.md", so the bridge is inserted into the STAGED
-# AGENTS.md before the approved copy is promoted (and only when AGENTS.md is
-# approved). Idempotent: skips when the rule is already present (e.g. preserved
-# via DO NOT REGENERATE markers or by a previous reinsert).
+# Reinsert the "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule into
+# the IDE-specific rules files when Windsurf/Devin is an active IDE.
+# The bridge belongs in .windsurf/rules/project.md and .devin/rules/project.md
+# (not AGENTS.md), because it's IDE-specific configuration for legacy path resolution.
+# $1 (optional) is the staging directory — defaults to .wizard-staging.
+# Idempotent: skips when the rule is already present.
 reinsert_legacy_bridge() {
-  local IDES RULE_FILE TARGET
+  local STAGING_DIR IDES RULE_FILE
+  STAGING_DIR="${1:-.wizard-staging}"
   IDES=$(jq -r '.answers.ides[]?' "$WF_STATE" 2>/dev/null)
   if ! echo "$IDES" | grep -q "windsurf"; then
     return 0
   fi
   RULE_FILE="${WF_DIR}/temp-files/AGENTS.md"
-  TARGET="${1:-AGENTS.md}"
-  if [ ! -f "$RULE_FILE" ] || [ ! -f "$TARGET" ]; then
+  if [ ! -f "$RULE_FILE" ]; then
     return 0
   fi
-  if grep -q "Gentle AI — Legacy Path Bridge" "$TARGET"; then
-    echo "  ℹ Legacy path bridge already present in $TARGET"
-    return 0
-  fi
-  # AGENTS.router.md may begin with leading HTML comments; find the first
-  # markdown heading ("# ") and insert after it. head/cat/tail are portable on
-  # BOTH BSD (macOS) and GNU (Linux) coreutils.
-  # Wrap in DO NOT REGENERATE markers so future refreshes preserve it.
-  # temp-files/AGENTS.md has no trailing newline, so add one before the
-  # closing marker to keep it on its own line.
-  TITLE_LINE=$(grep -n '^# ' "$TARGET" | head -1 | cut -d: -f1)
-  if [ -z "$TITLE_LINE" ]; then
-    echo "  ⚠ Could not find $TARGET title line for Windsurf bridge injection; skipping." >&2
-    return 0
-  fi
-  {
-    head -n "$TITLE_LINE" "$TARGET"
-    printf '%s\n' "<!-- WF: DO NOT REGENERATE -->"
-    cat "$RULE_FILE"
-    printf '\n%s\n' "<!-- /WF: DO NOT REGENERATE -->"
-    tail -n +$((TITLE_LINE + 1)) "$TARGET"
-  } > "$TARGET.tmp"
-  mv "$TARGET.tmp" "$TARGET"
-  if grep -q "Gentle AI — Legacy Path Bridge" "$TARGET"; then
-    echo "  ✓ Windsurf legacy path bridge rule reinserted into $TARGET"
-  else
-    echo "  ⚠ Windsurf legacy path bridge rule MISSING from $TARGET after reinsert." >&2
-  fi
+
+  # Target files: both Windsurf and Devin rules
+  for TARGET in "$STAGING_DIR/.windsurf/rules/project.md" "$STAGING_DIR/.devin/rules/project.md"; do
+    if [ ! -f "$TARGET" ]; then
+      # Create directory and file if missing (satellite may not exist yet)
+      mkdir -p "$(dirname "$TARGET")"
+      printf '# Project Rules\n\n' > "$TARGET"
+    fi
+    if grep -q "Gentle AI — Legacy Path Bridge" "$TARGET"; then
+      echo "  ℹ Legacy path bridge already present in $TARGET"
+      continue
+    fi
+    # Find first heading or use line 1
+    TITLE_LINE=$(grep -n '^# ' "$TARGET" | head -1 | cut -d: -f1)
+    if [ -z "$TITLE_LINE" ]; then
+      TITLE_LINE=1
+    fi
+    {
+      head -n "$TITLE_LINE" "$TARGET"
+      printf '%s\n' "<!-- WF: DO NOT REGENERATE -->"
+      cat "$RULE_FILE"
+      printf '\n%s\n' "<!-- /WF: DO NOT REGENERATE -->"
+      tail -n +$((TITLE_LINE + 1)) "$TARGET"
+    } > "$TARGET.tmp"
+    mv "$TARGET.tmp" "$TARGET"
+    if grep -q "Gentle AI — Legacy Path Bridge" "$TARGET"; then
+      echo "  ✓ Windsurf/Devin legacy path bridge inserted into $TARGET"
+    else
+      echo "  ⚠ Legacy path bridge MISSING from $TARGET after insert." >&2
+    fi
+  done
 }
 
 LIBEOF
@@ -591,38 +592,18 @@ fi
 
 echo "✓ State validation passed (schema v$SCHEMA_VERSION)"
 
-IDES=()
-[[ -d .claude ]] && IDES+=("claude-code")
-[[ -d .cursor ]] && IDES+=("cursor")
-if [[ -d .windsurf ]] || [[ -d .devin ]]; then
-  IDES+=("windsurf")
-fi
-[[ -d .kiro ]] && IDES+=("kiro")
-[[ -d .codex ]] && IDES+=("codex")
-[[ -d .opencode ]] && IDES+=("opencode")
-if [[ -d .gemini ]] || [[ -f GEMINI.md ]]; then
-  IDES+=("gemini-cli")
-fi
-if [[ -d .antigravity ]] || [[ -f ANTIGRAVITY.md ]]; then
-  IDES+=("antigravity")
-fi
-[[ -f .github/copilot-instructions.md ]] && IDES+=("vscode-copilot")
+# Read IDEs from state (user's original selection), do NOT auto-detect from directories
+# Auto-detection would add IDEs the user never selected (e.g., .claude/ from old runs)
+IDES=$(jq -r '.answers.ides[]?' "$WF_STATE" 2>/dev/null)
 
-if [[ ${#IDES[@]} -eq 0 ]]; then
-  echo "⚠ No active IDEs detected"
-else
-  echo "ℹ Detected IDEs: ${IDES[*]}"
-fi
-
-if [[ ${#IDES[@]} -eq 0 ]]; then
+if [[ -z "$IDES" ]]; then
+  echo "⚠ No active IDEs in state"
   IDES_JSON='[]'
 else
-  IDES_JSON=$(printf '%s\n' "${IDES[@]}" | jq -R . | jq -s .)
+  echo "ℹ Active IDEs from state: $IDES"
+  IDES_JSON=$(printf '%s\n' $IDES | jq -R . | jq -s .)
 fi
-# Merge detected IDEs with the existing answers instead of overwriting them:
-# a previously configured IDE whose directory is temporarily absent must not be
-# dropped (its generated files would then be offered for deletion as unmanaged).
-_apply_jq_filter --argjson ides "$IDES_JSON" '.answers.ides = ((.answers.ides // []) + $ides | unique)'
+# Keep answers.ides as-is (user's choice). Do not merge detected directories.
 
 echo "✓ Phase R0 complete"
 ```
@@ -823,13 +804,11 @@ if [[ ! -f .wizard-refresh-baseline.json ]]; then
 fi
 
 # Preserve custom AGENTS.md sections and reinsert the Windsurf/Devin legacy bridge
-# into staged AGENTS.md now so R4's diff preview reflects the final content.
+# into the IDE rules files in staging so R4's diff preview reflects the final content.
 if [[ -f AGENTS.md ]] && [[ -f "$STAGING/AGENTS.md" ]]; then
   preserve_custom_agents "$STAGING"
 fi
-if [[ -f "$STAGING/AGENTS.md" ]]; then
-  reinsert_legacy_bridge "$STAGING/AGENTS.md"
-fi
+reinsert_legacy_bridge "$STAGING"
 
 echo "✓ Phase R3 validation passed"
 ```
@@ -1159,13 +1138,10 @@ if [[ "$APPROVE_UPDATED" == "true" ]] || [[ "$APPROVE_ADDED" == "true" ]]; then
   if [[ -f AGENTS.md ]] && [[ -f "$STAGING/AGENTS.md" ]]; then
     preserve_custom_agents "$STAGING"
   fi
-  # Reinsert the Windsurf/Devin legacy path bridge into the STAGED AGENTS.md so
-  # the approved copy carries it, the manifest hashes it, and a declined refresh
-  # writes nothing. Idempotent: skipped when the rule is already present (e.g.
-  # preserved via DO NOT REGENERATE markers).
-  if [[ -f "$STAGING/AGENTS.md" ]]; then
-    reinsert_legacy_bridge "$STAGING/AGENTS.md"
-  fi
+  # Reinsert the Windsurf/Devin legacy path bridge into the IDE rules files
+  # so the approved copy carries it, the manifest hashes it, and a declined refresh
+  # writes nothing. Idempotent: skipped when the rule is already present.
+  reinsert_legacy_bridge "$STAGING"
 fi
 
 if [[ "$APPROVE_ADDED" == "true" ]]; then
