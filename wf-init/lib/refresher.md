@@ -486,9 +486,12 @@ WF_DIR="${WF_DIR:-/tmp/wf-refresh-phases}"
 source "${WF_DIR}/lib/refresh-lib.sh"
 
 LOCAL_VERSION=""
-if [[ -f AGENTS.md ]]; then
-  LOCAL_VERSION=$(sed -n 's/.*wf-version: \([^ |]*\).*/\1/p' AGENTS.md | tail -1)
+# install.sh SIEMPRE instala en .agents/skills/ (unconditional fallback universal)
+UNIVERSAL_SKILL="$HOME/.agents/skills/wf-refresh/SKILL.md"
+if [[ -f "$UNIVERSAL_SKILL" ]]; then
+  LOCAL_VERSION=$(sed -n 's/^version: *\([^ ]*\).*/\1/p' "$UNIVERSAL_SKILL" | head -1)
 fi
+# Fallback a state solo si no existe (primer run sin install.sh)
 if [[ -z "$LOCAL_VERSION" ]]; then
   LOCAL_VERSION=$(jq -r '.wizard_version // empty' "$WF_STATE" 2>/dev/null || true)
 fi
@@ -666,7 +669,7 @@ fi
 
 GIT_COMMITS=$(git log --oneline 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")
 
-OLD_STACK=$(jq -r '.discovery.stack_key // ""' "$WF_STATE")
+OLD_STACK=$(jq -r '.discovery.stack.stack_key // .discovery.stack_key // ""' "$WF_STATE")
 OLD_NODE=$(jq -r '.discovery.node_engine // ""' "$WF_STATE")
 OLD_NPM=$(jq -r '.discovery.npm_major // ""' "$WF_STATE")
 
@@ -677,12 +680,12 @@ if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || 
   [[ "$OLD_NPM" != "$NPM_MAJOR" ]] && echo "  - npm major: $OLD_NPM → $NPM_MAJOR"
 
   if _ask_yesno_safe "Use updated project info?"; then
-    _apply_jq_filter \
-      --arg stack_key "$STACK_KEY" \
-      --arg node_engine "$NODE_ENGINE" \
-      --arg npm_major "$NPM_MAJOR" \
-      --argjson git_commits "$GIT_COMMITS" \
-      '.discovery.stack_key = $stack_key | .discovery.node_engine = $node_engine | .discovery.npm_major = $npm_major | .discovery.git_commits = $git_commits'
+_apply_jq_filter \
+  --arg stack_key "$STACK_KEY" \
+  --arg node_engine "$NODE_ENGINE" \
+  --arg npm_major "$NPM_MAJOR" \
+  --argjson git_commits "$GIT_COMMITS" \
+  '.discovery.stack.stack_key = $stack_key | .discovery.node_engine = $node_engine | .discovery.npm_major = $npm_major | .discovery.git_commits = $git_commits'
     echo "✓ Updated discovery fields"
   else
     echo "ℹ Keeping existing discovery fields"
