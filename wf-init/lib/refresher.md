@@ -591,6 +591,13 @@ fi
 
 echo "✓ State validation passed (schema v$SCHEMA_VERSION)"
 
+# Copy state to staging for atomic refresh operations (R2-R6 operate on staging)
+STAGING_DIR=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' "$WF_STATE")
+mkdir -p "$STAGING_DIR"
+STAGING_STATE="$STAGING_DIR/wizard-state.json"
+cp "$WF_STATE" "$STAGING_STATE"
+echo "✓ State copied to staging: $STAGING_STATE"
+
 IDES=()
 [[ -d .claude ]] && IDES+=("claude-code")
 [[ -d .cursor ]] && IDES+=("cursor")
@@ -701,7 +708,7 @@ echo "✓ Phase R1 complete"
 
 ## Phase R2: State/schema migration
 
-Migrate `.wizard-state.json` from its current version to the actual `TARGET_VERSION` using cumulative, semver-aware migrations.
+Migrate `.wizard-state.json` from its current version to the actual `TARGET_VERSION` using cumulative, semver-aware migrations. **Operates on staging copy** (`$STAGING_STATE`).
 
 ```bash
 #!/bin/bash
@@ -710,9 +717,11 @@ set -e
 WF_DIR="${WF_DIR:-/tmp/wf-refresh-phases}"
 source "${WF_DIR}/lib/refresh-lib.sh"
 
+STAGING_STATE=".wizard-staging/wizard-state.json"
+
 echo "ℹ Checking for state migrations..."
 
-CURRENT_VERSION=$(jq -r '.wizard_version // "0.0.0"' "$WF_STATE")
+CURRENT_VERSION=$(jq -r '.wizard_version // "0.0.0"' "$STAGING_STATE")
 CURRENT_VERSION="${CURRENT_VERSION#v}"
 
 TARGET_VERSION=$(wf_fetch_version)
@@ -721,7 +730,8 @@ TARGET_VERSION="${TARGET_VERSION#v}"
 echo "ℹ Current state version: $CURRENT_VERSION"
 echo "ℹ Target version: $TARGET_VERSION"
 
-migrate_state "$CURRENT_VERSION" "$TARGET_VERSION"
+# Use migrate_state function but target the staging state
+WF_STATE="$STAGING_STATE" migrate_state "$CURRENT_VERSION" "$TARGET_VERSION"
 
 # Ask about new optional protocol features that are not present in the local
 # state yet (features added by newer wizard versions). ci/cd/release_please are
@@ -729,13 +739,13 @@ migrate_state "$CURRENT_VERSION" "$TARGET_VERSION"
 # configured via /wf-settings or /wf-init. Disabled features are recorded
 # explicitly so they are never re-asked.
 for FEATURE in decision_ladder tdd_protocol routing_abc; do
-  if ! jq -e ".features.$FEATURE != null" "$WF_STATE" >/dev/null 2>&1; then
+  if ! jq -e ".features.$FEATURE != null" "$STAGING_STATE" >/dev/null 2>&1; then
     echo "New optional feature available: $FEATURE"
     if _ask_yesno_safe "Enable $FEATURE?"; then
-      jq ".features.$FEATURE = true | .updated_at = (now | todate)" "$WF_STATE" > "$WF_STATE.tmp" && mv "$WF_STATE.tmp" "$WF_STATE"
+      WF_STATE="$STAGING_STATE" jq ".features.$FEATURE = true | .updated_at = (now | todate)" "$STAGING_STATE" > "$STAGING_STATE.tmp" && mv "$STAGING_STATE.tmp" "$STAGING_STATE"
       echo "✓ $FEATURE enabled"
     else
-      jq ".features.$FEATURE = false | .updated_at = (now | todate)" "$WF_STATE" > "$WF_STATE.tmp" && mv "$WF_STATE.tmp" "$WF_STATE"
+      WF_STATE="$STAGING_STATE" jq ".features.$FEATURE = false | .updated_at = (now | todate)" "$STAGING_STATE" > "$STAGING_STATE.tmp" && mv "$STAGING_STATE.tmp" "$STAGING_STATE"
       echo "✗ $FEATURE disabled"
     fi
   fi
@@ -763,8 +773,9 @@ set -e
 WF_DIR="${WF_DIR:-/tmp/wf-refresh-phases}"
 source "${WF_DIR}/lib/refresh-lib.sh"
 
+STAGING_STATE=".wizard-staging/wizard-state.json"
 BASELINE=".wizard-refresh-baseline.json"
-jq '{managed_paths: (.build_plan.managed_paths // []), generated_files: (.build_plan.generated_files // [])}' "$WF_STATE" > "$BASELINE"
+jq '{managed_paths: (.build_plan.managed_paths // []), generated_files: (.build_plan.generated_files // [])}' "$STAGING_STATE" > "$BASELINE"
 echo "✓ Baseline snapshot written ($(jq '.managed_paths | length' "$BASELINE") managed paths)"
 ```
 
@@ -777,7 +788,7 @@ echo "✓ Baseline snapshot written ($(jq '.managed_paths | length' "$BASELINE")
      - `{WF_RAW}` → `https://raw.githubusercontent.com/${WIZARD_REPO}/${WIZARD_BRANCH}`
      - `{PROJECT_PATH}` → the current working directory
      - `{WF_STAGING}` → the staging directory (`$STAGING` or `{PROJECT_PATH}/.wizard-staging`)
-     - `{WF_STATE}` → `.wizard-state.json`
+     - `{WF_STATE}` → `.wizard-staging/wizard-state.json`  **← staging copy for refresh**
    - The helper `lib/state-helpers.sh` lives directly under `$WF_DIR/lib/`.
    - Otherwise, read `lib/builder.md` and execute B1-B6 manually.
 2. After Builder-Core completes, read `phase6b-build-heavy.md` and run Builder-Heavy (B7-B9) the same way — **execute ONLY its steps 1-4 (verify staging, delegate, fallback, validate). Do NOT execute phase6b's Step 5 tail**: no `wf_phase_done phase6 phase7`, no "Wait for user confirmation", and NO `cat "$WF_DIR/phase7.md"`. Those belong to the `/wf-init` phase 7/8 flow, not to refresh — running them would derail into wf-init's review/promotion instead of returning to Phase R4. If you invoke `phase6b-build-heavy.md` through a bash wrapper, set `WF_REFRESH=1` so Step 5 guards the phase7 promotion. After Builder-Heavy validates, return to Phase R4 below.
@@ -793,11 +804,17 @@ set -e
 WF_DIR="${WF_DIR:-/tmp/wf-refresh-phases}"
 source "${WF_DIR}/lib/refresh-lib.sh"
 
-STAGING=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' "$WF_STATE")
+STAGING=".wizard-staging"
+STAGING_STATE="$STAGING/wizard-state.json"
 
 if [[ ! -d "$STAGING" ]]; then
   echo "✗ $STAGING/ was not created."
   echo "  Builder (Phase R3) did not complete successfully."
+  exit 1
+fi
+
+if [[ ! -f "$STAGING_STATE" ]]; then
+  echo "✗ $STAGING_STATE not found — Builder must write state to staging."
   exit 1
 fi
 
@@ -807,8 +824,7 @@ echo ""
 
 echo "$(find "$STAGING" -type f | wc -l) files in $STAGING/"
 
-# .wizard-state.json intentionally NOT validated in staging: state lives at the
-# project root; staging holds only generated files.
+# Validate staging state exists and has required fields
 for artifact in AGENTS.md; do
   if [[ ! -f "$STAGING/$artifact" ]]; then
     echo "✗ Missing critical artifact: $STAGING/$artifact"
@@ -1107,14 +1123,34 @@ if [[ ${#MISSING_GI_LINES[@]} -gt 0 ]]; then
   if _ask_yesno_safe "Append these .gitignore entries and include them in the commit?"; then APPROVE_GITIGNORE="true"; fi
 fi
 
-# Store approvals in state
+# Store approvals in staging state
+STAGING_STATE=".wizard-staging/wizard-state.json"
 jq --argjson added "$APPROVE_ADDED" \
    --argjson updated "$APPROVE_UPDATED" \
    --argjson deleted "$APPROVE_DELETED" \
    --argjson deleted_modified "$APPROVE_DELETED_MODIFIED" \
    --argjson gitignore "$APPROVE_GITIGNORE" \
-   '.build_plan.approval = {added: $added, updated: $updated, deleted: $deleted, deleted_modified: $deleted_modified, gitignore: $gitignore} | .updated_at = (now | todate)' "$WF_STATE" > "$WF_STATE.tmp"
-mv "$WF_STATE.tmp" "$WF_STATE"
+   '.build_plan.approval = {added: $added, updated: $updated, deleted: $deleted, deleted_modified: $deleted_modified, gitignore: $gitignore} | .updated_at = (now | todate)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
+mv "$STAGING_STATE.tmp" "$STAGING_STATE"
+
+# Explicit confirmation gate before R6 (Option A: ask user)
+echo ""
+echo "=== RESUMEN DE APROBACIONES ==="
+echo "  Added: $APPROVE_ADDED"
+echo "  Updated: $APPROVE_UPDATED"
+echo "  Deleted: $APPROVE_DELETED"
+echo "  Deleted-modified: $APPROVE_DELETED_MODIFIED"
+echo "  Gitignore: $APPROVE_GITIGNORE"
+echo ""
+echo "¿Aplicar estos cambios aprobados y continuar a Phase R6 (commit)? [y/n] "
+read -r -n 1 CONFIRM
+echo
+if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
+  echo "✓ Procediendo a Phase R6..."
+else
+  echo "✗ Refresh cancelado por el usuario. No se aplicaron cambios."
+  exit 0
+fi
 
 echo "✓ Phase R5 complete"
 ```
@@ -1123,7 +1159,8 @@ echo "✓ Phase R5 complete"
 
 ## Phase R6: Apply and close
 
-Copy approved changes, update state, write `.wizard-managed-files.json`, commit, and clean staging.
+Copy approved changes, update state, write `.wizard-managed-files.json`, commit, and close.
+**Reads approvals from staging state (`.wizard-staging/wizard-state.json`); promotes to root on success.**
 
 ```bash
 #!/bin/bash
@@ -1132,7 +1169,8 @@ set -e
 WF_DIR="${WF_DIR:-/tmp/wf-refresh-phases}"
 source "${WF_DIR}/lib/refresh-lib.sh"
 
-STAGING=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' "$WF_STATE")
+STAGING=".wizard-staging"
+STAGING_STATE="$STAGING/wizard-state.json"
 PLAN="refresh-plan.json"
 
 # Ensure staging, plan, and the R3 baseline are removed even if R6 fails.
@@ -1145,11 +1183,12 @@ trap cleanup_r6 EXIT
 
 echo "ℹ Applying approved changes..."
 
-APPROVE_ADDED=$(jq -r '.build_plan.approval.added // false' "$WF_STATE")
-APPROVE_UPDATED=$(jq -r '.build_plan.approval.updated // false' "$WF_STATE")
-APPROVE_DELETED=$(jq -r '.build_plan.approval.deleted // false' "$WF_STATE")
-APPROVE_DELETED_MODIFIED=$(jq -r '.build_plan.approval.deleted_modified // false' "$WF_STATE")
-APPROVE_GITIGNORE=$(jq -r '.build_plan.approval.gitignore // false' "$WF_STATE")
+# Read approvals from STAGING STATE (not root)
+APPROVE_ADDED=$(jq -r '.build_plan.approval.added // false' "$STAGING_STATE")
+APPROVE_UPDATED=$(jq -r '.build_plan.approval.updated // false' "$STAGING_STATE")
+APPROVE_DELETED=$(jq -r '.build_plan.approval.deleted // false' "$STAGING_STATE")
+APPROVE_DELETED_MODIFIED=$(jq -r '.build_plan.approval.deleted_modified // false' "$STAGING_STATE")
+APPROVE_GITIGNORE=$(jq -r '.build_plan.approval.gitignore // false' "$STAGING_STATE")
 
 # Preserve custom AGENTS.md sections BEFORE any copy: the project AGENTS.md still
 # holds the user's custom markers here, and the staged AGENTS.md is the freshly
@@ -1344,7 +1383,9 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
   fi
 
   if [ -s "$COMMIT_PATHS" ]; then
-    COMMIT_MSG=$(cat <<EOF
+    # Commit message via temp file to avoid nested heredoc parsing issues (zsh/bash)
+    COMMIT_MSG_FILE=$(mktemp)
+    cat > "$COMMIT_MSG_FILE" <<'MSG_EOF'
 chore: refresh workflow to v$TARGET_VERSION
 
 - Updated AGENTS.md with new project info
@@ -1354,8 +1395,9 @@ chore: refresh workflow to v$TARGET_VERSION
 - Removed $(jq '.deleted_modified | length' "$PLAN") modified-deprecated files
 
 Generated with /wf-refresh
-EOF
-)
+MSG_EOF
+    COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+    rm -f "$COMMIT_MSG_FILE"
 
     # git diff does NOT support --pathspec-from-file (usage error 129); read the
     # approved paths into positional arguments so the guard is portable.
@@ -1374,6 +1416,12 @@ EOF
   fi
 else
   echo "ℹ No changes approved; skipping commit (no files were written)"
+fi
+
+# Promote staging state to root (single source of truth for next refresh)
+if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ "$APPROVE_DELETED" == "true" ]] || [[ "$APPROVE_DELETED_MODIFIED" == "true" ]] || [[ "$APPROVE_GITIGNORE" == "true" ]]; then
+  cp "$STAGING_STATE" "$WF_STATE"
+  echo "✓ State promoted from staging to root"
 fi
 
 # Staging and plan are cleaned by the EXIT trap installed above.
