@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.0-beta.1...v0.8.1-beta.1) (2026-08-18)
+
+
+### Bug Fixes
+
+* **wf-refresh:** fix infinite loop in R-1 and false drift detection in R1 ([#88](https://github.com/hugoafj/ai-workflow-wizard/issues/88)) ([84d47ae](https://github.com/hugoafj/ai-workflow-wizard/commit/84d47ae00f632dca7ae642a64c081a1604bb4641))
+
 ## [0.8.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.7.1-beta.1...v0.8.0-beta.1) (2026-08-17)
 
 
