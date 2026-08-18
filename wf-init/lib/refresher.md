@@ -1,6 +1,6 @@
 # Refresh orchestrator — phases R-1 through R6
 
-This file is read as instructions by the agent running `/wf-refresh`. **Do not `source` this Markdown file.** Execute each fenced bash block in order, pausing for user approval at Phase R5.
+This file is read as instructions by the agent running `/wf-refresh`. **Do not `source` this Markdown file.** Execute each fenced bash block in order **under `bash`, never zsh** (the blocks use bash arrays and `$BASH_VERSION` guards), pausing for user approval at Phase R5.
 
 Prerequisites (set by `templates/commands/wf-refresh/_base.md`):
 - `WF_DIR` is `/tmp/wf-refresh-phases` (or wherever the command downloaded the phase files).
@@ -34,6 +34,13 @@ cat > "${WF_DIR}/lib/refresh-lib.sh" << 'LIBEOF'
 #!/bin/bash
 # Pure bash helper library for /wf-refresh.
 # No Markdown files are sourced here.
+
+# This library uses bash arrays and version comparison: refuse to run under
+# zsh/sh, where ${ARRAY[0]} is empty (1-indexed arrays) and cat '' fails.
+if [[ -z "${BASH_VERSION:-}" ]]; then
+  echo "ERROR: refresh-lib.sh must run under bash (zsh/sh detected). Re-run /wf-refresh with bash." >&2
+  exit 1
+fi
 
 WF_DIR="${WF_DIR:-/tmp/wf-refresh-phases}"
 WF_STATE="${WF_STATE:-.wizard-state.json}"
@@ -362,6 +369,9 @@ preserve_custom_agents() {
   local FOLLOWING_H SIG BF
   for (( j=0; j<${#BLOCK_FILES[@]}; j++ )); do
     BF="${BLOCK_FILES[$j]}"
+    # Defensive: skip missing block files. Under zsh (1-indexed arrays)
+    # BLOCK_FILES[0] is empty, which previously produced `cat: : No such file`.
+    [[ -n "$BF" && -f "$BF" ]] || continue
     FOLLOWING_H="${FOLLOWING[$j]}"
     SIG="${SIGNATURES[$j]}"
 
@@ -525,7 +535,15 @@ if version_lt "$LOCAL_VERSION" "$REMOTE_VERSION"; then
     INSTALL_SH="${WF_DIR}/install.sh"
     if curl -fsSL "${WF_RAW}/install.sh" -o "$INSTALL_SH" 2>/dev/null && [[ -s "$INSTALL_SH" ]]; then
       echo "ℹ Running install.sh..."
-      bash "$INSTALL_SH" || echo "⚠ install.sh failed; continuing anyway"
+      if bash "$INSTALL_SH"; then
+        # The global commands just changed: continuing in this session would mix
+        # the old and new wizard versions. Stop and ask for a fresh session.
+        echo "⚠ Global commands updated to $REMOTE_VERSION."
+        echo "  Open a NEW session and re-run /wf-refresh so the updated wizard drives the refresh."
+        exit 0
+      else
+        echo "⚠ install.sh failed; continuing anyway"
+      fi
     else
       echo "⚠ Could not download install.sh from ${WF_RAW}/install.sh; skipping update"
     fi
@@ -660,21 +678,34 @@ GIT_COMMITS=$(git log --oneline 2>/dev/null | wc -l | tr -d '[:space:]' || echo 
 OLD_STACK=$(jq -r '.discovery.stack.stack_key // .discovery.stack_key // ""' "$WF_STATE")
 OLD_NODE=$(jq -r '.discovery.node_engine // ""' "$WF_STATE")
 OLD_NPM=$(jq -r '.discovery.npm_major // ""' "$WF_STATE")
+OLD_COMMANDS=$(jq -r '.discovery.commands // ""' "$WF_STATE")
 
-if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || [[ "$OLD_NPM" != "$NPM_MAJOR" ]]; then
+# Re-discover the command list from package.json scripts when the state lacks
+# it (refresh must not drop the command list; the builder re-detects too).
+COMMANDS="$OLD_COMMANDS"
+if [[ -z "$COMMANDS" && -f package.json ]] && command -v jq >/dev/null 2>&1; then
+  COMMANDS=$(jq -r '[.scripts | keys[] | select(. == "build" or . == "test" or . == "lint" or . == "test:e2e") | "npm run " + .] | join(", ")' package.json 2>/dev/null || true)
+fi
+
+if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || [[ "$OLD_NPM" != "$NPM_MAJOR" ]] || [[ "$OLD_COMMANDS" != "$COMMANDS" ]]; then
   echo "⚠ Project content drift detected:"
   [[ "$OLD_STACK" != "$STACK_KEY" ]] && echo "  - Stack: $OLD_STACK → $STACK_KEY"
   [[ "$OLD_NODE" != "$NODE_ENGINE" ]] && echo "  - Node engine: $OLD_NODE → $NODE_ENGINE"
   [[ "$OLD_NPM" != "$NPM_MAJOR" ]] && echo "  - npm major: $OLD_NPM → $NPM_MAJOR"
+  [[ "$OLD_COMMANDS" != "$COMMANDS" ]] && echo "  - Commands: $OLD_COMMANDS → $COMMANDS"
 
   if _ask_yesno_safe "Use updated project info?"; then
-_apply_jq_filter \
-  --arg stack_key "$STACK_KEY" \
-  --arg node_engine "$NODE_ENGINE" \
-  --arg npm_major "$NPM_MAJOR" \
-  --argjson git_commits "$GIT_COMMITS" \
-  '.discovery.stack.stack_key = $stack_key | .discovery.node_engine = $node_engine | .discovery.npm_major = $npm_major | .discovery.git_commits = $git_commits'
-    echo "✓ Updated discovery fields"
+    # Write the drift to the STAGING state, not root: R6 promotes staging to
+    # root at the end, so a root-only write would be silently clobbered.
+    STAGING_DIR=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' "$WF_STATE")
+    WF_STATE="$STAGING_DIR/wizard-state.json" _apply_jq_filter \
+      --arg stack_key "$STACK_KEY" \
+      --arg node_engine "$NODE_ENGINE" \
+      --arg npm_major "$NPM_MAJOR" \
+      --argjson git_commits "$GIT_COMMITS" \
+      --arg commands "$COMMANDS" \
+      '.discovery.stack.stack_key = $stack_key | .discovery.node_engine = $node_engine | .discovery.npm_major = $npm_major | .discovery.git_commits = $git_commits | .discovery.commands = $commands'
+    echo "✓ Updated discovery fields (staging)"
   else
     echo "ℹ Keeping existing discovery fields"
   fi
@@ -713,6 +744,19 @@ echo "ℹ Target version: $TARGET_VERSION"
 
 # Use migrate_state function but target the staging state
 WF_STATE="$STAGING_STATE" migrate_state "$CURRENT_VERSION" "$TARGET_VERSION"
+
+# Unconditional legacy normalization (idempotent; runs even when versions match):
+# 1. testing.layers may be a dict of active flags in legacy states -> array.
+# 2. discovery.stack_key flat legacy -> nested discovery.stack.stack_key.
+# The builder (R3) already tolerates both shapes; this keeps the state canonical.
+WF_STATE="$STAGING_STATE" _apply_jq_filter '
+  if (.testing.layers | type) == "object" then
+    .testing.layers = [.testing.layers | to_entries[] | select(.value) | .key]
+  else . end |
+  .discovery.stack //= {} |
+  .discovery.stack.stack_key = (.discovery.stack.stack_key // .discovery.stack_key) |
+  del(.discovery.stack_key)
+'
 
 # Ask about new optional protocol features that are not present in the local
 # state yet (features added by newer wizard versions). ci/cd/release_please are
@@ -904,8 +948,9 @@ while IFS= read -r -d '' file; do
 # is staged by the builder for non-Husky projects. Git refuses to commit paths inside
 # .git/, but the refresh still must copy/chmod the hook and track it as a managed
 # side-effect. The git-add/commit filters below already skip .git/ paths.
+# Also exclude wizard-state.json: it is the staging state copy, never a project file.
 done < <(
-  find "$STAGING" -type f -not -path "*/.git/*" -print0
+  find "$STAGING" -type f -not -path "*/.git/*" -not -name "wizard-state.json" -print0
   if [[ -f "$STAGING/.git/hooks/post-commit" ]]; then
     printf '%s\0' "$STAGING/.git/hooks/post-commit"
   fi
@@ -1299,10 +1344,12 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
     --argjson files "$GENERATED_FILES" \
     '{wizard_version: $version, generated_at: $generated_at, files: $files}' > ".wizard-managed-files.json"
 
-  # Update state build_plan
+  # Update state build_plan. Write to the STAGING state so the final
+  # `cp "$STAGING_STATE" "$WF_STATE"` promotes the complete, recomputed plan
+  # (writing to root here would be silently overwritten by that cp).
   jq --argjson files "$GENERATED_FILES" --argjson paths "$MANAGED_PATHS" \
-     '.build_plan.generated_files = $files | .build_plan.managed_paths = $paths | .updated_at = (now | todate)' "$WF_STATE" > "$WF_STATE.tmp"
-  mv "$WF_STATE.tmp" "$WF_STATE"
+     '.build_plan.generated_files = $files | .build_plan.managed_paths = $paths | .updated_at = (now | todate)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
+  mv "$STAGING_STATE.tmp" "$STAGING_STATE"
 
   # Add to .gitignore (ensure a trailing newline first and use an exact line match).
   _gi_add() {
@@ -1323,7 +1370,7 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
 
     while IFS= read -r ide; do
       case "$ide" in
-        claude-code) _gi_add "!.claude/" ;;
+        claude-code) _gi_add "!.claude/"; _gi_add "!CLAUDE.md" ;;
         cursor) _gi_add "!.cursor/" ;;
         windsurf) _gi_add "!.windsurf/"; _gi_add "!.devin/" ;;
         kiro) _gi_add "!.kiro/" ;;

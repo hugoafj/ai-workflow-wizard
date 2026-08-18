@@ -62,7 +62,7 @@ Use `wf_state_set` to persist to `.wizard-state.json`:
 .discovery.stack.primary        → "node" | "php" | "python" | "rust" | "other"
 .discovery.stack.framework      → "react" | "next" | "laravel" | "express" | null
 .discovery.stack.detected_from  → "package.json" | "composer.json" | etc.
-.discovery.stack_key            → normalized key (e.g. "node-react", "php-laravel")
+.discovery.stack.stack_key   → normalized key (e.g. "node-react", "php-laravel")
 .discovery.code_files           → number of code files
 .discovery.git_commits          → number of commits
 .discovery.committers           → number of unique committers

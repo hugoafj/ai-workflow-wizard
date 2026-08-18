@@ -83,7 +83,7 @@ Read `.wizard-state.json` completely. If any required field for an artifact is m
 STOP and report (do not invent defaults).
 
 ### Step B2 — Resolve selection keys
-- `STACK=$(jq -r '.discovery.stack_key' .wizard-state.json)`
+- `STACK=$(jq -r '.discovery.stack.stack_key // .discovery.stack_key' .wizard-state.json)`
 - `IDES=$(jq -r '.answers.ides[]?' .wizard-state.json)`
 - `TDD_MODE=$(jq -r '.testing.tdd_mode' .wizard-state.json)`
 - `LAYERS=$(jq -r '.testing.layers[]?' .wizard-state.json)`

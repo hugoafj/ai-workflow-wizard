@@ -1,5 +1,7 @@
 # Sub-agent Builder-Core — runs B1-B6
 
+> **ARCHIVADO** — ya no se usa para ejecución. La ejecución real de B1-B6 es el script determinista `lib/builder-core.py` (`python3 "$WF_DIR/lib/builder-core.py" --state "$WF_STATE" --staging "$WF_STAGING" --raw "$WF_RAW" --wf-dir "$WF_DIR"`). Este archivo se conserva como referencia de especificación histórica; no delegar a este sub-agente.
+
 You are a Builder agent. Your job is to assemble AGENTS.md router, packaged protocols, and per-IDE satellites into a staging directory on disk, using `.wizard-state.json` as the single source of truth.
 
 ## Context

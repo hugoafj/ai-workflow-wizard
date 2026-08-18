@@ -151,7 +151,7 @@ provider they use (claude/gemini/codex/opencode/ollama/...).
 
 > **Single source**: write `.gga` from `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/cicd/variants/gga-config.tmpl.md`,
 > adjusting `PROVIDER` and `FILE_PATTERNS`/`EXCLUDE_PATTERNS` to the actual project stack
-> (`state.discovery.stack_key`). `RULES_FILE` stays as `AGENTS.md`. Then:
+> (`state.discovery.stack.stack_key`). `RULES_FILE` stays as `AGENTS.md`. Then:
 > `gga init` (if .gga does not exist) and `gga install` (installs the pre-commit hook).
 
 > **Hook coexistence**: GGA installs a **pre-commit** hook; this workflow's drift

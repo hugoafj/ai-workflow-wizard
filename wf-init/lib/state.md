@@ -63,8 +63,7 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
   },
 
   "discovery": {
-    "stack": { "primary": null, "framework": null, "detected_from": null },
-    "stack_key": null,
+    "stack": { "primary": null, "framework": null, "detected_from": null, "stack_key": null },
     "node_engine": null,
     "npm_major": null,
     "default_branch": null,
@@ -166,7 +165,7 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
   `phase6.md` file; `phase6` is a backward-compatible alias). Phase 6b is `phase6b-build-heavy`,
   which advances to `phase7` when complete. Phase 47 is `phase47-cicd` (the old `phase47` key is
   not used).
-- **`discovery.stack_key`**: normalized stack key (e.g. `node-react`, `php-laravel`,
+- **`discovery.stack.stack_key`**: normalized stack key (e.g. `node-react`, `php-laravel`,
   `python-django`). This is what the Builder uses to select `variants/<stack_key>.md`.
   **Never branch with `if stack === ...`**: the key selects a file.
 - **`answers.ides`**: determines which satellites/commands/packed protocols are generated.
