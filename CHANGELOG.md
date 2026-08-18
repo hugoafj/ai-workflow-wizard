@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.3-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.2-beta.1...v0.8.3-beta.1) (2026-08-18)
+
+
+### Bug Fixes
+
+* **wf-refresh:** issues 2,3,5 — AGENTS.md placeholders, IDE detection, Windsurf/Devin bridge ([#92](https://github.com/hugoafj/ai-workflow-wizard/issues/92)) ([97d661a](https://github.com/hugoafj/ai-workflow-wizard/commit/97d661a0a9cb9c5d788f4c46e452c7d7e453aad4))
+
 ## [0.8.2-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.1-beta.1...v0.8.2-beta.1) (2026-08-18)
 
 
