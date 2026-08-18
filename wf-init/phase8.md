@@ -36,44 +36,42 @@ fi
 # The hook needs execute permission
 [ -f .git/hooks/post-commit ] && chmod +x .git/hooks/post-commit
 
-# Reinsert Windsurf rule into AGENTS.md (safety net — may have been lost in the copy from staging)
+# Reinsert Windsurf/Devin legacy path bridge into IDE rules files (safety net)
 # Re-read active IDEs in case this block runs in a fresh shell
 IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
 if echo "$IDES" | grep -q "windsurf"; then
   WF_RULE_FILE="$WF_DIR/temp-files/AGENTS.md"
-  if [ -f "$WF_RULE_FILE" ] && [ -f AGENTS.md ]; then
-    # Check if the rule is already present
-    if ! grep -q "Gentle AI — Legacy Path Bridge" AGENTS.md; then
-      # The rule is the WHOLE file (title + body) — inject it in full so the
-      # "Gentle AI — Legacy Path Bridge" title is present for the grep check.
-      # AGENTS.router.md may begin with leading HTML comments; find the first
-      # markdown heading ("# ") and insert after it. head/cat/tail are
-      # portable on BOTH BSD (macOS) and GNU (Linux) coreutils.
-      # GNU-style `sed -i '1a\n...'` fails silently on macOS; never use it here.
-      # Wrap it in DO NOT REGENERATE markers so /wf-refresh preserves it.
-      # temp-files/AGENTS.md has no trailing newline, so add one before the
-      # closing marker to keep it on its own line.
-      TITLE_LINE=$(grep -n '^# ' AGENTS.md | head -1 | cut -d: -f1)
-      if [ -z "$TITLE_LINE" ]; then
-        echo "8.1 ERROR — Could not find AGENTS.md title line for Windsurf bridge injection." >&2
+  if [ -f "$WF_RULE_FILE" ]; then
+    # Target both Windsurf and Devin rules files
+    for TARGET in ".windsurf/rules/project.md" ".devin/rules/project.md"; do
+      if [ ! -f "$TARGET" ]; then
+        mkdir -p "$(dirname "$TARGET")"
+        printf '# Project Rules\n\n' > "$TARGET"
+      fi
+      # Check if the rule is already present
+      if ! grep -q "Gentle AI — Legacy Path Bridge" "$TARGET"; then
+        # Find first heading or use line 1
+        TITLE_LINE=$(grep -n '^# ' "$TARGET" | head -1 | cut -d: -f1)
+        if [ -z "$TITLE_LINE" ]; then
+          TITLE_LINE=1
+        fi
+        {
+          head -n "$TITLE_LINE" "$TARGET"
+          printf '%s\n' "<!-- WF: DO NOT REGENERATE -->"
+          cat "$WF_RULE_FILE"
+          printf '\n%s\n' "<!-- /WF: DO NOT REGENERATE -->"
+          tail -n +$((TITLE_LINE + 1)) "$TARGET"
+        } > "$TARGET.tmp"
+        mv "$TARGET.tmp" "$TARGET"
+      fi
+      # Verify
+      if grep -q "Gentle AI — Legacy Path Bridge" "$TARGET"; then
+        echo "8.1 OK — Legacy path bridge present in $TARGET"
+      else
+        echo "8.1 ERROR — Legacy path bridge MISSING from $TARGET after reinsert." >&2
         exit 1
       fi
-      {
-        head -n "$TITLE_LINE" AGENTS.md
-        printf '%s\n' "<!-- WF: DO NOT REGENERATE -->"
-        cat "$WF_RULE_FILE"
-        printf '\n%s\n' "<!-- /WF: DO NOT REGENERATE -->"
-        tail -n +$((TITLE_LINE + 1)) AGENTS.md
-      } > AGENTS.md.tmp
-      mv AGENTS.md.tmp AGENTS.md
-    fi
-    # Verify the rule landed — fail loudly, never silently (the silent failure is the bug)
-    if grep -q "Gentle AI — Legacy Path Bridge" AGENTS.md; then
-      echo "8.1 OK — Windsurf legacy path bridge rule present in AGENTS.md"
-    else
-      echo "8.1 ERROR — Windsurf legacy path bridge rule MISSING from AGENTS.md after reinsert." >&2
-      exit 1
-    fi
+    done
   fi
 fi
 
