@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.4-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.3-beta.1...v0.8.4-beta.1) (2026-08-18)
+
+
+### Bug Fixes
+
+* **wf-refresh:** deterministic builder-core/heavy scripts, deprecated cleanup, 1:1 validation ([#94](https://github.com/hugoafj/ai-workflow-wizard/issues/94)) ([f28710c](https://github.com/hugoafj/ai-workflow-wizard/commit/f28710c24158c30e43a81cfa741d7e2358c13240))
+
 ## [0.8.3-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.2-beta.1...v0.8.3-beta.1) (2026-08-18)
 
 
