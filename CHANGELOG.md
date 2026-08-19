@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.6-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.5-beta.1...v0.8.6-beta.1) (2026-08-19)
+
+
+### Bug Fixes
+
+* **wf-refresh:** network resilience, full script list, blank-line cleanup and R6 non-interactive gate ([#98](https://github.com/hugoafj/ai-workflow-wizard/issues/98)) ([9a96a1b](https://github.com/hugoafj/ai-workflow-wizard/commit/9a96a1be12d0e94abddbcb52ad050812e56748cc))
+
 ## [0.8.5-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.4-beta.1...v0.8.5-beta.1) (2026-08-18)
 
 
