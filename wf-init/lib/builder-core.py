@@ -22,7 +22,21 @@ import os
 import re
 import sys
 import urllib.request
+import socket
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# ---------------------------------------------------------------------------
+# IPv4-first DNS resolution: prefer AF_INET so urllib does not hang on
+# IPv6-first resolution (many dev machines have no IPv6 route); IPv6 remains
+# available as a fallback for IPv6-only networks.
+# ---------------------------------------------------------------------------
+_orig_getaddrinfo = socket.getaddrinfo
+
+def _ipv4_first_getaddrinfo(*args, **kwargs):
+    results = _orig_getaddrinfo(*args, **kwargs)
+    return sorted(results, key=lambda r: (r[0] != socket.AF_INET))
+
+socket.getaddrinfo = _ipv4_first_getaddrinfo
 
 # ---------------------------------------------------------------------------
 # B1. State loading
@@ -94,9 +108,11 @@ def fetch_with_retries(url, attempts=3):
     last = None
     for i in range(attempts):
         try:
+            print(">>> fetching %s" % url, file=sys.stderr)
             return fetch_text(url)
         except RuntimeError as exc:
             last = exc
+            print("    attempt %d/%d failed: %s" % (i + 1, attempts, exc), file=sys.stderr)
     if last is None:
         raise RuntimeError("failed to fetch %s (no attempts made)" % url)
     raise last
@@ -393,11 +409,14 @@ def detect_package_scripts():
         return None
     if not isinstance(scripts, dict) or not scripts:
         return None
-    # Prefer the conventional build script; otherwise join the first few names.
-    if "build" in scripts:
-        return "npm run build"
+    # List ALL scripts (F4): the old build-only / names[:6] behavior silently
+    # flattened the Commands section and dropped dev, test:ui, etc.
     names = sorted(scripts.keys())
-    return ", ".join("npm run %s" % n for n in names[:6])
+    return ", ".join("npm run %s" % n for n in names)
+
+
+def _warn_fallback(key, value):
+    print("WARNING: %s is empty in state — using fallback %r. Re-run /wf-init phase1 discovery or set state.%s." % (key, value, key), file=sys.stderr)
 
 
 def infer_placeholder(state, key):
@@ -415,19 +434,23 @@ def infer_placeholder(state, key):
             return commands if isinstance(commands, str) else ", ".join(commands)
         detected = detect_package_scripts()
         if detected:
+            _warn_fallback(key, detected)
             return detected
+        _warn_fallback(key, "npm run build")
         return "npm run build"
 
     if key == "discovery.conventions.code_style":
         naming = get_state_value(state, "discovery.conventions.naming", None)
         if naming:
             return naming
+        _warn_fallback(key, "camelCase")
         return "camelCase"
 
     if key == "discovery.conventions.structure":
         structure = get_state_value(state, "discovery.conventions.structure", None)
         if structure:
             return structure
+        _warn_fallback(key, "flat")
         return "flat"
 
     if key == "testing.checks_before_done":
@@ -446,6 +469,7 @@ def infer_placeholder(state, key):
         if not isinstance(mcps, list):
             mcps = [mcps]
         if not mcps:
+            _warn_fallback(key, "None configured")
             return "None configured"
         rows = []
         for mcp in mcps:
@@ -549,6 +573,8 @@ def resolve_router_ifs(text, state):
             else:
                 out.append(kept)
             i += m_close.end()
+            if i < n and text[i] == "\n":
+                i += 1
             continue
         # m_open is not None.
         cond_text = m_open.group(1)
@@ -564,10 +590,14 @@ def resolve_router_ifs(text, state):
             else:
                 out.append(kept)
             i += m_close.end()
+            if i < n and text[i] == "\n":
+                i += 1
             continue
         if "state." in cond_text:
             stack.append([cond_text.strip(), []])
             i += m_open.end()
+            if i < n and text[i] == "\n":
+                i += 1
             continue
         # Not a real conditional (documentation mention like `<if ...>`);
         # emit it literally.
@@ -623,6 +653,40 @@ def testing_approach_section(state):
     return "\n".join(lines).strip()
 
 
+def _collapse_blank_lines_outside_fences(text):
+    """Collapse 3+ consecutive newlines to one blank line, skipping fenced
+    code blocks so their intentional blank lines are preserved."""
+    in_fence = False
+    lines = text.split("\n")
+    out = []
+    i = 0
+    n = len(lines)
+    while i < n:
+        line = lines[i]
+        stripped = line.strip()
+        if not in_fence and stripped.startswith("```"):
+            in_fence = True
+            out.append(line)
+            i += 1
+            continue
+        if in_fence:
+            out.append(line)
+            if stripped.startswith("```"):
+                in_fence = False
+            i += 1
+            continue
+        # Outside a fence: collapse runs of blank lines to a single blank line.
+        if stripped == "":
+            out.append(line)
+            i += 1
+            while i < n and lines[i].strip() == "":
+                i += 1
+            continue
+        out.append(line)
+        i += 1
+    return "\n".join(out)
+
+
 def render_router(raw, state):
     """Render templates/AGENTS.router.md with full placeholder and <if> resolution."""
     router = fetch_with_retries(base_url(raw, "templates/AGENTS.router.md"))
@@ -676,10 +740,27 @@ def render_router(raw, state):
 
     router = resolve_gh_escapes(router, _router_resolver)
 
-    # Step 5: strip internal insert markers.
-    router = re.sub(r"<!--\s*Insert\s+.*?-->", "", router, flags=re.DOTALL)
+    # Step 5: strip builder-instruction HTML comments from the shipped file,
+    # preserving the WF: DO NOT REGENERATE markers (read by /wf-refresh) and
+    # the wf-version footer line (read by /wf-settings and /wf-refresh).
+    def _keep_comment(m):
+        c = m.group(0)
+        if "DO NOT REGENERATE" in c or c.startswith("<!-- wf-version:"):
+            return c
+        return ""
 
-    # Step 6: hard-fail on any leftover {{ or }} placeholder residue.
+    router = re.sub(r"<!--.*?-->", _keep_comment, router, flags=re.DOTALL)
+
+    # Step 6: collapse 3+ consecutive newlines to one blank line (the <if>/</if>
+    # resolver can leave gaps that break markdown tables) and drop trailing
+    # whitespace left by stripped instruction comments (two spaces after a
+    # placeholder would render as a hard break in CommonMark). The collapse only
+    # applies OUTSIDE fenced code blocks, so intentional multi-blank-line
+    # content inside ``` fences is preserved.
+    router = _collapse_blank_lines_outside_fences(router)
+    router = re.sub(r"[ \t]+$", "", router, flags=re.MULTILINE)
+
+    # Step 7: hard-fail on any leftover {{ or }} placeholder residue.
     if re.search(r"\{\{|\}\}", router):
         left = re.findall(r"\{\{[^}]*\}\}", router)[:5]
         raise ValueError("unresolved placeholders remain in AGENTS.md: %s" % left)
@@ -922,7 +1003,7 @@ def main(argv=None):
 
     state = load_state(args.state)
     staging = args.staging
-    raw = args.raw
+    raw = os.environ.get("WF_BUILDER_RAW", args.raw)
     wf_dir = args.wf_dir
     os.makedirs(staging, exist_ok=True)
 

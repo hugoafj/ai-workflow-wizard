@@ -81,6 +81,7 @@ WF_RAW="https://raw.githubusercontent.com/${WIZARD_REPO}/${WIZARD_BRANCH}"
 
 # Local directory for downloaded refresh files (temporary, can be cleaned later)
 WF_DIR="/tmp/wf-refresh-phases"
+rm -rf "$WF_DIR"
 mkdir -p "$WF_DIR"
 mkdir -p "$WF_DIR/lib"
 

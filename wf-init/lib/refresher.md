@@ -204,15 +204,39 @@ version_lt() {
 # not a tty (agent run), a bare `read` would fail under `set -e` and abort the
 # script. In that case, respect WF_REFRESH_DEFAULT_ANSWER ("yes" or "no") if
 # it is set; otherwise fail loudly instead of silently defaulting to NO.
+# A leftover newline from piped stdin is treated like EOF, not a silent NO.
+# Optional second argument "cancel": in non-tty mode without a default answer,
+# treat the empty/garbage reply as NO (return 1) instead of aborting with
+# exit 2. Used by the final R6 commit gate so an agent-driven run can decline
+# the commit cleanly instead of killing the whole refresh.
 _ask_yesno_safe() {
   local prompt="$1"
+  local cancel_on_empty="${2:-}"
   local reply leftover
   if ! read -p "$prompt [y/n] " -n 1 -r reply 2>/dev/null; then
+    reply=""
+  fi
+  echo
+  if [[ ! -t 0 ]]; then
+    # Drain the rest of the piped line so a leftover does not corrupt the next
+    # question.
+    read -r leftover 2>/dev/null || true
+    reply="${reply//[$'\n\r']/}"
+    if [[ "$reply" =~ ^[Yy]$ ]]; then
+      return 0
+    elif [[ "$reply" =~ ^[Nn]$ ]]; then
+      return 1
+    fi
+    # Non-tty with an empty/garbage reply (e.g. a leftover newline): use
+    # WF_REFRESH_DEFAULT_ANSWER or fail loudly instead of a silent NO.
     if [ "${WF_REFRESH_DEFAULT_ANSWER:-}" = "yes" ]; then
       echo "(non-interactive — using WF_REFRESH_DEFAULT_ANSWER=yes)"
       return 0
     elif [ "${WF_REFRESH_DEFAULT_ANSWER:-}" = "no" ]; then
       echo "(non-interactive — using WF_REFRESH_DEFAULT_ANSWER=no)"
+      return 1
+    elif [ "$cancel_on_empty" = "cancel" ]; then
+      echo "(non-interactive — no WF_REFRESH_DEFAULT_ANSWER; treating as NO)"
       return 1
     else
       echo "ERROR: non-interactive input required but WF_REFRESH_DEFAULT_ANSWER is not set." >&2
@@ -220,13 +244,7 @@ _ask_yesno_safe() {
       exit 2
     fi
   fi
-  echo
-  # When stdin is piped (not a tty), `read -n 1` consumes only the first char and
-  # leaves the rest of the line in the buffer; drain it so the leftover '\n' does
-  # not corrupt the next question.
-  if [[ ! -t 0 ]]; then
-    read -r leftover 2>/dev/null || true
-  fi
+  # TTY: any non-y/n reply is NO (interactive users can simply re-run).
   if [[ "$reply" =~ ^[Yy]$ ]]; then
     return 0
   else
@@ -1011,6 +1029,11 @@ for dp in "${DEPRECATED_PATHS[@]}"; do
   fi
 done
 
+# Deduplicate deletion paths (a path may appear both in the managed_paths
+# baseline and in DEPRECATED_PATHS; unique_by keeps the counts honest).
+DELETED=$(jq 'unique_by(.path)' <<< "$DELETED")
+DELETED_MODIFIED=$(jq 'unique_by(.path)' <<< "$DELETED_MODIFIED")
+
 # Write plan
 jq -n \
   --argjson added "$ADDED" \
@@ -1032,6 +1055,10 @@ echo "  Updated: $UPDATED_COUNT"
 echo "  Deleted: $DELETED_COUNT"
 echo "  Deleted-modified: $DELETED_MODIFIED_COUNT (requires explicit approval)"
 echo "  Unchanged: $UNCHANGED_COUNT (skipped)"
+
+if jq -e '.updated[]? | select(.path == "AGENTS.md")' "$PLAN" >/dev/null 2>&1; then
+  echo "ℹ AGENTS.md will be regenerated from state.discovery. If the Commands/Code Style/Project Structure/MCPs sections look flat, re-run /wf-init phase1 (discovery) before the next refresh."
+fi
 
 # The plan now holds the classified diff; the pre-Builder baseline is no longer
 # needed. (R6's cleanup trap also removes it defensively.)
@@ -1215,10 +1242,7 @@ echo "  Deleted: $APPROVE_DELETED"
 echo "  Deleted-modified: $APPROVE_DELETED_MODIFIED"
 echo "  Gitignore: $APPROVE_GITIGNORE"
 echo ""
-echo "¿Aplicar estos cambios aprobados y continuar a Phase R6 (commit)? [y/n] "
-read -r -n 1 CONFIRM
-echo
-if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
+if _ask_yesno_safe "Aplicar estos cambios aprobados y continuar a Phase R6 (commit)?" cancel; then
   echo "✓ Procediendo a Phase R6..."
 else
   echo "✗ Refresh cancelado por el usuario. No se aplicaron cambios."
@@ -1457,7 +1481,7 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
   if [ -s "$COMMIT_PATHS" ]; then
     # Commit message via temp file to avoid nested heredoc parsing issues (zsh/bash)
     COMMIT_MSG_FILE=$(mktemp)
-    cat > "$COMMIT_MSG_FILE" <<'MSG_EOF'
+    cat > "$COMMIT_MSG_FILE" <<MSG_EOF
 chore: refresh workflow to v$TARGET_VERSION
 
 - Updated AGENTS.md with new project info
