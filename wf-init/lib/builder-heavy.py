@@ -20,6 +20,7 @@ import json
 import os
 import re
 import sys
+import textwrap
 import urllib.request
 
 # Reuse helpers from builder-core (same WF_DIR install).
@@ -220,6 +221,8 @@ def write_testing_configs(raw, state, staging):
         frag = builder_core.strip_prose_header(frag)
         threshold = builder_core.get_state_value(state, "testing.coverage_threshold", "80")
         frag = frag.replace("{{threshold}}", str(threshold))
+        # Indent the fragment to sit inside the test: { } block (F11).
+        frag = textwrap.indent(frag, "    ")
         cfg = cfg.replace("test: {\n", "test: {\n" + frag + "\n")
         target = os.path.join(staging, "vitest.config.ts")
         with open(target, "w", encoding="utf-8") as fh:
@@ -234,7 +237,9 @@ def write_testing_configs(raw, state, staging):
         frag = builder_core.fetch_with_retries(
             builder_core.base_url(raw, "templates/protocols/testing/visual-snapshots.tmpl.md"))
         frag = builder_core.strip_prose_header(frag)
-        # Insert before the final closing brace of defineConfig.
+        # Insert before the final closing brace of defineConfig, indented to
+        # match the surrounding defineConfig block (F11).
+        frag = textwrap.indent(frag, "  ")
         cfg = cfg.rstrip()
         if cfg.endswith("})"):
             cfg = cfg[: -2] + frag + "\n})"
@@ -428,7 +433,11 @@ def write_cicd(raw, state, staging):
         rel = builder_core.strip_prose_header(rel)
         rel = builder_core.resolve_gh_escapes(rel)
         if ci.get("release_ai_summary", True):
-            ai_sum = builder_core.fetch_with_retries(builder_core.base_url(raw, "templates/protocols/cicd/variants/ai-summary-job.claude.yml.md"))
+            provider = ci.get("release_ai_provider", "claude")
+            if provider not in ("claude", "gemini", "openai"):
+                provider = "claude"
+            ai_url = builder_core.base_url(raw, "templates/protocols/cicd/variants/ai-summary-job.%s.yml.md" % provider)
+            ai_sum = builder_core.fetch_with_retries(ai_url)
             ai_sum = builder_core.extract_block(ai_sum, "yaml")
             rel = rel.replace("  # {{AI_SUMMARY_JOB}}", ai_sum)
         else:
@@ -559,7 +568,7 @@ def main(argv=None):
 
     state = builder_core.load_state(args.state)
     staging = args.staging
-    raw = args.raw
+    raw = os.environ.get("WF_BUILDER_RAW", args.raw)
     wf_dir = args.wf_dir
     os.makedirs(staging, exist_ok=True)
 
