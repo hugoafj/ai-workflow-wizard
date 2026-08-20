@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.7-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.6-beta.1...v0.8.7-beta.1) (2026-08-20)
+
+
+### Bug Fixes
+
+* **wf-refresh:** builder determinism, non-interactive gates, sdd-new regeneration and R1 backfill ([#100](https://github.com/hugoafj/ai-workflow-wizard/issues/100)) ([b5f4c11](https://github.com/hugoafj/ai-workflow-wizard/commit/b5f4c111eb7b82f75fc73adbe750b8aa4fdc4a96))
+
 ## [0.8.6-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.5-beta.1...v0.8.6-beta.1) (2026-08-19)
 
 
