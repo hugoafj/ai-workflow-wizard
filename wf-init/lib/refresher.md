@@ -63,6 +63,8 @@ if ! command -v wf_sha256 >/dev/null 2>&1; then
 fi
 
 # Fallback version fetcher if the shared helper is unavailable.
+# NEVER fall back to a hardcoded version: an unknown remote version must
+# surface as empty so the caller can abort instead of silently continuing.
 if ! command -v wf_fetch_version >/dev/null 2>&1; then
   wf_fetch_version() {
     local version=""
@@ -76,13 +78,10 @@ if ! command -v wf_fetch_version >/dev/null 2>&1; then
     if [[ -z "$version" ]]; then
       version=$(curl -fsSL "https://api.github.com/repos/${WIZARD_REPO}/tags?per_page=1" 2>/dev/null | jq -r '.[0].name // empty' 2>/dev/null || true)
     fi
-    if [[ -z "$version" ]]; then
-      version="0.7.1-beta.1"
-    fi
     # Strip a leading 'v' BEFORE the emptiness check: VERSION="v" alone would
     # otherwise pass the -z check and printf an empty string.
     version="${version#v}"
-    printf '%s' "${version:-0.7.1-beta.1}"
+    printf '%s' "$version"
   }
 fi
 
@@ -202,9 +201,15 @@ version_lt() {
 # Ask a yes/no question safely in BOTH tty and non-tty (agent-driven) contexts.
 # In an interactive tty it prompts like a normal read -n 1. When stdin is EOF or
 # not a tty (agent run), a bare `read` would fail under `set -e` and abort the
-# script. In that case, respect WF_REFRESH_DEFAULT_ANSWER ("yes" or "no") if
-# it is set; otherwise fail loudly instead of silently defaulting to NO.
-# A leftover newline from piped stdin is treated like EOF, not a silent NO.
+# script. In that case, resolution order is:
+#   1. WF_REFRESH_ANSWERS — per-question answers, "prompt=answer" pairs joined
+#      by "|" (prompts never contain "|" or "="). The match is exact on the
+#      prompt string.
+#   2. WF_REFRESH_DEFAULT_ANSWER ("yes" or "no") — global fallback.
+#   3. The "cancel" second argument: treat the empty/garbage reply as NO
+#      (return 1) instead of aborting.
+# If none of these applies, fail loudly (exit 2) instead of silently defaulting
+# to NO. A leftover newline from piped stdin is treated like EOF, not a silent NO.
 # Optional second argument "cancel": in non-tty mode without a default answer,
 # treat the empty/garbage reply as NO (return 1) instead of aborting with
 # exit 2. Used by the final R6 commit gate so an agent-driven run can decline
@@ -227,6 +232,20 @@ _ask_yesno_safe() {
     elif [[ "$reply" =~ ^[Nn]$ ]]; then
       return 1
     fi
+    # Per-question answer first (exact prompt match), then the global default.
+    local pq
+    pq=$(_wf_answers_get "$prompt")
+    if [ -n "$pq" ]; then
+      echo "(non-interactive — WF_REFRESH_ANSWERS[$prompt]=$pq)"
+      if [[ "$pq" =~ ^[Yy](es)?$ ]]; then
+        return 0
+      elif [[ "$pq" =~ ^[Nn](o)?$ ]]; then
+        return 1
+      else
+        echo "ERROR: WF_REFRESH_ANSWERS value for '$prompt' is '$pq'; expected yes/no." >&2
+        exit 2
+      fi
+    fi
     # Non-tty with an empty/garbage reply (e.g. a leftover newline): use
     # WF_REFRESH_DEFAULT_ANSWER or fail loudly instead of a silent NO.
     if [ "${WF_REFRESH_DEFAULT_ANSWER:-}" = "yes" ]; then
@@ -236,11 +255,11 @@ _ask_yesno_safe() {
       echo "(non-interactive — using WF_REFRESH_DEFAULT_ANSWER=no)"
       return 1
     elif [ "$cancel_on_empty" = "cancel" ]; then
-      echo "(non-interactive — no WF_REFRESH_DEFAULT_ANSWER; treating as NO)"
+      echo "(non-interactive — no WF_REFRESH_ANSWERS/WF_REFRESH_DEFAULT_ANSWER; treating as NO)"
       return 1
     else
-      echo "ERROR: non-interactive input required but WF_REFRESH_DEFAULT_ANSWER is not set." >&2
-      echo "  Aborting: refusing to silently default to NO. Set WF_REFRESH_DEFAULT_ANSWER=yes|no to continue non-interactively." >&2
+      echo "ERROR: non-interactive input required but WF_REFRESH_ANSWERS has no entry for '$prompt' and WF_REFRESH_DEFAULT_ANSWER is not set." >&2
+      echo "  Aborting: refusing to silently default to NO. Set WF_REFRESH_ANSWERS='$prompt=yes|...' or WF_REFRESH_DEFAULT_ANSWER=yes|no to continue non-interactively." >&2
       exit 2
     fi
   fi
@@ -250,6 +269,22 @@ _ask_yesno_safe() {
   else
     return 1
   fi
+}
+
+# Look up a per-question answer from WF_REFRESH_ANSWERS (format:
+# "prompt=yes|prompt=no|..."). Exact prompt match; empty when absent.
+_wf_answers_get() {
+  local wanted="$1"
+  local pair
+  [ -n "${WF_REFRESH_ANSWERS:-}" ] || return 0
+  IFS='|' read -r -a _wf_answers_pairs <<< "$WF_REFRESH_ANSWERS"
+  for pair in "${_wf_answers_pairs[@]}"; do
+    if [[ "$pair" == "$wanted="* ]]; then
+      printf '%s' "${pair#*=}"
+      return 0
+    fi
+  done
+  printf ''
 }
 
 # Ask a yes/no question. Returns 0 for yes, 1 for no.
@@ -481,9 +516,7 @@ reinsert_legacy_bridge() {
     fi
     {
       head -n "$TITLE_LINE" "$TARGET"
-      printf '%s\n' "<!-- WF: DO NOT REGENERATE -->"
       cat "$RULE_FILE"
-      printf '\n%s\n' "<!-- /WF: DO NOT REGENERATE -->"
       tail -n +$((TITLE_LINE + 1)) "$TARGET"
     } > "$TARGET.tmp"
     mv "$TARGET.tmp" "$TARGET"
@@ -534,9 +567,10 @@ REMOTE_VERSION="${REMOTE_VERSION:-$(wf_fetch_version)}"
 REMOTE_VERSION="${REMOTE_VERSION#v}"
 
 if [[ -z "$REMOTE_VERSION" ]]; then
-  echo "⚠ Could not fetch remote version (network issue?)"
-  echo "  Continuing with local version: $LOCAL_VERSION"
-  exit 0
+  echo "✗ Could not fetch the remote wizard version (network issue?)." >&2
+  echo "  Refusing to continue with a stale or hardcoded version." >&2
+  echo "  Re-run /wf-refresh when the network is available. No changes were made." >&2
+  exit 1
 fi
 
 echo "ℹ Remote wizard version: $REMOTE_VERSION"
@@ -700,9 +734,11 @@ OLD_COMMANDS=$(jq -r '.discovery.commands // ""' "$WF_STATE")
 
 # Re-discover the command list from package.json scripts when the state lacks
 # it (refresh must not drop the command list; the builder re-detects too).
+# Detect ALL scripts, not a hardcoded subset: the AGENTS.md Commands section
+# should list every runnable command the project defines.
 COMMANDS="$OLD_COMMANDS"
 if [[ -z "$COMMANDS" && -f package.json ]] && command -v jq >/dev/null 2>&1; then
-  COMMANDS=$(jq -r '[.scripts | keys[] | select(. == "build" or . == "test" or . == "lint" or . == "test:e2e") | "npm run " + .] | join(", ")' package.json 2>/dev/null || true)
+  COMMANDS=$(jq -r '[.scripts | keys[] | "npm run " + .] | join(", ")' package.json 2>/dev/null || true)
 fi
 
 if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || [[ "$OLD_NPM" != "$NPM_MAJOR" ]] || [[ "$OLD_COMMANDS" != "$COMMANDS" ]]; then
@@ -729,6 +765,74 @@ if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || 
   fi
 else
   echo "✓ No project drift detected"
+fi
+
+# --- Backfill richer AGENTS.md sections into staging state (Fix L) ---
+# The builder renders flat state fields to generic fallbacks ("npm run build",
+# "camelCase", "flat", "None configured"). When the current AGENTS.md already
+# carries richer sections for those fields, preserve them into the staging
+# state so a refresh does not flatten the project's own documentation.
+STAGING_DIR=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' "$WF_STATE")
+STAGING_STATE_BF="$STAGING_DIR/wizard-state.json"
+
+if [[ -f AGENTS.md ]]; then
+  # Extract a section body: from "## <header>" to the next "## " or a
+  # WF: DO NOT REGENERATE marker. Trim leading/trailing blank lines only
+  # (interior blank lines are preserved).
+  _wf_section() {
+    awk -v h="$1" '
+      $0 ~ "^## " h "$" { on=1; next }
+      on && /^## / { exit }
+      on && /^<!-- WF: DO NOT REGENERATE -->/ { exit }
+      on { print }
+    ' AGENTS.md | sed -e '/./,$!d' -e :a -e '/^\n*$/{$d;N;ba' -e '}'
+  }
+
+  # 1. discovery.commands (fallback "npm run build")
+  if [[ -z "$(jq -r '.discovery.commands // ""' "$STAGING_STATE_BF" 2>/dev/null)" ]]; then
+    CUR=$(_wf_section "Commands")
+    if [[ -n "$CUR" && "$CUR" != *"npm run build"* ]]; then
+      WF_STATE="$STAGING_STATE_BF" _apply_jq_filter --arg commands "$CUR" '.discovery.commands = $commands'
+      echo "✓ Backfilled discovery.commands from AGENTS.md"
+    fi
+  fi
+
+  # 2. conventions.code_style (fallback "camelCase")
+  if [[ -z "$(jq -r '.discovery.conventions.code_style // ""' "$STAGING_STATE_BF" 2>/dev/null)" ]]; then
+    CUR=$(_wf_section "Code Style & Conventions")
+    if [[ -n "$CUR" && "$CUR" != "camelCase" ]]; then
+      WF_STATE="$STAGING_STATE_BF" _apply_jq_filter --arg cs "$CUR" '.discovery.conventions.code_style = $cs'
+      echo "✓ Backfilled discovery.conventions.code_style from AGENTS.md"
+    fi
+  fi
+
+  # 3. conventions.structure (fallback "flat")
+  if [[ -z "$(jq -r '.discovery.conventions.structure // ""' "$STAGING_STATE_BF" 2>/dev/null)" ]]; then
+    CUR=$(_wf_section "Project Structure")
+    if [[ -n "$CUR" && "$CUR" != "flat" ]]; then
+      WF_STATE="$STAGING_STATE_BF" _apply_jq_filter --arg st "$CUR" '.discovery.conventions.structure = $st'
+      echo "✓ Backfilled discovery.conventions.structure from AGENTS.md"
+    fi
+  fi
+
+  # 4. mcps: parse the markdown table into [{name, active}]
+  if [[ "$(jq -c '.mcps // []' "$STAGING_STATE_BF" 2>/dev/null)" == "[]" ]]; then
+    MCP_JSON=$(_wf_section "Project MCPs" | awk -F'|' '
+      /^\| *[A-Za-z]/ && !/^ *\| *MCP *\|/ && !/^ *\| *[-: ]*\|/ {
+        name=$2; active=$3; gsub(/^ +| +$/, "", name); gsub(/^ +| +$/, "", active)
+        if (name != "") {
+          a = (tolower(active) == "no" || active == "") ? "false" : "true"
+          printf "{\"name\": \"%s\", \"active\": %s},", name, a
+        }
+      }')
+    if [[ -n "$MCP_JSON" ]]; then
+      MCP_JSON="[${MCP_JSON%,}]"
+      if echo "$MCP_JSON" | jq -e 'type == "array"' >/dev/null 2>&1; then
+        WF_STATE="$STAGING_STATE_BF" _apply_jq_filter --argjson mcps "$MCP_JSON" '.mcps = $mcps'
+        echo "✓ Backfilled mcps from AGENTS.md table"
+      fi
+    fi
+  fi
 fi
 
 echo "✓ Phase R1 complete"
@@ -888,6 +992,32 @@ if [[ -f AGENTS.md ]] && [[ -f "$STAGING/AGENTS.md" ]]; then
 fi
 reinsert_legacy_bridge "$STAGING"
 
+# Windsurf workflow setup (if applicable): /wf-init Phase 5 generates
+# .windsurf/workflows/sdd-new.md at init time. Re-run the same substitution
+# here so a refresh keeps it in sync with the current state (backend/project).
+# Runs BEFORE the EXPECTED[] check below, which requires the file to exist.
+IDES=$(jq -r '.answers.ides[]?' "$STAGING_STATE" 2>/dev/null)
+if echo "$IDES" | grep -q "windsurf"; then
+  if [[ -f "$WF_DIR/temp-files/sdd-new.md" ]]; then
+    SDD_BACKEND=$(jq -r '.sdd.backend // "hybrid"' "$STAGING_STATE")
+    PROJECT_NAME=$(jq -r '.answers.project_name' "$STAGING_STATE")
+    SDD_PATH="$SDD_BACKEND"
+    [ "$SDD_BACKEND" = "hybrid" ] && SDD_PATH="openspec"
+    mkdir -p "$STAGING/.windsurf/workflows"
+    cp "$WF_DIR/temp-files/sdd-new.md" "$STAGING/.windsurf/workflows/sdd-new.md"
+    if [ "$SDD_BACKEND" = "engram" ]; then
+      sed -i.bak "s|{{sdd.backend}}/changes/<name>/proposal.md|Engram memory:|g" "$STAGING/.windsurf/workflows/sdd-new.md"
+    else
+      sed -i.bak "s|{{sdd.backend}}/changes/|$SDD_PATH/changes/|g" "$STAGING/.windsurf/workflows/sdd-new.md"
+    fi
+    sed -i.bak "s/{{sdd.backend}}/$SDD_BACKEND/g" "$STAGING/.windsurf/workflows/sdd-new.md"
+    sed -i.bak "s|{project}|$PROJECT_NAME|g" "$STAGING/.windsurf/workflows/sdd-new.md"
+    rm -f "$STAGING/.windsurf/workflows/sdd-new.md.bak"
+  else
+    echo "⚠ $WF_DIR/temp-files/sdd-new.md not found; skipping .windsurf/workflows/sdd-new.md regeneration"
+  fi
+fi
+
 # Dynamic EXPECTED[] validation: every artifact the features imply must exist in
 # staging. A missing file means Builder-Core or Builder-Heavy did not run fully.
 EXPECTED=()
@@ -906,7 +1036,7 @@ for IDE in $IDES; do
     claude-code) EXPECTED+=(.claude/commands/wf-worktree.md .claude/commands/wf-settings.md .claude/commands/wf-onboard.md) ;;
     opencode)    EXPECTED+=(.opencode/commands/wf-worktree.md .opencode/commands/wf-settings.md .opencode/commands/wf-onboard.md) ;;
     cursor)      EXPECTED+=(.cursor/commands/wf-worktree.md .cursor/commands/wf-settings.md .cursor/commands/wf-onboard.md) ;;
-    windsurf)    EXPECTED+=(.windsurf/workflows/wf-worktree.md .windsurf/workflows/wf-settings.md .windsurf/workflows/wf-onboard.md) ;;
+    windsurf)    EXPECTED+=(.windsurf/workflows/wf-worktree.md .windsurf/workflows/wf-settings.md .windsurf/workflows/wf-onboard.md .windsurf/workflows/sdd-new.md) ;;
     kiro)        EXPECTED+=(.kiro/steering/wf-worktree.md .kiro/steering/wf-settings.md .kiro/steering/wf-onboard.md) ;;
     vscode-copilot) EXPECTED+=(.github/prompts/wf-worktree.prompt.md .github/prompts/wf-settings.prompt.md .github/prompts/wf-onboard.prompt.md) ;;
     codex)       EXPECTED+=(.codex/commands/wf-worktree.md .codex/commands/wf-settings.md .codex/commands/wf-onboard.md) ;;
@@ -1022,7 +1152,8 @@ DEPRECATED_PATHS=(.windsurf/workflows/wf-cicd.md .windsurf/workflows/wf-cleanup.
                   .codex/commands/wf-cicd.md .codex/commands/wf-cleanup.md .codex/commands/wf-refresh.md .codex/commands/wf-init.md
                   .kiro/steering/wf-cicd.md .kiro/steering/wf-cleanup.md .kiro/steering/wf-refresh.md .kiro/steering/wf-init.md
                   .github/prompts/wf-cicd.prompt.md .github/prompts/wf-cleanup.prompt.md .github/prompts/wf-refresh.prompt.md .github/prompts/wf-init.prompt.md
-                  .agents/protocols/wf-cicd.md .agents/skills/wf-cicd/SKILL.md .agents/skills/wf-cleanup/SKILL.md .agents/skills/wf-refresh/SKILL.md .agents/skills/wf-init/SKILL.md)
+                  .agents/protocols/wf-cicd.md .agents/skills/wf-cicd/SKILL.md .agents/skills/wf-cleanup/SKILL.md .agents/skills/wf-refresh/SKILL.md .agents/skills/wf-init/SKILL.md
+                  .agents/skills/wf-sdd-config/SKILL.md .agents/protocols/wf-sdd-config.md)
 for dp in "${DEPRECATED_PATHS[@]}"; do
   if [ -f "$dp" ] && [ ! -f "$STAGING/$dp" ]; then
     DELETED=$(jq --arg path "$dp" --arg reason "deprecated command" '. += [{"path": $path, "reason": $reason}]' <<< "$DELETED")
@@ -1224,7 +1355,7 @@ if [[ ${#MISSING_GI_LINES[@]} -gt 0 ]]; then
 fi
 
 # Store approvals in staging state
-STAGING_STATE=".wizard-staging/wizard-state.json"
+STAGING_STATE="$STAGING/wizard-state.json"
 jq --argjson added "$APPROVE_ADDED" \
    --argjson updated "$APPROVE_UPDATED" \
    --argjson deleted "$APPROVE_DELETED" \
@@ -1233,7 +1364,7 @@ jq --argjson added "$APPROVE_ADDED" \
    '.build_plan.approval = {added: $added, updated: $updated, deleted: $deleted, deleted_modified: $deleted_modified, gitignore: $gitignore} | .updated_at = (now | todate)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
 mv "$STAGING_STATE.tmp" "$STAGING_STATE"
 
-# Explicit confirmation gate before R6 (Option A: ask user)
+# Explicit confirmation gate before R6: apply+commit, apply without commit, or cancel.
 echo ""
 echo "=== RESUMEN DE APROBACIONES ==="
 echo "  Added: $APPROVE_ADDED"
@@ -1242,12 +1373,47 @@ echo "  Deleted: $APPROVE_DELETED"
 echo "  Deleted-modified: $APPROVE_DELETED_MODIFIED"
 echo "  Gitignore: $APPROVE_GITIGNORE"
 echo ""
-if _ask_yesno_safe "Aplicar estos cambios aprobados y continuar a Phase R6 (commit)?" cancel; then
-  echo "✓ Procediendo a Phase R6..."
+echo "¿Cómo aplicar los cambios aprobados?"
+if [[ ! -t 0 ]]; then
+  # Non-tty (agent-driven): WF_REFRESH_APPLY_MODE must name the choice.
+  case "${WF_REFRESH_APPLY_MODE:-}" in
+    commit) APPLY_CHOICE="1" ;;
+    apply-only) APPLY_CHOICE="2" ;;
+    cancel) APPLY_CHOICE="3" ;;
+    *)
+      echo "ERROR: non-interactive apply gate requires WF_REFRESH_APPLY_MODE=commit|apply-only|cancel." >&2
+      echo "  Aborting: refusing to guess. No changes were applied." >&2
+      exit 2
+      ;;
+  esac
+  echo "(non-interactive — WF_REFRESH_APPLY_MODE=${WF_REFRESH_APPLY_MODE:-})"
 else
-  echo "✗ Refresh cancelado por el usuario. No se aplicaron cambios."
-  exit 0
+  while true; do
+    read -r -p "Opción [1=commit / 2=sin commit / 3=cancelar] (default 1): " APPLY_CHOICE
+    APPLY_CHOICE="${APPLY_CHOICE:-1}"
+    case "$APPLY_CHOICE" in
+      1|2|3) break ;;
+      *) echo "  Opción inválida: '$APPLY_CHOICE' (use 1, 2 o 3)" ;;
+    esac
+  done
 fi
+case "$APPLY_CHOICE" in
+    1)
+      echo "✓ Procediendo a Phase R6 (aplicar + commit)..."
+      ;;
+    2)
+      echo "✓ Modo aplicar-sin-commit: los archivos se copiarán al working tree"
+      echo "  pero NO se creará ningún commit. Revisa y commitea cuando quieras."
+      jq '.build_plan.apply_only = true | .updated_at = (now | todate)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
+      mv "$STAGING_STATE.tmp" "$STAGING_STATE"
+      ;;
+    3)
+      echo "✗ Refresh cancelado por el usuario. No se aplicaron cambios."
+      rm -rf "$STAGING"
+      rm -f "$PLAN" .wizard-refresh-baseline.json
+      exit 0
+      ;;
+esac
 
 echo "✓ Phase R5 complete"
 ```
@@ -1286,6 +1452,8 @@ APPROVE_UPDATED=$(jq -r '.build_plan.approval.updated // false' "$STAGING_STATE"
 APPROVE_DELETED=$(jq -r '.build_plan.approval.deleted // false' "$STAGING_STATE")
 APPROVE_DELETED_MODIFIED=$(jq -r '.build_plan.approval.deleted_modified // false' "$STAGING_STATE")
 APPROVE_GITIGNORE=$(jq -r '.build_plan.approval.gitignore // false' "$STAGING_STATE")
+# Apply-only mode: copy approved files to the working tree but do NOT stage or commit.
+APPLY_ONLY=$(jq -r '.build_plan.apply_only // false' "$STAGING_STATE")
 
 # Preserve custom AGENTS.md sections BEFORE any copy: the project AGENTS.md still
 # holds the user's custom markers here, and the staged AGENTS.md is the freshly
@@ -1344,9 +1512,10 @@ if [[ "$APPROVE_DELETED_MODIFIED" == "true" ]]; then
   echo "✓ Modified-removed files deleted"
 fi
 
-# Git operations (only if any category was approved)
+# Git operations (only if any category was approved). In apply-only mode we still
+# compute the manifest and update state, but we do NOT stage or commit.
 if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ "$APPROVE_DELETED" == "true" ]] || [[ "$APPROVE_DELETED_MODIFIED" == "true" ]] || [[ "$APPROVE_GITIGNORE" == "true" ]]; then
-  echo "ℹ Committing changes..."
+  echo "ℹ $(if [[ "$APPLY_ONLY" == "true" ]]; then echo "Applying changes to the working tree (no commit)"; else echo "Committing changes..."; fi)"
 
   # Recompute generated_files and managed_paths from the approved plan, reading
   # file contents from the project tree (not staging) so hashes reflect the final state.
@@ -1435,6 +1604,9 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
     fi
   fi
 
+  # Stage and commit only when not in apply-only mode (apply-only leaves the
+  # changes unstaged in the working tree for the user to review and commit).
+  if [[ "$APPLY_ONLY" != "true" ]]; then
   # Stage only the paths the user explicitly approved (null-delimited to handle
   # spaces and avoid `git add -A` dragging in unrelated user changes). Do NOT
   # reset the whole index: `git reset --mixed HEAD` would unstage unrelated work
@@ -1510,12 +1682,21 @@ MSG_EOF
   else
     echo "ℹ No approved paths to commit"
   fi
+  else
+    echo "ℹ Apply-only mode: changes left in the working tree (unstaged)."
+    echo "  Review with: git status && git diff"
+  fi
 else
   echo "ℹ No changes approved; skipping commit (no files were written)"
 fi
 
-# Promote staging state to root (single source of truth for next refresh)
+# Promote staging state to root (single source of truth for next refresh).
+# apply_only is a per-run decision: drop it so the promoted state stays clean.
 if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ "$APPROVE_DELETED" == "true" ]] || [[ "$APPROVE_DELETED_MODIFIED" == "true" ]] || [[ "$APPROVE_GITIGNORE" == "true" ]]; then
+  if [[ "$APPLY_ONLY" == "true" ]]; then
+    jq 'del(.build_plan.apply_only)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
+    mv "$STAGING_STATE.tmp" "$STAGING_STATE"
+  fi
   cp "$STAGING_STATE" "$WF_STATE"
   echo "✓ State promoted from staging to root"
 fi
@@ -1523,7 +1704,11 @@ fi
 # Staging and plan are cleaned by the EXIT trap installed above.
 
 echo "✓ Phase R6 complete"
-echo "ℹ Next: git push (when ready)"
+if [[ "$APPLY_ONLY" == "true" ]]; then
+  echo "ℹ Apply-only: revisa los cambios en el working tree y commitea cuando quieras."
+else
+  echo "ℹ Next: git push (when ready)"
+fi
 ```
 
 ---
