@@ -33,6 +33,16 @@ CHANGED_SDD=""
 # `git diff --cached` which sees an empty index immediately post-commit.
 CHANGED=$(git diff-tree --no-commit-id --name-only -r HEAD 2>/dev/null)
 
+# Check if this is a wizard refresh commit
+COMMIT_MSG=$(git log -1 --pretty=%B HEAD 2>/dev/null || true)
+IS_WIZARD_REFRESH=false
+if echo "$COMMIT_MSG" | grep -q "^chore: refresh workflow to v"; then
+  IS_WIZARD_REFRESH=true
+fi
+
+# Wizard-managed config files that should not trigger SDD drift on refresh
+WIZARD_MANAGED_SDD_FILES="vitest.config.ts vitest.config.js playwright.config.ts playwright.config.js"
+
 for f in $REFRESH_FILES; do
   if echo "$CHANGED" | grep -qxF "$f"; then
     CHANGED_REFRESH="$CHANGED_REFRESH $f"
@@ -40,6 +50,12 @@ for f in $REFRESH_FILES; do
 done
 
 for f in $SDD_FILES; do
+  # Skip wizard-managed SDD files on wizard refresh commits (false positive prevention)
+  if [[ "$IS_WIZARD_REFRESH" = "true" ]]; then
+    if echo "$WIZARD_MANAGED_SDD_FILES" | grep -qw "$f"; then
+      continue
+    fi
+  fi
   if echo "$CHANGED" | grep -qxF "$f"; then
     CHANGED_SDD="$CHANGED_SDD $f"
   fi

@@ -473,13 +473,15 @@ def infer_placeholder(state, key):
         # Commands discovered in phase1; re-detect from package.json on refresh.
         commands = get_state_value(state, "discovery.commands", None)
         if commands is not None:
-            return commands if isinstance(commands, str) else ", ".join(commands)
+            return commands if isinstance(commands, str) else "\n".join("- " + c for c in commands)
         detected = detect_package_scripts()
         if detected:
-            _warn_fallback(key, detected)
-            return detected
-        _warn_fallback(key, "npm run build")
-        return "npm run build"
+            # Convert comma-separated to bulleted format
+            bulleted = "\n".join("- " + c.strip() for c in detected.split(","))
+            _warn_fallback(key, bulleted)
+            return bulleted
+        _warn_fallback(key, "- npm run build")
+        return "- npm run build"
 
     if key == "discovery.conventions.code_style":
         # FU3b: Compose code_style from structured conventions fields.

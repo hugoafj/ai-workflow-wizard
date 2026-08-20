@@ -548,6 +548,67 @@ set -e
 WF_DIR="${WF_DIR:-/tmp/wf-refresh-phases}"
 source "${WF_DIR}/lib/refresh-lib.sh"
 
+# FU5: Handle WF_REFRESH_RESUME=1 — skip prompt if answer provided via WF_REFRESH_ANSWERS
+# The prompt "Update global commands?" is matched exactly in _wf_answers_get.
+if [[ "${WF_REFRESH_RESUME:-}" = "1" ]]; then
+  RESUME_ANSWER=$(_wf_answers_get "Update global commands?")
+  if [[ -n "$RESUME_ANSWER" ]]; then
+    echo "ℹ Resuming Phase R-1 with WF_REFRESH_ANSWERS[Update global commands?]=$RESUME_ANSWER"
+    LOCAL_VERSION=""
+    UNIVERSAL_SKILL="$HOME/.agents/skills/wf-refresh/SKILL.md"
+    if [[ -f "$UNIVERSAL_SKILL" ]]; then
+      LOCAL_VERSION=$(sed -n 's/^version: *\([^ ]*\).*/\1/p' "$UNIVERSAL_SKILL" | head -1)
+    fi
+    if [[ -z "$LOCAL_VERSION" ]]; then
+      LOCAL_VERSION=$(jq -r '.wizard_version // empty' "$WF_STATE" 2>/dev/null || true)
+    fi
+    LOCAL_VERSION="${LOCAL_VERSION:-0.7.1-beta.1}"
+    LOCAL_VERSION="${LOCAL_VERSION#v}"
+
+    REMOTE_VERSION=$(curl -fsSL "${WF_RAW}/VERSION" 2>/dev/null | head -1 || true)
+    REMOTE_VERSION="${REMOTE_VERSION:-$(wf_fetch_version)}"
+    REMOTE_VERSION="${REMOTE_VERSION#v}"
+
+    if [[ -z "$REMOTE_VERSION" ]]; then
+      echo "✗ Could not fetch the remote wizard version (network issue?)." >&2
+      echo "  Refusing to continue with a stale or hardcoded version." >&2
+      echo "  Re-run /wf-refresh when the network is available. No changes were made." >&2
+      exit 1
+    fi
+
+    if [[ "$LOCAL_VERSION" == "$REMOTE_VERSION" ]]; then
+      echo "✓ Wizard is up-to-date"
+      exit 0
+    fi
+
+    if version_lt "$LOCAL_VERSION" "$REMOTE_VERSION"; then
+      if [[ "$RESUME_ANSWER" =~ ^[Yy](es)?$ ]]; then
+        echo "⚠ Wizard is outdated (local: $LOCAL_VERSION, remote: $REMOTE_VERSION)"
+        echo "ℹ Running install.sh (from WF_REFRESH_ANSWERS=yes)..."
+        INSTALL_SH="${WF_DIR}/install.sh"
+        if curl -fsSL "${WF_RAW}/install.sh" -o "$INSTALL_SH" 2>/dev/null && [[ -s "$INSTALL_SH" ]]; then
+          if bash "$INSTALL_SH"; then
+            echo "⚠ Global commands updated to $REMOTE_VERSION."
+            echo "  Open a NEW session and re-run /wf-refresh so the updated wizard drives the refresh."
+            exit 0
+          else
+            echo "⚠ install.sh failed; continuing anyway"
+          fi
+        else
+          echo "⚠ Could not download install.sh from ${WF_RAW}/install.sh; skipping update"
+        fi
+      else
+        echo "ℹ Skipping global commands update (from WF_REFRESH_ANSWERS=no)"
+      fi
+    else
+      echo "⚠ Local version is ahead of remote (local: $LOCAL_VERSION, remote: $REMOTE_VERSION)"
+    fi
+    echo "✓ Phase R-1 complete (resumed)"
+    exit 0
+  fi
+  # No answer provided for this prompt, continue to normal interactive/non-interactive logic
+fi
+
 # FU5: Clear pending prompts file at start of fresh run (R-1 is first phase)
 rm -f "${WF_DIR}/.wizard-pending-prompts"
 
@@ -794,6 +855,11 @@ if [[ -f package.json ]] && command -v jq >/dev/null 2>&1; then
   
   if [[ -n "$MERGED_COMMANDS" ]]; then
     COMMANDS="$MERGED_COMMANDS"
+    # Write merged commands (with descriptions) to staging state so Builder uses them
+    STAGING_DIR=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' "$WF_STATE")
+    STAGING_STATE_BF="$STAGING_DIR/wizard-state.json"
+    WF_STATE="$STAGING_STATE_BF" _apply_jq_filter --arg commands "$MERGED_COMMANDS" '.discovery.commands = $commands'
+    echo "✓ Updated discovery.commands with merged descriptions (staging)"
   fi
 fi
 
@@ -1442,6 +1508,22 @@ echo "✓ Phase R4 complete"
 
 Present the grouped diff and collect explicit user approvals for each category. Do NOT proceed to Phase R6 without approval.
 
+### Non-interactive Resume Flow (FU5)
+
+When running in non-interactive mode (no TTY, e.g., CI/CD, agent-driven), `_ask_yesno_safe` cannot prompt the user. Instead, it records pending prompts to `${WF_DIR}/.wizard-pending-prompts` and returns exit code 3. Phase R5 collects all pending prompts from all phases and emits a manifest:
+
+```
+GENTLE_AI_WF_REFRESH_NEEDS=prompt=<prompt1>|prompt=<prompt2>|...|apply_mode=<mode>
+```
+
+To resume:
+1. Read the manifest (from stdout or env var)
+2. Set `WF_REFRESH_ANSWERS` with `prompt=yes|prompt=no|...` pairs (joined by `|`)
+3. Set `WF_REFRESH_APPLY_MODE` to `commit`, `apply-only`, or `cancel`
+4. Re-run with `WF_REFRESH_RESUME=1`
+
+**Important**: Phase R-1 (global commands) also supports resume — if it had a pending prompt, it will consume the answer from `WF_REFRESH_ANSWERS` on resume. All phases share the same manifest/answer mechanism.
+
 ```bash
 #!/bin/bash
 set -e
@@ -1464,14 +1546,14 @@ if [[ "${WF_REFRESH_RESUME:-}" = "1" ]]; then
   echo "ℹ Resuming at R5 (WF_REFRESH_RESUME=1) — staging and plan validated."
 else
   # FU5: Collect pending prompts from all phases and emit manifest if any.
-  local pending_file="${WF_DIR}/.wizard-pending-prompts"
+  pending_file="${WF_DIR}/.wizard-pending-prompts"
   if [[ -f "$pending_file" ]]; then
-    local prompts
+    prompts=()
     mapfile -t prompts < "$pending_file"
     if [[ ${#prompts[@]} -gt 0 ]]; then
       # Build manifest: prompt=<p1>|prompt=<p2>|...|apply_mode=...
-      local manifest=""
-      local apply_mode="${WF_REFRESH_APPLY_MODE:-}"
+      manifest=""
+      apply_mode="${WF_REFRESH_APPLY_MODE:-}"
       for p in "${prompts[@]}"; do
         manifest+="prompt=${p}|"
       done
@@ -1995,10 +2077,19 @@ MSG_EOF
       COMMIT_PATH_ARGS+=("$p")
     done < "$COMMIT_PATHS"
 
+    # FU7: Support WF_REFRESH_SKIP_TESTS to skip husky pre-commit hooks (e.g., npm test)
+    # Useful for CI/automation where tests run separately. Default: run hooks.
+    SKIP_TESTS="${WF_REFRESH_SKIP_TESTS:-false}"
+    COMMIT_FLAGS=""
+    if [[ "$SKIP_TESTS" = "true" ]]; then
+      COMMIT_FLAGS="--no-verify"
+      echo "ℹ Skipping pre-commit hooks (WF_REFRESH_SKIP_TESTS=true)"
+    fi
+
     if git diff --cached --quiet -- "${COMMIT_PATH_ARGS[@]}"; then
       echo "ℹ Approved paths have no staged changes; skipping commit"
     else
-      git commit -m "$COMMIT_MSG" --pathspec-from-file="$COMMIT_PATHS" --pathspec-file-nul
+      git commit $COMMIT_FLAGS -m "$COMMIT_MSG" --pathspec-from-file="$COMMIT_PATHS" --pathspec-file-nul
     fi
   else
     echo "ℹ No approved paths to commit"

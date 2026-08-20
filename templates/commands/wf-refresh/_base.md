@@ -52,6 +52,8 @@ Detects project drift and applies updates safely:
 
 Download the refresh orchestrator and supporting files, then read and execute each phase in `refresher.md` in order. **Do NOT `source` Markdown files** — read them as instructions and execute the fenced bash blocks one at a time.
 
+**CRITICAL**: To avoid heredoc/escaping issues (especially with jq filters containing nested quotes), each phase script MUST be written to a temporary file and executed with `bash /path/to/file.sh` — never executed inline via `bash -c '...'` or heredoc.
+
 ```bash
 #!/bin/bash
 set -e
@@ -125,11 +127,84 @@ if [ "$missing" = true ]; then
 fi
 
 echo "✓ Refresh files downloaded to: ${WF_DIR}"
+
+# Helper: extract a phase from refresher.md and write to executable temp file
+# Usage: _extract_phase "Phase R-1" "phase-r1.sh"
+_extract_phase() {
+  local phase_name="$1"
+  local out_file="$2"
+  local refresher="${WF_DIR}/lib/refresher.md"
+  
+  # Find the phase section and extract the first fenced bash block after it
+  awk -v phase="$phase_name" '
+    $0 ~ "^## " phase "[[:space:]]*$" { in_phase=1; next }
+    in_phase && /^```bash/ { in_block=1; next }
+    in_block && /^```/ { exit }
+    in_block { print }
+  ' "$refresher" > "$out_file"
+  
+  if [[ ! -s "$out_file" ]]; then
+    echo "✗ Failed to extract $phase_name from refresher.md" >&2
+    return 1
+  fi
+  chmod +x "$out_file"
+  return 0
+}
+
+# Execute a phase script with proper error handling
+# Usage: _run_phase "Phase R-1" "phase-r1.sh"
+_run_phase() {
+  local phase_name="$1"
+  local script_file="$2"
+  echo "=== Executing $phase_name ==="
+  if bash "$script_file"; then
+    echo "✓ $phase_name completed"
+    return 0
+  else
+    local exit_code=$?
+    echo "✗ $phase_name failed with exit code $exit_code" >&2
+    return $exit_code
+  fi
+}
 ```
 
-Now read the orchestrator and execute each phase in order:
+Now read the orchestrator and execute each phase in order using the helper functions:
 
-**Next step**: open `${WF_DIR}/lib/refresher.md` and execute the bash blocks under each **Phase** heading in sequence, pausing for user approval at Phase R5.
+```bash
+# Phase R-1: Global command refresh
+_extract_phase "Phase R-1" "${WF_DIR}/phase-r1.sh"
+_run_phase "Phase R-1" "${WF_DIR}/phase-r1.sh" || exit $?
+
+# Phase R0: Project validation
+_extract_phase "Phase R0" "${WF_DIR}/phase-r0.sh"
+_run_phase "Phase R0" "${WF_DIR}/phase-r0.sh" || exit $?
+
+# Phase R1: Project content drift
+_extract_phase "Phase R1" "${WF_DIR}/phase-r1-drift.sh"
+_run_phase "Phase R1" "${WF_DIR}/phase-r1-drift.sh" || exit $?
+
+# Phase R2: State/schema migration
+_extract_phase "Phase R2" "${WF_DIR}/phase-r2.sh"
+_run_phase "Phase R2" "${WF_DIR}/phase-r2.sh" || exit $?
+
+# Phase R3: Build new staging (Step 0 + Builder + validation)
+_extract_phase "Phase R3" "${WF_DIR}/phase-r3.sh"
+_run_phase "Phase R3" "${WF_DIR}/phase-r3.sh" || exit $?
+
+# Phase R4: Diff and plan
+_extract_phase "Phase R4" "${WF_DIR}/phase-r4.sh"
+_run_phase "Phase R4" "${WF_DIR}/phase-r4.sh" || exit $?
+
+# Phase R5: Review gate
+_extract_phase "Phase R5" "${WF_DIR}/phase-r5.sh"
+_run_phase "Phase R5" "${WF_DIR}/phase-r5.sh" || exit $?
+
+# Phase R6: Apply and close
+_extract_phase "Phase R6" "${WF_DIR}/phase-r6.sh"
+_run_phase "Phase R6" "${WF_DIR}/phase-r6.sh" || exit $?
+```
+
+Each phase script is extracted from `refresher.md` and executed as a standalone bash file, avoiding all heredoc/escaping issues.
 
 ---
 
