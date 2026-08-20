@@ -298,8 +298,8 @@ def write_cicd(raw, state, staging):
         qg = builder_core.strip_prose_header(qg, keep_notes=True)
         qg = builder_core.resolve_if_blocks(qg, state, raw)
         qg = builder_core.resolve_gh_escapes(qg)
-        qg = qg.replace("{{node_version}}", str(builder_core.get_state_value(state, "discovery.node_engine", "22")))
-        qg = qg.replace("{{npm_major}}", str(builder_core.get_state_value(state, "discovery.npm_major", "10")))
+        qg = qg.replace("{{node_version}}", str(builder_core._coalesce(state, "discovery.node_engine", "22")))
+        qg = qg.replace("{{npm_major}}", str(builder_core._coalesce(state, "discovery.npm_major", "10")))
         if builder_core.unresolved_placeholders(qg):
             raise ValueError("unresolved placeholders in quality-guard.yml")
         qg_target = os.path.join(staging, ".github", "workflows", "quality-guard.yml")
@@ -487,7 +487,7 @@ def write_cicd(raw, state, staging):
             dep = builder_core.resolve_gh_escapes(dep)
             trigger_event = "tags:\n        - 'v*'" if builder_core.get_state_value(state, "cd.trigger", "tags") == "tags" else "branches:\n        - main"
             php_version = builder_core.get_state_value(state, "discovery.php_version", "8.3")
-            node_version = builder_core.get_state_value(state, "discovery.node_engine", "22")
+            node_version = builder_core._coalesce(state, "discovery.node_engine", "22")
             has_node_assets = "true" if builder_core.get_state_value(state, "cd.stack_detected", "") == "laravel_node" else "false"
             dep = dep.replace("{{trigger_event}}", trigger_event)
             dep = dep.replace("{{php_version}}", str(php_version))
