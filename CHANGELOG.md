@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.8-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.7-beta.1...v0.8.8-beta.1) (2026-08-20)
+
+
+### Bug Fixes
+
+* **wf-refresh:** 7 field-report defects + R2 normalization + doc-sync (FU1–FU7) ([#102](https://github.com/hugoafj/ai-workflow-wizard/issues/102)) ([5482a92](https://github.com/hugoafj/ai-workflow-wizard/commit/5482a92a11c817455cf4c2c5eaae12db3a0aa6e8))
+
 ## [0.8.7-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.6-beta.1...v0.8.7-beta.1) (2026-08-20)
 
 
