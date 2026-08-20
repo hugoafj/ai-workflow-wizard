@@ -61,6 +61,18 @@ def get_state_value(state, dot_path, default=None):
     return node
 
 
+def _coalesce(state, dot_path, default):
+    """
+    Coalesce a state value: returns `default` when the value is missing, null, empty string,
+    or the string "None". This ensures that quality-guard and deploy workflows never
+    render empty/"None" values even before R2 normalization runs.
+    """
+    val = get_state_value(state, dot_path, None)
+    if val is None or val == "" or val == "None":
+        return default
+    return val
+
+
 def stack_key(state):
     """Resolve the stack key with the nested fallback (Bug 2, PR #88)."""
     return get_state_value(state, "discovery.stack.stack_key") or \
@@ -470,7 +482,33 @@ def infer_placeholder(state, key):
         return "npm run build"
 
     if key == "discovery.conventions.code_style":
-        naming = get_state_value(state, "discovery.conventions.naming", None)
+        # FU3b: Compose code_style from structured conventions fields.
+        # When any of naming, components, imports, tests, css, state are present,
+        # emit bullets: "- Naming: <value>", "- Components: <value>", etc.
+        # Fall back to preserving AGENTS.md section verbatim (from R1 backfill)
+        # when ALL structured fields are absent, then to naming, then camelCase.
+        conventions = get_state_value(state, "discovery.conventions", {}) or {}
+        fields = [
+            ("Naming", "naming"),
+            ("Components", "components"),
+            ("Imports", "imports"),
+            ("Tests", "tests"),
+            ("CSS", "css"),
+            ("State", "state"),
+        ]
+        bullets = []
+        for label, field_key in fields:
+            val = conventions.get(field_key)
+            if val:
+                bullets.append("- %s: %s" % (label, val))
+        if bullets:
+            return "\n".join(bullets)
+        # Fallback 1: pre-existing rich code_style from R1 backfill (preserves AGENTS.md section)
+        existing = get_state_value(state, "discovery.conventions.code_style", None)
+        if existing and isinstance(existing, str) and existing not in ("camelCase", "flat", ""):
+            return existing
+        # Fallback 2: naming convention
+        naming = conventions.get("naming")
         if naming:
             return naming
         _warn_fallback(key, "camelCase")
@@ -501,15 +539,48 @@ def infer_placeholder(state, key):
         if not mcps:
             _warn_fallback(key, "None configured")
             return "None configured"
-        rows = []
+        
+        # Deduplicate MCPs by lowercased name (case-insensitive merge).
+        # Keep the entry with purpose/setup if present; otherwise first occurrence.
+        seen = {}
         for mcp in mcps:
             if isinstance(mcp, dict):
                 name = mcp.get("name", "?")
-                active = mcp.get("active", True)
-                rows.append("| %s | %s |" % (name, "yes" if active else "no"))
+                lname = name.lower()
+                if lname not in seen or (not seen[lname].get("purpose") and mcp.get("purpose")):
+                    seen[lname] = mcp
             else:
-                rows.append("| %s | yes |" % str(mcp))
-        return "\n".join(["| MCP | Active |", "|---|---|"] + rows)
+                lname = str(mcp).lower()
+                if lname not in seen:
+                    seen[lname] = mcp
+        deduped = list(seen.values())
+        
+        # Check if any MCP has purpose (3-col table)
+        has_purpose = any(isinstance(m, dict) and m.get("purpose") for m in deduped)
+        
+        if has_purpose:
+            # 3-column table: | MCP | Purpose | Required setup |
+            rows = []
+            for mcp in deduped:
+                if isinstance(mcp, dict):
+                    name = mcp.get("name", "?")
+                    purpose = mcp.get("purpose", "")
+                    setup = mcp.get("setup", "")
+                    rows.append("| %s | %s | %s |" % (name, purpose, setup))
+                else:
+                    rows.append("| %s | | |" % str(mcp))
+            return "\n".join(["| MCP | Purpose | Required setup |", "|---|---|---|"] + rows)
+        else:
+            # 2-column fallback: | MCP | Active |
+            rows = []
+            for mcp in deduped:
+                if isinstance(mcp, dict):
+                    name = mcp.get("name", "?")
+                    active = mcp.get("active", True)
+                    rows.append("| %s | %s |" % (name, "yes" if active else "no"))
+                else:
+                    rows.append("| %s | yes |" % str(mcp))
+            return "\n".join(["| MCP | Active |", "|---|---|"] + rows)
 
     return None
 

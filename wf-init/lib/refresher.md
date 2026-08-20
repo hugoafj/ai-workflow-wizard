@@ -208,12 +208,11 @@ version_lt() {
 #   2. WF_REFRESH_DEFAULT_ANSWER ("yes" or "no") — global fallback.
 #   3. The "cancel" second argument: treat the empty/garbage reply as NO
 #      (return 1) instead of aborting.
-# If none of these applies, fail loudly (exit 2) instead of silently defaulting
-# to NO. A leftover newline from piped stdin is treated like EOF, not a silent NO.
+# If none of these applies in non-tty mode, record the pending prompt in a
+# manifest file and return 3 (distinct from abort 2 and success 0/no 1).
+# The R5 gate will collect ALL pending prompts and emit GENTLE_AI_WF_REFRESH_NEEDS.
 # Optional second argument "cancel": in non-tty mode without a default answer,
-# treat the empty/garbage reply as NO (return 1) instead of aborting with
-# exit 2. Used by the final R6 commit gate so an agent-driven run can decline
-# the commit cleanly instead of killing the whole refresh.
+# treat the empty/garbage reply as NO (return 1) instead of aborting.
 _ask_yesno_safe() {
   local prompt="$1"
   local cancel_on_empty="${2:-}"
@@ -247,7 +246,7 @@ _ask_yesno_safe() {
       fi
     fi
     # Non-tty with an empty/garbage reply (e.g. a leftover newline): use
-    # WF_REFRESH_DEFAULT_ANSWER or fail loudly instead of a silent NO.
+    # WF_REFRESH_DEFAULT_ANSWER or record as pending instead of failing.
     if [ "${WF_REFRESH_DEFAULT_ANSWER:-}" = "yes" ]; then
       echo "(non-interactive — using WF_REFRESH_DEFAULT_ANSWER=yes)"
       return 0
@@ -258,9 +257,11 @@ _ask_yesno_safe() {
       echo "(non-interactive — no WF_REFRESH_ANSWERS/WF_REFRESH_DEFAULT_ANSWER; treating as NO)"
       return 1
     else
-      echo "ERROR: non-interactive input required but WF_REFRESH_ANSWERS has no entry for '$prompt' and WF_REFRESH_DEFAULT_ANSWER is not set." >&2
-      echo "  Aborting: refusing to silently default to NO. Set WF_REFRESH_ANSWERS='$prompt=yes|...' or WF_REFRESH_DEFAULT_ANSWER=yes|no to continue non-interactively." >&2
-      exit 2
+      # FU5: Record pending prompt for manifest instead of aborting.
+      local pending_file="${WF_DIR}/.wizard-pending-prompts"
+      echo "$prompt" >> "$pending_file"
+      echo "(non-interactive — prompt recorded for manifest: '$prompt')"
+      return 3
     fi
   fi
   # TTY: any non-y/n reply is NO (interactive users can simply re-run).
@@ -547,6 +548,9 @@ set -e
 WF_DIR="${WF_DIR:-/tmp/wf-refresh-phases}"
 source "${WF_DIR}/lib/refresh-lib.sh"
 
+# FU5: Clear pending prompts file at start of fresh run (R-1 is first phase)
+rm -f "${WF_DIR}/.wizard-pending-prompts"
+
 LOCAL_VERSION=""
 # install.sh SIEMPRE instala en .agents/skills/ (unconditional fallback universal)
 UNIVERSAL_SKILL="$HOME/.agents/skills/wf-refresh/SKILL.md"
@@ -732,13 +736,193 @@ OLD_NODE=$(jq -r '.discovery.node_engine // ""' "$WF_STATE")
 OLD_NPM=$(jq -r '.discovery.npm_major // ""' "$WF_STATE")
 OLD_COMMANDS=$(jq -r '.discovery.commands // ""' "$WF_STATE")
 
-# Re-discover the command list from package.json scripts when the state lacks
-# it (refresh must not drop the command list; the builder re-detects too).
-# Detect ALL scripts, not a hardcoded subset: the AGENTS.md Commands section
-# should list every runnable command the project defines.
-COMMANDS="$OLD_COMMANDS"
-if [[ -z "$COMMANDS" && -f package.json ]] && command -v jq >/dev/null 2>&1; then
+# Always re-detect the full script list from package.json on every refresh.
+# FU2: The old behavior only detected when state lacked commands; now we always
+# re-detect so stale partial lists are replaced by the fresh full list.
+# OLD_COMMANDS is fallback only when package.json is missing or jq fails.
+COMMANDS=""
+if [[ -f package.json ]] && command -v jq >/dev/null 2>&1; then
   COMMANDS=$(jq -r '[.scripts | keys[] | "npm run " + .] | join(", ")' package.json 2>/dev/null || true)
+fi
+if [[ -z "$COMMANDS" ]]; then
+  COMMANDS="$OLD_COMMANDS"
+fi
+
+# FU3a: Parse AGENTS.md Commands section into name->description map and emit merged bullets.
+# The builder renders discovery.commands verbatim, so we write the bulleted list to state.
+# This runs unconditionally when package.json exists and we have script names.
+if [[ -f package.json ]] && command -v jq >/dev/null 2>&1; then
+  # Extract fresh script names from package.json (without "npm run " prefix for matching)
+  SCRIPT_NAMES=$(jq -r '.scripts | keys[]' package.json 2>/dev/null || true)
+  
+  # Parse current AGENTS.md Commands section for descriptions (if AGENTS.md exists)
+  declare -A CMD_DESC
+  if [[ -f AGENTS.md ]]; then
+    # Use awk to extract the Commands section and parse bullets/lines
+    # Formats supported:
+    #   - npm run <name> — <description>
+    #   - npm run <name> - <description>
+    #   - npm run <name>  (no description)
+    #   <name> — <description>
+    while IFS= read -r line; do
+      # Match patterns like "npm run <name> — <desc>" or "<name> — <desc>" or "- npm run <name> — <desc>"
+      if [[ "$line" =~ ^[[:space:]]*[-*]?[[:space:]]*(npm[[:space:]]+run[[:space:]]+)?([^[:space:]:—-]+)[[:space:]]*[—-][[:space:]]*(.+)$ ]]; then
+        name="${BASH_REMATCH[2]}"
+        desc="${BASH_REMATCH[3]}"
+        CMD_DESC["$name"]="$desc"
+      elif [[ "$line" =~ ^[[:space:]]*[-*]?[[:space:]]*(npm[[:space:]]+run[[:space:]]+)?([^[:space:]:—-]+)[[:space:]]*$ ]]; then
+        name="${BASH_REMATCH[2]}"
+        CMD_DESC["$name"]=""
+      fi
+    done < <(_wf_section "Commands")
+  fi
+  
+  # Emit merged bullets: - npm run <name> — <description> (description omitted when unknown)
+  MERGED_COMMANDS=""
+  while IFS= read -r script; do
+    [[ -z "$script" ]] && continue
+    desc="${CMD_DESC[$script]:-}"
+    if [[ -n "$desc" ]]; then
+      MERGED_COMMANDS+="- npm run $script — $desc"$'\n'
+    else
+      MERGED_COMMANDS+="- npm run $script"$'\n'
+    fi
+  done <<< "$SCRIPT_NAMES"
+  
+  # Remove trailing newline
+  MERGED_COMMANDS="${MERGED_COMMANDS%$'\n'}"
+  
+  if [[ -n "$MERGED_COMMANDS" ]]; then
+    COMMANDS="$MERGED_COMMANDS"
+  fi
+fi
+
+# FU3c: Regenerate Project Structure from live tree and merge comments from AGENTS.md
+# Deterministic find: depth 2, exclude node_modules/.git/dist/.wizard-*
+LIVE_STRUCTURE=$(find . -mindepth 1 -maxdepth 2 -type d \
+  -not -path "./node_modules/*" \
+  -not -path "./.git/*" \
+  -not -path "./dist/*" \
+  -not -path "./.wizard-*" \
+  -not -path "./.wizard-*" \
+  2>/dev/null | sed 's|^\./||' | sort)
+
+if [[ -n "$LIVE_STRUCTURE" ]]; then
+  # Parse old AGENTS.md Project Structure for comments (path -> comment)
+  declare -A STRUCT_COMMENTS
+  if [[ -f AGENTS.md ]]; then
+    # Extract lines like "src/ — single source of truth" or "templates/  # single source of truth"
+    while IFS= read -r line; do
+      # Match patterns: "path/ — comment" or "path/  # comment" or "path/ -- comment"
+      if [[ "$line" =~ ^[[:space:]]*[-*]?[[:space:]]*([^[:space:]:#—-]+/)[[:space:]]*[—-#][[:space:]]*(.+)$ ]]; then
+        path="${BASH_REMATCH[1]}"
+        comment="${BASH_REMATCH[2]}"
+        STRUCT_COMMENTS["$path"]="$comment"
+      elif [[ "$line" =~ ^[[:space:]]*[-*]?[[:space:]]*([^[:space:]:#—-]+/)[[:space:]]*$ ]]; then
+        path="${BASH_REMATCH[1]}"
+        STRUCT_COMMENTS["$path"]=""
+      fi
+    done < <(_wf_section "Project Structure")
+  fi
+  
+  # Merge: live tree paths with comments from old structure where path matches exactly
+  MERGED_STRUCTURE=""
+  while IFS= read -r path; do
+    [[ -z "$path" ]] && continue
+    comment="${STRUCT_COMMENTS[$path]:-}"
+    if [[ -n "$comment" ]]; then
+      MERGED_STRUCTURE+="$path — $comment"$'\n'
+    else
+      MERGED_STRUCTURE+="$path"$'\n'
+    fi
+  done <<< "$LIVE_STRUCTURE"
+  
+  MERGED_STRUCTURE="${MERGED_STRUCTURE%$'\n'}"
+  
+  if [[ -n "$MERGED_STRUCTURE" ]]; then
+    STAGING_DIR=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' "$WF_STATE")
+    STAGING_STATE_BF="$STAGING_DIR/wizard-state.json"
+    WF_STATE="$STAGING_STATE_BF" _apply_jq_filter --arg st "$MERGED_STRUCTURE" '.discovery.conventions.structure = $st'
+    echo "✓ Regenerated structure from live tree with merged comments"
+  fi
+fi
+
+# FU3d: Re-detect MCPs from config files and merge purpose/setup from AGENTS.md
+# Known MCP config locations
+MCP_CONFIGS=(".mcp.json" ".cursor/mcp.json" ".windsurf/mcp.json")
+DETECTED_MCPS=()
+for mcp_config in "${MCP_CONFIGS[@]}"; do
+  if [[ -f "$mcp_config" ]] && command -v jq >/dev/null 2>&1; then
+    # Extract MCP names from config (assuming format like { "mcpServers": { "name": {...} } })
+    names=$(jq -r '.mcpServers | keys[]?' "$mcp_config" 2>/dev/null || true)
+    if [[ -n "$names" ]]; then
+      while IFS= read -r name; do
+        [[ -n "$name" ]] && DETECTED_MCPS+=("$name")
+      done <<< "$names"
+    fi
+  fi
+done
+# Also check .github/copilot-instructions.md for MCP hints
+if [[ -f ".github/copilot-instructions.md" ]]; then
+  # Extract MCP names mentioned in the file (simple grep for known MCP names)
+  known_mcps=("engrag" "context7" "playwright" "github" "supabase" "postgres" "stripe" "octokit")
+  for known in "${known_mcps[@]}"; do
+    if grep -qi "$known" ".github/copilot-instructions.md" 2>/dev/null; then
+      DETECTED_MCPS+=("$known")
+    fi
+  done
+fi
+# Deduplicate
+if [[ ${#DETECTED_MCPS[@]} -gt 0 ]]; then
+  IFS=$'\n' DETECTED_MCPS=($(sort -u <<< "${DETECTED_MCPS[*]}"))
+fi
+
+# Parse old AGENTS.md MCP table for purpose/setup (3-col: | MCP | Purpose | Required setup |)
+declare -A MCP_PURPOSE
+declare -A MCP_SETUP
+if [[ -f AGENTS.md ]]; then
+  while IFS= read -r line; do
+    # Match 3-col table rows: | name | purpose | setup |
+    if [[ "$line" =~ ^\|[[:space:]]*([^|]+)[[:space:]]*\|[[:space:]]*([^|]+)[[:space:]]*\|[[:space:]]*([^|]+)[[:space:]]*\|$ ]]; then
+      name="${BASH_REMATCH[1]}"
+      purpose="${BASH_REMATCH[2]}"
+      setup="${BASH_REMATCH[3]}"
+      # Trim whitespace
+      name=$(echo "$name" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+      purpose=$(echo "$purpose" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+      setup=$(echo "$setup" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+      # Skip header and separator rows
+      if [[ "$name" != "MCP" && "$name" != "---" && "$name" != "" ]]; then
+        MCP_PURPOSE["$name"]="$purpose"
+        MCP_SETUP["$name"]="$setup"
+      fi
+    fi
+  done < <(_wf_section "Project MCPs")
+fi
+
+# Build merged mcps array with purpose/setup
+if [[ ${#DETECTED_MCPS[@]} -gt 0 ]]; then
+  MCP_JSON=""
+  for name in "${DETECTED_MCPS[@]}"; do
+    purpose="${MCP_PURPOSE[$name]:-}"
+    setup="${MCP_SETUP[$name]:-}"
+    if [[ -n "$purpose" || -n "$setup" ]]; then
+      # Escape JSON strings
+      p_escaped=$(printf '%s' "$purpose" | jq -Rs .)
+      s_escaped=$(printf '%s' "$setup" | jq -Rs .)
+      MCP_JSON+="{\"name\": \"$name\", \"active\": true, \"purpose\": $p_escaped, \"setup\": $s_escaped},"
+    else
+      MCP_JSON+="{\"name\": \"$name\", \"active\": true},"
+    fi
+  done
+  MCP_JSON="[${MCP_JSON%,}]"
+  
+  if echo "$MCP_JSON" | jq -e 'type == "array"' >/dev/null 2>&1; then
+    STAGING_DIR=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' "$WF_STATE")
+    STAGING_STATE_BF="$STAGING_DIR/wizard-state.json"
+    WF_STATE="$STAGING_STATE_BF" _apply_jq_filter --argjson mcps "$MCP_JSON" '.mcps = $mcps'
+    echo "✓ Re-detected MCPs from configs with merged purpose/setup"
+  fi
 fi
 
 if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || [[ "$OLD_NPM" != "$NPM_MAJOR" ]] || [[ "$OLD_COMMANDS" != "$COMMANDS" ]]; then
@@ -751,14 +935,22 @@ if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || 
   if _ask_yesno_safe "Use updated project info?"; then
     # Write the drift to the STAGING state, not root: R6 promotes staging to
     # root at the end, so a root-only write would be silently clobbered.
+    # Only write non-empty node_engine/npm_major to avoid clobbering good values with empty discovery results.
     STAGING_DIR=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' "$WF_STATE")
+    JQ_FILTER='.discovery.stack.stack_key = $stack_key | .discovery.git_commits = $git_commits | .discovery.commands = $commands'
+    if [[ -n "$NODE_ENGINE" ]]; then
+      JQ_FILTER="$JQ_FILTER | .discovery.node_engine = \$node_engine"
+    fi
+    if [[ -n "$NPM_MAJOR" ]]; then
+      JQ_FILTER="$JQ_FILTER | .discovery.npm_major = \$npm_major"
+    fi
     WF_STATE="$STAGING_DIR/wizard-state.json" _apply_jq_filter \
       --arg stack_key "$STACK_KEY" \
       --arg node_engine "$NODE_ENGINE" \
       --arg npm_major "$NPM_MAJOR" \
       --argjson git_commits "$GIT_COMMITS" \
       --arg commands "$COMMANDS" \
-      '.discovery.stack.stack_key = $stack_key | .discovery.node_engine = $node_engine | .discovery.npm_major = $npm_major | .discovery.git_commits = $git_commits | .discovery.commands = $commands'
+      "$JQ_FILTER"
     echo "✓ Updated discovery fields (staging)"
   else
     echo "ℹ Keeping existing discovery fields"
@@ -878,6 +1070,18 @@ WF_STATE="$STAGING_STATE" _apply_jq_filter '
   .discovery.stack //= {} |
   .discovery.stack.stack_key = (.discovery.stack.stack_key // .discovery.stack_key) |
   del(.discovery.stack_key)
+'
+
+# R2 normalization (FU9): normalize corrupted node_engine/npm_major values.
+# Values of "None" or "" become null so the builder defaults ("22"/"10") apply.
+# Runs unconditionally and idempotently on every refresh.
+WF_STATE="$STAGING_STATE" _apply_jq_filter '
+  if .discovery.node_engine == "None" or .discovery.node_engine == "" then
+    .discovery.node_engine = null
+  else . end |
+  if .discovery.npm_major == "None" or .discovery.npm_major == "" then
+    .discovery.npm_major = null
+  else . end
 '
 
 # Ask about new optional protocol features that are not present in the local
@@ -1078,20 +1282,33 @@ DELETED_MODIFIED="[]"
 UNCHANGED="[]"
 
 # Scan staging files (null-delimited: paths with spaces are safe)
-while IFS= read -r -d '' file; do
-  REL_PATH="${file#$STAGING/}"
-  STAGING_HASH=$(wf_sha256 "$file")
+  while IFS= read -r -d '' file; do
+    REL_PATH="${file#$STAGING/}"
+    STAGING_HASH=$(wf_sha256 "$file")
 
-  if [[ -f "$REL_PATH" ]]; then
-    PROJECT_HASH=$(wf_sha256 "$REL_PATH")
-    if [[ "$STAGING_HASH" == "$PROJECT_HASH" ]]; then
-      UNCHANGED=$(jq --arg path "$REL_PATH" --arg hash "$STAGING_HASH" '. += [{"path": $path, "hash": $hash}]' <<< "$UNCHANGED")
+    if [[ -f "$REL_PATH" ]]; then
+      PROJECT_HASH=$(wf_sha256 "$REL_PATH")
+      if [[ "$STAGING_HASH" == "$PROJECT_HASH" ]]; then
+        UNCHANGED=$(jq --arg path "$REL_PATH" --arg hash "$STAGING_HASH" '. += [{"path": $path, "hash": $hash}]' <<< "$UNCHANGED")
+      else
+        # FU7: Check if the working tree file differs from HEAD (local modifications)
+        local_modified=false
+        if git rev-parse --verify HEAD >/dev/null 2>&1; then
+          if ! git diff --quiet HEAD -- "$REL_PATH" 2>/dev/null; then
+            local_modified=true
+          fi
+        else
+          # No HEAD (non-git or fresh repo): compare against recorded old_hash from baseline
+          OLD_HASH=$(jq -r --arg path "$REL_PATH" '.generated_files[] | select(.path == $path) | .hash' "$OLD_MANAGED" 2>/dev/null || true)
+          if [[ -n "$OLD_HASH" && "$PROJECT_HASH" != "$OLD_HASH" ]]; then
+            local_modified=true
+          fi
+        fi
+        UPDATED=$(jq --arg path "$REL_PATH" --arg old_hash "$PROJECT_HASH" --arg new_hash "$STAGING_HASH" --argjson local_modified "$local_modified" '. += [{"path": $path, "old_hash": $old_hash, "new_hash": $new_hash, "local_modified": $local_modified}]' <<< "$UPDATED")
+      fi
     else
-      UPDATED=$(jq --arg path "$REL_PATH" --arg old_hash "$PROJECT_HASH" --arg new_hash "$STAGING_HASH" '. += [{"path": $path, "old_hash": $old_hash, "new_hash": $new_hash}]' <<< "$UPDATED")
+      ADDED=$(jq --arg path "$REL_PATH" --arg hash "$STAGING_HASH" '. += [{"path": $path, "hash": $hash}]' <<< "$ADDED")
     fi
-  else
-    ADDED=$(jq --arg path "$REL_PATH" --arg hash "$STAGING_HASH" '. += [{"path": $path, "hash": $hash}]' <<< "$ADDED")
-  fi
 # Exclude git-internal files from the plan, with one exception: .git/hooks/post-commit
 # is staged by the builder for non-Husky projects. Git refuses to commit paths inside
 # .git/, but the refresh still must copy/chmod the hook and track it as a managed
@@ -1145,15 +1362,36 @@ rm -f "$OLD_MANAGED"
 # Explicit deprecated-path cleanup (Fix 3): these global-only command artifacts
 # (installed by install.sh, never part of a project) must be removed even when
 # they are NOT in the managed_paths baseline.
-DEPRECATED_PATHS=(.windsurf/workflows/wf-cicd.md .windsurf/workflows/wf-cleanup.md .windsurf/workflows/wf-refresh.md .windsurf/workflows/wf-init.md
-                  .claude/commands/wf-cicd.md .claude/commands/wf-cleanup.md .claude/commands/wf-refresh.md .claude/commands/wf-init.md
-                  .cursor/commands/wf-cicd.md .cursor/commands/wf-cleanup.md .cursor/commands/wf-refresh.md .cursor/commands/wf-init.md
-                  .opencode/commands/wf-cicd.md .opencode/commands/wf-cleanup.md .opencode/commands/wf-refresh.md .opencode/commands/wf-init.md
-                  .codex/commands/wf-cicd.md .codex/commands/wf-cleanup.md .codex/commands/wf-refresh.md .codex/commands/wf-init.md
-                  .kiro/steering/wf-cicd.md .kiro/steering/wf-cleanup.md .kiro/steering/wf-refresh.md .kiro/steering/wf-init.md
-                  .github/prompts/wf-cicd.prompt.md .github/prompts/wf-cleanup.prompt.md .github/prompts/wf-refresh.prompt.md .github/prompts/wf-init.prompt.md
-                  .agents/protocols/wf-cicd.md .agents/skills/wf-cicd/SKILL.md .agents/skills/wf-cleanup/SKILL.md .agents/skills/wf-refresh/SKILL.md .agents/skills/wf-init/SKILL.md
-                  .agents/skills/wf-sdd-config/SKILL.md .agents/protocols/wf-sdd-config.md)
+# FU4: Extended with per-IDE skill dirs for 6 deprecated commands (wf-cicd, wf-cleanup,
+# wf-refresh, wf-init, wf-sdd-config, wf-sdd-lite) across 8 IDE skill roots.
+DEPRECATED_COMMANDS=(wf-cicd wf-cleanup wf-refresh wf-init wf-sdd-config wf-sdd-lite)
+IDE_SKILL_ROOTS=(.claude/skills .cursor/skills .opencode/skills .windsurf/skills .codex/skills .kiro/skills .github/skills)
+# .devin/skills only when windsurf is active (per reinsert_legacy_bridge)
+IDES=$(jq -r '.answers.ides[]?' "$WF_STATE" 2>/dev/null)
+if echo "$IDES" | grep -q "windsurf"; then
+  IDE_SKILL_ROOTS+=(.devin/skills)
+fi
+
+DEPRECATED_PATHS=(
+  # Existing command artifacts (workflows/commands/prompts/protocols)
+  .windsurf/workflows/wf-cicd.md .windsurf/workflows/wf-cleanup.md .windsurf/workflows/wf-refresh.md .windsurf/workflows/wf-init.md
+  .claude/commands/wf-cicd.md .claude/commands/wf-cleanup.md .claude/commands/wf-refresh.md .claude/commands/wf-init.md
+  .cursor/commands/wf-cicd.md .cursor/commands/wf-cleanup.md .cursor/commands/wf-refresh.md .cursor/commands/wf-init.md
+  .opencode/commands/wf-cicd.md .opencode/commands/wf-cleanup.md .opencode/commands/wf-refresh.md .opencode/commands/wf-init.md
+  .codex/commands/wf-cicd.md .codex/commands/wf-cleanup.md .codex/commands/wf-refresh.md .codex/commands/wf-init.md
+  .kiro/steering/wf-cicd.md .kiro/steering/wf-cleanup.md .kiro/steering/wf-refresh.md .kiro/steering/wf-init.md
+  .github/prompts/wf-cicd.prompt.md .github/prompts/wf-cleanup.prompt.md .github/prompts/wf-refresh.prompt.md .github/prompts/wf-init.prompt.md
+  .agents/protocols/wf-cicd.md .agents/skills/wf-cicd/SKILL.md .agents/skills/wf-cleanup/SKILL.md .agents/skills/wf-refresh/SKILL.md .agents/skills/wf-init/SKILL.md
+  .agents/skills/wf-sdd-config/SKILL.md .agents/protocols/wf-sdd-config.md
+  # FU4: Per-IDE skill dirs for 6 deprecated commands
+)
+# Add per-IDE skill paths for all 6 deprecated commands
+for cmd in "${DEPRECATED_COMMANDS[@]}"; do
+  for root in "${IDE_SKILL_ROOTS[@]}"; do
+    DEPRECATED_PATHS+=("$root/$cmd/SKILL.md")
+  done
+done
+
 for dp in "${DEPRECATED_PATHS[@]}"; do
   if [ -f "$dp" ] && [ ! -f "$STAGING/$dp" ]; then
     DELETED=$(jq --arg path "$dp" --arg reason "deprecated command" '. += [{"path": $path, "reason": $reason}]' <<< "$DELETED")
@@ -1213,6 +1451,46 @@ source "${WF_DIR}/lib/refresh-lib.sh"
 
 PLAN="refresh-plan.json"
 STAGING=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' "$WF_STATE")
+
+# FU5: Handle WF_REFRESH_RESUME=1 — skip R-1..R4, re-enter R5 with staging intact.
+# The manifest from a previous non-tty run emitted GENTLE_AI_WF_REFRESH_NEEDS with exit 3.
+# On resume, validate that staging/plan exist and proceed directly to R5 review.
+if [[ "${WF_REFRESH_RESUME:-}" = "1" ]]; then
+  if [[ ! -d "$STAGING" ]] || [[ ! -f "$PLAN" ]]; then
+    echo "ERROR: WF_REFRESH_RESUME=1 but staging ($STAGING) or plan ($PLAN) missing." >&2
+    echo "  Cannot resume — run full /wf-refresh instead." >&2
+    exit 1
+  fi
+  echo "ℹ Resuming at R5 (WF_REFRESH_RESUME=1) — staging and plan validated."
+else
+  # FU5: Collect pending prompts from all phases and emit manifest if any.
+  local pending_file="${WF_DIR}/.wizard-pending-prompts"
+  if [[ -f "$pending_file" ]]; then
+    local prompts
+    mapfile -t prompts < "$pending_file"
+    if [[ ${#prompts[@]} -gt 0 ]]; then
+      # Build manifest: prompt=<p1>|prompt=<p2>|...|apply_mode=...
+      local manifest=""
+      local apply_mode="${WF_REFRESH_APPLY_MODE:-}"
+      for p in "${prompts[@]}"; do
+        manifest+="prompt=${p}|"
+      done
+      if [[ -n "$apply_mode" ]]; then
+        manifest+="apply_mode=${apply_mode}"
+      else
+        manifest="${manifest%|}"  # trim trailing |
+      fi
+      echo "GENTLE_AI_WF_REFRESH_NEEDS=${manifest}"
+      # Clean up pending file for next run
+      rm -f "$pending_file"
+      echo "✗ Non-tty run requires answers for ${#prompts[@]} prompt(s)." >&2
+      echo "  Set WF_REFRESH_ANSWERS or WF_REFRESH_DEFAULT_ANSWER and re-run with WF_REFRESH_RESUME=1." >&2
+      exit 3
+    fi
+    # No pending prompts, clean up
+    rm -f "$pending_file"
+  fi
+fi
 
 echo ""
 echo "=== REFRESH PLAN ==="
@@ -1319,6 +1597,23 @@ if [[ $DELETED_MODIFIED_COUNT -gt 0 ]]; then
   if _ask_yesno_safe "Delete these modified files?"; then APPROVE_DELETED_MODIFIED="true"; fi
 fi
 
+# FU7: Dedicated warning block for locally-modified updated files
+LOCAL_MODIFIED_COUNT=$(jq '[.updated[]? | select(.local_modified == true)] | length' "$PLAN")
+if [[ $LOCAL_MODIFIED_COUNT -gt 0 ]]; then
+  echo ""
+  echo "⚠️  LOCALLY-MODIFIED UPDATED FILES ($LOCAL_MODIFIED_COUNT) — working tree differs from HEAD:"
+  jq -r '.updated[]? | select(.local_modified == true) | "  - \(.path)"' "$PLAN"
+  echo ""
+  echo "These files have uncommitted changes. Overwriting them will lose your local edits."
+  if _ask_yesno_safe "Overwrite locally-modified files?"; then
+    APPROVE_OVERWRITE_LOCAL="true"
+  else
+    APPROVE_OVERWRITE_LOCAL="false"
+  fi
+else
+  APPROVE_OVERWRITE_LOCAL="false"
+fi
+
 # The refresh appends wizard-managed entries to .gitignore in R6. Mutating it
 # behind the review gate contradicts AGENTS.md ("show me the full diff and wait
 # for my approval"), so preview the exact lines that would be appended and
@@ -1361,7 +1656,8 @@ jq --argjson added "$APPROVE_ADDED" \
    --argjson deleted "$APPROVE_DELETED" \
    --argjson deleted_modified "$APPROVE_DELETED_MODIFIED" \
    --argjson gitignore "$APPROVE_GITIGNORE" \
-   '.build_plan.approval = {added: $added, updated: $updated, deleted: $deleted, deleted_modified: $deleted_modified, gitignore: $gitignore} | .updated_at = (now | todate)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
+   --argjson overwrite_local "$APPROVE_OVERWRITE_LOCAL" \
+   '.build_plan.approval = {added: $added, updated: $updated, deleted: $deleted, deleted_modified: $deleted_modified, gitignore: $gitignore, overwrite_local: $overwrite_local} | .updated_at = (now | todate)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
 mv "$STAGING_STATE.tmp" "$STAGING_STATE"
 
 # Explicit confirmation gate before R6: apply+commit, apply without commit, or cancel.
@@ -1372,6 +1668,7 @@ echo "  Updated: $APPROVE_UPDATED"
 echo "  Deleted: $APPROVE_DELETED"
 echo "  Deleted-modified: $APPROVE_DELETED_MODIFIED"
 echo "  Gitignore: $APPROVE_GITIGNORE"
+echo "  Overwrite local: $APPROVE_OVERWRITE_LOCAL"
 echo ""
 echo "¿Cómo aplicar los cambios aprobados?"
 if [[ ! -t 0 ]]; then
@@ -1452,6 +1749,8 @@ APPROVE_UPDATED=$(jq -r '.build_plan.approval.updated // false' "$STAGING_STATE"
 APPROVE_DELETED=$(jq -r '.build_plan.approval.deleted // false' "$STAGING_STATE")
 APPROVE_DELETED_MODIFIED=$(jq -r '.build_plan.approval.deleted_modified // false' "$STAGING_STATE")
 APPROVE_GITIGNORE=$(jq -r '.build_plan.approval.gitignore // false' "$STAGING_STATE")
+# FU7: Overwrite locally-modified files approval
+APPROVE_OVERWRITE_LOCAL=$(jq -r '.build_plan.approval.overwrite_local // false' "$STAGING_STATE")
 # Apply-only mode: copy approved files to the working tree but do NOT stage or commit.
 APPLY_ONLY=$(jq -r '.build_plan.apply_only // false' "$STAGING_STATE")
 
@@ -1483,6 +1782,12 @@ fi
 if [[ "$APPROVE_UPDATED" == "true" ]]; then
   echo "ℹ Updating files..."
   while IFS= read -r -d '' file; do
+    # FU7: Skip local-modified files unless overwrite_local approval is given
+    local_modified=$(jq -r --arg path "$file" '.updated[]? | select(.path == $path) | .local_modified // false' "$PLAN")
+    if [[ "$local_modified" == "true" && "$APPROVE_OVERWRITE_LOCAL" != "true" ]]; then
+      echo "  ⏭ Skipping locally-modified file (no overwrite approval): $file"
+      continue
+    fi
     cp "$STAGING/$file" "$file"
     [[ "$file" == *".sh" ]] && chmod +x "$file"
     [[ "$file" == .husky/* || "$file" == .git/hooks/* ]] && chmod +x "$file"
@@ -1495,7 +1800,15 @@ if [[ "$APPROVE_DELETED" == "true" ]]; then
   DELETED_LIST=$(mktemp)
   jq -j '.deleted[]?.path + "\u0000"' "$PLAN" > "$DELETED_LIST"
   if [ -s "$DELETED_LIST" ]; then
-    git rm -f --ignore-unmatch --pathspec-from-file="$DELETED_LIST" --pathspec-file-nul
+    if [[ "$APPLY_ONLY" == "true" ]]; then
+      # FU6: Apply-only mode uses plain rm (unstaged)
+      while IFS= read -r -d '' file; do
+        rm -f "$file"
+      done < "$DELETED_LIST"
+    else
+      # Commit mode uses git rm (staged)
+      git rm -f --ignore-unmatch --pathspec-from-file="$DELETED_LIST" --pathspec-file-nul
+    fi
   fi
   rm -f "$DELETED_LIST"
   echo "✓ Files deleted"
@@ -1506,7 +1819,15 @@ if [[ "$APPROVE_DELETED_MODIFIED" == "true" ]]; then
   DELETED_MODIFIED_LIST=$(mktemp)
   jq -j '.deleted_modified[]?.path + "\u0000"' "$PLAN" > "$DELETED_MODIFIED_LIST"
   if [ -s "$DELETED_MODIFIED_LIST" ]; then
-    git rm -f --ignore-unmatch --pathspec-from-file="$DELETED_MODIFIED_LIST" --pathspec-file-nul
+    if [[ "$APPLY_ONLY" == "true" ]]; then
+      # FU6: Apply-only mode uses plain rm (unstaged)
+      while IFS= read -r -d '' file; do
+        rm -f "$file"
+      done < "$DELETED_MODIFIED_LIST"
+    else
+      # Commit mode uses git rm (staged)
+      git rm -f --ignore-unmatch --pathspec-from-file="$DELETED_MODIFIED_LIST" --pathspec-file-nul
+    fi
   fi
   rm -f "$DELETED_MODIFIED_LIST"
   echo "✓ Modified-removed files deleted"
@@ -1705,7 +2026,7 @@ fi
 
 echo "✓ Phase R6 complete"
 if [[ "$APPLY_ONLY" == "true" ]]; then
-  echo "ℹ Apply-only: revisa los cambios en el working tree y commitea cuando quieras."
+  echo "ℹ Apply-only: changes left in the working tree (unstaged). Review with: git status && git diff"
 else
   echo "ℹ Next: git push (when ready)"
 fi
