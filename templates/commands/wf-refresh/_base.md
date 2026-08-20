@@ -98,6 +98,7 @@ curl -fsSL "${WF_RAW}/wf-init/phase6a-agents.md" > "${WF_DIR}/phase6a-agents.md"
 curl -fsSL "${WF_RAW}/wf-init/phase6b-build-heavy.md" > "${WF_DIR}/phase6b-build-heavy.md" 2>/dev/null || true
 mkdir -p "${WF_DIR}/temp-files"
 curl -fsSL "${WF_RAW}/temp-files/AGENTS.md" > "${WF_DIR}/temp-files/AGENTS.md" 2>/dev/null || true
+curl -fsSL "${WF_RAW}/temp-files/sdd-new.md" > "${WF_DIR}/temp-files/sdd-new.md" 2>/dev/null || true
 
 REQUIRED_FILES=(
   "${WF_DIR}/lib/refresher.md"
@@ -108,6 +109,7 @@ REQUIRED_FILES=(
   "${WF_DIR}/phase6a-agents.md"
   "${WF_DIR}/phase6b-build-heavy.md"
   "${WF_DIR}/temp-files/AGENTS.md"
+  "${WF_DIR}/temp-files/sdd-new.md"
 )
 
 missing=false

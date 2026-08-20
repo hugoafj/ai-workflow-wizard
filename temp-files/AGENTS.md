@@ -46,7 +46,7 @@ Claude Code, OpenCode, Kilo Code, and Qwen Code.
 5. Honor `<repo>/.windsurf/workflows/` files, but `global_rules.md` (the
    orchestrator) ALWAYS takes precedence when they conflict.
 6. The SDD contract for THIS project is declared in `.wizard-state.json`
-   (`state.sdd.backend`). Read that backend before deciding where SDD artifacts
+   (`.sdd.backend`). Read that backend before deciding where SDD artifacts
    live:
    - `openspec` or `hybrid` → use `openspec/changes/`. The legacy Windsurf
      `.sdd/` format (`.sdd/proposal.md`, `.sdd/spec.md`) is OBSOLETE. If any
@@ -63,6 +63,6 @@ Claude Code, OpenCode, Kilo Code, and Qwen Code.
 `~/.codeium/windsurf/memories/global_rules.md` (orchestrator)
 > project `AGENTS.md` > `.windsurf/workflows/*` > skills
 >
-> EXCEPT for the SDD artifact format: follow `state.sdd.backend` in
+> EXCEPT for the SDD artifact format: follow `.sdd.backend` in
 > `.wizard-state.json` — `openspec`/`hybrid` use `openspec/changes/` (never
 > `.sdd/`); `engram` keeps SDD context in Engram memory.

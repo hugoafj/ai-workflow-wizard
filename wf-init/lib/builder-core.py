@@ -136,10 +136,20 @@ def extract_block(text, lang="markdown"):
     return text.strip()
 
 
-def strip_prose_header(text):
-    """Remove leading `#` prose header lines from a variant file (CI/CD files)."""
+def strip_prose_header(text, keep_notes=False):
+    """Remove leading `#` prose header lines from a variant file (CI/CD files).
+
+    With keep_notes=True, preserve the `# Notes:` documentation block (YAML
+    comments are valid in the generated workflow) while still dropping the
+    title, placeholder-resolution and conditional-resolution lines above it.
+    Only safe for YAML workflow targets; TS/JSON fragments keep the default
+    False because `#` is not a valid comment there.
+    """
     lines = text.splitlines()
-    out = []
+    if keep_notes:
+        for i, line in enumerate(lines):
+            if line.lstrip().startswith("# Notes:"):
+                return "\n".join(lines[i:]).strip()
     i = 0
     while i < len(lines):
         line = lines[i]
@@ -236,8 +246,12 @@ def build_protocol_body(raw, name, state):
 def resolve_if_blocks(text, state, raw=None):
     """Resolve `<if CONDITION>:` blocks (marker line + block) from semantic text.
 
-    The marker form is `<if CONDITION>:` on its own line; the block ends at the
-    next marker line or a non-indented line, whichever comes first.
+    The marker form is `<if CONDITION>:` on its own line. The block ends at the
+    next marker line, a non-empty line less indented than the first content
+    line, or (for YAML step lists) the next `- ` item at the same indent as the
+    first content line — whichever comes first. The YAML step-list boundary
+    keeps steps that follow a conditional block (e.g. Build after a conditional
+    Sanitization step) OUT of the conditional block.
     """
     lines = text.splitlines(keepends=True)
     out = []
@@ -248,13 +262,29 @@ def resolve_if_blocks(text, state, raw=None):
         if m:
             cond = m.group(1).strip()
             block_start = i + 1
+            # First non-empty content line establishes the block's base indent.
+            first_idx = None
+            for k in range(block_start, len(lines)):
+                if lines[k].strip():
+                    first_idx = k
+                    break
+            first_indent = len(lines[first_idx]) - len(lines[first_idx].lstrip()) if first_idx is not None else 0
+            first_is_yaml_list = first_idx is not None and \
+                lines[first_idx].lstrip().startswith("- ") and \
+                first_indent == (len(line) - len(line.lstrip()))
             j = block_start
             while j < len(lines):
                 nxt = lines[j]
                 if re.match(r"^\s*<if .+>:\s*\n$", nxt):
                     break
-                if nxt.strip() and not nxt.startswith((" ", "\t")):
-                    break
+                if nxt.strip() and first_idx is not None and j > first_idx:
+                    nxt_indent = len(nxt) - len(nxt.lstrip())
+                    if nxt_indent < first_indent:
+                        break
+                    # YAML step lists: the next `- ` item at the same indent is a
+                    # new step, NOT part of the conditional block.
+                    if first_is_yaml_list and nxt_indent == first_indent and nxt.lstrip().startswith("- "):
+                        break
                 j += 1
             block = "".join(lines[block_start:j])
             if eval_semantic_cond(cond, state, raw):

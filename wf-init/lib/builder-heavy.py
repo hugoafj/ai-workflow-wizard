@@ -295,10 +295,10 @@ def write_cicd(raw, state, staging):
     if cicd:
         qg_url = builder_core.base_url(raw, "templates/protocols/cicd/variants/quality-guard.yml.md")
         qg = builder_core.fetch_with_retries(qg_url)
-        qg = builder_core.strip_prose_header(qg)
+        qg = builder_core.strip_prose_header(qg, keep_notes=True)
         qg = builder_core.resolve_if_blocks(qg, state, raw)
         qg = builder_core.resolve_gh_escapes(qg)
-        qg = qg.replace("{{node_version}}", str(builder_core.get_state_value(state, "discovery.node_version", "20")))
+        qg = qg.replace("{{node_version}}", str(builder_core.get_state_value(state, "discovery.node_engine", "22")))
         qg = qg.replace("{{npm_major}}", str(builder_core.get_state_value(state, "discovery.npm_major", "10")))
         if builder_core.unresolved_placeholders(qg):
             raise ValueError("unresolved placeholders in quality-guard.yml")
@@ -329,7 +329,7 @@ def write_cicd(raw, state, staging):
             created.append(os.path.relpath(gga_target, staging))
 
             gga_wf = builder_core.fetch_with_retries(builder_core.base_url(raw, "templates/protocols/cicd/variants/gga-review.yml.md"))
-            gga_wf = builder_core.strip_prose_header(gga_wf)
+            gga_wf = builder_core.strip_prose_header(gga_wf, keep_notes=True)
             provider_cli = {"claude": "@anthropic-ai/claude-code", "gemini": "@google/gemini-cli", "codex": "@openai/codex"}.get(gga_provider, "@anthropic-ai/claude-code")
             provider_secret = {"claude": "ANTHROPIC_API_KEY", "gemini": "GEMINI_API_KEY", "codex": "OPENAI_API_KEY"}.get(gga_provider, "ANTHROPIC_API_KEY")
             gga_wf = gga_wf.replace("{{provider_cli}}", provider_cli)
@@ -354,7 +354,7 @@ def write_cicd(raw, state, staging):
             created.append(os.path.relpath(gga_wf_target, staging))
         elif ai_reviewer == "claude":
             cl = builder_core.fetch_with_retries(builder_core.base_url(raw, "templates/protocols/cicd/variants/claude-review.yml.md"))
-            cl = builder_core.strip_prose_header(cl)
+            cl = builder_core.strip_prose_header(cl, keep_notes=True)
             inline = ci.get("inline_suggestions", True)
             if not inline:
                 cl = re.sub(r"^\s*claude_args:\s*\|.*?^\s*[^\s].*$", "", cl, flags=re.MULTILINE | re.DOTALL)
@@ -365,7 +365,7 @@ def write_cicd(raw, state, staging):
             created.append(os.path.relpath(cl_target, staging))
         elif ai_reviewer == "gemini":
             gm = builder_core.fetch_with_retries(builder_core.base_url(raw, "templates/protocols/cicd/variants/gemini-review.yml.md"))
-            gm = builder_core.strip_prose_header(gm)
+            gm = builder_core.strip_prose_header(gm, keep_notes=True)
             auto_improve = ci.get("auto_improve", False)
             # pr-agent-config.toml lives with the workflow; toggle auto_improve.
             gm_target = os.path.join(staging, ".github", "workflows", "gemini-review.yml")
@@ -397,7 +397,7 @@ def write_cicd(raw, state, staging):
     if cicd and security_review in ("claude", "gemini"):
         sec_url = builder_core.base_url(raw, "templates/protocols/cicd/variants/security-review.%s.yml.md" % security_review)
         sec = builder_core.fetch_with_retries(sec_url)
-        sec = builder_core.strip_prose_header(sec)
+        sec = builder_core.strip_prose_header(sec, keep_notes=True)
         sec = builder_core.resolve_gh_escapes(sec)
         if builder_core.unresolved_placeholders(sec):
             raise ValueError("unresolved placeholders in security-review.yml")
@@ -430,7 +430,7 @@ def write_cicd(raw, state, staging):
     # --- Release-please.
     if release_please:
         rel = builder_core.fetch_with_retries(builder_core.base_url(raw, "templates/protocols/cicd/variants/release-please.yml.md"))
-        rel = builder_core.strip_prose_header(rel)
+        rel = builder_core.strip_prose_header(rel, keep_notes=True)
         rel = builder_core.resolve_gh_escapes(rel)
         if ci.get("release_ai_summary", True):
             provider = ci.get("release_ai_provider", "claude")
@@ -483,11 +483,11 @@ def write_cicd(raw, state, staging):
         except RuntimeError:
             dep = ""
         if dep:
-            dep = builder_core.strip_prose_header(dep)
+            dep = builder_core.strip_prose_header(dep, keep_notes=True)
             dep = builder_core.resolve_gh_escapes(dep)
             trigger_event = "tags:\n        - 'v*'" if builder_core.get_state_value(state, "cd.trigger", "tags") == "tags" else "branches:\n        - main"
             php_version = builder_core.get_state_value(state, "discovery.php_version", "8.3")
-            node_version = builder_core.get_state_value(state, "discovery.node_version", "20")
+            node_version = builder_core.get_state_value(state, "discovery.node_engine", "22")
             has_node_assets = "true" if builder_core.get_state_value(state, "cd.stack_detected", "") == "laravel_node" else "false"
             dep = dep.replace("{{trigger_event}}", trigger_event)
             dep = dep.replace("{{php_version}}", str(php_version))

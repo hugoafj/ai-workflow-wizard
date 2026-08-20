@@ -57,9 +57,7 @@ if echo "$IDES" | grep -q "windsurf"; then
         fi
         {
           head -n "$TITLE_LINE" "$TARGET"
-          printf '%s\n' "<!-- WF: DO NOT REGENERATE -->"
           cat "$WF_RULE_FILE"
-          printf '\n%s\n' "<!-- /WF: DO NOT REGENERATE -->"
           tail -n +$((TITLE_LINE + 1)) "$TARGET"
         } > "$TARGET.tmp"
         mv "$TARGET.tmp" "$TARGET"
