@@ -134,17 +134,42 @@ _extract_phase() {
   local phase_name="$1"
   local out_file="$2"
   local refresher="${WF_DIR}/lib/refresher.md"
-  
-  # Find the phase section and extract the first fenced bash block after it
+
+  # Extract ALL fenced bash blocks of the phase, concatenated in order.
+  # Header match is prefix-with-boundary: "Phase R-1" matches
+  # "## Phase R-1: Global command refresh" but would not match a hypothetical
+  # "## Phase R-10". Blocks are self-contained (each re-declares WF_DIR and
+  # re-sources refresh-lib.sh) and designed to run sequentially, so
+  # concatenation preserves execution order and per-block fail-fast.
   awk -v phase="$phase_name" '
-    $0 ~ "^## " phase "[[:space:]]*$" { in_phase=1; next }
-    in_phase && /^```bash/ { in_block=1; next }
-    in_block && /^```/ { exit }
-    in_block { print }
+    $0 ~ ("^## " phase "([[:space:]]*:|[[:space:]]*$)") { in_phase=1; next }
+    in_phase && /^## /   { exit }
+    in_phase && /^```bash/ {
+      if (found++) printf "\n# --- block %d ---\n", found
+      in_block=1; next
+    }
+    in_block && /^```/   { in_block=0; next }
+    in_block             { print }
   ' "$refresher" > "$out_file"
-  
-  if [[ ! -s "$out_file" ]]; then
-    echo "✗ Failed to extract $phase_name from refresher.md" >&2
+
+  # Defense in depth: verify block coverage. A silent truncation here used to
+  # surface much later as wrong plan classifications (R3 block 2 never ran ->
+  # sdd-new.md was classified deleted_modified instead of updated). Die loudly
+  # at extraction time instead.
+  local total extracted
+  total=$(awk -v phase="$phase_name" '
+    $0 ~ ("^## " phase "([[:space:]]*:|[[:space:]]*$)") { in_phase=1; next }
+    in_phase && /^## / { exit }
+    in_phase && /^```bash/ { c++ }
+    END { print c+0 }
+  ' "$refresher")
+  if [[ -s "$out_file" ]]; then
+    extracted=$(( $(grep -c '^# --- block' "$out_file") + 1 ))
+  else
+    extracted=0
+  fi
+  if [[ "$total" -eq 0 || "$extracted" -ne "$total" ]]; then
+    echo "✗ Failed to extract $phase_name: got $extracted/$total bash blocks" >&2
     return 1
   fi
   chmod +x "$out_file"
@@ -214,6 +239,11 @@ Each phase script is extracted from `refresher.md` and executed as a standalone 
 
 - **Issue**: In a non-interactive run, the `Update global commands?` answer was missing. R-1 emits `GENTLE_AI_WF_REFRESH_NEEDS=prompt=Update global commands?` and stops BEFORE any refresh work — this is expected control flow, not a crash.
 - **Solution**: Ask the user, set `WF_REFRESH_ANSWERS='Update global commands?=yes'` (or `=no`) and re-run with `WF_REFRESH_RESUME=1`. If the answer is `yes` and `install.sh` succeeds, R-1 exits 3 again: open a NEW session and re-run `/wf-refresh` so the updated wizard drives the refresh.
+
+### Phase R1/R2 exits with code 3 (drift / feature prompts)
+
+- **Issue**: In a non-interactive run, `Use updated project info?` (R1) or `Enable <FEATURE>?` (R2) had no answer. The phase stops IMMEDIATELY — before staging is built — and emits `GENTLE_AI_WF_REFRESH_NEEDS=prompt=...`. This is expected control flow: continuing would build staging from stale info and the answer collected later would have no consumer.
+- **Solution**: Set `WF_REFRESH_ANSWERS='Use updated project info?=yes'` (or `=no`, or the matching `Enable <FEATURE>?` prompt) and re-run with `WF_REFRESH_RESUME=1`. The run re-enters exactly the phase that asked (tracked via `.wizard-resume-phase`), consumes your answer, and continues through R5 normally.
 
 ### Phase R-1 fails (global command update)
 

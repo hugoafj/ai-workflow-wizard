@@ -288,6 +288,67 @@ _wf_answers_get() {
   printf ''
 }
 
+# Extract a "## <header>" section body from AGENTS.md (up to the next "## "
+# header or a WF: DO NOT REGENERATE marker). Trims leading/trailing blank
+# lines only; interior blank lines are preserved.
+# Lives in refresh-lib.sh (not inline in R1): R1 calls it during discovery
+# (Commands / Project Structure / Project MCPs) BEFORE the point where it
+# used to be defined — bash runs top-down, so those calls failed with
+# "command not found" and degraded exactly those AGENTS.md sections.
+_wf_section() {
+  awk -v h="$1" '
+    $0 ~ "^## " h "$" { on=1; next }
+    on && /^## / { exit }
+    on && /^<!-- WF: DO NOT REGENERATE -->/ { exit }
+    on { print }
+  ' AGENTS.md | sed -e '/./,$!d' -e :a -e '/^\n*$/{$d;N;ba' -e '}'
+}
+
+# Fail-fast prompt gate for pre-R5 phases (R1/R2). In non-tty runs an
+# unanswered prompt must STOP the phase immediately instead of continuing
+# with default-"no" behavior: staging would be built from stale info and the
+# answer collected later by the R5 manifest would have no consumer (the
+# owning phase never re-runs under WF_REFRESH_RESUME=1). Mirrors the
+# restart-semantics pattern R-1 uses for "Update global commands?".
+# Writes .wizard-resume-phase so a resumed run re-enters THIS phase.
+_require_answer_or_stop() {
+  local prompt="$1" phase_id="$2"
+  local rc=0
+  _ask_yesno_safe "$prompt" || rc=$?
+  case "$rc" in
+    0|1) return "$rc" ;;
+    3)
+      printf '%s\n' "$phase_id" > "${WF_DIR}/.wizard-resume-phase"
+      echo "GENTLE_AI_WF_REFRESH_NEEDS=prompt=${prompt}"
+      echo "✗ Non-tty run requires an answer for '${prompt}' before ${phase_id} can continue." >&2
+      echo "  Set WF_REFRESH_ANSWERS='${prompt}=yes' (or =no) and re-run with WF_REFRESH_RESUME=1." >&2
+      exit 3
+      ;;
+    *)
+      return "$rc"
+      ;;
+  esac
+}
+
+# Resume-marker gate for phases R-1..R4: skip this phase when a resumed run
+# targets a later phase; consume the marker when this phase is the target.
+# Without a marker (fresh run, or legacy resume-to-R5) this is a no-op, so
+# the pre-existing WF_REFRESH_RESUME contract keeps working unchanged.
+_wf_resume_gate() {
+  local phase_id="$1"
+  local marker="${WF_DIR}/.wizard-resume-phase"
+  if [[ "${WF_REFRESH_RESUME:-}" = "1" && -f "$marker" ]]; then
+    local marked
+    marked=$(cat "$marker")
+    if [[ "$marked" != "$phase_id" ]]; then
+      echo "ℹ Skipping ${phase_id} (resume targets ${marked})"
+      exit 0
+    fi
+    rm -f "$marker"
+    echo "ℹ Resuming at ${phase_id} (WF_REFRESH_RESUME=1)"
+  fi
+}
+
 # Ask a yes/no question. Returns 0 for yes, 1 for no.
 _ask_yesno() {
   _ask_yesno_safe "$1"
@@ -548,6 +609,10 @@ set -e
 WF_DIR="${WF_DIR:-/tmp/wf-refresh-phases}"
 source "${WF_DIR}/lib/refresh-lib.sh"
 
+# Resume-marker gate: if a resumed run targets a later phase, skip R-1.
+# No marker (fresh run or legacy resume-to-R5) -> no-op.
+_wf_resume_gate "R-1"
+
 # FU5: Handle WF_REFRESH_RESUME=1 — skip prompt if answer provided via WF_REFRESH_ANSWERS
 # The prompt "Update global commands?" is matched exactly in _wf_answers_get.
 if [[ "${WF_REFRESH_RESUME:-}" = "1" ]]; then
@@ -611,8 +676,9 @@ if [[ "${WF_REFRESH_RESUME:-}" = "1" ]]; then
   # No answer provided for this prompt, continue to normal interactive/non-interactive logic
 fi
 
-# FU5: Clear pending prompts file at start of fresh run (R-1 is first phase)
-rm -f "${WF_DIR}/.wizard-pending-prompts"
+# FU5: Clear pending prompts file at start of fresh run (R-1 is first phase).
+# Also clear any stale resume-phase marker from a previous interrupted run.
+rm -f "${WF_DIR}/.wizard-pending-prompts" "${WF_DIR}/.wizard-resume-phase"
 
 LOCAL_VERSION=""
 # install.sh SIEMPRE instala en .agents/skills/ (unconditional fallback universal)
@@ -703,6 +769,9 @@ set -e
 WF_DIR="${WF_DIR:-/tmp/wf-refresh-phases}"
 source "${WF_DIR}/lib/refresh-lib.sh"
 
+# Resume-marker gate: skip R0 when a resumed run targets a later phase.
+_wf_resume_gate "R0"
+
 if [[ ! -f "$WF_STATE" ]]; then
   echo "✗ $WF_STATE not found"
   echo "  Please run /wf-init first"
@@ -778,6 +847,10 @@ set -e
 
 WF_DIR="${WF_DIR:-/tmp/wf-refresh-phases}"
 source "${WF_DIR}/lib/refresh-lib.sh"
+
+# Resume-marker gate: skip R1 when a resumed run targets a later phase;
+# when R1 is the target, consume the marker and run with WF_REFRESH_ANSWERS.
+_wf_resume_gate "R1"
 
 echo "ℹ Re-discovering project..."
 
@@ -1067,7 +1140,9 @@ if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || 
   [[ "$OLD_NPM" != "$NPM_MAJOR" ]] && echo "  - npm major: $OLD_NPM → $NPM_MAJOR"
   [[ "$OLD_COMMANDS" != "$COMMANDS" ]] && echo "  - Commands: $OLD_COMMANDS → $COMMANDS"
 
-  if _ask_yesno_safe "Use updated project info?"; then
+  # Fail-fast: in non-tty runs an unanswered prompt stops R1 here (before any
+  # staging work) instead of silently taking the "no" path with stale info.
+  if _require_answer_or_stop "Use updated project info?" "R1"; then
     # Write the drift to the STAGING state, not root: R6 promotes staging to
     # root at the end, so a root-only write would be silently clobbered.
     # Only write non-empty node_engine/npm_major to avoid clobbering good values with empty discovery results.
@@ -1103,17 +1178,9 @@ STAGING_DIR=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' "$WF_STATE")
 STAGING_STATE_BF="$STAGING_DIR/wizard-state.json"
 
 if [[ -f AGENTS.md ]]; then
-  # Extract a section body: from "## <header>" to the next "## " or a
-  # WF: DO NOT REGENERATE marker. Trim leading/trailing blank lines only
-  # (interior blank lines are preserved).
-  _wf_section() {
-    awk -v h="$1" '
-      $0 ~ "^## " h "$" { on=1; next }
-      on && /^## / { exit }
-      on && /^<!-- WF: DO NOT REGENERATE -->/ { exit }
-      on { print }
-    ' AGENTS.md | sed -e '/./,$!d' -e :a -e '/^\n*$/{$d;N;ba' -e '}'
-  }
+  # _wf_section() lives in refresh-lib.sh. It is ALSO called earlier in this
+  # phase (Commands / Project Structure / Project MCPs discovery); defining
+  # it here was too late — bash executes top-down, so those calls failed.
 
   # 1. discovery.commands (fallback "npm run build")
   if [[ -z "$(jq -r '.discovery.commands // ""' "$STAGING_STATE_BF" 2>/dev/null)" ]]; then
@@ -1178,6 +1245,10 @@ set -e
 WF_DIR="${WF_DIR:-/tmp/wf-refresh-phases}"
 source "${WF_DIR}/lib/refresh-lib.sh"
 
+# Resume-marker gate: skip R2 when a resumed run targets a later phase;
+# when R2 is the target, consume the marker and run with WF_REFRESH_ANSWERS.
+_wf_resume_gate "R2"
+
 STAGING_STATE=".wizard-staging/wizard-state.json"
 
 echo "ℹ Checking for state migrations..."
@@ -1227,7 +1298,9 @@ WF_STATE="$STAGING_STATE" _apply_jq_filter '
 for FEATURE in decision_ladder tdd_protocol routing_abc; do
   if ! jq -e ".features.$FEATURE != null" "$STAGING_STATE" >/dev/null 2>&1; then
     echo "New optional feature available: $FEATURE"
-    if _ask_yesno_safe "Enable $FEATURE?"; then
+    # Fail-fast: an unanswered feature prompt stops R2 immediately so the
+    # answer is consumed by a re-run of THIS phase, not lost after R5.
+    if _require_answer_or_stop "Enable $FEATURE?" "R2"; then
       WF_STATE="$STAGING_STATE" jq ".features.$FEATURE = true | .updated_at = (now | todate)" "$STAGING_STATE" > "$STAGING_STATE.tmp" && mv "$STAGING_STATE.tmp" "$STAGING_STATE"
       echo "✓ $FEATURE enabled"
     else
@@ -1259,27 +1332,30 @@ set -e
 WF_DIR="${WF_DIR:-/tmp/wf-refresh-phases}"
 source "${WF_DIR}/lib/refresh-lib.sh"
 
-STAGING_STATE=".wizard-staging/wizard-state.json"
+# Resume-marker gate: skip R3 when a resumed run targets a later phase.
+_wf_resume_gate "R3"
+
+STAGING=".wizard-staging"
+STAGING_STATE="$STAGING/wizard-state.json"
 BASELINE=".wizard-refresh-baseline.json"
+
+# Step 0: snapshot pre-Builder managed_paths/generated_files. R4's deletion
+# diff depends on this baseline, so it must be captured BEFORE the Builder runs.
 jq '{managed_paths: (.build_plan.managed_paths // []), generated_files: (.build_plan.generated_files // [])}' "$STAGING_STATE" > "$BASELINE"
 echo "✓ Baseline snapshot written ($(jq '.managed_paths | length' "$BASELINE") managed paths)"
+
+# Builder-Core (B1-B6) + Builder-Heavy (B7-B9), fully deterministic: no
+# sub-agent delegation, no placeholder guessing. These invocations live
+# INSIDE this block so _extract_phase concatenation yields an order-correct,
+# self-contained script (baseline -> builders -> validation) instead of
+# depending on prose steps between fences.
+python3 "$WF_DIR/lib/builder-core.py" --state "$STAGING_STATE" --staging "$STAGING" --raw "${WF_RAW}" --wf-dir "$WF_DIR"
+python3 "$WF_DIR/lib/builder-heavy.py" --state "$STAGING_STATE" --staging "$STAGING" --raw "${WF_RAW}" --wf-dir "$WF_DIR"
+
+echo "✓ Builder finished — staging populated at $STAGING/"
 ```
 
-**Instructions for the agent:**
-
-1. Run Builder-Core (B1-B6) deterministically:
-   ```bash
-   python3 "$WF_DIR/lib/builder-core.py" --state "$STAGING_STATE" --staging "$STAGING" --raw "${WF_RAW}" --wf-dir "$WF_DIR"
-   ```
-   - `STAGING=".wizard-staging"`, `STAGING_STATE="$STAGING/wizard-state.json"`.
-   - `WF_RAW` is built from `WIZARD_REPO`/`WIZARD_BRANCH` (see `_base.md`).
-   - The scripts are deterministic: no sub-agent delegation, no placeholder guessing.
-2. Run Builder-Heavy (B7-B9) deterministically:
-   ```bash
-   python3 "$WF_DIR/lib/builder-heavy.py" --state "$STAGING_STATE" --staging "$STAGING" --raw "${WF_RAW}" --wf-dir "$WF_DIR"
-   ```
-3. The combined result must be `.wizard-staging/` containing `AGENTS.md`, the satellite files, commands, protocols, etc.
-4. After Builder finishes, run the validation block below (including the dynamic `EXPECTED[]` check).
+**Instructions for the agent:** the block above is self-contained — it snapshots the baseline, runs Builder-Core and Builder-Heavy deterministically (`STAGING=".wizard-staging"`, `STAGING_STATE="$STAGING/wizard-state.json"`), and fails fast via `set -e`. The validation block below then verifies the staging set (B9/B9.5) before R4.
 
 > **Important:** `lib/refresher.md`, `lib/builder.md`, `phase6a-agents.md`, and `phase6b-build-heavy.md` are **Markdown instruction files**, not bash scripts. Do not `source` them.
 
@@ -1405,8 +1481,28 @@ set -e
 WF_DIR="${WF_DIR:-/tmp/wf-refresh-phases}"
 source "${WF_DIR}/lib/refresh-lib.sh"
 
+# Resume-marker gate: skip R4 when a resumed run targets a later phase.
+_wf_resume_gate "R4"
+
 STAGING=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' "$WF_STATE")
 PLAN="refresh-plan.json"
+
+# Gate: fail loudly on unresolved wizard placeholders in staging. A previous
+# build once escaped "{{version}}" into a committed .release-please-manifest.json;
+# builder guidance says to abort on placeholders but nothing enforced it.
+# Only wizard-owned placeholder namespaces are flagged — arbitrary "{{ }}"
+# text (e.g. Vue/Angular interpolation quoted in project docs) is NOT a
+# wizard placeholder and must not fail the refresh.
+echo "ℹ Scanning staging for unresolved placeholders..."
+PLACEHOLDER_HITS=$(grep -RInE '\{\{(answers|discovery|features|testing|mcps|protocols|conventions|stack)\.|\{\{(wizard_version|version|sdd\.backend)\}\}|\{\{PROTOCOL_BODY:' "$STAGING" 2>/dev/null || true)
+if [[ -n "$PLACEHOLDER_HITS" ]]; then
+  echo "✗ Unresolved wizard placeholders found in $STAGING:" >&2
+  echo "$PLACEHOLDER_HITS" >&2
+  echo "  The Builder escaped template placeholders into final artifacts." >&2
+  echo "  Fix the Builder output (or extend the allowlist above) before refreshing." >&2
+  exit 1
+fi
+echo "✓ No unresolved placeholders in staging"
 
 echo "ℹ Computing diff..."
 
@@ -1579,7 +1675,7 @@ Present the grouped diff and collect explicit user approvals for each category. 
 
 ### Non-interactive Resume Flow (FU5)
 
-When running in non-interactive mode (no TTY, e.g., CI/CD, agent-driven), `_ask_yesno_safe` cannot prompt the user. Instead, it records pending prompts to `${WF_DIR}/.wizard-pending-prompts` and returns exit code 3. Phase R5 collects all pending prompts from all phases and emits a manifest:
+When running in non-interactive mode (no TTY, e.g., CI/CD, agent-driven), `_ask_yesno_safe` cannot prompt the user. Instead, it records pending prompts to `${WF_DIR}/.wizard-pending-prompts` and returns exit code 3. Pre-R5 phases (R1/R2) treat a recorded prompt as a hard stop via `_require_answer_or_stop`: they emit the manifest immediately and write `.wizard-resume-phase`, so a resumed run re-enters exactly the phase that asked and the answer is consumed by its owner. Phase R5 keeps the collection sweep as a safety net for its own prompts (which resume re-enters at R5 anyway):
 
 ```
 GENTLE_AI_WF_REFRESH_NEEDS=prompt=<prompt1>|prompt=<prompt2>|...|apply_mode=<mode>
