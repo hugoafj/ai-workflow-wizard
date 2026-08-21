@@ -210,6 +210,11 @@ Each phase script is extracted from `refresher.md` and executed as a standalone 
 
 ## Troubleshooting
 
+### Phase R-1 exits with code 3 (global command update)
+
+- **Issue**: In a non-interactive run, the `Update global commands?` answer was missing. R-1 emits `GENTLE_AI_WF_REFRESH_NEEDS=prompt=Update global commands?` and stops BEFORE any refresh work — this is expected control flow, not a crash.
+- **Solution**: Ask the user, set `WF_REFRESH_ANSWERS='Update global commands?=yes'` (or `=no`) and re-run with `WF_REFRESH_RESUME=1`. If the answer is `yes` and `install.sh` succeeds, R-1 exits 3 again: open a NEW session and re-run `/wf-refresh` so the updated wizard drives the refresh.
+
 ### Phase R-1 fails (global command update)
 
 - **Issue**: `install.sh` not found or fails
