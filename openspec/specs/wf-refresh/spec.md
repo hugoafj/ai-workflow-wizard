@@ -93,20 +93,33 @@ R1 SHALL re-detect the full script list from `package.json` on EVERY refresh whe
 
 ### Requirement: FU3a — Commands rendered as merged bullets
 
-The Commands section SHALL render as a bulleted list with shape `- npm run <name> — <description>`. Scripts in `package.json` but new to the current AGENTS.md Commands section SHALL appear without a description; documented scripts SHALL keep descriptions parsed from the current AGENTS.md Commands section (name-keyed merge).
+The Commands section SHALL render as a bulleted list with shape `` - `npm run <name>` — <description> `` (backticked). Scripts in `package.json` but new to the current AGENTS.md Commands section SHALL appear without a description; documented scripts SHALL keep descriptions parsed from the current AGENTS.md Commands section (name-keyed merge). The parser SHALL strip backticks before matching and SHALL allow `:` inside script names (canonical npm scripts like `test:e2e`). R1 SHALL report the honest merged/total description count instead of an unconditional success message.
+
+#### Scenario: Backticked rich format round-trips
+
+- GIVEN AGENTS.md Commands has `` - `npm run dev` — Start development server ``
+- WHEN AGENTS.md is regenerated and `dev` still exists in `package.json`
+- THEN the section contains `` - `npm run dev` — Start development server `` with the description preserved
 
 #### Scenario: Known scripts keep descriptions, new scripts do not
 
 - GIVEN AGENTS.md Commands has `- npm run dev — dev server` and `package.json` adds a `lint` script
 - WHEN AGENTS.md is regenerated
-- THEN the section contains `- npm run dev — dev server` and `- npm run lint` (no description)
+- THEN the section contains `- \`npm run dev\` — dev server` and `- \`npm run lint\`` (no description)
 - AND no `package.json` script is dropped
+
+#### Scenario: Colon-bearing scripts keep descriptions
+
+- GIVEN AGENTS.md Commands has `` - `npm run test:e2e` — Run E2E tests ``
+- WHEN AGENTS.md is regenerated
+- THEN the description survives on the `test:e2e` bullet
 
 #### Scenario: No prior section renders description-less bullets
 
 - GIVEN no prior AGENTS.md Commands section (or none with descriptions)
 - WHEN AGENTS.md is regenerated
-- THEN every script renders as `- npm run <name>` with an empty description
+- THEN every script renders as `` - `npm run <name>` `` with an empty description
+- AND R1 logs a warning that zero descriptions matched (never a false success)
 
 #### Scenario: Removed scripts disappear
 
@@ -132,7 +145,7 @@ The Code Style & Conventions section SHALL be re-composed as bullets from `disco
 
 ### Requirement: FU3c — Project Structure regenerated from the live tree
 
-The Project Structure section SHALL be regenerated from a live filesystem scan performed by R1. Comments from the old section SHALL be preserved where the referenced path/name still matches the live tree.
+The Project Structure section SHALL be regenerated from a live filesystem scan performed by R1. Comments from the old section SHALL be preserved where the referenced path/name still matches the live tree; tree-drawing glyphs (`│`, `├`, `└`, `─`) SHALL be normalized before matching so comments survive from tree-formatted sections. A **downgrade guard** SHALL prevent trading a richer section for a poorer one: a fenced or tree-formatted original section SHALL be preserved verbatim, and when regeneration would drop every inline comment the original had, the original section SHALL be kept with a warning.
 
 #### Scenario: New files appear in the tree
 
@@ -145,6 +158,19 @@ The Project Structure section SHALL be regenerated from a live filesystem scan p
 - GIVEN the old section carries `templates/ — single source of truth` and `templates/` still exists
 - WHEN AGENTS.md is regenerated
 - THEN that comment is preserved on the `templates/` line
+
+#### Scenario: Tree-formatted section survives verbatim
+
+- GIVEN the old section is a fenced code block using box-drawing glyphs (`├── src/  # components`) written by `/wf-init` discovery
+- WHEN AGENTS.md is regenerated
+- THEN the fenced tree is preserved verbatim (never flattened to a dirs-only list)
+
+#### Scenario: Regeneration losing all comments falls back to the original
+
+- GIVEN a flat old section where every entry carries an inline comment
+- AND the regenerated merge matches no comment
+- WHEN AGENTS.md is regenerated
+- THEN the original section content wins and R1 logs a warning
 
 ### Requirement: FU3d — MCP table re-detected and rendered with 3 columns
 
@@ -183,6 +209,28 @@ Section preservation SHALL operate as a FALLBACK only: richer existing content w
 - GIVEN state holds a flat value for a section and AGENTS.md holds a richer multi-line version
 - WHEN AGENTS.md is regenerated
 - THEN the richer content is used as the merge source and preserved
+
+### Requirement: R4G — Placeholder gate with narrow sed-context exemption
+
+Before diffing, R4 SHALL fail loudly when any wizard-owned placeholder namespace (`{{answers.*}}`, `{{discovery.*}}`, `{{features.*}}`, `{{testing.*}}`, `{{mcps.*}}`, `{{protocols.*}}`, `{{conventions.*}}`, `{{stack.*}}`, `{{wizard_version}}`, `{{version}}`, `{{PROTOCOL_BODY:*}}`) appears unresolved in staging. Arbitrary `{{ }}` text quoted in project docs (e.g. Vue/Angular interpolation) SHALL NOT be flagged. `{{sdd.backend}}` SHALL be exempt ONLY when it appears as a sed search pattern (the runtime literal wf-settings uses to re-resolve the SDD backend post-build, shipped verbatim by builder-core.py by design); occurrences outside that sed-command context SHALL still fail the gate. The exemption scan SHALL use POSIX ERE (`grep -E`) with escaped braces, because BSD grep (macOS) gives undefined behavior for unescaped `{{` in BRE.
+
+#### Scenario: Intentional sed literals do not block the refresh
+
+- GIVEN staging contains the shipped wf-settings skill whose body includes `sed -i.bak "s|{{sdd.backend}}/changes/<name>/proposal.md|$SDD_PROPOSAL_PATH|g"` and `sed -i.bak "s/{{sdd.backend}}/$SDD_BACKEND_PATH/g"`
+- WHEN R4 runs the placeholder gate
+- THEN the gate passes and the refresh proceeds to the diff step
+
+#### Scenario: Unresolved sdd.backend outside sed context still fails
+
+- GIVEN staging contains a final artifact with prose text `backend is {{sdd.backend}} here`
+- WHEN R4 runs the placeholder gate
+- THEN the gate fails listing that occurrence and exits non-zero before diffing
+
+#### Scenario: Real leaks are still caught
+
+- GIVEN staging contains an artifact with an unresolved `{{version}}`
+- WHEN R4 runs the placeholder gate
+- THEN the gate fails regardless of any other content in the same run
 
 ### Requirement: FU4 — Deprecated-path cleanup covers per-IDE skills
 

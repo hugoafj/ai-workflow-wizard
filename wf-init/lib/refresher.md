@@ -913,27 +913,39 @@ if [[ -f package.json ]] && command -v jq >/dev/null 2>&1; then
   if [[ -f AGENTS.md ]]; then
     # Use awk to extract the Commands section and parse bullets/lines
     # Formats supported:
+    #   - `npm run <name>` — <description>   (backticked rich format)
     #   - npm run <name> — <description>
     #   - npm run <name> - <description>
     #   - npm run <name>  (no description)
     #   <name> — <description>
     while IFS= read -r line; do
-      # Match patterns like "npm run <name> — <desc>" or "<name> — <desc>" or "- npm run <name> — <desc>"
-      if [[ "$line" =~ ^[[:space:]]*[-*]?[[:space:]]*(npm[[:space:]]+run[[:space:]]+)?([^[:space:]:—-]+)[[:space:]]*[—-][[:space:]]*(.+)$ ]]; then
+      # Strip backticks FIRST: the documented rich format is
+      # "- `npm run dev` — Start development server" and the name class below
+      # would otherwise capture "`npm" (backtick is not whitespace) and never
+      # match the script name, silently dropping every description.
+      line="${line//\`/}"
+      # Name class allows ':' (canonical npm scripts like test:e2e /
+      # test:coverage) and stops at whitespace or the em-dash/hyphen separator.
+      if [[ "$line" =~ ^[[:space:]]*[-*]?[[:space:]]*(npm[[:space:]]+run[[:space:]]+)?([^[:space:]—-]+)[[:space:]]*[—-][[:space:]]*(.+)$ ]]; then
         CMD_NAMES+=("${BASH_REMATCH[2]}")
         CMD_DESCS+=("${BASH_REMATCH[3]}")
-      elif [[ "$line" =~ ^[[:space:]]*[-*]?[[:space:]]*(npm[[:space:]]+run[[:space:]]+)?([^[:space:]:—-]+)[[:space:]]*$ ]]; then
+      elif [[ "$line" =~ ^[[:space:]]*[-*]?[[:space:]]*(npm[[:space:]]+run[[:space:]]+)?([^[:space:]—-]+)[[:space:]]*$ ]]; then
         CMD_NAMES+=("${BASH_REMATCH[2]}")
         CMD_DESCS+=("")
       fi
     done < <(_wf_section "Commands")
   fi
   
-  # Emit merged bullets: - npm run <name> — <description> (description omitted when unknown)
+  # Emit merged bullets: - `npm run <name>` — <description> (description
+  # omitted when unknown). Backticked shape matches the documented rich format
+  # so the next refresh round-trips through the parser unchanged.
   # Last match wins so later duplicates override earlier ones.
   MERGED_COMMANDS=""
+  MERGED_DESC_COUNT=0
+  SCRIPT_TOTAL=0
   while IFS= read -r script; do
     [[ -z "$script" ]] && continue
+    SCRIPT_TOTAL=$((SCRIPT_TOTAL+1))
     desc=""
     for _ci in "${!CMD_NAMES[@]}"; do
       if [[ "${CMD_NAMES[_ci]}" = "$script" ]]; then
@@ -941,9 +953,10 @@ if [[ -f package.json ]] && command -v jq >/dev/null 2>&1; then
       fi
     done
     if [[ -n "$desc" ]]; then
-      MERGED_COMMANDS+="- npm run $script — $desc"$'\n'
+      MERGED_COMMANDS+="- \`npm run $script\` — $desc"$'\n'
+      MERGED_DESC_COUNT=$((MERGED_DESC_COUNT+1))
     else
-      MERGED_COMMANDS+="- npm run $script"$'\n'
+      MERGED_COMMANDS+="- \`npm run $script\`"$'\n'
     fi
   done <<< "$SCRIPT_NAMES"
   
@@ -956,7 +969,10 @@ if [[ -f package.json ]] && command -v jq >/dev/null 2>&1; then
     STAGING_DIR=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' "$WF_STATE")
     STAGING_STATE_BF="$STAGING_DIR/wizard-state.json"
     WF_STATE="$STAGING_STATE_BF" _apply_jq_filter --arg commands "$MERGED_COMMANDS" '.discovery.commands = $commands'
-    echo "✓ Updated discovery.commands with merged descriptions (staging)"
+    echo "✓ Merged $MERGED_DESC_COUNT/$SCRIPT_TOTAL command descriptions from AGENTS.md (staging)"
+    if [[ "$MERGED_DESC_COUNT" -eq 0 ]]; then
+      echo "⚠ No command descriptions matched the current AGENTS.md Commands section — re-run /wf-init phase1 if this section should be annotated"
+    fi
   fi
 fi
 
@@ -987,13 +1003,18 @@ if [[ -n "$LIVE_STRUCTURE" ]]; then
   if [[ -f AGENTS.md ]]; then
     # Extract lines like "src/ — single source of truth" or "templates/  # single source of truth"
     while IFS= read -r line; do
+      # Normalize tree-drawing glyphs FIRST ("├── src/" -> "src/"): box-drawing
+      # chars are not [[:space:]], so without this the path class never reached
+      # them and every comment in a tree-formatted section was silently dropped.
+      line="${line//[│├└─]/}"
+      line="${line#"${line%%[![:space:]]*}"}"   # ltrim
       # Match patterns: "path/ — comment" or "path/  # comment" or "path/ -- comment".
       # The separator class is [—#-] (dash LAST): "[—-#]" would form the range
       # em-dash..'#', which is empty, so em-dash comments never matched.
-      if [[ "$line" =~ ^[[:space:]]*[-*]?[[:space:]]*([^[:space:]:#—-]+/)[[:space:]]*[—#-][[:space:]]*(.+)$ ]]; then
+      if [[ "$line" =~ ^[-*]?[[:space:]]*([^[:space:]:#—-]+/)[[:space:]]*[—#-][[:space:]]*(.+)$ ]]; then
         STRUCT_PATHS+=("${BASH_REMATCH[1]%/}")
         STRUCT_COMMENTS+=("${BASH_REMATCH[2]}")
-      elif [[ "$line" =~ ^[[:space:]]*[-*]?[[:space:]]*([^[:space:]:#—-]+/)[[:space:]]*$ ]]; then
+      elif [[ "$line" =~ ^[-*]?[[:space:]]*([^[:space:]:#—-]+/)[[:space:]]*$ ]]; then
         STRUCT_PATHS+=("${BASH_REMATCH[1]%/}")
         STRUCT_COMMENTS+=("")
       fi
@@ -1040,8 +1061,35 @@ if [[ -n "$LIVE_STRUCTURE" ]]; then
   if [[ -n "$MERGED_STRUCTURE" ]]; then
     STAGING_DIR=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' "$WF_STATE")
     STAGING_STATE_BF="$STAGING_DIR/wizard-state.json"
-    WF_STATE="$STAGING_STATE_BF" _apply_jq_filter --arg st "$MERGED_STRUCTURE" '.discovery.conventions.structure = $st'
-    echo "✓ Regenerated structure from live tree with merged comments"
+    # Downgrade guard: never trade a MORE informative section for a LESS
+    # informative one. A fenced/tree-formatted original (written by /wf-init
+    # discovery: hierarchy, files, comments) outranks the deterministic flat
+    # regeneration (dirs only, depth 2) — keep it verbatim. Same guard when
+    # regeneration would drop every inline comment the original had.
+    OLD_ANNOTATED=0
+    for _sc in "${STRUCT_COMMENTS[@]}"; do
+      if [[ -n "$_sc" ]]; then OLD_ANNOTATED=$((OLD_ANNOTATED+1)); fi
+    done
+    NEW_ANNOTATED=$(printf '%s' "$MERGED_STRUCTURE" | grep -c ' — ' || true)
+    RAW_STRUCTURE_SECTION=""
+    if [[ -f AGENTS.md ]]; then
+      RAW_STRUCTURE_SECTION=$(_wf_section "Project Structure")
+    fi
+    case "$RAW_STRUCTURE_SECTION" in
+      *'```'*|*'│'*|*'├'*|*'└'*)
+        WF_STATE="$STAGING_STATE_BF" _apply_jq_filter --arg st "$RAW_STRUCTURE_SECTION" '.discovery.conventions.structure = $st'
+        echo "✓ Kept rich Project Structure section verbatim (tree/fenced format outranks flat regeneration)"
+        ;;
+      *)
+        if [[ "$OLD_ANNOTATED" -gt 0 && "$NEW_ANNOTATED" -eq 0 ]]; then
+          WF_STATE="$STAGING_STATE_BF" _apply_jq_filter --arg st "$RAW_STRUCTURE_SECTION" '.discovery.conventions.structure = $st'
+          echo "⚠ Regenerated structure lost all $OLD_ANNOTATED inline comments — kept original section verbatim"
+        else
+          WF_STATE="$STAGING_STATE_BF" _apply_jq_filter --arg st "$MERGED_STRUCTURE" '.discovery.conventions.structure = $st'
+          echo "✓ Regenerated structure from live tree ($NEW_ANNOTATED inline comments preserved)"
+        fi
+        ;;
+    esac
   fi
 fi
 
@@ -1494,7 +1542,22 @@ PLAN="refresh-plan.json"
 # text (e.g. Vue/Angular interpolation quoted in project docs) is NOT a
 # wizard placeholder and must not fail the refresh.
 echo "ℹ Scanning staging for unresolved placeholders..."
-PLACEHOLDER_HITS=$(grep -RInE '\{\{(answers|discovery|features|testing|mcps|protocols|conventions|stack)\.|\{\{(wizard_version|version|sdd\.backend)\}\}|\{\{PROTOCOL_BODY:' "$STAGING" 2>/dev/null || true)
+PLACEHOLDER_HITS=$(grep -RInE '\{\{(answers|discovery|features|testing|mcps|protocols|conventions|stack)\.|\{\{(wizard_version|version)\}\}|\{\{PROTOCOL_BODY:' "$STAGING" 2>/dev/null || true)
+# {{sdd.backend}} is scanned SEPARATELY with a narrow exemption: it doubles as
+# a RUNTIME literal — the sed SEARCH PATTERN wf-settings uses to re-resolve the
+# SDD backend when the user switches backends post-build — and builder-core.py
+# ships it verbatim on purpose (see its NOTE in write_skills). Only occurrences
+# OUTSIDE that sed-command context are unresolved-placeholder leaks. The
+# exemption regex MUST use grep -E with escaped braces: BSD grep (macOS) gives
+# undefined behavior for unescaped `{{` in BRE, so a fix validated only against
+# GNU grep can pass CI and silently match nothing on macOS.
+SDD_BACKEND_HITS=$(grep -RInE '\{\{sdd\.backend\}\}' "$STAGING" 2>/dev/null \
+  | grep -vE 'sed[[:space:]].*s.[[:space:]]*\{\{sdd\.backend\}\}' || true)
+if [[ -n "$PLACEHOLDER_HITS" && -n "$SDD_BACKEND_HITS" ]]; then
+  PLACEHOLDER_HITS="${PLACEHOLDER_HITS}"$'\n'"${SDD_BACKEND_HITS}"
+elif [[ -z "$PLACEHOLDER_HITS" && -n "$SDD_BACKEND_HITS" ]]; then
+  PLACEHOLDER_HITS="$SDD_BACKEND_HITS"
+fi
 if [[ -n "$PLACEHOLDER_HITS" ]]; then
   echo "✗ Unresolved wizard placeholders found in $STAGING:" >&2
   echo "$PLACEHOLDER_HITS" >&2
@@ -1657,7 +1720,7 @@ echo "  Deleted-modified: $DELETED_MODIFIED_COUNT (requires explicit approval)"
 echo "  Unchanged: $UNCHANGED_COUNT (skipped)"
 
 if jq -e '.updated[]? | select(.path == "AGENTS.md")' "$PLAN" >/dev/null 2>&1; then
-  echo "ℹ AGENTS.md will be regenerated from state.discovery. If the Commands/Code Style/Project Structure/MCPs sections look flat, re-run /wf-init phase1 (discovery) before the next refresh."
+  echo "ℹ AGENTS.md will be regenerated from state.discovery. Fenced/tree-formatted Project Structure sections and backticked command descriptions are preserved/merged; if other sections still look flat, re-run /wf-init phase1 (discovery) before the next refresh."
 fi
 
 # The plan now holds the classified diff; the pre-Builder baseline is no longer
