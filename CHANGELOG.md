@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.12-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.11-beta.1...v0.8.12-beta.1) (2026-08-21)
+
+
+### Bug Fixes
+
+* **wf-refresh:** narrow sed exemption in R4 gate and rich-section preservation ([#111](https://github.com/hugoafj/ai-workflow-wizard/issues/111)) ([9217962](https://github.com/hugoafj/ai-workflow-wizard/commit/921796207e7cb45a7a44b8ce37bdca19562f0d51))
+
 ## [0.8.11-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.10-beta.1...v0.8.11-beta.1) (2026-08-21)
 
 
