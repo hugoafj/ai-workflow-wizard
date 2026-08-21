@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.11-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.10-beta.1...v0.8.11-beta.1) (2026-08-21)
+
+
+### Bug Fixes
+
+* **wf-refresh:** 4 silent-failure bugs (B1–B4) ([#108](https://github.com/hugoafj/ai-workflow-wizard/issues/108)) ([f66b854](https://github.com/hugoafj/ai-workflow-wizard/commit/f66b8545765fc849c32e3e7f52261bc9cc208a3b))
+
 ## [0.8.10-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.9-beta.1...v0.8.10-beta.1) (2026-08-21)
 
 
