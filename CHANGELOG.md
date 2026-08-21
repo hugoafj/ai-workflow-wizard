@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.10-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.9-beta.1...v0.8.10-beta.1) (2026-08-21)
+
+
+### Bug Fixes
+
+* **wf-refresh:** stop R-1 on unanswered global-update prompt and keep AGENTS.md sections rich ([#106](https://github.com/hugoafj/ai-workflow-wizard/issues/106)) ([2e66521](https://github.com/hugoafj/ai-workflow-wizard/commit/2e665218c3a969375b759a2a67ca9896ba9b8ca6))
+
 ## [0.8.9-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.8-beta.1...v0.8.9-beta.1) (2026-08-20)
 
 
