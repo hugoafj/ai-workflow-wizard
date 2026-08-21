@@ -209,19 +209,30 @@ R4's `DEPRECATED_PATHS` SHALL include per-IDE **skills** paths for the deprecate
 
 ### Requirement: FU5 — Non-tty robustness with structured manifest and resume
 
-A non-tty run with an unanswered prompt (no `WF_REFRESH_ANSWERS` entry, no `WF_REFRESH_DEFAULT_ANSWER`) SHALL NOT abort the pipeline with a bare `exit 2`. It SHALL emit a structured pending-prompts manifest (`GENTLE_AI_WF_REFRESH_NEEDS="prompt=...|..."` payload), exit with a clear documented code, and either clean `.wizard-staging/`/`refresh-plan.json`/baseline or print exact resume instructions. `WF_REFRESH_RESUME=1` SHALL skip R-1→R4 and re-enter the R5 gate with staging intact. Abort paths (R5 cancel, apply-gate refusal) SHALL clean staging/plan or print exact resume steps.
+A non-tty run with an unanswered prompt (no `WF_REFRESH_ANSWERS` entry, no `WF_REFRESH_DEFAULT_ANSWER`) SHALL NOT abort the pipeline with a bare `exit 2`. It SHALL emit a structured pending-prompts manifest (`GENTLE_AI_WF_REFRESH_NEEDS="prompt=...|..."` payload), exit with a clear documented code, and either clean `.wizard-staging/`/`refresh-plan.json`/baseline or print exact resume instructions.
 
-#### Scenario: Unanswered prompt emits the manifest
+Pre-R5 prompts (R1 drift, R2 features) SHALL stop their owning phase IMMEDIATELY via fail-fast (`_require_answer_or_stop`): continuing on a default answer would build staging from stale info, and an answer collected later would have no consumer because the owning phase never re-runs. The failing phase SHALL write `.wizard-resume-phase` before exiting 3. With `WF_REFRESH_RESUME=1`, phases R-1→R4 SHALL consult that marker: phases before the target skip themselves, the target phase consumes the marker and re-runs fully (its prompts resolve from `WF_REFRESH_ANSWERS`), and the pipeline continues through R5 normally. Without a marker, `WF_REFRESH_RESUME=1` SHALL preserve the legacy behavior of skipping R-1→R4 and re-entering the R5 gate with staging intact (for runs stopped at R5). Abort paths (R5 cancel, apply-gate refusal) SHALL clean staging/plan or print exact resume steps.
+
+#### Scenario: Unanswered pre-R5 prompt stops its phase
 
 - GIVEN a non-tty run and the R1 drift prompt has no answer and no default
-- WHEN `_ask_yesno_safe` is called
-- THEN the run does not `exit 2` mid-pipeline
-- AND it prints `GENTLE_AI_WF_REFRESH_NEEDS="prompt=..."` with a clear exit code
+- WHEN `_require_answer_or_stop` is called
+- THEN the phase stops immediately (before any staging work) instead of taking a silent default-"no" path
+- AND it prints `GENTLE_AI_WF_REFRESH_NEEDS="prompt=..."` with exit code 3
+- AND `.wizard-resume-phase` names the phase that asked
 - AND no orphaned `.wizard-staging/`, `refresh-plan.json`, or `.wizard-refresh-baseline.json` remain (or exact resume instructions are printed)
+
+#### Scenario: Resume re-enters the phase that recorded the prompt
+
+- GIVEN a previous non-tty run stopped at R1 or R2 with `.wizard-resume-phase` written
+- WHEN re-run with `WF_REFRESH_RESUME=1` and the matching `WF_REFRESH_ANSWERS` entry
+- THEN earlier phases skip themselves via the marker
+- AND the marked phase re-runs fully, consuming the supplied answer
+- AND the pipeline continues through R3→R5 normally
 
 #### Scenario: Resume re-enters R5 with staging intact
 
-- GIVEN a previous run stopped at the R5 gate and `.wizard-staging/` + `refresh-plan.json` still exist
+- GIVEN a previous run stopped at the R5 gate and `.wizard-staging/` + `refresh-plan.json` still exist, with no `.wizard-resume-phase` marker
 - WHEN re-run with `WF_REFRESH_RESUME=1`
 - THEN R-1→R4 are skipped
 - AND the R5 review gate re-enters with the preserved plan and staging intact
