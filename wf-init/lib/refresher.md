@@ -590,7 +590,9 @@ if [[ "${WF_REFRESH_RESUME:-}" = "1" ]]; then
           if bash "$INSTALL_SH"; then
             echo "⚠ Global commands updated to $REMOTE_VERSION."
             echo "  Open a NEW session and re-run /wf-refresh so the updated wizard drives the refresh."
-            exit 0
+            # Exit 3 (not 0): the orchestrator must stop here. Continuing would
+            # run R0-R4 with the stale wizard code downloaded at session start.
+            exit 3
           else
             echo "⚠ install.sh failed; continuing anyway"
           fi
@@ -647,7 +649,19 @@ fi
 
 if version_lt "$LOCAL_VERSION" "$REMOTE_VERSION"; then
   echo "⚠ Wizard is outdated (local: $LOCAL_VERSION, remote: $REMOTE_VERSION)"
-  if _ask_yesno_safe "Update global commands?"; then
+  UPDATE_RC=0
+  _ask_yesno_safe "Update global commands?" || UPDATE_RC=$?
+  if [[ "$UPDATE_RC" = "3" ]]; then
+    # Restart-semantics prompt: this answer decides whether the wizard itself is
+    # replaced, so it must be resolved BEFORE any refresh work. Cut the pipeline
+    # here instead of deferring to R5 — R0-R4 work would be wasted once the user
+    # answers "yes" (install.sh requires a fresh session anyway).
+    rm -f "${WF_DIR}/.wizard-pending-prompts"
+    echo "GENTLE_AI_WF_REFRESH_NEEDS=prompt=Update global commands?"
+    echo "✗ Non-tty run requires an answer for 'Update global commands?' before any refresh work." >&2
+    echo "  Set WF_REFRESH_ANSWERS='Update global commands?=yes' (or =no) and re-run with WF_REFRESH_RESUME=1." >&2
+    exit 3
+  elif [[ "$UPDATE_RC" = "0" ]]; then
     # install.sh lives in the wizard repo, not in the project directory.
     INSTALL_SH="${WF_DIR}/install.sh"
     if curl -fsSL "${WF_RAW}/install.sh" -o "$INSTALL_SH" 2>/dev/null && [[ -s "$INSTALL_SH" ]]; then
@@ -655,9 +669,11 @@ if version_lt "$LOCAL_VERSION" "$REMOTE_VERSION"; then
       if bash "$INSTALL_SH"; then
         # The global commands just changed: continuing in this session would mix
         # the old and new wizard versions. Stop and ask for a fresh session.
+        # Exit 3 (not 0) so the orchestrator's `|| exit` stops the run instead of
+        # proceeding to R0 with stale wizard code.
         echo "⚠ Global commands updated to $REMOTE_VERSION."
         echo "  Open a NEW session and re-run /wf-refresh so the updated wizard drives the refresh."
-        exit 0
+        exit 3
       else
         echo "⚠ install.sh failed; continuing anyway"
       fi
@@ -816,8 +832,11 @@ if [[ -f package.json ]] && command -v jq >/dev/null 2>&1; then
   # Extract fresh script names from package.json (without "npm run " prefix for matching)
   SCRIPT_NAMES=$(jq -r '.scripts | keys[]' package.json 2>/dev/null || true)
   
-  # Parse current AGENTS.md Commands section for descriptions (if AGENTS.md exists)
-  declare -A CMD_DESC
+  # Parse current AGENTS.md Commands section for descriptions (if AGENTS.md exists).
+  # Parallel indexed arrays instead of `declare -A`: associative arrays need
+  # bash 4+, but stock macOS still ships bash 3.2.
+  CMD_NAMES=()
+  CMD_DESCS=()
   if [[ -f AGENTS.md ]]; then
     # Use awk to extract the Commands section and parse bullets/lines
     # Formats supported:
@@ -828,21 +847,26 @@ if [[ -f package.json ]] && command -v jq >/dev/null 2>&1; then
     while IFS= read -r line; do
       # Match patterns like "npm run <name> — <desc>" or "<name> — <desc>" or "- npm run <name> — <desc>"
       if [[ "$line" =~ ^[[:space:]]*[-*]?[[:space:]]*(npm[[:space:]]+run[[:space:]]+)?([^[:space:]:—-]+)[[:space:]]*[—-][[:space:]]*(.+)$ ]]; then
-        name="${BASH_REMATCH[2]}"
-        desc="${BASH_REMATCH[3]}"
-        CMD_DESC["$name"]="$desc"
+        CMD_NAMES+=("${BASH_REMATCH[2]}")
+        CMD_DESCS+=("${BASH_REMATCH[3]}")
       elif [[ "$line" =~ ^[[:space:]]*[-*]?[[:space:]]*(npm[[:space:]]+run[[:space:]]+)?([^[:space:]:—-]+)[[:space:]]*$ ]]; then
-        name="${BASH_REMATCH[2]}"
-        CMD_DESC["$name"]=""
+        CMD_NAMES+=("${BASH_REMATCH[2]}")
+        CMD_DESCS+=("")
       fi
     done < <(_wf_section "Commands")
   fi
   
   # Emit merged bullets: - npm run <name> — <description> (description omitted when unknown)
+  # Last match wins so later duplicates override earlier ones.
   MERGED_COMMANDS=""
   while IFS= read -r script; do
     [[ -z "$script" ]] && continue
-    desc="${CMD_DESC[$script]:-}"
+    desc=""
+    for _ci in "${!CMD_NAMES[@]}"; do
+      if [[ "${CMD_NAMES[_ci]}" = "$script" ]]; then
+        desc="${CMD_DESCS[_ci]}"
+      fi
+    done
     if [[ -n "$desc" ]]; then
       MERGED_COMMANDS+="- npm run $script — $desc"$'\n'
     else
@@ -864,42 +888,77 @@ if [[ -f package.json ]] && command -v jq >/dev/null 2>&1; then
 fi
 
 # FU3c: Regenerate Project Structure from live tree and merge comments from AGENTS.md
-# Deterministic find: depth 2, exclude node_modules/.git/dist/.wizard-*
+# Deterministic find: depth 2. Exclude build/output/dependency directories BOTH
+# themselves and their children ("-not -path X" alone misses the directory when
+# the pattern requires a trailing slash component).
 LIVE_STRUCTURE=$(find . -mindepth 1 -maxdepth 2 -type d \
-  -not -path "./node_modules/*" \
-  -not -path "./.git/*" \
-  -not -path "./dist/*" \
-  -not -path "./.wizard-*" \
+  -not -path "./node_modules" -not -path "./node_modules/*" \
+  -not -path "./.git" -not -path "./.git/*" \
+  -not -path "./dist" -not -path "./dist/*" \
+  -not -path "./build" -not -path "./build/*" \
+  -not -path "./coverage" -not -path "./coverage/*" \
+  -not -path "./playwright-report" -not -path "./playwright-report/*" \
+  -not -path "./test-results" -not -path "./test-results/*" \
   -not -path "./.wizard-*" \
   2>/dev/null | sed 's|^\./||' | sort)
 
 if [[ -n "$LIVE_STRUCTURE" ]]; then
-  # Parse old AGENTS.md Project Structure for comments (path -> comment)
-  declare -A STRUCT_COMMENTS
+  # Parse old AGENTS.md Project Structure for comments (path -> comment).
+  # Parallel indexed arrays instead of `declare -A` (bash 3.2 compatible).
+  # Paths are stored WITHOUT trailing slash so they match the live tree's
+  # `find` output exactly ("src/" in prose vs "src" from find never matched,
+  # which silently dropped every merged comment); the trailing slash is
+  # re-added on emission to keep the documented "dir/ — comment" shape.
+  STRUCT_PATHS=()
+  STRUCT_COMMENTS=()
   if [[ -f AGENTS.md ]]; then
     # Extract lines like "src/ — single source of truth" or "templates/  # single source of truth"
     while IFS= read -r line; do
-      # Match patterns: "path/ — comment" or "path/  # comment" or "path/ -- comment"
-      if [[ "$line" =~ ^[[:space:]]*[-*]?[[:space:]]*([^[:space:]:#—-]+/)[[:space:]]*[—-#][[:space:]]*(.+)$ ]]; then
-        path="${BASH_REMATCH[1]}"
-        comment="${BASH_REMATCH[2]}"
-        STRUCT_COMMENTS["$path"]="$comment"
+      # Match patterns: "path/ — comment" or "path/  # comment" or "path/ -- comment".
+      # The separator class is [—#-] (dash LAST): "[—-#]" would form the range
+      # em-dash..'#', which is empty, so em-dash comments never matched.
+      if [[ "$line" =~ ^[[:space:]]*[-*]?[[:space:]]*([^[:space:]:#—-]+/)[[:space:]]*[—#-][[:space:]]*(.+)$ ]]; then
+        STRUCT_PATHS+=("${BASH_REMATCH[1]%/}")
+        STRUCT_COMMENTS+=("${BASH_REMATCH[2]}")
       elif [[ "$line" =~ ^[[:space:]]*[-*]?[[:space:]]*([^[:space:]:#—-]+/)[[:space:]]*$ ]]; then
-        path="${BASH_REMATCH[1]}"
-        STRUCT_COMMENTS["$path"]=""
+        STRUCT_PATHS+=("${BASH_REMATCH[1]%/}")
+        STRUCT_COMMENTS+=("")
       fi
     done < <(_wf_section "Project Structure")
   fi
   
-  # Merge: live tree paths with comments from old structure where path matches exactly
+  _struct_in_live() {
+    # Membership test against the live tree list (exact line match).
+    printf '%s\n' "$LIVE_STRUCTURE" | grep -Fxq "$1"
+  }
+  
+  # Merge pass 1: surviving original entries first, in original order, with
+  # their comments; drop paths that no longer exist on disk.
   MERGED_STRUCTURE=""
-  while IFS= read -r path; do
-    [[ -z "$path" ]] && continue
-    comment="${STRUCT_COMMENTS[$path]:-}"
-    if [[ -n "$comment" ]]; then
-      MERGED_STRUCTURE+="$path — $comment"$'\n'
-    else
-      MERGED_STRUCTURE+="$path"$'\n'
+  for _si in "${!STRUCT_PATHS[@]}"; do
+    _sp="${STRUCT_PATHS[_si]}"
+    if _struct_in_live "$_sp"; then
+      _sc="${STRUCT_COMMENTS[_si]}"
+      if [[ -n "$_sc" ]]; then
+        MERGED_STRUCTURE+="$_sp/ — $_sc"$'\n'
+      else
+        MERGED_STRUCTURE+="$_sp/"$'\n'
+      fi
+    fi
+  done
+  
+  # Merge pass 2: newly detected directories (no original entry), sorted order.
+  while IFS= read -r _lp; do
+    [[ -z "$_lp" ]] && continue
+    _known=0
+    for _si in "${!STRUCT_PATHS[@]}"; do
+      if [[ "${STRUCT_PATHS[_si]}" = "$_lp" ]]; then
+        _known=1
+        break
+      fi
+    done
+    if [[ "$_known" = "0" ]]; then
+      MERGED_STRUCTURE+="$_lp/"$'\n'
     fi
   done <<< "$LIVE_STRUCTURE"
   
@@ -944,8 +1003,11 @@ if [[ ${#DETECTED_MCPS[@]} -gt 0 ]]; then
 fi
 
 # Parse old AGENTS.md MCP table for purpose/setup (3-col: | MCP | Purpose | Required setup |)
-declare -A MCP_PURPOSE
-declare -A MCP_SETUP
+# Parallel indexed arrays instead of `declare -A`: associative arrays need
+# bash 4+, but stock macOS still ships bash 3.2. Last match wins.
+MCP_NAMES=()
+MCP_PURPOSES=()
+MCP_SETUPS=()
 if [[ -f AGENTS.md ]]; then
   while IFS= read -r line; do
     # Match 3-col table rows: | name | purpose | setup |
@@ -959,8 +1021,9 @@ if [[ -f AGENTS.md ]]; then
       setup=$(echo "$setup" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
       # Skip header and separator rows
       if [[ "$name" != "MCP" && "$name" != "---" && "$name" != "" ]]; then
-        MCP_PURPOSE["$name"]="$purpose"
-        MCP_SETUP["$name"]="$setup"
+        MCP_NAMES+=("$name")
+        MCP_PURPOSES+=("$purpose")
+        MCP_SETUPS+=("$setup")
       fi
     fi
   done < <(_wf_section "Project MCPs")
@@ -970,8 +1033,14 @@ fi
 if [[ ${#DETECTED_MCPS[@]} -gt 0 ]]; then
   MCP_JSON=""
   for name in "${DETECTED_MCPS[@]}"; do
-    purpose="${MCP_PURPOSE[$name]:-}"
-    setup="${MCP_SETUP[$name]:-}"
+    purpose=""
+    setup=""
+    for _mi in "${!MCP_NAMES[@]}"; do
+      if [[ "${MCP_NAMES[_mi]}" = "$name" ]]; then
+        purpose="${MCP_PURPOSES[_mi]}"
+        setup="${MCP_SETUPS[_mi]}"
+      fi
+    done
     if [[ -n "$purpose" || -n "$setup" ]]; then
       # Escape JSON strings
       p_escaped=$(printf '%s' "$purpose" | jq -Rs .)

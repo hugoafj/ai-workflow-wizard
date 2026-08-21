@@ -532,7 +532,9 @@ def infer_placeholder(state, key):
             checks.append("test")
         if "e2e" in layers:
             checks.append("test:e2e")
-        return ", ".join(checks)
+        # Bulleted list (one command per line) instead of a comma join: the
+        # comma form was unreadable and lost the run-these-before-done framing.
+        return "\n".join("- `npm run %s`" % c for c in checks)
 
     if key == "mcps.table":
         mcps = get_state_value(state, "mcps", []) or []
@@ -722,6 +724,13 @@ def testing_approach_section(state):
     shipped AGENTS.md always shows the tests that actually exist. The router
     already provides the `## Testing Approach` heading, so this returns the
     body only (no duplicate heading).
+
+    Rich deterministic content modeled on the canonical fragment: per-layer
+    blocks carry the file-placement and naming conventions (unit tests next to
+    the code under test, integration in a dedicated folder, e2e specs named by
+    user flow), not just the run commands. Runner brand names are deliberately
+    omitted — they belong to the Commands section, which the discovery merge
+    keeps accurate.
     """
     layers = normalize_layers(state)
     has_unit = "unit" in layers or "integration" in layers
@@ -736,6 +745,9 @@ def testing_approach_section(state):
             "```bash",
             "npm run test",
             "```",
+            "",
+            "- Unit: one test file next to the code it covers (`Component.test.tsx` next to the component).",
+            "- Integration: real render tests in `src/__tests__/integration/` (`*.integration.test.tsx`).",
         ]
     if has_e2e:
         lines += [
@@ -747,6 +759,9 @@ def testing_approach_section(state):
             "```bash",
             "npm run test:e2e",
             "```",
+            "",
+            "- One spec file per user flow, named by the flow — not by the component or hook.",
+            "- Specs live in `e2e/<feature-name>.spec.ts` (examples: `persistence.spec.ts`, `task-creation.spec.ts`).",
         ]
     if not has_unit and not has_e2e:
         lines += [
