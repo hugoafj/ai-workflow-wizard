@@ -48,6 +48,15 @@ WIZARD_REPO="${WIZARD_REPO:-hugoafj/ai-workflow-wizard}"
 WIZARD_BRANCH="${WIZARD_BRANCH:-main}"
 WF_RAW="${WF_RAW:-https://raw.githubusercontent.com/${WIZARD_REPO}/${WIZARD_BRANCH}}"
 
+# Durable per-project state dir: resume marker (.wizard-resume-phase), pending
+# prompts (.wizard-pending-prompts) and the R5 full review file. The bootstrap
+# exports it; re-derive here so any phase block run standalone still resolves
+# it. It MUST live outside WF_DIR: the bootstrap wipes WF_DIR at the start of
+# every run, and resume state has to survive that wipe (field report M3).
+WF_STATE_DIR="${WF_STATE_DIR:-${TMPDIR:-/tmp}/wf-refresh-state-$(printf %s "$(pwd)" | cksum | cut -d' ' -f1)}"
+export WF_STATE_DIR
+mkdir -p "$WF_STATE_DIR"
+
 # Source shared helpers (wf_fetch_version, wf_sha256) from /wf-init.
 [ -f "${WF_DIR}/lib/state-helpers.sh" ] && source "${WF_DIR}/lib/state-helpers.sh"
 
@@ -205,7 +214,7 @@ version_lt() {
 # already-answered question.
 _wf_pending_remove() {
   local prompt="$1"
-  local pending_file="${WF_DIR}/.wizard-pending-prompts"
+  local pending_file="${WF_STATE_DIR}/.wizard-pending-prompts"
   [ -f "$pending_file" ] || return 0
   local tmp="${pending_file}.tmp"
   # grep exits 1 when EVERY line matched (result is empty): tolerate it.
@@ -277,7 +286,7 @@ _ask_yesno_safe() {
       return 1
     else
       # FU5: Record pending prompt for manifest instead of aborting.
-      local pending_file="${WF_DIR}/.wizard-pending-prompts"
+      local pending_file="${WF_STATE_DIR}/.wizard-pending-prompts"
       echo "$prompt" >> "$pending_file"
       echo "(non-interactive — prompt recorded for manifest: '$prompt')"
       return 3
@@ -337,7 +346,7 @@ _require_answer_or_stop() {
   case "$rc" in
     0|1) return "$rc" ;;
     3)
-      printf '%s\n' "$phase_id" > "${WF_DIR}/.wizard-resume-phase"
+      printf '%s\n' "$phase_id" > "${WF_STATE_DIR}/.wizard-resume-phase"
       echo "GENTLE_AI_WF_REFRESH_NEEDS=prompt=${prompt}"
       echo "✗ Non-tty run requires an answer for '${prompt}' before ${phase_id} can continue." >&2
       echo "  Set WF_REFRESH_ANSWERS='${prompt}=yes' (or =no) and re-run with WF_REFRESH_RESUME=1." >&2
@@ -355,7 +364,7 @@ _require_answer_or_stop() {
 # the pre-existing WF_REFRESH_RESUME contract keeps working unchanged.
 _wf_resume_gate() {
   local phase_id="$1"
-  local marker="${WF_DIR}/.wizard-resume-phase"
+  local marker="${WF_STATE_DIR}/.wizard-resume-phase"
   if [[ "${WF_REFRESH_RESUME:-}" = "1" && -f "$marker" ]]; then
     local marked
     marked=$(cat "$marker")
@@ -697,7 +706,7 @@ fi
 
 # FU5: Clear pending prompts file at start of fresh run (R-1 is first phase).
 # Also clear any stale resume-phase marker from a previous interrupted run.
-rm -f "${WF_DIR}/.wizard-pending-prompts" "${WF_DIR}/.wizard-resume-phase"
+rm -f "${WF_STATE_DIR}/.wizard-pending-prompts" "${WF_STATE_DIR}/.wizard-resume-phase"
 
 LOCAL_VERSION=""
 # install.sh SIEMPRE instala en .agents/skills/ (unconditional fallback universal)
@@ -741,7 +750,7 @@ if version_lt "$LOCAL_VERSION" "$REMOTE_VERSION"; then
     # replaced, so it must be resolved BEFORE any refresh work. Cut the pipeline
     # here instead of deferring to R5 — R0-R4 work would be wasted once the user
     # answers "yes" (install.sh requires a fresh session anyway).
-    rm -f "${WF_DIR}/.wizard-pending-prompts"
+    rm -f "${WF_STATE_DIR}/.wizard-pending-prompts"
     echo "GENTLE_AI_WF_REFRESH_NEEDS=prompt=Update global commands?"
     echo "✗ Non-tty run requires an answer for 'Update global commands?' before any refresh work." >&2
     echo "  Set WF_REFRESH_ANSWERS='Update global commands?=yes' (or =no) and re-run with WF_REFRESH_RESUME=1." >&2
@@ -1742,6 +1751,30 @@ if jq -e '.updated[]? | select(.path == "AGENTS.md")' "$PLAN" >/dev/null 2>&1; t
   echo "ℹ AGENTS.md will be regenerated from state.discovery. Fenced/tree-formatted Project Structure sections and backticked command descriptions are preserved/merged; if other sections still look flat, re-run /wf-init phase1 (discovery) before the next refresh."
 fi
 
+# Behavioral diff for curated config keys (field report B4): R5 classifies by
+# hash, so a semantic flip like ci.auto_improve false→true hides among N
+# mechanical updates. Compare the project copy vs staging line-wise per key
+# and persist every flip into the plan so R5 can surface them FIRST.
+CURATED_KEYS=(auto_improve tdd_mode e2e_in_ci release_ai_summary release_ai_provider)
+BEHAVIORAL="[]"
+while IFS= read -r ufile; do
+  [[ -n "$ufile" && -f "$ufile" && -f "$STAGING/$ufile" ]] || continue
+  for KEY in "${CURATED_KEYS[@]}"; do
+    OLD_V=$(grep -hE "^[[:space:]]*[\"']?${KEY}[\"']?[[:space:]]*[:=]" "$ufile" 2>/dev/null | tail -n 1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' || true)
+    NEW_V=$(grep -hE "^[[:space:]]*[\"']?${KEY}[\"']?[[:space:]]*[:=]" "${STAGING}/${ufile}" 2>/dev/null | tail -n 1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' || true)
+    if [[ -n "$OLD_V$NEW_V" && "$OLD_V" != "$NEW_V" ]]; then
+      BEHAVIORAL=$(jq --arg path "$ufile" --arg old_v "$OLD_V" --arg new_v "$NEW_V" \
+        '. += [{"path": $path, "old": $old_v, "new": $new_v}]' <<< "$BEHAVIORAL")
+    fi
+  done
+done < <(jq -r '.updated[]?.path' "$PLAN")
+jq --argjson behavioral "$BEHAVIORAL" '. + {behavioral_changes: $behavioral}' "$PLAN" > "${PLAN}.tmp"
+mv "${PLAN}.tmp" "$PLAN"
+BEHAVIORAL_COUNT=$(jq '.behavioral_changes | length' "$PLAN")
+if [[ "$BEHAVIORAL_COUNT" -gt 0 ]]; then
+  echo "⚠ Behavioral changes detected: $BEHAVIORAL_COUNT — Phase R5 lists them FIRST."
+fi
+
 # The plan now holds the classified diff; the pre-Builder baseline is no longer
 # needed. (R6's cleanup trap also removes it defensively.)
 rm -f "$BASELINE"
@@ -1757,7 +1790,7 @@ Present the grouped diff and collect explicit user approvals for each category. 
 
 ### Non-interactive Resume Flow (FU5)
 
-When running in non-interactive mode (no TTY, e.g., CI/CD, agent-driven), `_ask_yesno_safe` cannot prompt the user. Instead, it records pending prompts to `${WF_DIR}/.wizard-pending-prompts` and returns exit code 3. Pre-R5 phases (R1/R2) treat a recorded prompt as a hard stop via `_require_answer_or_stop`: they emit the manifest immediately and write `.wizard-resume-phase`, so a resumed run re-enters exactly the phase that asked and the answer is consumed by its owner. Phase R5 batches its OWN review prompts the same way: unanswered ones accumulate during the review and are emitted as ONE manifest (plus `apply_mode`) before any approval is stored, so a runner supplies every answer in a single pass. The legacy collection sweep remains as a safety net for pre-R5 leftovers:
+When running in non-interactive mode (no TTY, e.g., CI/CD, agent-driven), `_ask_yesno_safe` cannot prompt the user. Instead, it records pending prompts to `${WF_STATE_DIR}/.wizard-pending-prompts` and returns exit code 3. Pre-R5 phases (R1/R2) treat a recorded prompt as a hard stop via `_require_answer_or_stop`: they emit the manifest immediately and write `.wizard-resume-phase`, so a resumed run re-enters exactly the phase that asked and the answer is consumed by its owner. Phase R5 batches its OWN review prompts the same way: unanswered ones accumulate during the review and are emitted as ONE manifest (plus `apply_mode`) before any approval is stored, so a runner supplies every answer in a single pass. The legacy collection sweep remains as a safety net for pre-R5 leftovers:
 
 ```
 GENTLE_AI_WF_REFRESH_NEEDS=prompt=<prompt1>|prompt=<prompt2>|...|apply_mode=<mode>
@@ -1793,14 +1826,14 @@ if [[ "${WF_REFRESH_RESUME:-}" = "1" ]]; then
   echo "ℹ Resuming at R5 (WF_REFRESH_RESUME=1) — staging and plan validated."
   # Consume a marker left by the review-prompt hard stop so this exact phase
   # re-entered. The R-1..R4 resume gates already skipped via that same marker.
-  if [[ -f "${WF_DIR}/.wizard-resume-phase" ]] \
-     && [[ "$(cat "${WF_DIR}/.wizard-resume-phase")" = "R5" ]]; then
-    rm -f "${WF_DIR}/.wizard-resume-phase"
+  if [[ -f "${WF_STATE_DIR}/.wizard-resume-phase" ]] \
+     && [[ "$(cat "${WF_STATE_DIR}/.wizard-resume-phase")" = "R5" ]]; then
+    rm -f "${WF_STATE_DIR}/.wizard-resume-phase"
     echo "ℹ Resuming at R5 (review gate)"
   fi
 else
   # FU5: Collect pending prompts from all phases and emit manifest if any.
-  pending_file="${WF_DIR}/.wizard-pending-prompts"
+  pending_file="${WF_STATE_DIR}/.wizard-pending-prompts"
   if [[ -f "$pending_file" ]]; then
     prompts=()
     mapfile -t prompts < "$pending_file"
@@ -1861,53 +1894,114 @@ if [[ $DELETED_MODIFIED_COUNT -gt 0 ]]; then
 fi
 
 # Show the REAL diff before asking for approval (AGENTS.md: show me the full
-# diff and wait for my approval). Preview each category with bounded output:
-# added → staged content; updated → diff against staging; deleted/deleted_modified → current content.
+# diff and wait for my approval).
+#
+# R5 output contract (round-2 field reports B4/M2):
+#   1. Behavioral changes FIRST — curated config keys whose value flips
+#      between the project copy and staging must never hide between N
+#      mechanical updates that R5 classifies by hash alone.
+#   2. The FULL review is ALWAYS written to $REVIEW_FILE. WF_STATE_DIR lives
+#      outside .wizard-staging, so the R6 cleanup trap cannot delete it.
+#   3. Inline verbosity follows WF_REFRESH_PREVIEW:
+#        full (default) — identical to the historical behavior;
+#        summary        — counts + behavioral changes only;
+#        none           — pointer to the review file only.
 MAX_PREVIEW_LINES="${MAX_PREVIEW_LINES:-120}"
-_preview_file() {
-  local label="$1" file="$2"
-  echo "    --- $label: $file ---"
-  if [[ "$label" == "UPDATED" ]]; then
-    if diff -u "$file" "$STAGING/$file" 2>/dev/null | head -n "$MAX_PREVIEW_LINES"; then
-      :
-    else
-      true
+case "${WF_REFRESH_PREVIEW:-full}" in
+  full|summary|none) REVIEW_MODE="${WF_REFRESH_PREVIEW:-full}" ;;
+  *) REVIEW_MODE="full" ;;
+esac
+REVIEW_FILE="${WF_STATE_DIR}/refresh-review.md"
+
+# --- 1. Behavioral changes over curated keys (project copy vs staging) ------
+CURATED_KEYS=(auto_improve tdd_mode e2e_in_ci release_ai_summary release_ai_provider)
+BEHAVIORAL_CHANGES=()
+while IFS= read -r file; do
+  [[ -n "$file" && -f "$file" && -f "$STAGING/$file" ]] || continue
+  for KEY in "${CURATED_KEYS[@]}"; do
+    OLD_V=$(grep -hE "^[[:space:]]*[\"']?${KEY}[\"']?[[:space:]]*[:=]" "$file" 2>/dev/null | tail -n 1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' || true)
+    NEW_V=$(grep -hE "^[[:space:]]*[\"']?${KEY}[\"']?[[:space:]]*[:=]" "${STAGING}/${file}" 2>/dev/null | tail -n 1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' || true)
+    if [[ -n "$OLD_V$NEW_V" && "$OLD_V" != "$NEW_V" ]]; then
+      BEHAVIORAL_CHANGES+=("  ⚡ ${file} · ${OLD_V:-<absent>} → ${NEW_V:-<absent>}")
     fi
-  elif [[ "$label" == "ADDED" ]]; then
-    if head -n "$MAX_PREVIEW_LINES" "$STAGING/$file" 2>/dev/null; then :; fi
+  done
+done < <(jq -r '.updated[]?.path' "$PLAN")
+
+echo ""
+if [[ ${#BEHAVIORAL_CHANGES[@]} -gt 0 ]]; then
+  echo "⚡ BEHAVIORAL CHANGES (${#BEHAVIORAL_CHANGES[@]}) — review these FIRST:"
+  printf '%s\n' "${BEHAVIORAL_CHANGES[@]}"
+else
+  echo "⚡ No behavioral changes detected in curated config keys."
+fi
+
+# --- 2. Full review document (always written, durable across R6 cleanup) ----
+{
+  echo "# wf-refresh review — $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  echo ""
+  echo "- Added: $ADDED_COUNT"
+  echo "- Updated: $UPDATED_COUNT"
+  echo "- Deleted: $DELETED_COUNT"
+  echo "- Deleted-modified: $DELETED_MODIFIED_COUNT"
+  echo ""
+  echo "  BEHAVIORAL CHANGES (${#BEHAVIORAL_CHANGES[@]}):"
+  if [[ ${#BEHAVIORAL_CHANGES[@]} -gt 0 ]]; then
+    printf '%s\n' "${BEHAVIORAL_CHANGES[@]}"
   else
-    if head -n "$MAX_PREVIEW_LINES" "$file" 2>/dev/null; then :; fi
+    echo "  (none)"
   fi
   echo ""
+} > "$REVIEW_FILE"
+
+_preview_file() {
+  local label="$1" file="$2"
+  {
+    echo "    --- $label: $file ---"
+    case "$label" in
+      UPDATED)
+        diff -u "$file" "$STAGING/$file" 2>/dev/null | head -n "$MAX_PREVIEW_LINES" || true ;;
+      ADDED)
+        head -n "$MAX_PREVIEW_LINES" "$STAGING/$file" 2>/dev/null || true ;;
+      *)
+        head -n "$MAX_PREVIEW_LINES" "$file" 2>/dev/null || true ;;
+    esac
+    echo ""
+  } >> "$REVIEW_FILE"
 }
 
 if [[ $ADDED_COUNT -gt 0 ]]; then
-  echo "  Previewing ADDED files (first $MAX_PREVIEW_LINES lines each):"
+  echo "  ADDED files (first $MAX_PREVIEW_LINES lines each):" >> "$REVIEW_FILE"
   while IFS= read -r file; do
     _preview_file "ADDED" "$file"
   done < <(jq -r '.added[]?.path' "$PLAN")
 fi
 
 if [[ $UPDATED_COUNT -gt 0 ]]; then
-  echo "  Previewing UPDATED files (diff vs staging, first $MAX_PREVIEW_LINES lines each):"
+  echo "  UPDATED files (diff vs staging, first $MAX_PREVIEW_LINES lines each):" >> "$REVIEW_FILE"
   while IFS= read -r file; do
     _preview_file "UPDATED" "$file"
   done < <(jq -r '.updated[]?.path' "$PLAN")
 fi
 
 if [[ $DELETED_COUNT -gt 0 ]]; then
-  echo "  Previewing DELETED files (current content that would be removed, first $MAX_PREVIEW_LINES lines each):"
+  echo "  DELETED files (current content that would be removed, first $MAX_PREVIEW_LINES lines each):" >> "$REVIEW_FILE"
   while IFS= read -r file; do
     _preview_file "DELETED" "$file"
   done < <(jq -r '.deleted[]?.path' "$PLAN")
 fi
 
 if [[ $DELETED_MODIFIED_COUNT -gt 0 ]]; then
-  echo "  Previewing DELETED-MODIFIED files (your local content that would be removed, first $MAX_PREVIEW_LINES lines each):"
+  echo "  DELETED-MODIFIED files (your local content that would be removed, first $MAX_PREVIEW_LINES lines each):" >> "$REVIEW_FILE"
   while IFS= read -r file; do
     _preview_file "DELETED-MODIFIED" "$file"
   done < <(jq -r '.deleted_modified[]?.path' "$PLAN")
 fi
+
+# --- 3. Inline emission per mode ---------------------------------------------
+if [[ "$REVIEW_MODE" == "full" ]]; then
+  cat "$REVIEW_FILE"
+fi
+echo "  Full review written to: $REVIEW_FILE (mode: $REVIEW_MODE)"
 
 APPROVE_ADDED="false"
 APPROVE_UPDATED="false"
@@ -2007,7 +2101,7 @@ fi
 # below); prompts already satisfied from WF_REFRESH_ANSWERS drop off the list,
 # so the run converges in as few round-trips as the runner's answers allow.
 if [[ ${#R5_PENDING[@]} -gt 0 ]]; then
-  printf '%s\n' "R5" > "${WF_DIR}/.wizard-resume-phase"
+  printf '%s\n' "R5" > "${WF_STATE_DIR}/.wizard-resume-phase"
   manifest=""
   for p in "${R5_PENDING[@]}"; do manifest+="prompt=${p}|"; done
   manifest+="apply_mode=${WF_REFRESH_APPLY_MODE:-}"
@@ -2031,7 +2125,7 @@ mv "$STAGING_STATE.tmp" "$STAGING_STATE"
 
 # Explicit confirmation gate before R6: apply+commit, apply without commit, or cancel.
 echo ""
-echo "=== RESUMEN DE APROBACIONES ==="
+echo "=== APPROVALS SUMMARY ==="
 echo "  Added: $APPROVE_ADDED"
 echo "  Updated: $APPROVE_UPDATED"
 echo "  Deleted: $APPROVE_DELETED"
@@ -2039,7 +2133,7 @@ echo "  Deleted-modified: $APPROVE_DELETED_MODIFIED"
 echo "  Gitignore: $APPROVE_GITIGNORE"
 echo "  Overwrite local: $APPROVE_OVERWRITE_LOCAL"
 echo ""
-echo "¿Cómo aplicar los cambios aprobados?"
+echo "How should the approved changes be applied?"
 if [[ ! -t 0 ]]; then
   # Non-tty (agent-driven): WF_REFRESH_APPLY_MODE must name the choice.
   case "${WF_REFRESH_APPLY_MODE:-}" in
@@ -2059,26 +2153,26 @@ if [[ ! -t 0 ]]; then
   echo "(non-interactive — WF_REFRESH_APPLY_MODE=${WF_REFRESH_APPLY_MODE:-})"
 else
   while true; do
-    read -r -p "Opción [1=commit / 2=sin commit / 3=cancelar] (default 1): " APPLY_CHOICE
+    read -r -p "Option [1=commit / 2=apply-without-commit / 3=cancel] (default 1): " APPLY_CHOICE
     APPLY_CHOICE="${APPLY_CHOICE:-1}"
     case "$APPLY_CHOICE" in
       1|2|3) break ;;
-      *) echo "  Opción inválida: '$APPLY_CHOICE' (use 1, 2 o 3)" ;;
+      *) echo "  Invalid option: '$APPLY_CHOICE' (use 1, 2, or 3)" ;;
     esac
   done
 fi
 case "$APPLY_CHOICE" in
     1)
-      echo "✓ Procediendo a Phase R6 (aplicar + commit)..."
+      echo "✓ Proceeding to Phase R6 (apply + commit)..."
       ;;
     2)
-      echo "✓ Modo aplicar-sin-commit: los archivos se copiarán al working tree"
-      echo "  pero NO se creará ningún commit. Revisa y commitea cuando quieras."
+      echo "✓ Apply-without-commit mode: files will be copied to the working tree"
+      echo "  but NO commit will be created. Review and commit whenever you want."
       jq '.build_plan.apply_only = true | .updated_at = (now | todate)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
       mv "$STAGING_STATE.tmp" "$STAGING_STATE"
       ;;
     3)
-      echo "✗ Refresh cancelado por el usuario. No se aplicaron cambios."
+      echo "✗ Refresh cancelled by the user. No changes were applied."
       rm -rf "$STAGING"
       rm -f "$PLAN" .wizard-refresh-baseline.json
       exit 0
