@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.14-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.13-beta.1...v0.8.14-beta.1) (2026-08-22)
+
+
+### Bug Fixes
+
+* **wf-refresh:** round-2 runtime fixes — durable state, behavioral review signal, builder merge ([#116](https://github.com/hugoafj/ai-workflow-wizard/issues/116)) ([3d88fce](https://github.com/hugoafj/ai-workflow-wizard/commit/3d88fce7c2981fcec3cc21fbaa81e7fe6336d4bc))
+
 ## [0.8.13-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.12-beta.1...v0.8.13-beta.1) (2026-08-22)
 
 
