@@ -41,8 +41,14 @@ if echo "$COMMIT_MSG" | grep -q "^chore: refresh workflow to v"; then
   IS_WIZARD_REFRESH=true
 fi
 
-# Wizard-managed config files that should not trigger SDD drift on refresh
-WIZARD_MANAGED_SDD_FILES="vitest.config.ts vitest.config.js playwright.config.ts playwright.config.js"
+# A wizard refresh commit writes wizard-managed files BY DESIGN: AGENTS.md,
+# IDE commands/satellites/skills, vitest/playwright configs, hooks. Warning
+# about them seconds after applying would self-trigger the very flow that
+# produced the commit (field report B2), so refresh commits never raise drift.
+# openspec/config.yaml is excluded for the same loop reason (see note above).
+if [[ "$IS_WIZARD_REFRESH" = "true" ]]; then
+  exit 0
+fi
 
 for f in $REFRESH_FILES; do
   if echo "$CHANGED" | grep -qxF "$f"; then
@@ -51,12 +57,6 @@ for f in $REFRESH_FILES; do
 done
 
 for f in $SDD_FILES; do
-  # Skip wizard-managed SDD files on wizard refresh commits (false positive prevention)
-  if [[ "$IS_WIZARD_REFRESH" = "true" ]]; then
-    if echo "$WIZARD_MANAGED_SDD_FILES" | grep -qw "$f"; then
-      continue
-    fi
-  fi
   if echo "$CHANGED" | grep -qxF "$f"; then
     CHANGED_SDD="$CHANGED_SDD $f"
   fi
