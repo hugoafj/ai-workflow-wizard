@@ -1012,7 +1012,10 @@ def write_skills(raw, state, staging):
         for tgt in dict.fromkeys(targets):
             os.makedirs(tgt, exist_ok=True)
             with open(os.path.join(tgt, "SKILL.md"), "w", encoding="utf-8") as fh:
-                fh.write(rendered)
+                # strip_internal_comment() .strip()s the rendered text, so the
+                # trailing newline of the source SKILL.md is gone by this
+                # point; every other writer appends one explicitly.
+                fh.write(rendered.rstrip() + "\n")
             skills_created.append(os.path.relpath(os.path.join(tgt, "SKILL.md"), staging))
     return skills_created
 
