@@ -439,7 +439,28 @@ def write_cicd(raw, state, staging):
             ai_url = builder_core.base_url(raw, "templates/protocols/cicd/variants/ai-summary-job.%s.yml.md" % provider)
             ai_sum = builder_core.fetch_with_retries(ai_url)
             ai_sum = builder_core.extract_block(ai_sum, "yaml")
-            rel = rel.replace("  # {{AI_SUMMARY_JOB}}", ai_sum)
+            # The variant fragments carry no code fence, so extract_block falls
+            # back to the raw text INCLUDING the documentation banner. Strip it:
+            # the generated workflow must only contain real YAML (field report B3).
+            ai_sum = builder_core.strip_prose_header(ai_sum)
+            # strip_prose_header trims outer whitespace too, which left-flushes
+            # the fragment body (its first line starts at column 0). Injecting
+            # it verbatim would emit a second ROOT key next to `jobs:` and break
+            # the workflow. Re-indent every non-empty line to the anchor's own
+            # column so the job lands as a sibling of `release-please:`.
+            anchor = "  # {{AI_SUMMARY_JOB}}"
+            indent = anchor[: len(anchor) - len(anchor.lstrip())]
+            ai_sum = "\n".join(
+                (indent + line) if line.strip() else line
+                for line in ai_sum.splitlines()
+            )
+            # Fail loudly if the anchor drifts — a silent str.replace no-op would
+            # ship release-please.yml with a live placeholder inside.
+            if anchor not in rel:
+                raise RuntimeError(
+                    "release-please.yml.md template: {{AI_SUMMARY_JOB}} anchor "
+                    "missing — refusing to merge the AI summary job silently")
+            rel = rel.replace(anchor, ai_sum)
         else:
             rel = re.sub(r"^\s*#\s*\{\{AI_SUMMARY_JOB\}\}\s*$", "", rel, flags=re.MULTILINE)
         rel_target = os.path.join(staging, ".github", "workflows", "release-please.yml")

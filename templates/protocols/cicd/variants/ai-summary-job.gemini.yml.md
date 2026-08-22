@@ -47,7 +47,7 @@
         uses: actions/github-script@v7
         with:
           script: |
-            const errorMsg = `⚠️ **AI Summary failed`
+            const errorMsg = `⚠️ **AI Summary failed**`
 
             The AI summary generation could not complete. This is usually caused by:
             - **Gemini API quota exceeded** — check your Gemini API key and billing
