@@ -322,6 +322,14 @@ def eval_semantic_cond(cond, state, raw=None):
     layers = normalize_layers(state)
     c = cond.lower()
 
+    # MUST stay ABOVE the generic "e2e layer" phrases: this condition string
+    # contains "e2e layer active" as a substring, and the layers-only rules
+    # below would otherwise swallow it. Mirrors the documented intent
+    # (archived subagent-builder-heavy.md): include E2E CI steps only when the
+    # layer is active AND ci.e2e_in_ci is not false. Missing key defaults to
+    # True ("!= false"); states written by migrate_state always set it.
+    if "e2e layer active in ci" in c or "e2e in ci" in c:
+        return ("e2e" in layers) and bool(get_state_value(state, "ci.e2e_in_ci", True))
     if "at least one layer" in c or "any layer" in c:
         return bool(layers)
     if "e2e layer active" in c or "e2e layer is active" in c or "e2e layer" in c:
