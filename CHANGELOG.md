@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.13-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.12-beta.1...v0.8.13-beta.1) (2026-08-22)
+
+
+### Bug Fixes
+
+* **wf-refresh:** placeholder-safe extraction, gate contract, and builder fixes ([#114](https://github.com/hugoafj/ai-workflow-wizard/issues/114)) ([23da073](https://github.com/hugoafj/ai-workflow-wizard/commit/23da073c3f7a09c5cbd211a246370cbc09014f49))
+
 ## [0.8.12-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.11-beta.1...v0.8.12-beta.1) (2026-08-21)
 
 
