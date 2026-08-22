@@ -80,13 +80,19 @@ def stack_key(state):
 
 
 def stack_primary(state):
-    """Primary stack from discovery.stack.primary (list or string)."""
+    """Primary stack from discovery.stack.primary, falling back to stack_key.
+
+    States migrated by R2 get discovery.stack.stack_key normalized but never
+    gain a .primary field; without this fallback those npm projects resolved
+    release-type "simple" instead of "node" in builder-heavy's
+    release-please-config rendering.
+    """
     primary = get_state_value(state, "discovery.stack.primary")
-    if isinstance(primary, list):
-        return primary[0] if primary else ""
-    if isinstance(primary, str):
+    if isinstance(primary, list) and primary:
+        return primary[0]
+    if isinstance(primary, str) and primary:
         return primary
-    return ""
+    return stack_key(state)
 
 
 def bool_feature(state, name):
@@ -322,6 +328,14 @@ def eval_semantic_cond(cond, state, raw=None):
     layers = normalize_layers(state)
     c = cond.lower()
 
+    # MUST stay ABOVE the generic "e2e layer" phrases: this condition string
+    # contains "e2e layer active" as a substring, and the layers-only rules
+    # below would otherwise swallow it. Mirrors the documented intent
+    # (archived subagent-builder-heavy.md): include E2E CI steps only when the
+    # layer is active AND ci.e2e_in_ci is not false. Missing key defaults to
+    # True ("!= false"); states written by migrate_state always set it.
+    if "e2e layer active in ci" in c or "e2e in ci" in c:
+        return ("e2e" in layers) and bool(get_state_value(state, "ci.e2e_in_ci", True))
     if "at least one layer" in c or "any layer" in c:
         return bool(layers)
     if "e2e layer active" in c or "e2e layer is active" in c or "e2e layer" in c:
@@ -998,7 +1012,10 @@ def write_skills(raw, state, staging):
         for tgt in dict.fromkeys(targets):
             os.makedirs(tgt, exist_ok=True)
             with open(os.path.join(tgt, "SKILL.md"), "w", encoding="utf-8") as fh:
-                fh.write(rendered)
+                # strip_internal_comment() .strip()s the rendered text, so the
+                # trailing newline of the source SKILL.md is gone by this
+                # point; every other writer appends one explicitly.
+                fh.write(rendered.rstrip() + "\n")
             skills_created.append(os.path.relpath(os.path.join(tgt, "SKILL.md"), staging))
     return skills_created
 

@@ -198,6 +198,21 @@ version_lt() {
   version_lte "$v1" "$v2"
 }
 
+# Remove a prompt line from the FU5 pending manifest once it has been answered
+# (via WF_REFRESH_ANSWERS, WF_REFRESH_DEFAULT_ANSWER, or cancel semantics).
+# Without this, a resumed run consumes the answer but leaves the stale line
+# behind in .wizard-pending-prompts, so a later collection sweep re-emits an
+# already-answered question.
+_wf_pending_remove() {
+  local prompt="$1"
+  local pending_file="${WF_DIR}/.wizard-pending-prompts"
+  [ -f "$pending_file" ] || return 0
+  local tmp="${pending_file}.tmp"
+  # grep exits 1 when EVERY line matched (result is empty): tolerate it.
+  grep -vFx -- "$prompt" "$pending_file" > "$tmp" || true
+  mv "$tmp" "$pending_file"
+}
+
 # Ask a yes/no question safely in BOTH tty and non-tty (agent-driven) contexts.
 # In an interactive tty it prompts like a normal read -n 1. When stdin is EOF or
 # not a tty (agent run), a bare `read` would fail under `set -e` and abort the
@@ -235,6 +250,7 @@ _ask_yesno_safe() {
     local pq
     pq=$(_wf_answers_get "$prompt")
     if [ -n "$pq" ]; then
+      _wf_pending_remove "$prompt"
       echo "(non-interactive — WF_REFRESH_ANSWERS[$prompt]=$pq)"
       if [[ "$pq" =~ ^[Yy](es)?$ ]]; then
         return 0
@@ -248,12 +264,15 @@ _ask_yesno_safe() {
     # Non-tty with an empty/garbage reply (e.g. a leftover newline): use
     # WF_REFRESH_DEFAULT_ANSWER or record as pending instead of failing.
     if [ "${WF_REFRESH_DEFAULT_ANSWER:-}" = "yes" ]; then
+      _wf_pending_remove "$prompt"
       echo "(non-interactive — using WF_REFRESH_DEFAULT_ANSWER=yes)"
       return 0
     elif [ "${WF_REFRESH_DEFAULT_ANSWER:-}" = "no" ]; then
+      _wf_pending_remove "$prompt"
       echo "(non-interactive — using WF_REFRESH_DEFAULT_ANSWER=no)"
       return 1
     elif [ "$cancel_on_empty" = "cancel" ]; then
+      _wf_pending_remove "$prompt"
       echo "(non-interactive — no WF_REFRESH_ANSWERS/WF_REFRESH_DEFAULT_ANSWER; treating as NO)"
       return 1
     else
@@ -1738,7 +1757,7 @@ Present the grouped diff and collect explicit user approvals for each category. 
 
 ### Non-interactive Resume Flow (FU5)
 
-When running in non-interactive mode (no TTY, e.g., CI/CD, agent-driven), `_ask_yesno_safe` cannot prompt the user. Instead, it records pending prompts to `${WF_DIR}/.wizard-pending-prompts` and returns exit code 3. Pre-R5 phases (R1/R2) treat a recorded prompt as a hard stop via `_require_answer_or_stop`: they emit the manifest immediately and write `.wizard-resume-phase`, so a resumed run re-enters exactly the phase that asked and the answer is consumed by its owner. Phase R5 keeps the collection sweep as a safety net for its own prompts (which resume re-enters at R5 anyway):
+When running in non-interactive mode (no TTY, e.g., CI/CD, agent-driven), `_ask_yesno_safe` cannot prompt the user. Instead, it records pending prompts to `${WF_DIR}/.wizard-pending-prompts` and returns exit code 3. Pre-R5 phases (R1/R2) treat a recorded prompt as a hard stop via `_require_answer_or_stop`: they emit the manifest immediately and write `.wizard-resume-phase`, so a resumed run re-enters exactly the phase that asked and the answer is consumed by its owner. Phase R5 batches its OWN review prompts the same way: unanswered ones accumulate during the review and are emitted as ONE manifest (plus `apply_mode`) before any approval is stored, so a runner supplies every answer in a single pass. The legacy collection sweep remains as a safety net for pre-R5 leftovers:
 
 ```
 GENTLE_AI_WF_REFRESH_NEEDS=prompt=<prompt1>|prompt=<prompt2>|...|apply_mode=<mode>
@@ -1772,6 +1791,13 @@ if [[ "${WF_REFRESH_RESUME:-}" = "1" ]]; then
     exit 1
   fi
   echo "ℹ Resuming at R5 (WF_REFRESH_RESUME=1) — staging and plan validated."
+  # Consume a marker left by the review-prompt hard stop so this exact phase
+  # re-entered. The R-1..R4 resume gates already skipped via that same marker.
+  if [[ -f "${WF_DIR}/.wizard-resume-phase" ]] \
+     && [[ "$(cat "${WF_DIR}/.wizard-resume-phase")" = "R5" ]]; then
+    rm -f "${WF_DIR}/.wizard-resume-phase"
+    echo "ℹ Resuming at R5 (review gate)"
+  fi
 else
   # FU5: Collect pending prompts from all phases and emit manifest if any.
   pending_file="${WF_DIR}/.wizard-pending-prompts"
@@ -1887,24 +1913,45 @@ APPROVE_ADDED="false"
 APPROVE_UPDATED="false"
 APPROVE_DELETED="false"
 APPROVE_DELETED_MODIFIED="false"
+APPROVE_OVERWRITE_LOCAL="false"
+
+# R5 review ask. Unlike the pre-R5 fail-fast gates, unanswered prompts here do
+# NOT abort one-by-one: they accumulate in R5_PENDING and, once every category
+# has been asked, ONE combined manifest is emitted listing everything still
+# missing plus apply_mode. A runner can then supply all answers in a single
+# WF_REFRESH_ANSWERS batch instead of one round-trip per question.
+R5_PENDING=()
+_r5_ask() {
+  local prompt="$1" var="$2" rc=0
+  _ask_yesno_safe "$prompt" || rc=$?
+  case "$rc" in
+    0) printf -v "$var" '%s' "true" ;;
+    1) printf -v "$var" '%s' "false" ;;
+    3)
+      R5_PENDING+=("$prompt")
+      printf -v "$var" '%s' "false"
+      ;;
+    *) printf -v "$var" '%s' "false" ;;
+  esac
+}
 
 if [[ $ADDED_COUNT -gt 0 ]]; then
-  if _ask_yesno_safe "Apply added files?"; then APPROVE_ADDED="true"; fi
+  _r5_ask "Apply added files?" APPROVE_ADDED
 fi
 
 if [[ $UPDATED_COUNT -gt 0 ]]; then
-  if _ask_yesno_safe "Apply updated files?"; then APPROVE_UPDATED="true"; fi
+  _r5_ask "Apply updated files?" APPROVE_UPDATED
 fi
 
 if [[ $DELETED_COUNT -gt 0 ]]; then
-  if _ask_yesno_safe "Delete removed files?"; then APPROVE_DELETED="true"; fi
+  _r5_ask "Delete removed files?" APPROVE_DELETED
 fi
 
 if [[ $DELETED_MODIFIED_COUNT -gt 0 ]]; then
   echo "The following files are wizard-managed but were modified by you."
   echo "Deleting them may lose your changes."
   jq -r '.deleted_modified[] | "  - \(.path)"' "$PLAN"
-  if _ask_yesno_safe "Delete these modified files?"; then APPROVE_DELETED_MODIFIED="true"; fi
+  _r5_ask "Delete these modified files?" APPROVE_DELETED_MODIFIED
 fi
 
 # FU7: Dedicated warning block for locally-modified updated files
@@ -1915,11 +1962,7 @@ if [[ $LOCAL_MODIFIED_COUNT -gt 0 ]]; then
   jq -r '.updated[]? | select(.local_modified == true) | "  - \(.path)"' "$PLAN"
   echo ""
   echo "These files have uncommitted changes. Overwriting them will lose your local edits."
-  if _ask_yesno_safe "Overwrite locally-modified files?"; then
-    APPROVE_OVERWRITE_LOCAL="true"
-  else
-    APPROVE_OVERWRITE_LOCAL="false"
-  fi
+  _r5_ask "Overwrite locally-modified files?" APPROVE_OVERWRITE_LOCAL
 else
   APPROVE_OVERWRITE_LOCAL="false"
 fi
@@ -1956,7 +1999,23 @@ if [[ ${#MISSING_GI_LINES[@]} -gt 0 ]]; then
   echo "🛡️  .gitignore changes (wizard-managed entries to be appended and committed):"
   printf '    + %s\n' "${MISSING_GI_LINES[@]}"
   echo ""
-  if _ask_yesno_safe "Append these .gitignore entries and include them in the commit?"; then APPROVE_GITIGNORE="true"; fi
+  _r5_ask "Append these .gitignore entries and include them in the commit?" APPROVE_GITIGNORE
+fi
+
+# Emit ONE manifest listing every still-unanswered review prompt plus the
+# pending apply decision, then stop. Resume re-enters exactly here (marker
+# below); prompts already satisfied from WF_REFRESH_ANSWERS drop off the list,
+# so the run converges in as few round-trips as the runner's answers allow.
+if [[ ${#R5_PENDING[@]} -gt 0 ]]; then
+  printf '%s\n' "R5" > "${WF_DIR}/.wizard-resume-phase"
+  manifest=""
+  for p in "${R5_PENDING[@]}"; do manifest+="prompt=${p}|"; done
+  manifest+="apply_mode=${WF_REFRESH_APPLY_MODE:-}"
+  echo "GENTLE_AI_WF_REFRESH_NEEDS=${manifest}"
+  echo "✗ Non-tty run requires ${#R5_PENDING[@]} answer(s) and WF_REFRESH_APPLY_MODE before applying." >&2
+  echo "  Set WF_REFRESH_ANSWERS='<prompt>=yes|<prompt>=no|...' and" >&2
+  echo "  WF_REFRESH_APPLY_MODE=commit|apply-only|cancel, then re-run with WF_REFRESH_RESUME=1." >&2
+  exit 3
 fi
 
 # Store approvals in staging state
@@ -1988,9 +2047,13 @@ if [[ ! -t 0 ]]; then
     apply-only) APPLY_CHOICE="2" ;;
     cancel) APPLY_CHOICE="3" ;;
     *)
+      # Same contract as every other gate: NEEDS marker + exit 3. A bare
+      # exit 2 here used to bypass automated runners listening for
+      # GENTLE_AI_WF_REFRESH_NEEDS entirely.
+      echo "GENTLE_AI_WF_REFRESH_NEEDS=apply_mode="
       echo "ERROR: non-interactive apply gate requires WF_REFRESH_APPLY_MODE=commit|apply-only|cancel." >&2
       echo "  Aborting: refusing to guess. No changes were applied." >&2
-      exit 2
+      exit 3
       ;;
   esac
   echo "(non-interactive — WF_REFRESH_APPLY_MODE=${WF_REFRESH_APPLY_MODE:-})"

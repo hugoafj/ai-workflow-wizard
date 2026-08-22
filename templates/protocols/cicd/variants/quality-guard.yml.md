@@ -8,7 +8,7 @@
 #   <if type-check script or tsconfig.json exists>: → include type-check step
 #   <if unit or integration layer is active>:      → include test step
 #   <if test:sanitization script exists>:          → include sanitization step
-#   <if e2e layer is active>:                      → include Playwright steps
+#   <if e2e layer active in ci>:                   → include Playwright steps (requires testing.layers incl. e2e AND ci.e2e_in_ci != false)
 #
 # Notes:
 #   - Node 22 is active LTS, satisfies >=18/>=20/>=22 of the current ecosystem
@@ -74,11 +74,11 @@ jobs:
             echo "No build script defined; skipping."
           fi
 
-      <if e2e layer is active>:
+      <if e2e layer active in ci>:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      <if e2e layer is active>:
+      <if e2e layer active in ci>:
       - name: E2E tests
         run: npm run test:e2e
 
