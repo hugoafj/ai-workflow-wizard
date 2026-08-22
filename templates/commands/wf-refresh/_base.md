@@ -286,6 +286,20 @@ Each phase script is extracted from `refresher.md` and executed as a standalone 
 - **Issue**: In a non-interactive run, `Use updated project info?` (R1) or `Enable <FEATURE>?` (R2) had no answer. The phase stops IMMEDIATELY — before staging is built — and emits `GENTLE_AI_WF_REFRESH_NEEDS=prompt=...`. This is expected control flow: continuing would build staging from stale info and the answer collected later would have no consumer.
 - **Solution**: Set `WF_REFRESH_ANSWERS='Use updated project info?=yes'` (or `=no`, or the matching `Enable <FEATURE>?` prompt) and re-run with `WF_REFRESH_RESUME=1`. The run re-enters exactly the phase that asked (tracked via `.wizard-resume-phase`), consumes your answer, and continues through R5 normally.
 
+### Phase R5 exits with code 3 (review prompts and/or apply mode)
+
+- **Issue**: In a non-interactive run, review prompts (`Apply added files?`, `Apply updated files?`, `Delete removed files?`, `Delete these modified files?`, `Overwrite locally-modified files?`, `Append these .gitignore entries...`) and/or the apply decision were unanswered. R5 emits ONE manifest listing everything still missing — `GENTLE_AI_WF_REFRESH_NEEDS=prompt=...|apply_mode=` — and stops BEFORE applying anything. This is expected control flow.
+- **Solution**: Set `WF_REFRESH_ANSWERS='Apply added files?=yes|Apply updated files?=no'` using the exact prompt strings from the manifest, AND set `WF_REFRESH_APPLY_MODE`, then re-run with `WF_REFRESH_RESUME=1`. Already-answered prompts drop off the list automatically on the next pass.
+
+### Apply gate: WF_REFRESH_APPLY_MODE
+
+Before applying (Phase R5 → R6), a non-tty run requires an explicit decision:
+- `WF_REFRESH_APPLY_MODE=commit` — apply approved changes and commit them
+- `WF_REFRESH_APPLY_MODE=apply-only` — apply to the working tree, NO commit
+- `WF_REFRESH_APPLY_MODE=cancel` — discard staging; nothing is written
+
+A missing value emits `GENTLE_AI_WF_REFRESH_NEEDS=apply_mode=` with exit 3 (same contract as every other gate).
+
 ### Phase R-1 fails (global command update)
 
 - **Issue**: `install.sh` not found or fails
