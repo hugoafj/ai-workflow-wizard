@@ -92,7 +92,9 @@ echo "Source: ${WIZARD_REPO}@${WIZARD_BRANCH}/wf-init/"
 
 curl -fsSL "${WF_RAW}/wf-init/lib/refresher.md" > "${WF_DIR}/lib/refresher.md" 2>/dev/null || true
 curl -fsSL "${WF_RAW}/wf-init/lib/state.md" > "${WF_DIR}/lib/state.md" 2>/dev/null || true
-curl -fsSL "${WF_RAW}/wf-init/lib/state-helpers.sh" > "${WF_DIR}/lib/state-helpers.sh" 2>/dev/null || true
+# NOTE: state-helpers.sh is NOT downloaded here on purpose. The
+# "Setup: create helper library" section of refresher.md downloads it
+# (with fallbacks) when it writes lib/refresh-lib.sh below.
 curl -fsSL "${WF_RAW}/wf-init/lib/builder.md" > "${WF_DIR}/lib/builder.md" 2>/dev/null || true
 curl -fsSL "${WF_RAW}/wf-init/lib/builder-core.py" > "${WF_DIR}/lib/builder-core.py" 2>/dev/null || true
 curl -fsSL "${WF_RAW}/wf-init/lib/builder-heavy.py" > "${WF_DIR}/lib/builder-heavy.py" 2>/dev/null || true
@@ -104,7 +106,6 @@ curl -fsSL "${WF_RAW}/temp-files/sdd-new.md" > "${WF_DIR}/temp-files/sdd-new.md"
 
 REQUIRED_FILES=(
   "${WF_DIR}/lib/refresher.md"
-  "${WF_DIR}/lib/state-helpers.sh"
   "${WF_DIR}/lib/builder.md"
   "${WF_DIR}/lib/builder-core.py"
   "${WF_DIR}/lib/builder-heavy.py"
@@ -131,8 +132,8 @@ echo "✓ Refresh files downloaded to: ${WF_DIR}"
 # Helper: extract a phase from refresher.md and write to executable temp file
 # Usage: _extract_phase "Phase R-1" "phase-r1.sh"
 _extract_phase() {
-  local phase_name="$1"
-  local out_file="$2"
+  local phase_name="${1}"
+  local out_file="${2}"
   local refresher="${WF_DIR}/lib/refresher.md"
 
   # Extract ALL fenced bash blocks of the phase, concatenated in order.
@@ -141,28 +142,60 @@ _extract_phase() {
   # "## Phase R-10". Blocks are self-contained (each re-declares WF_DIR and
   # re-sources refresh-lib.sh) and designed to run sequentially, so
   # concatenation preserves execution order and per-block fail-fast.
-  awk -v phase="$phase_name" '
-    $0 ~ ("^## " phase "([[:space:]]*:|[[:space:]]*$)") { in_phase=1; next }
-    in_phase && /^## /   { exit }
-    in_phase && /^```bash/ {
-      if (found++) printf "\n# --- block %d ---\n", found
-      in_block=1; next
+  #
+  # PLACEHOLDER-SAFE: this program deliberately uses a getline loop in BEGIN
+  # instead of pattern rules. Before an agent sees a command body, OpenCode
+  # expands every "dollar + digits" token as a positional-argument placeholder
+  # (packages/opencode/src/session/prompt.ts, placeholderRegex /\$(\d+)/g):
+  # with no arguments, awk's current-record field is injected as the literal
+  # string "undefined" and shell positionals become empty strings, which
+  # silently destroyed this extraction. A getline loop needs no awk field
+  # variables at all. For the same reason, shell positional parameters below
+  # use the brace form (invisible to that regex, identical in bash).
+  awk -v phase="$phase_name" -v srcfile="$refresher" '
+    BEGIN {
+      re = "^## " phase "([[:space:]]*:|[[:space:]]*$)"
+      in_phase = 0; in_block = 0; found = 0
+      while ((getline line < srcfile) > 0) {
+        if (!in_phase) {
+          if (line ~ re) { in_phase = 1 }
+          continue
+        }
+        if (line ~ re) continue
+        if (line ~ /^## /) exit
+        if (line ~ /^```bash/) {
+          if (found++) printf "\n# --- block %d ---\n", found
+          in_block = 1
+          continue
+        }
+        if (in_block && line ~ /^```/) { in_block = 0; continue }
+        if (in_block) print line
+      }
+      close(srcfile)
     }
-    in_block && /^```/   { in_block=0; next }
-    in_block             { print }
-  ' "$refresher" > "$out_file"
+  ' > "$out_file"
 
   # Defense in depth: verify block coverage. A silent truncation here used to
   # surface much later as wrong plan classifications (R3 block 2 never ran ->
   # sdd-new.md was classified deleted_modified instead of updated). Die loudly
   # at extraction time instead.
   local total extracted
-  total=$(awk -v phase="$phase_name" '
-    $0 ~ ("^## " phase "([[:space:]]*:|[[:space:]]*$)") { in_phase=1; next }
-    in_phase && /^## / { exit }
-    in_phase && /^```bash/ { c++ }
-    END { print c+0 }
-  ' "$refresher")
+  total=$(awk -v phase="$phase_name" -v srcfile="$refresher" '
+    BEGIN {
+      re = "^## " phase "([[:space:]]*:|[[:space:]]*$)"
+      in_phase = 0; c = 0
+      # NOTE: break, not exit — exit inside BEGIN would end the whole
+      # program and skip the final count print.
+      while ((getline line < srcfile) > 0) {
+        if (!in_phase) { if (line ~ re) in_phase = 1; continue }
+        if (line ~ re) continue
+        if (line ~ /^## /) break
+        if (line ~ /^```bash/) c++
+      }
+      close(srcfile)
+      print c + 0
+    }
+  ')
   if [[ -s "$out_file" ]]; then
     extracted=$(( $(grep -c '^# --- block' "$out_file") + 1 ))
   else
@@ -179,8 +212,8 @@ _extract_phase() {
 # Execute a phase script with proper error handling
 # Usage: _run_phase "Phase R-1" "phase-r1.sh"
 _run_phase() {
-  local phase_name="$1"
-  local script_file="$2"
+  local phase_name="${1}"
+  local script_file="${2}"
   echo "=== Executing $phase_name ==="
   if bash "$script_file"; then
     echo "✓ $phase_name completed"
@@ -196,6 +229,14 @@ _run_phase() {
 Now read the orchestrator and execute each phase in order using the helper functions:
 
 ```bash
+# Setup: build the shared helper library BEFORE any phase runs. Every phase
+# sources ${WF_DIR}/lib/refresh-lib.sh, and that file is written by the
+# "Setup: create helper library" section of refresher.md. Without running it
+# first, Phase R-1 dies with:
+#   /tmp/wf-refresh-phases/lib/refresh-lib.sh: No such file or directory
+_extract_phase "Setup: create helper library" "${WF_DIR}/phase-setup.sh" || exit $?
+_run_phase "Setup: create helper library" "${WF_DIR}/phase-setup.sh" || exit $?
+
 # Phase R-1: Global command refresh
 _extract_phase "Phase R-1" "${WF_DIR}/phase-r1.sh"
 _run_phase "Phase R-1" "${WF_DIR}/phase-r1.sh" || exit $?
