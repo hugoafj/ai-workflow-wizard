@@ -80,13 +80,19 @@ def stack_key(state):
 
 
 def stack_primary(state):
-    """Primary stack from discovery.stack.primary (list or string)."""
+    """Primary stack from discovery.stack.primary, falling back to stack_key.
+
+    States migrated by R2 get discovery.stack.stack_key normalized but never
+    gain a .primary field; without this fallback those npm projects resolved
+    release-type "simple" instead of "node" in builder-heavy's
+    release-please-config rendering.
+    """
     primary = get_state_value(state, "discovery.stack.primary")
-    if isinstance(primary, list):
-        return primary[0] if primary else ""
-    if isinstance(primary, str):
+    if isinstance(primary, list) and primary:
+        return primary[0]
+    if isinstance(primary, str) and primary:
         return primary
-    return ""
+    return stack_key(state)
 
 
 def bool_feature(state, name):
