@@ -87,6 +87,18 @@ rm -rf "$WF_DIR"
 mkdir -p "$WF_DIR"
 mkdir -p "$WF_DIR/lib"
 
+# Durable per-project state dir: resume marker + pending prompts + review file.
+# It MUST live outside WF_DIR — the bootstrap wipes WF_DIR at the start of every
+# run and resume state has to survive that wipe (field report M3: a documented
+# re-run before resuming used to destroy .wizard-pending-prompts and
+# .wizard-resume-phase). The cksum suffix discriminates projects sharing /tmp.
+export WF_STATE_DIR="${TMPDIR:-/tmp}/wf-refresh-state-$(printf %s "$(pwd)" | cksum | cut -d' ' -f1)"
+mkdir -p "$WF_STATE_DIR"
+if [[ -s "$WF_STATE_DIR/.wizard-resume-phase" ]]; then
+  echo "ℹ Previous refresh interrupted at phase: $(cat "$WF_STATE_DIR/.wizard-resume-phase")"
+  echo "  Re-run with WF_REFRESH_RESUME=1 to resume it."
+fi
+
 echo "Downloading refresh files from GitHub..."
 echo "Source: ${WIZARD_REPO}@${WIZARD_BRANCH}/wf-init/"
 
@@ -197,7 +209,13 @@ _extract_phase() {
     }
   ')
   if [[ -s "$out_file" ]]; then
-    extracted=$(( $(grep -c '^# --- block' "$out_file") + 1 ))
+    # grep -c exits 1 when the count is 0 (single-block phases emit no
+    # markers). Plain arithmetic would propagate that status and kill any
+    # caller invoking this function WITHOUT the `||` suppression while set -e
+    # is active. Tolerate it explicitly so extraction context never matters.
+    local marker_count
+    marker_count=$(grep -c '^# --- block' "$out_file" || true)
+    extracted=$(( ${marker_count:-0} + 1 ))
   else
     extracted=0
   fi
