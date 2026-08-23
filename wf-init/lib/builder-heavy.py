@@ -440,19 +440,36 @@ def write_cicd(raw, state, staging):
             ai_sum = builder_core.fetch_with_retries(ai_url)
             ai_sum = builder_core.extract_block(ai_sum, "yaml")
             # The variant fragments carry no code fence, so extract_block falls
-            # back to the raw text INCLUDING the documentation banner. Strip it:
-            # the generated workflow must only contain real YAML (field report B3).
-            ai_sum = builder_core.strip_prose_header(ai_sum)
-            # strip_prose_header trims outer whitespace too, which left-flushes
-            # the fragment body (its first line starts at column 0). Injecting
-            # it verbatim would emit a second ROOT key next to `jobs:` and break
-            # the workflow. Re-indent every non-empty line to the anchor's own
-            # column so the job lands as a sibling of `release-please:`.
+            # back to the raw text INCLUDING the documentation banner (field
+            # report B3: the generated workflow must contain only real YAML).
+            # Neither extract_block nor strip_prose_header can be used here for
+            # the BODY: both end in .strip(), which left-flushes only the FIRST
+            # line and destroys the fragment's internal relative indent (its
+            # job key ships pre-indented two spaces). Split the banner off
+            # manually so the body keeps its original indentation, normalize to
+            # the fragment's own minimum common indent, then shift every
+            # non-empty line to the anchor's column so the job lands as a true
+            # sibling of `release-please:` regardless of template style.
+            frag_lines = ai_sum.splitlines()
+            _i = 0
+            while _i < len(frag_lines) and (
+                frag_lines[_i].startswith("#") or not frag_lines[_i].strip()
+            ):
+                _i += 1
+            frag_lines = frag_lines[_i:]
+            while frag_lines and not frag_lines[-1].strip():
+                frag_lines.pop()
+            margins = [
+                len(line) - len(line.lstrip())
+                for line in frag_lines
+                if line.strip()
+            ]
+            base = min(margins) if margins else 0
             anchor = "  # {{AI_SUMMARY_JOB}}"
             indent = anchor[: len(anchor) - len(anchor.lstrip())]
             ai_sum = "\n".join(
-                (indent + line) if line.strip() else line
-                for line in ai_sum.splitlines()
+                (indent + line[base:]) if line.strip() else ""
+                for line in frag_lines
             )
             # Fail loudly if the anchor drifts — a silent str.replace no-op would
             # ship release-please.yml with a live placeholder inside.
