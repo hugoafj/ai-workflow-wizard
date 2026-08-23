@@ -53,7 +53,8 @@ WF_RAW="${WF_RAW:-https://raw.githubusercontent.com/${WIZARD_REPO}/${WIZARD_BRAN
 # exports it; re-derive here so any phase block run standalone still resolves
 # it. It MUST live outside WF_DIR: the bootstrap wipes WF_DIR at the start of
 # every run, and resume state has to survive that wipe (field report M3).
-WF_STATE_DIR="${WF_STATE_DIR:-${TMPDIR:-/tmp}/wf-refresh-state-$(printf %s "$(pwd)" | cksum | cut -d' ' -f1)}"
+_WF_TMP_BASE="${TMPDIR:-/tmp}"
+WF_STATE_DIR="${WF_STATE_DIR:-${_WF_TMP_BASE%/}/wf-refresh-state-$(printf %s "$(pwd)" | cksum | cut -d' ' -f1)}"
 export WF_STATE_DIR
 mkdir -p "$WF_STATE_DIR"
 
@@ -607,6 +608,9 @@ reinsert_legacy_bridge() {
     {
       head -n "$TITLE_LINE" "$TARGET"
       cat "$RULE_FILE"
+      # temp-files/AGENTS.md ships without a trailing newline; emit one so
+      # the content below starts on its own line instead of fusing with it.
+      if [ -n "$(tail -c1 "$RULE_FILE")" ]; then printf '\n'; fi
       tail -n +$((TITLE_LINE + 1)) "$TARGET"
     } > "$TARGET.tmp"
     mv "$TARGET.tmp" "$TARGET"
@@ -1209,12 +1213,28 @@ if [[ ${#DETECTED_MCPS[@]} -gt 0 ]]; then
   fi
 fi
 
-if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || [[ "$OLD_NPM" != "$NPM_MAJOR" ]] || [[ "$OLD_COMMANDS" != "$COMMANDS" ]]; then
+# Normalize wizard-owned debris out of the cached commands before comparing:
+# builders <=0.8.13 could cache HTML generation markers inside
+# discovery.commands. They belong to the wizard, not the project — comparing
+# them verbatim fires a false drift decision ("cry wolf").
+_wf_norm_commands() {
+  printf '%s' "$1" | sed -e 's/<!--[^>]*-->//g' -e 's/[[:space:]]*$//' | sed '/^[[:space:]]*$/d'
+}
+OLD_COMMANDS_CLEAN=$(_wf_norm_commands "$OLD_COMMANDS")
+COMMANDS_CLEAN=$(_wf_norm_commands "$COMMANDS")
+
+if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || [[ "$OLD_NPM" != "$NPM_MAJOR" ]] || [[ "$OLD_COMMANDS_CLEAN" != "$COMMANDS_CLEAN" ]]; then
   echo "⚠ Project content drift detected:"
   [[ "$OLD_STACK" != "$STACK_KEY" ]] && echo "  - Stack: $OLD_STACK → $STACK_KEY"
   [[ "$OLD_NODE" != "$NODE_ENGINE" ]] && echo "  - Node engine: $OLD_NODE → $NODE_ENGINE"
   [[ "$OLD_NPM" != "$NPM_MAJOR" ]] && echo "  - npm major: $OLD_NPM → $NPM_MAJOR"
-  [[ "$OLD_COMMANDS" != "$COMMANDS" ]] && echo "  - Commands: $OLD_COMMANDS → $COMMANDS"
+  if [[ "$OLD_COMMANDS_CLEAN" != "$COMMANDS_CLEAN" ]]; then
+    echo "  - Commands:"
+    { diff -u \
+        <(printf '%s\n' "$OLD_COMMANDS_CLEAN") \
+        <(printf '%s\n' "$COMMANDS_CLEAN") \
+      | tail -n +3 | sed 's/^/      /'; } || true
+  fi
 
   # Fail-fast: in non-tty runs an unanswered prompt stops R1 here (before any
   # staging work) instead of silently taking the "no" path with stale info.
@@ -2088,7 +2108,9 @@ for line in "${GI_PROPOSED_LINES[@]}"; do
 done
 
 APPROVE_GITIGNORE="false"
+GI_HAD_CANDIDATES="false"
 if [[ ${#MISSING_GI_LINES[@]} -gt 0 ]]; then
+  GI_HAD_CANDIDATES="true"
   echo ""
   echo "🛡️  .gitignore changes (wizard-managed entries to be appended and committed):"
   printf '    + %s\n' "${MISSING_GI_LINES[@]}"
@@ -2119,8 +2141,9 @@ jq --argjson added "$APPROVE_ADDED" \
    --argjson deleted "$APPROVE_DELETED" \
    --argjson deleted_modified "$APPROVE_DELETED_MODIFIED" \
    --argjson gitignore "$APPROVE_GITIGNORE" \
+   --argjson gi_candidates "$GI_HAD_CANDIDATES" \
    --argjson overwrite_local "$APPROVE_OVERWRITE_LOCAL" \
-   '.build_plan.approval = {added: $added, updated: $updated, deleted: $deleted, deleted_modified: $deleted_modified, gitignore: $gitignore, overwrite_local: $overwrite_local} | .updated_at = (now | todate)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
+   '.build_plan.approval = {added: $added, updated: $updated, deleted: $deleted, deleted_modified: $deleted_modified, gitignore: $gitignore, overwrite_local: $overwrite_local, gitignore_candidates: $gi_candidates} | .updated_at = (now | todate)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
 mv "$STAGING_STATE.tmp" "$STAGING_STATE"
 
 # Explicit confirmation gate before R6: apply+commit, apply without commit, or cancel.
@@ -2216,6 +2239,9 @@ APPROVE_UPDATED=$(jq -r '.build_plan.approval.updated // false' "$STAGING_STATE"
 APPROVE_DELETED=$(jq -r '.build_plan.approval.deleted // false' "$STAGING_STATE")
 APPROVE_DELETED_MODIFIED=$(jq -r '.build_plan.approval.deleted_modified // false' "$STAGING_STATE")
 APPROVE_GITIGNORE=$(jq -r '.build_plan.approval.gitignore // false' "$STAGING_STATE")
+# Whether R5 actually had .gitignore candidates: without it, legacy plans would
+# make the else branch below print a misleading "not approved" skip message.
+GI_HAD_CANDIDATES=$(jq -r '.build_plan.approval.gitignore_candidates // false' "$STAGING_STATE")
 # FU7: Overwrite locally-modified files approval
 APPROVE_OVERWRITE_LOCAL=$(jq -r '.build_plan.approval.overwrite_local // false' "$STAGING_STATE")
 # Apply-only mode: copy approved files to the working tree but do NOT stage or commit.
@@ -2369,7 +2395,9 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
       esac
     done < <(jq -r '.answers.ides[]?' "$WF_STATE" 2>/dev/null)
   else
-    echo "ℹ .gitignore changes not approved; skipping .gitignore mutation"
+    if [[ "$GI_HAD_CANDIDATES" == "true" ]]; then
+      echo "ℹ .gitignore changes not approved; skipping .gitignore mutation"
+    fi
   fi
 
   # Reflect the .gitignore change in the refresh plan so it is approved/committed explicitly.
