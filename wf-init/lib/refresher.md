@@ -1212,12 +1212,28 @@ if [[ ${#DETECTED_MCPS[@]} -gt 0 ]]; then
   fi
 fi
 
-if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || [[ "$OLD_NPM" != "$NPM_MAJOR" ]] || [[ "$OLD_COMMANDS" != "$COMMANDS" ]]; then
+# Normalize wizard-owned debris out of the cached commands before comparing:
+# builders <=0.8.13 could cache HTML generation markers inside
+# discovery.commands. They belong to the wizard, not the project — comparing
+# them verbatim fires a false drift decision ("cry wolf").
+_wf_norm_commands() {
+  printf '%s' "$1" | sed -e 's/<!--[^>]*-->//g' -e 's/[[:space:]]*$//' | sed '/^[[:space:]]*$/d'
+}
+OLD_COMMANDS_CLEAN=$(_wf_norm_commands "$OLD_COMMANDS")
+COMMANDS_CLEAN=$(_wf_norm_commands "$COMMANDS")
+
+if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || [[ "$OLD_NPM" != "$NPM_MAJOR" ]] || [[ "$OLD_COMMANDS_CLEAN" != "$COMMANDS_CLEAN" ]]; then
   echo "⚠ Project content drift detected:"
   [[ "$OLD_STACK" != "$STACK_KEY" ]] && echo "  - Stack: $OLD_STACK → $STACK_KEY"
   [[ "$OLD_NODE" != "$NODE_ENGINE" ]] && echo "  - Node engine: $OLD_NODE → $NODE_ENGINE"
   [[ "$OLD_NPM" != "$NPM_MAJOR" ]] && echo "  - npm major: $OLD_NPM → $NPM_MAJOR"
-  [[ "$OLD_COMMANDS" != "$COMMANDS" ]] && echo "  - Commands: $OLD_COMMANDS → $COMMANDS"
+  if [[ "$OLD_COMMANDS_CLEAN" != "$COMMANDS_CLEAN" ]]; then
+    echo "  - Commands:"
+    { diff -u \
+        <(printf '%s\n' "$OLD_COMMANDS_CLEAN") \
+        <(printf '%s\n' "$COMMANDS_CLEAN") \
+      | tail -n +3 | sed 's/^/      /'; } || true
+  fi
 
   # Fail-fast: in non-tty runs an unanswered prompt stops R1 here (before any
   # staging work) instead of silently taking the "no" path with stale info.
