@@ -2107,7 +2107,9 @@ for line in "${GI_PROPOSED_LINES[@]}"; do
 done
 
 APPROVE_GITIGNORE="false"
+GI_HAD_CANDIDATES="false"
 if [[ ${#MISSING_GI_LINES[@]} -gt 0 ]]; then
+  GI_HAD_CANDIDATES="true"
   echo ""
   echo "🛡️  .gitignore changes (wizard-managed entries to be appended and committed):"
   printf '    + %s\n' "${MISSING_GI_LINES[@]}"
@@ -2138,8 +2140,9 @@ jq --argjson added "$APPROVE_ADDED" \
    --argjson deleted "$APPROVE_DELETED" \
    --argjson deleted_modified "$APPROVE_DELETED_MODIFIED" \
    --argjson gitignore "$APPROVE_GITIGNORE" \
+   --argjson gi_candidates "$GI_HAD_CANDIDATES" \
    --argjson overwrite_local "$APPROVE_OVERWRITE_LOCAL" \
-   '.build_plan.approval = {added: $added, updated: $updated, deleted: $deleted, deleted_modified: $deleted_modified, gitignore: $gitignore, overwrite_local: $overwrite_local} | .updated_at = (now | todate)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
+   '.build_plan.approval = {added: $added, updated: $updated, deleted: $deleted, deleted_modified: $deleted_modified, gitignore: $gitignore, overwrite_local: $overwrite_local, gitignore_candidates: $gi_candidates} | .updated_at = (now | todate)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
 mv "$STAGING_STATE.tmp" "$STAGING_STATE"
 
 # Explicit confirmation gate before R6: apply+commit, apply without commit, or cancel.
@@ -2235,6 +2238,9 @@ APPROVE_UPDATED=$(jq -r '.build_plan.approval.updated // false' "$STAGING_STATE"
 APPROVE_DELETED=$(jq -r '.build_plan.approval.deleted // false' "$STAGING_STATE")
 APPROVE_DELETED_MODIFIED=$(jq -r '.build_plan.approval.deleted_modified // false' "$STAGING_STATE")
 APPROVE_GITIGNORE=$(jq -r '.build_plan.approval.gitignore // false' "$STAGING_STATE")
+# Whether R5 actually had .gitignore candidates: without it, legacy plans would
+# make the else branch below print a misleading "not approved" skip message.
+GI_HAD_CANDIDATES=$(jq -r '.build_plan.approval.gitignore_candidates // false' "$STAGING_STATE")
 # FU7: Overwrite locally-modified files approval
 APPROVE_OVERWRITE_LOCAL=$(jq -r '.build_plan.approval.overwrite_local // false' "$STAGING_STATE")
 # Apply-only mode: copy approved files to the working tree but do NOT stage or commit.
@@ -2388,7 +2394,9 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
       esac
     done < <(jq -r '.answers.ides[]?' "$WF_STATE" 2>/dev/null)
   else
-    echo "ℹ .gitignore changes not approved; skipping .gitignore mutation"
+    if [[ "$GI_HAD_CANDIDATES" == "true" ]]; then
+      echo "ℹ .gitignore changes not approved; skipping .gitignore mutation"
+    fi
   fi
 
   # Reflect the .gitignore change in the refresh plan so it is approved/committed explicitly.
