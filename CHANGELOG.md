@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.15-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.14-beta.1...v0.8.15-beta.1) (2026-08-23)
+
+
+### Bug Fixes
+
+* **wf-refresh:** triage round-3 — bridge newline, merge indent, R1 drift gate UX ([#118](https://github.com/hugoafj/ai-workflow-wizard/issues/118)) ([83ed172](https://github.com/hugoafj/ai-workflow-wizard/commit/83ed172382840f2953b7e4ff2283f90c7f7e2c3b))
+
 ## [0.8.14-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.13-beta.1...v0.8.14-beta.1) (2026-08-22)
 
 
