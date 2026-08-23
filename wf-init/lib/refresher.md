@@ -53,7 +53,8 @@ WF_RAW="${WF_RAW:-https://raw.githubusercontent.com/${WIZARD_REPO}/${WIZARD_BRAN
 # exports it; re-derive here so any phase block run standalone still resolves
 # it. It MUST live outside WF_DIR: the bootstrap wipes WF_DIR at the start of
 # every run, and resume state has to survive that wipe (field report M3).
-WF_STATE_DIR="${WF_STATE_DIR:-${TMPDIR:-/tmp}/wf-refresh-state-$(printf %s "$(pwd)" | cksum | cut -d' ' -f1)}"
+_WF_TMP_BASE="${TMPDIR:-/tmp}"
+WF_STATE_DIR="${WF_STATE_DIR:-${_WF_TMP_BASE%/}/wf-refresh-state-$(printf %s "$(pwd)" | cksum | cut -d' ' -f1)}"
 export WF_STATE_DIR
 mkdir -p "$WF_STATE_DIR"
 
