@@ -607,6 +607,9 @@ reinsert_legacy_bridge() {
     {
       head -n "$TITLE_LINE" "$TARGET"
       cat "$RULE_FILE"
+      # temp-files/AGENTS.md ships without a trailing newline; emit one so
+      # the content below starts on its own line instead of fusing with it.
+      if [ -n "$(tail -c1 "$RULE_FILE")" ]; then printf '\n'; fi
       tail -n +$((TITLE_LINE + 1)) "$TARGET"
     } > "$TARGET.tmp"
     mv "$TARGET.tmp" "$TARGET"
