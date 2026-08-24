@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.16-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.15-beta.1...v0.8.16-beta.1) (2026-08-24)
+
+
+### Bug Fixes
+
+* **wf-refresh:** insert legacy bridge before first heading with blank separators ([#120](https://github.com/hugoafj/ai-workflow-wizard/issues/120)) ([4174d8c](https://github.com/hugoafj/ai-workflow-wizard/commit/4174d8cbe90af33792e7d6511867a97169e55fa3))
+
 ## [0.8.15-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.14-beta.1...v0.8.15-beta.1) (2026-08-23)
 
 
