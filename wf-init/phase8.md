@@ -50,18 +50,25 @@ if echo "$IDES" | grep -q "windsurf"; then
       fi
       # Check if the rule is already present
       if ! grep -q "Gentle AI — Legacy Path Bridge" "$TARGET"; then
-        # Find first heading or use line 1
-        TITLE_LINE=$(grep -n '^# ' "$TARGET" | head -1 | cut -d: -f1)
-        if [ -z "$TITLE_LINE" ]; then
-          TITLE_LINE=1
+        # Insert the rule BEFORE the first '# ' heading (or at the top when
+        # the file has none): it must stay outside the satellite's own
+        # "Windsurf Rules" section and below any frontmatter, with one blank
+        # line separating it from the content above and below.
+        HEADING_LINE=$(grep -n '^# ' "$TARGET" | head -1 | cut -d: -f1)
+        if [ -z "$HEADING_LINE" ]; then
+          HEADING_LINE=1
         fi
         {
-          head -n "$TITLE_LINE" "$TARGET"
+          if [ "$HEADING_LINE" -gt 1 ]; then
+            head -n $((HEADING_LINE - 1)) "$TARGET"
+            printf '\n'
+          fi
           cat "$WF_RULE_FILE"
-          # temp-files/AGENTS.md ships without a trailing newline; emit one so
-          # the content below starts on its own line instead of fusing with it.
+          # temp-files/AGENTS.md ships without a trailing newline; terminate
+          # its last line, then leave one blank line before the heading below.
           if [ -n "$(tail -c1 "$WF_RULE_FILE")" ]; then printf '\n'; fi
-          tail -n +$((TITLE_LINE + 1)) "$TARGET"
+          printf '\n'
+          tail -n +"$HEADING_LINE" "$TARGET"
         } > "$TARGET.tmp"
         mv "$TARGET.tmp" "$TARGET"
       fi
