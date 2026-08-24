@@ -63,6 +63,40 @@ Scan the project to detect what the wizard installed:
 echo "=== AI Workflow Wizard Artifacts ==="
 echo ""
 
+# 0. Manifest-authoritative candidates. build_plan.managed_paths is THE source of
+# truth for what the wizard installed: classify every manifest path present on disk
+# as wizard-owned BEFORE the heuristic scan below. Heuristics remain as a safety net
+# for orphaned artifacts from installs that predate the manifest. Self-contained
+# block (re-reads state — fenced blocks may run in fresh shells).
+MANAGED_PATHS=""
+if [ -f ".wizard-state.json" ]; then
+  MANAGED_PATHS=$(jq -r '.build_plan.managed_paths[]? // empty' ".wizard-state.json" 2>/dev/null || true)
+fi
+if [ -n "$MANAGED_PATHS" ]; then
+  echo "📜 Manifest-classified wizard-owned paths (authoritative):"
+  while IFS= read -r p; do
+    [ -z "$p" ] && continue
+    case "$p" in
+      AGENTS.md)
+        echo "  ⚙ $p (special → Phase 2 cleans its content, never deletes the file)"
+        ;;
+      .gitignore)
+        echo "  ⚙ $p (special → revert wizard entries only, keep the file)"
+        ;;
+      .claude/settings.json|.claude/settings.local.json|.cursor/mcp.json|.windsurf/mcp.json)
+        echo "  ⚙ $p (special → remove only the wizard MCP entry)"
+        ;;
+      .windsurf/workflows/sdd-new.md)
+        echo "  ⏭ $p (gentle-ai bridge — DO NOT delete)"
+        ;;
+      *)
+        [ -e "$p" ] && echo "  🗑 $p (manifest)"
+        ;;
+    esac
+  done <<< "$MANAGED_PATHS"
+  echo ""
+fi
+
 # 1. Wizard skills (Do NOT confuse with gentle-ai skills)
 echo "📦 Wizard skills:"
 for dir in .claude/skills .cursor/skills .gemini/skills .agents/skills .kiro/skills .codex/skills .opencode/skills .windsurf/skills .devin/skills; do
@@ -87,6 +121,10 @@ for dir in .claude/skills .cursor/skills .gemini/skills .agents/skills .kiro/ski
 done
 
 # 2. Wizard commands
+# NOTE: .windsurf/workflows/sdd-new.md is INTENTIONALLY not classified as wizard-owned.
+# gentle-ai creates that file; the wizard only overwrites it to apply a fix, and
+# gentle-ai sync may rewrite it. Landing in "not from wizard" is correct — never
+# delete it, and do not "fix" this classification to treat it as wizard-owned.
 echo ""
 echo "📋 Wizard commands:"
 for dir in .claude/commands .cursor/commands .windsurf/workflows .kiro/steering .github/prompts .opencode/commands .codex/commands; do
@@ -135,7 +173,8 @@ done
 echo ""
 echo "📡 Wizard satellites:"
 for f in CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/copilot-instructions.md \
-         .cursor/rules/project.mdc .windsurf/rules/project.md .kiro/steering/project-context.md; do
+         .cursor/rules/project.mdc .windsurf/rules/project.md .devin/rules/project.md \
+         .kiro/steering/project-context.md; do
   if [ -f "$f" ]; then
     echo "  🗑 $f (wizard)"
   fi
@@ -157,7 +196,7 @@ if [ -d ".github/workflows" ]; then
   for wf in .github/workflows/*; do
     wf_name=$(basename "$wf")
     case "$wf_name" in
-      gemini-review.yml|claude-review.yml|gga-review.yml|quality-guard.yml|security-review.*.yml|ai-summary-job.*.yml|release-please.yml|deploy.yml)
+      gemini-review.yml|claude-review.yml|gga-review.yml|quality-guard.yml|security-review*.yml|ai-summary-job.*.yml|release-please.yml|deploy.yml)
         echo "  🗑 $wf (wizard)"
         ;;
       *)
@@ -202,10 +241,15 @@ echo "📁 Other artifacts:"
 [ -f ".git/hooks/post-commit" ] && echo "  🗑 .git/hooks/post-commit (git hook installed by the wizard)"
 [ -d ".wizard-staging" ] && echo "  🗑 .wizard-staging/ (leftover from an interrupted run)"
 [ -d "openspec" ] && echo "  ⏭ openspec/ (gentle-ai — DO NOT delete)"
-if [ -f ".gitignore" ] && grep -qE "^\.wf-status$|^\.wizard-state\.json$|^\.wizard-managed-files\.json$|^\.wizard-staging/$|^!\.cursor/$|^!\.windsurf/$|^!\.devin/$|^!\.kiro/$|^!\.claude/$|^!\.codex/$|^!\.opencode/$|^!\.gemini/$|^!GEMINI\.md$|^!ANTIGRAVITY\.md$|^!\.github/copilot-instructions\.md$|^!\.github/prompts/$" .gitignore; then
+if [ -f ".gitignore" ] && grep -qE "^\.wf-status$|^\.wizard-state\.json$|^\.wizard-managed-files\.json$|^\.wizard-staging/$|^!\.agents/$|^!\.cursor/$|^!\.windsurf/$|^!\.devin/$|^!\.kiro/$|^!\.claude/$|^!\.codex/$|^!\.opencode/$|^!\.gemini/$|^!GEMINI\.md$|^!ANTIGRAVITY\.md$|^!\.github/copilot-instructions\.md$|^!\.github/prompts/$" .gitignore; then
   echo "  🗑 .gitignore (wizard entries — review which ones to revert)"
 fi
 ```
+
+**Merge rule**: when `.wizard-state.json` has `build_plan.managed_paths`, it is the
+authority — build the final inventory as the UNION of the manifest-classified list
+(block 0) and the heuristic scan above, deduplicating overlapping entries. The
+heuristic patterns stay as a safety net for orphans (installs older than the manifest).
 
 **PAUSE**. Show the complete inventory and ask the user to write freely what to keep:
 
@@ -326,7 +370,8 @@ Remove each wizard satellite detected in Phase 0:
 
 ```bash
 rm -f CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/copilot-instructions.md \
-      .cursor/rules/project.mdc .windsurf/rules/project.md .kiro/steering/project-context.md
+      .cursor/rules/project.mdc .windsurf/rules/project.md .devin/rules/project.md \
+      .kiro/steering/project-context.md
 ```
 
 ### Protocols flat
@@ -369,6 +414,53 @@ rm -f .git/hooks/post-commit
 ```
 
 Revert the wizard entries in `.gitignore` (the lines detected in Phase 0).
+
+### Node projects · package.json reconciliation
+
+If `.husky/` deletion was confirmed and `package.json` exists, detect what init
+left behind: `/wf-init` Phase 8 runs `npx husky init` (adds `"prepare": "husky"`
+to package.json) and installs commitlint as a devDependency. Without this step,
+the NEXT `npm install` runs `prepare` → husky recreates `.husky/_` and
+reconfigures `core.hooksPath`: the wizard partially resurrects itself after an
+uninstall.
+
+```bash
+# Detection (read-only):
+if [ -f package.json ]; then
+  jq -r '.scripts.prepare // empty' package.json | grep -qx 'husky' \
+    && echo '⚠ scripts.prepare = "husky" remains — npm install will recreate .husky/_'
+  jq -r '.devDependencies // {} | keys[]' package.json | grep -E '^(husky|commitlint|@commitlint/)' || true
+fi
+git config --get core.hooksPath 2>/dev/null   # may still point to .husky
+```
+
+Offer to reconcile and WAIT for an explicit `yes` (never run automatically):
+
+```bash
+# Only after yes:
+npm pkg delete scripts.prepare
+npm uninstall husky commitlint @commitlint/cli @commitlint/config-conventional 2>/dev/null || true
+# Only when core.hooksPath pointed into .husky:
+git config --unset core.hooksPath 2>/dev/null || true
+```
+
+### Report broken npm scripts
+
+If any test config was deleted (`vitest.config.ts`, `playwright.config.ts`, …)
+and `package.json` exists, report which npm scripts now reference deleted
+configs — otherwise CI breaks mysteriously weeks later with no clue why:
+
+```bash
+if [ -f package.json ]; then
+  # List ONLY the test configs actually deleted in this run:
+  DELETED_CONFIGS="vitest.config.ts playwright.config.ts"
+  jq -r '.scripts // {} | to_entries[] | "\(.key)\t\(.value)"' package.json | while IFS=$'\t' read -r name value; do
+    for cfg in $DELETED_CONFIGS; do
+      case "$value" in *"$cfg"*) echo "⚠ Script '$name' references deleted $cfg";; esac
+    done
+  done
+fi
+```
 
 After each group, report:
 
@@ -489,5 +581,8 @@ Next steps:
   this project. Would you like to verify manually?"
 - **If the project has no AGENTS.md**: there is nothing to clean in AGENTS.md.
   Only delete the detected artifacts.
+- **If AGENTS.md ends up EMPTY after Phase 2 cleanup**: delete the file
+  (`rm AGENTS.md`) and report it explicitly in the final output. An empty
+  AGENTS.md serves nobody.
 - **If the user has gentle-ai installed**: inform them that wf-cleanup does NOT
   uninstall it — that's manual with `gentle-ai uninstall`.
