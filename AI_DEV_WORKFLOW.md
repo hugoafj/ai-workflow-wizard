@@ -2353,11 +2353,21 @@ Global paths written by `install.sh` per command:
 - Builder B7: generates for all IDEs including `.codex/commands/`.
 - Unified naming: "AI Workflow Wizard" in all active files.
 - Command `/wf-cleanup` to uninstall the wizard from a project without touching gentle-ai.
-  Detection covers everything the wizard creates: satellites (including
-  `.cursor/rules/`, `.windsurf/rules/`, `.kiro/steering/`), flat protocols (`.agents/protocols/`),
-  commands, CI/CD workflows (including `deploy.yml`), MCP settings (Playwright MCP entries),
-  test configs, the `post-commit` hook (`.git/hooks/`), `.husky/`, `.gga`, `.pr_agent.toml`,
-  release-please configs, `.wizard-staging/`, `.wizard-managed-files.json`, and `.gitignore` entries.
+  Detection is manifest-driven: `build_plan.managed_paths` from `.wizard-state.json` is the
+  authority (with special-handled exclusions: `AGENTS.md` → Phase 2 cleans its content,
+  `.gitignore` → revert wizard lines only, MCP settings → remove the wizard entry only,
+  `.windsurf/workflows/sdd-new.md` → gentle-ai bridge, never deleted), and the heuristic
+  patterns stay as a safety net for orphaned artifacts from installs older than the
+  manifest. Heuristics cover satellites (including `.cursor/rules/`, `.windsurf/rules/`,
+  `.devin/rules/project.md`, `.kiro/steering/`), flat protocols (`.agents/protocols/`),
+  commands, CI/CD workflows (`security-review*.yml`, including `deploy.yml`), MCP settings
+  (Playwright MCP entries), test configs, the `post-commit` hook (`.git/hooks/`), `.husky/`,
+  `.gga`, `.pr_agent.toml`, release-please configs, `.wizard-staging/`,
+  `.wizard-managed-files.json`, and `.gitignore` entries. In Node projects with `.husky/`
+  deleted, it offers package.json reconciliation (remove `"prepare": "husky"`,
+  husky/commitlint devDependencies, and a stale `core.hooksPath`) so a later
+  `npm install` cannot resurrect the wizard, and reports npm scripts left referencing
+  deleted test configs.
   Confirmation is free-form: after the inventory, the user writes in their own words what to
   keep, and everything wizard-owned not mentioned is deleted after a per-group confirmation.
 
