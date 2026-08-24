@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.17-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.16-beta.1...v0.8.17-beta.1) (2026-08-24)
+
+
+### Bug Fixes
+
+* **wf-cleanup:** manifest-driven detection, devin satellite, gitignore !.agents/, husky reconciliation ([#123](https://github.com/hugoafj/ai-workflow-wizard/issues/123)) ([669f9e2](https://github.com/hugoafj/ai-workflow-wizard/commit/669f9e25b8c85b4a286d8ac0849b7c1a90ec157a))
+
 ## [0.8.16-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.15-beta.1...v0.8.16-beta.1) (2026-08-24)
 
 
