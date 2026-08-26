@@ -140,6 +140,29 @@ if [ "$(jq -r '.ci.conventional_commits' .wizard-state.json)" = "true" ]; then
   [ -f .husky/post-commit ] && chmod +x .husky/post-commit
   # migrate drift hook to Husky: delete the old one to avoid double firing
   [ -f .husky/post-commit ] && rm -f .git/hooks/post-commit
+
+  # Field report B5: `npx husky init` drops a factory pre-commit (`npm test`).
+  # With watch-mode test scripts ("test": "vitest" — no run/--run flag) every
+  # git commit hangs until killed. GGA-local already wrote its own pre-commit
+  # from staging; otherwise replace ONLY the untouched factory sample with an
+  # inert hook. A pre-existing user hook is never clobbered — it is reported.
+  if [ -f .husky/pre-commit ] && ! grep -q "gga run" .husky/pre-commit 2>/dev/null; then
+    PC_ACTIVE=$(grep -vE '^\s*(#|$)' .husky/pre-commit 2>/dev/null | tr -d ' \t' | tr '\n' ';')
+    if [ "$PC_ACTIVE" = "npmtest" ] || [ "$PC_ACTIVE" = "npmruntest" ]; then
+      printf '%s\n' \
+        '# Intentionally inert — enable real pre-commit checks deliberately.' \
+        '# The wizard replaced Husky'"'"'s factory "npm test": with watch-mode test' \
+        '# scripts (vitest without "run") every commit would hang until killed.' \
+        '# Safe example once you decide the tradeoff:' \
+        '# npx vitest related --run $(git diff --cached --name-only --diff-filter=ACMR)' \
+        > .husky/pre-commit
+      chmod +x .husky/pre-commit
+      echo "8.1b — factory .husky/pre-commit (npm test) replaced with an inert hook (watch-mode hang risk)."
+    elif [ -n "$PC_ACTIVE" ]; then
+      echo "8.1b WARNING — .husky/pre-commit holds a non-factory script; left untouched." >&2
+      echo "            Verify it terminates (no watch mode) or every commit will hang." >&2
+    fi
+  fi
 fi
 
 # GGA local mode: the pre-commit hook (uses .gga + AGENTS.md, already written)
@@ -203,11 +226,15 @@ if [ "$HAS_TESTING" -gt 0 ] || [ "$HAS_CONVENTIONAL" = "true" ]; then
   esac
 fi
 
-# Generate test dummy for Node if unit tests are enabled but no test files exist
+# Generate test dummy for Node if unit tests are enabled but NO TEST FILES exist.
+# Field report B9: the original check tested ONE hardcoded path, contradicting
+# this comment and creating dummy files in projects that already had tests
+# elsewhere. Glob the whole tree (minus node_modules) first.
 if [[ "$STACK_KEY" == node-* || "$STACK_KEY" == *-react || "$STACK_KEY" == *-vue || "$STACK_KEY" == *-nextjs || "$STACK_KEY" == *-node ]]; then
   if jq -e '.testing.layers[] | select(. == "unit" or . == "integration")' .wizard-state.json >/dev/null 2>&1; then
-    TEST_FILE="src/__tests__/example.test.ts"
-    if [ ! -f "$TEST_FILE" ]; then
+    EXISTING_TESTS=$(find . -path ./node_modules -prune -o -type f \( -name '*.test.*' -o -name '*.spec.*' \) -print 2>/dev/null | head -1)
+    if [ -z "$EXISTING_TESTS" ]; then
+      TEST_FILE="src/__tests__/example.test.ts"
       mkdir -p "$(dirname "$TEST_FILE")"
       cat > "$TEST_FILE" << 'TESTEOF'
 import { describe, it, expect } from 'vitest'
@@ -374,6 +401,20 @@ if [ -f openspec/config.yaml ]; then
 
   # 3. Apply edits with yq (variables UNIT, E2E, FRAMEWORK now available in same subshell)
   if command -v yq &>/dev/null; then
+    # 3a. Scalar-in-path guard (field report B1): `yq eval '.a.b = v'` over a
+    # path whose parent holds a SCALAR is a silent no-op — neither error nor
+    # write. Some /sdd-init runs leave `runner: vitest` (string) or
+    # `coverage: true` (bool) behind; setting their sub-keys then loses data.
+    # Delete any non-map node first so the canonical maps below are recreated.
+    for LEAF_PATH in .testing.runner .testing.coverage \
+                     .testing.layers.unit .testing.layers.integration .testing.layers.e2e; do
+      KIND=$(yq eval "${LEAF_PATH} | type" openspec/config.yaml)
+      if [ -n "$KIND" ] && [ "$KIND" != "!!map" ] && [ "$KIND" != "!!null" ]; then
+        echo "8.1d WARNING — ${LEAF_PATH} held a scalar (${KIND}); replaced by the canonical map."
+        yq eval "del(${LEAF_PATH})" -i openspec/config.yaml
+      fi
+    done
+
     # Runner: sdd-apply detects it from the testing section
     yq eval ".testing.runner.framework = \"$FRAMEWORK\"" -i openspec/config.yaml
 
@@ -426,12 +467,48 @@ find the file already carries the same value at a non-canonical nesting (older `
 output), leave the old key in place and confirm the canonical one is now set; if in doubt, ask
 the user.
 
-Verify the edit landed — if the coverage extra was activated, the file must now contain the
-threshold under `rules.verify`:
+Verify EVERY edit landed — assert each written field reads back with its exact value before
+declaring OK (field report B1: two writes were lost silently and only a per-field readback
+would have caught them):
 
 ```bash
 if [ -f openspec/config.yaml ]; then
-  grep -n "coverage_threshold" openspec/config.yaml && echo "8.1d OK — rules.verify.coverage_threshold present"
+  ASSERT_FAIL=0
+  _assert_eq() {
+    GOT=$(yq eval "$1" openspec/config.yaml)
+    if [ "$GOT" != "$2" ]; then
+      echo "8.1d ERROR — $1 => '$GOT' (expected '$2') — the write did NOT land." >&2
+      ASSERT_FAIL=1
+    fi
+  }
+  _assert_eq '.testing.runner.framework' "$FRAMEWORK"
+  if [ "$UNIT" = "true" ]; then
+    _assert_eq '.testing.layers.unit.available' "true"
+    _assert_eq '.testing.layers.unit.tool' "vitest"
+  fi
+  if [ "$INTEGRATION" = "true" ]; then
+    _assert_eq '.testing.layers.integration.available' "true"
+    _assert_eq '.testing.layers.integration.tool' "vitest"
+  fi
+  if [ "$E2E" = "true" ]; then
+    _assert_eq '.testing.layers.e2e.available' "true"
+    _assert_eq '.testing.layers.e2e.tool' "playwright"
+  fi
+  if [ "$COVERAGE" = "true" ]; then
+    _assert_eq '.testing.coverage.available' "true"
+    _assert_eq '.testing.coverage.command' "npm run test:coverage"
+    _assert_eq '.rules.verify.coverage_threshold' "$COVERAGE_THRESHOLD"
+    _assert_eq '.rules.verify.test_command' "npm run test:coverage"
+  else
+    _assert_eq '.rules.verify.test_command' "npm test"
+  fi
+  _assert_eq '.rules.apply.test_command' "npm test"
+  _assert_eq '.rules.verify.build_command' "npm run build"
+  if [ "$ASSERT_FAIL" -ne 0 ]; then
+    echo "8.1d ERROR — one or more canonical fields missing after write; do not continue." >&2
+    exit 1
+  fi
+  echo "8.1d OK — all canonical fields verified"
 fi
 ```
 
