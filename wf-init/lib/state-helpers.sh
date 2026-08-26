@@ -59,6 +59,7 @@ wf_state_init() {
     "node_engine": null,
     "npm_major": null,
     "default_branch": null,
+    "commands": null,
     "code_files": null,
     "git_commits": null,
     "committers": null,

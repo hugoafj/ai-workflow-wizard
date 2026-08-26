@@ -42,6 +42,30 @@ Changes to .gitignore:
     .wizard-staging/    (ignored — it's temporary)
 ```
 
+Side effects that Phase 8 will apply AFTER your approval — visible now so the approval
+covers them (field report B14: installs were invisible at review time):
+
+```
+SIDE EFFECTS in Phase 8 (installs + package.json changes):
+<if state.ci.conventional_commits == true>:
+  - npx husky init → creates .husky/, adds "prepare" script to package.json,
+    installs commitlint; replaces Husky's factory pre-commit with an inert hook.
+</if>
+<if unit/integration layer active>:
+  - npm install: vitest, @testing-library/*, jsdom, @vitest/ui, @vitest/coverage-v8
+    (+ @vitejs/plugin-react on React stacks).
+</if>
+<if e2e layer active>:
+  - npm install: @playwright/test; downloads Chromium via npx playwright install --with-deps.
+</if>
+<if any testing layer active>:
+  - package.json scripts added: test, test:ui, test:coverage (+ test:e2e, test:e2e:ui, test:e2e:report).
+</if>
+Approving this gate approves these installs too.
+```
+
+Include only the lines whose condition matches `.wizard-state.json` — if none match, skip the block entirely.
+
 If custom content was migrated from a previous AGENTS.md:
 
 ```

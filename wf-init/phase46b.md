@@ -93,10 +93,12 @@ Inform the user that references are generated the first time they run
 `npx playwright test --update-snapshots`, and that they must review and commit
 those reference images manually.
 
-**If they activated extra 3 (POM)**, generate an `e2e/pages/` folder with a minimal
-example (one class per page already covered by the existing example spec),
-and update the convention in the Testing Approach section of AGENTS.md so
-the agent follows it in future specs.
+**If they activated extra 3 (POM)**: the Builder stages a minimal scaffold —
+`e2e/pages/HomePage.ts` (Phase 6b, from `pom-example.tmpl.md`) — and the AGENTS.md Testing
+Approach section gains the page-object convention line automatically. It is deliberately a
+PATTERN, not real pages: real Page Objects emerge with features via sdd-apply, replacing the
+example locators with actual `data-testid` values grepped from components. Nothing is edited
+by hand here.
 
 **If they activated layer 1 or 1+2 (Vitest)**:
 
@@ -301,7 +303,7 @@ Testing stack configured (in memory — everything is written in Phase 8):
     <if unit>  src/test/setup.ts ✓
     <if e2e>   playwright.config.ts ✓
     <if e2e>   e2e/example.spec.ts ✓
-    <if POM>   e2e/pages/ ✓ (minimal example)
+    <if POM>   e2e/pages/HomePage.ts ✓ (minimal scaffold)
 
   Files modified in Phase 8:
     package.json  → test scripts added

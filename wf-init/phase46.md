@@ -33,7 +33,22 @@ grep -E '"(@(playwright/test|testing-library/|vitest/)|vitest|jest|cypress|playw
 ls vitest.config.ts vitest.config.js jest.config.ts playwright.config.ts 2>/dev/null
 ```
 
-**If a test runner already exists**: report what was found and ask if they want to add missing layers. Don't install anything without confirmation.
+**If a test runner already exists**: report what was found and ask if they want to add missing
+layers. Don't install anything without confirmation.
+
+**Check wiring, not just dependencies** (field report B8): a dependency without its config is a
+BROKEN layer, not a configured one. A project with `@playwright/test` installed but no
+`playwright.config.ts` crashes on its first e2e run (`npx playwright test --list` picks up unit
+specs). So for each layer report BOTH signals and only declare it configured when both are
+present:
+
+- Unit/integration: vitest/jest dependency AND `vitest.config.*`/`jest.config.*` (or a `test:` block in vite config).
+- E2E: playwright dependency AND `playwright.config.ts`.
+
+When the dependency exists but the config is missing, treat that layer as NOT configured and
+offer to generate the missing config with the wizard's own templates. Optionally smoke-check
+e2e wiring before declaring it done: `npx playwright test --list` should list specs without
+crashing.
 
 **If there's no test runner**, ask what layers to activate:
 

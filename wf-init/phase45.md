@@ -11,7 +11,7 @@ source "$WF_DIR/lib/state-helpers.sh"
 FEATURES_ROUTING=$(jq -r '.features.routing_abc // false' .wizard-state.json)
 FEATURES_TDD=$(jq -r '.features.tdd_protocol // false' .wizard-state.json)
 if [ "$FEATURES_ROUTING" != "true" ] && [ "$FEATURES_TDD" != "true" ]; then
-  echo "Phase 4.5 skipped — SDD not required (no ABC Routing nor TDD Protocol)."
+  echo "Phase 4.5 skipped — SDD not required (SDD Routing off and TDD Protocol off)."
   NEXT=
   if [ "$(jq -r '.features.ci // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.cd // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.release_please // false' .wizard-state.json)" = "true" ]; then
     NEXT="phase47-cicd"
@@ -360,7 +360,27 @@ if [ "$SDD_BACKEND" = "openspec" ] || [ "$SDD_BACKEND" = "hybrid" ]; then
 fi
 ```
 
-For `openspec`/`hybrid` backends, all three must exist when the check runs. Show the `config.yaml` contents to the user so they can see and confirm it reflects their choice. If there is any problem:
+For `openspec`/`hybrid` backends, all three must exist when the check runs. Show the `config.yaml` contents to the user so they can see and confirm it reflects their choice.
+
+Sanity-check the backend value before trusting the file — an improvised `/sdd-init` run
+(field report B11) wrote invented legacy keys like `phases.*.template: ".sdd/templates/*"`
+that exist nowhere in the wizard or the skill:
+
+```bash
+BACKEND_LINE=$(grep -E '^backend:' openspec/config.yaml 2>/dev/null | head -1 | sed 's/^backend:[[:space:]]*//')
+case "$BACKEND_LINE" in
+  engram|openspec|hybrid) echo "backend value OK: $BACKEND_LINE" ;;
+  "")
+    echo "⚠ openspec/config.yaml has no readable top-level backend key." >&2
+    echo "  Show the full file to the user and confirm it was created by /sdd-init." >&2 ;;
+  *)
+    echo "⚠ Unexpected backend '$BACKEND_LINE' in openspec/config.yaml." >&2
+    echo "  Show the full file to the user before continuing." >&2 ;;
+esac
+```
+
+If there is any problem (missing files, unreadable backend, or the user reports the
+initialization did not run), show this and stop — do not improvise a fix:
 
 ```
 SDD initialization was not completed. Missing: <list of what's missing>.
