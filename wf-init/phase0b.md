@@ -58,6 +58,13 @@ First, capture the dry-run output to a variable:
 SYNC_OUTPUT=$(gentle-ai sync --dry-run 2>&1)
 ```
 
+Classify the output BEFORE deciding it reports drift (field report B6): static plan metadata —
+step counters like "Apply steps: N" or plan summaries that print identically on every run,
+even right after a real sync of hundreds of files — is NOT drift. A drift signal is an explicit
+statement about specific files that WOULD change/write/update now. Only such a listing counts
+as pending changes; if the output is ambiguous, show it verbatim to the user and ask instead
+of deciding either way.
+
 **If the output reports NO pending changes** (sync is current): continue silently to Step 0.5, no
 message needed.
 

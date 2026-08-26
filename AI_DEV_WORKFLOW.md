@@ -527,19 +527,19 @@ The wizard phases:
 - **Phase 0** — Self-contained prerequisite. Installs/verifies gentle-ai, runs `gentle-ai doctor`, confirms active agents for this project.
 - **Phase 0b** — System health check. Verifies `gentle-ai doctor` critical checks, warns on disk space and Engram reachability.
 - **Phase 0c** — Workflow feature selection. Lets the user toggle routing, TDD, CI/CD, release-please and other optional modules before discovery.
-- **Phase 1** — Discovery (lists files, manifests, previous satellites, commits).
+- **Phase 1** — Discovery (lists files, manifests, previous satellites, commits; also saves npm scripts to `discovery.commands` and the root folder summary for the AGENTS.md Commands / Project Structure sections).
 - **Phase 2** — Migration of previous artifacts (if any with their own content).
 - **Phase 3** — Mode: greenfield vs legacy (auto-detect + confirmation).
 - **Phase 4** — Reverse engineering (legacy only).
-- **Phase 4.5** — SDD initialization (conditional, only if routing or TDD is enabled). With the context already discovered (committers, stack, greenfield vs legacy), the wizard explains the three backends (engram / openspec / hybrid), makes a grounded recommendation, and runs `/sdd-init` with the user's choice. The wizard always shows all three modes — the user decides. For Windsurf/Devin, it also ensures the "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule is present in the project's `AGENTS.md`; on greenfield projects (where Phase 6a has not generated `AGENTS.md` yet) it creates the file directly so `/sdd-init` can load the legacy skill paths in the new session.
-- **Phase 4.6** — Testing stack setup (conditional, only if TDD is enabled). Detects or installs the selected testing layers (unit, integration, E2E) and registers the Playwright MCP when applicable.
-- **Phase 4.6b** — Testing extras and MCP registration (conditional, only if TDD is enabled). Optional coverage targets, visual regression, Page Object Model, and final MCP registration.
+- **Phase 4.5** — SDD initialization (conditional, only if routing or TDD is enabled). With the context already discovered (committers, stack, greenfield vs legacy), the wizard explains the three backends (engram / openspec / hybrid), makes a grounded recommendation, and runs `/sdd-init` with the user's choice. The wizard always shows all three modes — the user decides. Verification also sanity-checks the `backend:` value in `openspec/config.yaml` (an improvised `/sdd-init` run once wrote invented keys). For Windsurf/Devin, it also ensures the "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule is present in the project's `AGENTS.md`; on greenfield projects (where Phase 6a has not generated `AGENTS.md` yet) it creates the file directly so `/sdd-init` can load the legacy skill paths in the new session.
+- **Phase 4.6** — Testing stack setup (conditional, only if TDD is enabled). Detects or installs the selected testing layers (unit, integration, E2E) and registers the Playwright MCP when applicable. Layer detection checks wiring, not just dependencies: a Playwright dependency without `playwright.config.ts` counts as NOT configured and the wizard offers to generate the config.
+- **Phase 4.6b** — Testing extras and MCP registration (conditional, only if TDD is enabled). Optional coverage targets, visual regression, Page Object Model (Builder-Heavy stages a minimal `e2e/pages/HomePage.ts` scaffold plus an AGENTS.md convention line), and final MCP registration.
 - **Phase 4.7** — CI/CD configuration (conditional, only if CI, CD, or release-please is enabled). Collects AI reviewer, security review, conventional commits, release-please, E2E in CI, and tag-based deploy preferences; writes no files here.
 - **Phase 5** — Minimum questions (4-5 depending on path).
-- **Phase 6a** — Deterministic assembly (Builder-Core): `AGENTS.md`, packaged protocols, and per-IDE satellites into `.wizard-staging/` on disk (does not promote to the project root yet). Runs the deterministic script `wf-init/lib/builder-core.py` (`python3 "$WF_DIR/lib/builder-core.py" --state .wizard-state.json --staging .wizard-staging --raw "$WF_RAW" --wf-dir "$WF_DIR"`); it hard-fails on unresolved placeholders instead of guessing.
+- **Phase 6a** — Deterministic assembly (Builder-Core): `AGENTS.md`, packaged protocols, and per-IDE satellites into `.wizard-staging/` on disk (does not promote to the project root yet). Runs the deterministic script `wf-init/lib/builder-core.py` (`python3 "$WF_DIR/lib/builder-core.py" --state .wizard-state.json --staging .wizard-staging --raw "$WF_RAW" --wf-dir "$WF_DIR"`); it hard-fails on unresolved placeholders instead of guessing. List state fields render as UTF-8 markdown bullets (`critical_constraints` → readable rule list, never escaped JSON); missing satellite templates hard-fail with the affected IDE listed instead of skipping silently. The E2E Testing Approach section embeds the `data-testid` convention from its template file.
 - **Phase 6b** — Deterministic assembly (Builder-Heavy): per-IDE commands, post-commit hook, testing configs, and CI/CD into `.wizard-staging/`. Runs the deterministic script `wf-init/lib/builder-heavy.py` with the same argument contract (B7-B9).
-- **Phase 7** — Human review gate (preview, approval).
-- **Phase 8** — Write, handle `.gitignore`, install post-commit hook (detects AGENTS.md and SDD drift in the same hook), commit. When Windsurf is active, re-inserts the "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule into `AGENTS.md` after the staging copy (portable head/tail/cat, verified with a loud failure check) — the staging router does not carry the rule. Validates the `AGENTS.md` `wf-version` footer is a concrete semver (never `latest` or an unresolved placeholder) and fails loudly if it is not — a non-semver footer blocks every `/wf-init` and `/wf-refresh`. It also cross-checks the footer against the state's `wizard_version` and warns on mismatch (it does not abort, so a manually advanced footer does not break a refresh).
+- **Phase 7** — Human review gate (preview incl. the Phase-8 install side effects — husky/commitlint/vitest/playwright installs and package.json script additions — approval).
+- **Phase 8** — Write, handle `.gitignore`, install post-commit hook (detects AGENTS.md and SDD drift in the same hook), commit. When Windsurf is active, re-inserts the "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule into `AGENTS.md` after the staging copy (portable head/tail/cat, verified with a loud failure check) — the staging router does not carry the rule. Validates the `AGENTS.md` `wf-version` footer is a concrete semver (never `latest` or an unresolved placeholder) and fails loudly if it is not — a non-semver footer blocks every `/wf-init` and `/wf-refresh`. It also cross-checks the footer against the state's `wizard_version` and warns on mismatch (it does not abort, so a manually advanced footer does not break a refresh). When conventional commits is active it neutralizes Husky's factory `pre-commit` (`npm test`) with an inert hook unless GGA-local wrote one or a non-factory user hook exists (watch-mode scripts would hang every commit); the dummy-test creation globs the whole tree instead of one hardcoded path; the 8.1d `openspec/config.yaml` edit deletes scalar nodes at canonical paths before writing sub-keys (a yq write over a scalar is a silent no-op) and asserts every written field reads back before declaring OK.
 
 **How it is invoked**: with `install.sh` it is installed as a global slash command on all detected IDEs. You invoke it with `/wf-init` from any repo. The agent detects and reads the phase files from the repo as it progresses.
 
@@ -656,6 +656,20 @@ Apply the conventions defined in `AGENTS.md` in all your responses.
 Apply the conventions defined in `AGENTS.md` in all your responses.
 @AGENTS.md
 ```
+
+**`.opencode/AGENTS.md`** (if OpenCode) / **`.codex/AGENTS.md`** (if Codex CLI):
+
+```markdown
+<!--
+OpenCode/Codex read AGENTS.md from the repository root natively (no @-import
+syntax). This satellite exists for parity with the other IDE satellites and
+simply points back to the source of truth.
+-->
+Project rules: see `AGENTS.md` at the repository root — OpenCode loads it automatically.
+```
+
+Both templates live in `templates/satellites/` (`opencode.tmpl`, `codex.tmpl`). A missing
+satellite template is a hard builder failure naming the affected IDE — never a silent skip.
 
 #### About `.gitignore`
 
@@ -876,7 +890,7 @@ What you will see, in order:
 
 **Phase 4.6 — Testing stack setup** (conditional, only if TDD is enabled). Detects or installs the selected testing layers.
 
-**Phase 4.6b — Testing extras** (conditional, only if TDD is enabled). Optional coverage targets, visual regression, Page Object Model, and final MCP registration.
+**Phase 4.6b — Testing extras** (conditional, only if TDD is enabled). Optional coverage targets, visual regression, Page Object Model (Builder-Heavy stages a minimal `e2e/pages/HomePage.ts` scaffold), and final MCP registration.
 
 **Phase 4.7 — CI/CD configuration** (conditional, only if CI, CD, or release-please is enabled). Collects AI reviewer, security review, conventional commits, release-please, and tag-based deploy preferences; writes no files here.
 
@@ -2205,7 +2219,7 @@ All three are always asked in Phase 4.6, after TDD mode, and **none activate wit
 |---|---|---|---|---|
 | Coverage targets | Minimum coverage threshold; fails `npm run test -- --coverage` if not met | Nearly zero — one config line in `vitest.config.ts` | Almost always — cheap and provides an objective quality signal |
 | Visual regression (snapshots) | Compares screenshots against a saved reference | Real and ongoing — each run is slower, and references need manual re-generation when design intentionally changes | Projects with stable UI where an accidental visual change would be costly |
-| Page Object Model | Organizes Playwright selectors into reusable classes | None at runtime, but it's an abstraction layer | Projects with multiple E2E specs — for 2-3 flows it's over-engineering, same logic the workflow's Decision Ladder already applies |
+| Page Object Model | Organizes Playwright selectors into reusable classes. Activating it stages a minimal `e2e/pages/HomePage.ts` scaffold plus an AGENTS.md convention line; real page objects emerge with features via sdd-apply | None at runtime, but it's an abstraction layer | Projects with multiple E2E specs — for 2-3 flows it's over-engineering, same logic the workflow's Decision Ladder already applies |
 
 Integration with CI/CD (so the coverage threshold also blocks the pipeline, not just the local run) is pending until Block 6 exists — today the gate can only apply locally.
 

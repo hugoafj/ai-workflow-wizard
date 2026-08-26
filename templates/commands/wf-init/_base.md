@@ -120,13 +120,13 @@ ls "$WF_DIR"
 |-------|------|-------------|
 | 0a | `phase0.md` | Install/verify gentle-ai + version |
 | 0b | `phase0b.md` | Health check (doctor) + confirm agents |
-| 0c | `phase0c.md` | **FEATURE SELECTION** (Ladder, TDD, Routes ABC, CI/CD, release-please) |
+| 0c | `phase0c.md` | **FEATURE SELECTION** (Ladder, TDD, SDD Routing, CI/CD, release-please) |
 | 1 | `phase1.md` | Discovery report |
 | 2 | `phase2.md` | Previous artifact migration |
 | 3 | `phase3.md` | Greenfield vs legacy classification |
 | 4 | `phase4.md` | Reverse engineering (legacy only) |
 | 5 | `phase5.md` | Questions: project name, stack, critical constraints |
-| 4.5 | `phase45.md` | SDD initialization — **only if Routes ABC or TDD active** |
+| 4.5 | `phase45.md` | SDD initialization — **only if SDD Routing or TDD active** |
 | 4.6 | `phase46.md` | Testing stack configuration (layers + TDD mode) — **only if TDD active** |
 | 4.6b | `phase46b.md` | Optional testing extras — **only if TDD active** |
 | 4.7 | `phase47-cicd.md` | CI/CD configuration — **only if CI/CD or release-please active** |
