@@ -67,6 +67,7 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
     "node_engine": null,
     "npm_major": null,
     "default_branch": null,
+    "commands": null,
     "code_files": null,
     "git_commits": null,
     "committers": null,
@@ -168,6 +169,12 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
 - **`discovery.stack.stack_key`**: normalized stack key (e.g. `node-react`, `php-laravel`,
   `python-django`). This is what the Builder uses to select `variants/<stack_key>.md`.
   **Never branch with `if stack === ...`**: the key selects a file.
+- **`discovery.commands`**: array of npm script names detected in phase 1. The Builder renders
+  the AGENTS.md **Commands** section from it; when absent, the Builder re-detects from
+  `package.json` and warns.
+- **`discovery.conventions.structure`**: short tree of main folders + purpose (phase 4 reverse
+  engineering). Feeds the AGENTS.md **Project Structure** section; when absent the Builder
+  falls back to `"flat"`.
 - **`answers.ides`**: determines which satellites/commands/packed protocols are generated.
 - **`testing.tdd_mode`**: `standard` | `strict` → selects `templates/commands/wf-tdd/variants/{standard,strict}.md`.
 - **`build_plan`**: populated by the Builder with the exact list of artifacts to write.

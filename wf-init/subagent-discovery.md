@@ -40,6 +40,14 @@ git -C "{PROJECT_PATH}" log --oneline -10 2>/dev/null
 # Project size
 find "{PROJECT_PATH}" -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" -o -name "*.py" -o -name "*.php" 2>/dev/null | grep -v node_modules | grep -v ".git" | wc -l
 
+# npm scripts (feeds the AGENTS.md Commands section — the Builder renders
+# them from .discovery.commands; without it the section falls back to a
+# generic re-detection)
+node -e "process.stdout.write(Object.keys(require('{PROJECT_PATH}/package.json').scripts||{}).join('\n'))" 2>/dev/null; echo
+
+# Root structure summary (feeds .discovery.conventions.structure)
+find "{PROJECT_PATH}" -maxdepth 1 -type d -not -name '.*' -not -path "{PROJECT_PATH}" 2>/dev/null
+
 # Toolchain
 node -e "process.stdout.write(require('{PROJECT_PATH}/package.json').engines?.node||'')" 2>/dev/null; echo
 npm --version 2>/dev/null | cut -d. -f1
@@ -70,6 +78,8 @@ Use `wf_state_set` to persist to `.wizard-state.json`:
 .discovery.node_engine          → detected Node version (or null)
 .discovery.npm_major            → local npm major version (or null)
 .discovery.default_branch       → default branch
+.discovery.commands             → [npm script names] for node stacks | null (the Builder
+                                  renders the AGENTS.md Commands section from this)
 .discovery.prior_artifacts      → { agents_md: bool, claude_md: bool, satellites: [...], hook: bool }
 ```
 
@@ -133,6 +143,9 @@ If legacy, read 2-3 representative files from `src/` to detect conventions:
 .discovery.conventions.tests      → detected framework | "no tests"
 .discovery.conventions.css        → "tailwind" | "css-modules" | "styled-components" | "plain"
 .discovery.conventions.state      → "useState" | "zustand" | "redux" | "context" | "other"
+.discovery.conventions.structure  → short tree of main folders + their purpose (one line each;
+                                    feeds the AGENTS.md Project Structure section — without it
+                                    the Builder falls back to the literal word "flat")
 ```
 
 If greenfield, leave `.discovery.conventions = {}`.
