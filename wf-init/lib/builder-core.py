@@ -618,8 +618,17 @@ def resolve_placeholder(state, key):
         return stack_key(state)
     value = get_state_value(state, key, None)
     if value is not None:
-        if isinstance(value, (dict, list)):
-            return json.dumps(value)
+        if key == "discovery.commands" and isinstance(value, list):
+            # Same shape as the re-detection fallback: "- npm run <script>".
+            return "\n".join("- npm run %s" % v for v in value)
+        if isinstance(value, list):
+            # Markdown bullets (UTF-8): list-typed placeholders such as
+            # answers.critical_constraints must render as readable rule
+            # lists. The previous json.dumps() wrote escaped JSON arrays
+            # ("aprobaci\u00f3n") straight into AGENTS.md (field report B12).
+            return "\n".join("- " + str(v) for v in value)
+        if isinstance(value, dict):
+            return json.dumps(value, ensure_ascii=False)
         return str(value)
     inferred = infer_placeholder(state, key)
     if inferred is not None:
@@ -730,7 +739,7 @@ def resolve_router_ifs(text, state):
     return "".join(out)
 
 
-def testing_approach_section(state):
+def testing_approach_section(state, raw=None):
     """Generate the Testing Approach section body from the active test layers.
 
     Replaces inlining the raw `testing-approach.section.md` instruction
@@ -777,6 +786,24 @@ def testing_approach_section(state):
             "- One spec file per user flow, named by the flow — not by the component or hook.",
             "- Specs live in `e2e/<feature-name>.spec.ts` (examples: `persistence.spec.ts`, `task-creation.spec.ts`).",
         ]
+        if get_state_value(state, "testing.page_object_model", False):
+            lines += [
+                "- Page objects live in `e2e/pages/` — one class per screen; specs never hold raw selectors.",
+            ]
+        # Field report B4: phase 4.6b documents the data-testid convention for
+        # e2e projects, but nothing injected it into the generated AGENTS.md
+        # and data-testid.section.md sat orphaned. Single source stays the
+        # template file; append it verbatim when e2e is active.
+        if raw:
+            try:
+                dt = fetch_with_retries(
+                    base_url(raw, "templates/protocols/testing/data-testid.section.md"))
+                dt = strip_internal_comment(dt)
+                dt = re.sub(r"^\s*<if[^>]*>:\s*\n?", "", dt)
+                if dt.strip():
+                    lines += ["", dt.strip()]
+            except RuntimeError:
+                pass
     if not has_unit and not has_e2e:
         lines += [
             "No automated test layers are active. Follow `testing.checks_before_done` "
@@ -832,7 +859,7 @@ def render_router(raw, state):
         # testing-approach.section.md is an instruction fragment, not a
         # template body: generate the resolved section from the active layers.
         if spec == "testing/testing-approach.section.md":
-            return testing_approach_section(state)
+            return testing_approach_section(state, raw)
         # spec may be "templates/commands/wf-ladder/_base.md (protocol-header)"
         # or "testing/testing-approach.section.md" (fragment file). The regex
         # stripped the leading "protocols/" from the include name, so re-add it
@@ -910,6 +937,7 @@ IDE_PATHS = {
     "cursor": ".cursor/protocols/",
     "codex": ".codex/protocols/",
     "windsurf": ".windsurf/protocols/",
+    "gemini-cli": ".gemini/protocols/",
     "kiro": ".kiro/protocols/",
     "vscode-copilot": ".github/protocols/",
     "antigravity": ".agents/protocols/",
@@ -921,6 +949,10 @@ SKILL_PATHS = {
     "cursor": ".cursor/skills/",
     "codex": ".codex/skills/",
     "windsurf": ".windsurf/skills/",
+    # builder.md B4 table: gemini-cli native skills path. Commands keep the
+    # universal .agents/skills fallback (Gemini custom commands are TOML, a
+    # different format the Builder does not emit).
+    "gemini-cli": ".gemini/skills/",
     "kiro": ".kiro/skills/",
     "vscode-copilot": ".github/skills/",
     "antigravity": ".agents/skills/",
@@ -1039,16 +1071,22 @@ def write_satellites(raw, state, staging):
 
     Destinations follow the spec in `wf-init/lib/builder.md` (Step B6 satellite
     table), restored after the 17c5d95 regression introduced `wizard.md`
-    destinations and dropped devin. opencode/codex are not in the spec table
-    and keep their code-introduced destinations.
+    destinations and dropped devin.
+
+    Missing templates are a HARD failure collected across all IDEs (field
+    report B2): the deterministic contract says the builder never silently
+    skips an artifact — opencode.tmpl 404 used to exit 0 with the satellite
+    missing.
     """
     created = []
+    failures = []
     sat_map = {
         "claude-code": ("claude.tmpl", "CLAUDE.md"),
         "opencode": ("opencode.tmpl", ".opencode/AGENTS.md"),
         "cursor": ("cursor.tmpl", ".cursor/rules/project.mdc"),
         "codex": ("codex.tmpl", ".codex/AGENTS.md"),
         "windsurf": ("windsurf.tmpl", ".windsurf/rules/project.md"),
+        "gemini-cli": ("gemini.tmpl", "GEMINI.md"),
         "kiro": ("kiro.tmpl", ".kiro/steering/project-context.md"),
         "vscode-copilot": ("copilot.tmpl", ".github/copilot-instructions.md"),
         "antigravity": ("antigravity.tmpl", "ANTIGRAVITY.md"),
@@ -1061,7 +1099,8 @@ def write_satellites(raw, state, staging):
         url = base_url(raw, "templates/satellites/%s" % (tmpl_name))
         try:
             text = fetch_with_retries(url)
-        except RuntimeError:
+        except RuntimeError as exc:
+            failures.append("%s: %s" % (ide, exc))
             continue
         rendered = render_satellite(text, state)
         target = os.path.join(staging, rel)
@@ -1073,10 +1112,11 @@ def write_satellites(raw, state, staging):
     # whenever windsurf is active; it has no IDE_PATHS entry of its own.
     if "windsurf" in ides:
         url = base_url(raw, "templates/satellites/windsurf.tmpl")
+        text = None
         try:
             text = fetch_with_retries(url)
-        except RuntimeError:
-            text = None
+        except RuntimeError as exc:
+            failures.append("devin: %s" % exc)
         if text:
             rendered = render_satellite(text, state)
             target = os.path.join(staging, ".devin/rules/project.md")
@@ -1084,6 +1124,8 @@ def write_satellites(raw, state, staging):
             with open(target, "w", encoding="utf-8") as fh:
                 fh.write(rendered + "\n")
             created.append(os.path.relpath(target, staging))
+    if failures:
+        raise RuntimeError("missing satellite templates: %s" % "; ".join(failures))
     return created
 
 
