@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.18-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.17-beta.1...v0.8.18-beta.1) (2026-08-26)
+
+
+### Bug Fixes
+
+* **wf-init:** v0.8.17-beta.1 field-report triage ([#125](https://github.com/hugoafj/ai-workflow-wizard/issues/125)) ([afcc38e](https://github.com/hugoafj/ai-workflow-wizard/commit/afcc38ec41ce1d53c88c374ee971cc3283aedc9c))
+
 ## [0.8.17-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.16-beta.1...v0.8.17-beta.1) (2026-08-24)
 
 
