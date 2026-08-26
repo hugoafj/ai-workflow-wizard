@@ -247,6 +247,21 @@ def write_testing_configs(raw, state, staging):
         with open(target, "w", encoding="utf-8") as fh:
             fh.write(cfg + "\n")
         created.append(os.path.relpath(target, staging))
+
+        # POM extra (field report B3): phase 4.6b offers "Page Object Model"
+        # in its menu and the docs promised e2e/pages/, but neither builder
+        # generated anything. Stage the minimal scaffold when active; real
+        # page objects emerge with features via sdd-apply following the
+        # AGENTS.md convention line.
+        if builder_core.get_state_value(state, "testing.page_object_model", False):
+            pom = builder_core.fetch_with_retries(
+                builder_core.base_url(raw, "templates/protocols/testing/pom-example.tmpl.md"))
+            pom = builder_core.extract_block(pom, "typescript")
+            pom_target = os.path.join(staging, "e2e", "pages", "HomePage.ts")
+            os.makedirs(os.path.dirname(pom_target), exist_ok=True)
+            with open(pom_target, "w", encoding="utf-8") as fh:
+                fh.write(pom + "\n")
+            created.append(os.path.relpath(pom_target, staging))
     return created
 
 
