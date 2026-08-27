@@ -779,6 +779,10 @@ rm -rf "$STAGING"
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
+
+# Validate state before final phase transition
+jq -e '.build_plan.generated_files != null and .build_plan.managed_paths != null' .wizard-state.json || { echo "FAIL: build_plan validation failed"; exit 1; }
+
 wf_phase_done phase8 done
 ```
 

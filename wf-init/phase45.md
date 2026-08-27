@@ -419,7 +419,6 @@ re-running /sdd-init and will notify in .wf-status.
 
 Continuing with project questions...
 ```
-
 **PAUSE — Wait for "continue" or "yes" to move to the next phase (depending on features).**
 
 ---
@@ -428,9 +427,13 @@ Continuing with project questions...
 > Calculate the next phase based on features: `phase46` if `features.tdd_protocol = true`; else `phase47-cicd` if `features.ci`, `features.cd`, or `features.release_please` is true; else `phase5`.
 > Tell the user: *"SDD initialized. Reply **continue** when you are ready to proceed."*
 > Wait for the response. Only when they confirm, run in bash:
+
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
+
+# Validate state before phase transition
+jq -e '.sdd.backend != null and .sdd.already_initialized != null' .wizard-state.json || { echo "FAIL: SDD validation failed"; exit 1; }
 
 NEXT=
 if [ "$(jq -r '.features.tdd_protocol // false' .wizard-state.json)" = "true" ]; then

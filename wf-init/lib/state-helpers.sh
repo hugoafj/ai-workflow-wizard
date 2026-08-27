@@ -146,10 +146,76 @@ JSON
 wf_state_get() { jq -r "$1 // empty" "$WF_STATE" 2>/dev/null; }
 
 # Write a field (e.g. wf_state_set '.discovery.classification' '"legacy"')
+# Returns 0 on success, 1 on failure. Verifies the write by reading back the path.
 wf_state_set() {
-  local filter="$1" value="$2" tmp
+  local filter="$1" value="$2" tmp verify
   tmp="$(mktemp)"
-  jq "$filter = $value | .updated_at = (now | todate)" "$WF_STATE" > "$tmp" && mv "$tmp" "$WF_STATE"
+  if jq "$filter = $value | .updated_at = (now | todate)" "$WF_STATE" > "$tmp"; then
+    mv "$tmp" "$WF_STATE"
+    # Verify write: read back the path
+    verify=$(jq -r "$filter // empty" "$WF_STATE" 2>/dev/null)
+    if [ -z "$verify" ] && [ "$value" != "null" ] && [ "$value" != '""' ]; then
+      echo "ERROR: wf_state_set wrote but verification failed for $filter" >&2
+      return 1
+    fi
+  else
+    rm -f "$tmp"
+    echo "ERROR: wf_state_set jq failed for $filter" >&2
+    return 1
+  fi
+}
+
+# Validate critical state fields before phase transition
+# Returns 0 if valid, 1 if corrupted
+wf_state_validate() {
+  local required_fields=(
+    ".answers.ides"
+    ".features.decision_ladder"
+    ".features.tdd_protocol"
+    ".features.routing_abc"
+    ".features.ci"
+    ".features.cd"
+    ".features.release_please"
+    ".discovery.stack.primary"
+    ".discovery.stack.framework"
+  )
+  local field valid=true
+  for field in "${required_fields[@]}"; do
+    if ! jq -e "$field != null" "$WF_STATE" >/dev/null 2>&1; then
+      echo "ERROR: wf_state_validate - missing or null field: $field" >&2
+      valid=false
+    fi
+  done
+  # answers.ides must be array with at least 0 elements (can be empty but must exist)
+  if ! jq -e '.answers.ides | type == "array"' "$WF_STATE" >/dev/null 2>&1; then
+    echo "ERROR: wf_state_validate - answers.ides is not an array" >&2
+    valid=false
+  fi
+  $valid
+}
+
+# Mark phase and advance pointer (e.g. wf_phase_done phase1 phase2)
+# Validates state before advancing pointer
+wf_phase_done() {
+  local done_phase="$1" next="$2" tmp
+  # Validate state before transition
+  if ! wf_state_validate; then
+    echo "ERROR: wf_phase_done - state validation failed, not advancing pointer" >&2
+    return 1
+  fi
+  tmp="$(mktemp)"
+  if jq ".phases[\"$done_phase\"].status = \"done\" | .phase_pointer = \"$next\" | .updated_at = (now | todate)" \
+     "$WF_STATE" > "$tmp" && mv "$tmp" "$WF_STATE"; then
+    # Verify pointer advanced
+    local ptr
+    ptr=$(jq -r '.phase_pointer // empty' "$WF_STATE" 2>/dev/null)
+    if [ "$ptr" != "$next" ]; then
+      echo "ERROR: wf_phase_done - pointer not advanced to $next (got $ptr)" >&2
+      return 1
+    fi
+  else
+    return 1
+  fi
 }
 
 # Compute SHA256 hash of a file with portable fallback (macOS/BSD).
@@ -159,12 +225,4 @@ wf_sha256() {
   else
     shasum -a 256 -- "$1" | awk '{print $1}'
   fi
-}
-
-# Mark phase and advance pointer (e.g. wf_phase_done phase1 phase2)
-wf_phase_done() {
-  local done_phase="$1" next="$2" tmp
-  tmp="$(mktemp)"
-  jq ".phases[\"$done_phase\"].status = \"done\" | .phase_pointer = \"$next\" | .updated_at = (now | todate)" \
-    "$WF_STATE" > "$tmp" && mv "$tmp" "$WF_STATE"
 }

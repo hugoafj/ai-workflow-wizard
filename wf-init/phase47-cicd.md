@@ -321,6 +321,10 @@ else
   NEXT="phase5"
   echo "ℹ Next: Phase 5 for project details"
 fi
+
+# Validate state before phase transition
+jq -e '.ci.ai_reviewer != null and .ci.conventional_commits != null and .cd.enabled != null and .cd.platform != null' .wizard-state.json || { echo "FAIL: CI/CD validation failed"; exit 1; }
+
 wf_phase_done phase47-cicd "$NEXT"
 echo "ℹ Next phase: $NEXT"
 cat "$WF_DIR/$NEXT.md"

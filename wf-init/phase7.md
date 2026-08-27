@@ -105,6 +105,10 @@ staging manually bypassing the state — the state is the source of truth.
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 wf_state_init
+
+# Validate state before phase transition
+jq -e '.build_plan.generated_files != null and .build_plan.managed_paths != null' .wizard-state.json || { echo "FAIL: build_plan validation failed"; exit 1; }
+
 wf_phase_done phase7 phase8
 cat "$WF_DIR/phase8.md"
 ```
