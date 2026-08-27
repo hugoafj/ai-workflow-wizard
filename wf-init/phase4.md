@@ -32,14 +32,14 @@ Is this correct? Fix any errors before continuing.
 > **⛔ STOP HERE — do not execute anything else.**
 > **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `discovery.conventions` (the detected/corrected conventions from reverse engineering). Mark `wf_phase_done phase4 <next>`.
 > Compute the next phase based on ALREADY SELECTED features. If any have been activated, route to the relevant conditional phase; otherwise phase5:
-> ```bash
-> echo "phase5"
-> ```
 > Wait for the response. Only when the user confirms with "yes", run in bash:
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
+
+# Validate state before phase transition
+jq -e '.discovery.conventions != null' .wizard-state.json || { echo "FAIL: conventions validation failed"; exit 1; }
 
 NEXT=
 if [ "$(jq -r '.features.routing_abc // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.tdd_protocol // false' .wizard-state.json)" = "true" ]; then

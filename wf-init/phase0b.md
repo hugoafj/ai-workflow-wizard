@@ -41,6 +41,19 @@ If everything is `ok` or non-critical `[!!]`, show a clean summary:
   Engram: <reachable / not reachable — will be started on-demand>
 ```
 
+**Persist doctor results to state:**
+
+```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
+# Extract version from doctor output (first line like "gentle-ai v0.8.18-beta.1")
+DOCTOR_VERSION=$(echo "$DOCTOR_OUTPUT" | head -1 | sed -E 's/.*v?([0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.]+)?).*/\1/')
+wf_state_set '.gentle_ai.doctor' '"ok"'
+wf_state_set '.gentle_ai.version' "\"$DOCTOR_VERSION\""
+wf_state_set '.gentle_ai.install_choice' '"wizard"'
+```
+
 ---
 
 ### Step 0.4b — Check gentle-ai sync freshness (hard stop, non-ignorable)
@@ -55,7 +68,44 @@ If everything is `ok` or non-critical `[!!]`, show a clean summary:
 First, capture the dry-run output to a variable:
 
 ```bash
-SYNC_OUTPUT=$(gentle-ai sync --dry-run 2>&1)
+# Run sync dry-run, capturing both stdout and stderr
+if ! SYNC_OUTPUT=$(gentle-ai sync --dry-run 2>&1); then
+  SYNC_EXIT=$?
+  echo "⚠ gentle-ai sync --dry-run failed (exit $SYNC_EXIT):"
+  echo "$SYNC_OUTPUT"
+  echo ""
+  echo "Cannot determine sync status. What do you want to do?"
+  echo "  [retry]         — run gentle-ai sync --dry-run again"
+  echo "  [skip check]    — continue without sync verification (not recommended)"
+  echo "  [abort]         — stop wizard, fix gentle-ai first"
+  read -r SYNC_CHOICE
+  case "$SYNC_CHOICE" in
+    retry)
+      # Re-run the sync check (user must re-trigger this step)
+      echo "Please re-run the sync check step."
+      exit 1
+      ;;
+    skip*)
+      echo "ℹ Skipping sync check, continuing anyway"
+      wf_state_set '.gentle_ai.sync_stale_accepted' 'true'
+      ;;
+    *)
+      echo "Aborted."
+      exit 1
+      ;;
+  esac
+else
+  # Classify output: "Apply steps: N" where N > 0 = REAL drift (gentle-ai doesn't list files in dry-run)
+  # "Apply steps: 0" / "Nothing to do" / "Up to date" = no drift
+  # Anything else / ambiguous = show verbatim and ask
+  if echo "$SYNC_OUTPUT" | grep -qE 'Apply steps: [1-9][0-9]*'; then
+    SYNC_HAS_DRIFT=true
+  elif echo "$SYNC_OUTPUT" | grep -qiE 'Apply steps: 0|Nothing to do|Up to date|up.to.date|no changes|no pending'; then
+    SYNC_HAS_DRIFT=false
+  else
+    SYNC_HAS_DRIFT="ambiguous"
+  fi
+fi
 ```
 
 Classify the output BEFORE deciding it reports drift (field report B6): static plan metadata —
@@ -92,8 +142,17 @@ either option, and do not continue silently under any circumstance.
 
 - If `sync now`: run `gentle-ai sync`, show its output, then re-run `gentle-ai sync --dry-run` to
   confirm it now reports no pending changes before continuing to Step 0.5.
-- If `continue anyway`: record this decision in `.wizard-state.json` (`gentle_ai.sync_stale_accepted
-  = true`) so `wf-refresh` can surface it again later, and continue to Step 0.5.
+**If the output is ambiguous** (could not classify): present the FULL output verbatim and ask:
+
+```
+⚠ gentle-ai sync --dry-run output could not be automatically classified:
+
+<paste $SYNC_OUTPUT here, verbatim>
+
+Does this indicate pending changes that should be synced?
+  [yes, sync now]    — run `gentle-ai sync` before continuing
+  [no, continue]     — proceed without syncing (record as sync_stale_accepted=true)
+```
 
 ---
 
@@ -113,6 +172,16 @@ in Phase 6b only for the agents you confirm here.
 
 **Wait for user response.** Save the final agent list in `state.answers.ides` (used by the Builder to generate satellites).
 
+**Persist confirmed IDEs to state:**
+
+```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
+# CONFIRMED_IDES_ARRAY should be a JSON array like '["opencode","windsurf"]'
+wf_state_set '.answers.ides' "$CONFIRMED_IDES_ARRAY"
+```
+
 ---
 
 ### ✓ PHASE 0 COMPLETED
@@ -130,13 +199,21 @@ Continuing with project discovery...
 
 ---
 > **⛔ STOP HERE — do not execute anything else.**
-> **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `gentle_ai.doctor` (doctor result), `answers.ides` (final confirmed agent list). Mark `wf_phase_done phase0b phase0c`.
+> **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `gentle_ai.doctor`, `gentle_ai.version`, `gentle_ai.install_choice`, `gentle_ai.sync_stale_accepted`, `answers.ides` (final confirmed agent list). Mark `wf_phase_done phase0b phase0c`.
+> **Validation**: before `wf_phase_done`, verify critical fields are not null:
+> ```bash
+> jq -e '.gentle_ai.doctor != null and .gentle_ai.version != null and .answers.ides | type == "array"' .wizard-state.json || { echo "FAIL: state validation failed"; exit 1; }
+> ```
 > Tell the user: *"Phase 0 completed. Reply **continue** to choose which features to configure."*
 > Wait for the response. Only when confirmed, run in bash:
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
+
+# Validate state before phase transition
+jq -e '.gentle_ai.doctor != null and .gentle_ai.version != null and .answers.ides | type == "array"' .wizard-state.json || { echo "FAIL: state validation failed"; exit 1; }
+
 wf_phase_done phase0b phase0c
 cat "$WF_DIR/phase0c.md"
 ```

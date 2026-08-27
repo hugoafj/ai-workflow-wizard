@@ -327,6 +327,10 @@ already writes correctly to both sources in sync.
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
+
+# Validate state before phase transition
+jq -e '.testing.layers != null and .testing.tdd_mode != null' .wizard-state.json || { echo "FAIL: testing validation failed"; exit 1; }
+
 wf_phase_done phase46 phase46b
 cat "$WF_DIR/phase46b.md"
 ```

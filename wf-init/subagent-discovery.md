@@ -4,16 +4,20 @@ You are a project discovery agent. Your job is to run bash commands to analyze a
 
 ## Context you receive
 
-- `PROJECT_PATH`: absolute path to the target project
+- `PROJECT_PATH`: absolute path to the target project (e.g., `/home/user/my-project`)
 - `WF_PATH`: absolute path to the downloaded phase directory (WF_DIR — contains `lib/` and phase files)
-- `WF_STATE`: `{PROJECT_PATH}/.wizard-state.json`
+- `STATE_FILE`: absolute path to the state file (e.g., `/home/user/my-project/.wizard-state.json`)
 - `WF_RAW`: `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main`
+
+**IMPORTANT**: The `task` tool does NOT interpolate environment variables. Use the literal `STATE_FILE` path (e.g., `/home/user/my-project/.wizard-state.json`) in all `wf_state_set` calls and when sourcing state-helpers.sh. Do NOT use `$WF_STATE` — it will be empty in the sub-agent's environment.
 
 ## Instructions
 
 ### 1. Initialize state helpers
 
 ```bash
+# Set WF_STATE to the absolute path received in context
+WF_STATE="{STATE_FILE}"
 source "{WF_PATH}/lib/state-helpers.sh"
 ```
 

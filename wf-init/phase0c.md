@@ -71,17 +71,27 @@ Parse the selected features and proceed.
 
 ### Persistence
 
-Save in `.wizard-state.json` under the `features` section:
+Save in `.wizard-state.json` under the `features` section using explicit `wf_state_set` calls:
 
-```json
-{
-  "decision_ladder": <true/false based on option 1>,
-  "tdd_protocol": <true/false based on option 2>,
-  "routing_abc": <true/false based on option 3>,
-  "ci": <true/false based on option 4>,
-  "cd": <true/false based on option 5>,
-  "release_please": <true/false based on option 6 or if they chose 4>
-}
+```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
+# Parse user selection (e.g., "1,3,4") into boolean variables
+# This is pseudo-code — implement the parsing in your agent logic
+LADDER=<true/false based on option 1>
+TDD=<true/false based on option 2>
+ROUTING=<true/false based on option 3>
+CI=<true/false based on option 4>
+CD=<true/false based on option 5>
+RELEASE=<true/false based on option 6 or if CI is true>
+
+wf_state_set '.features.decision_ladder' "$LADDER"
+wf_state_set '.features.tdd_protocol' "$TDD"
+wf_state_set '.features.routing_abc' "$ROUTING"
+wf_state_set '.features.ci' "$CI"
+wf_state_set '.features.cd' "$CD"
+wf_state_set '.features.release_please' "$RELEASE"
 ```
 
 Mark `wf_phase_done phase0c phase1`.
@@ -93,6 +103,10 @@ Wait for the response. Only when confirmed, run in bash:
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
+
+# Validate state before phase transition
+jq -e '.features.decision_ladder != null and .features.tdd_protocol != null and .features.routing_abc != null and .features.ci != null and .features.cd != null and .features.release_please != null' .wizard-state.json || { echo "FAIL: features validation failed"; exit 1; }
+
 wf_phase_done phase0c phase1
 cat "$WF_DIR/phase1.md"
 ```

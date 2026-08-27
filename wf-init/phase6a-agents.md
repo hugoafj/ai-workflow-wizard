@@ -75,6 +75,9 @@ If validation succeeds, mark this phase done and continue with part B:
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
+# Validate state before phase transition
+jq -e '.build_plan.generated_files != null and .build_plan.managed_paths != null' .wizard-state.json || { echo "FAIL: build_plan validation failed"; exit 1; }
+
 echo "✓ Phase 6a complete"
 if [ "$WF_REFRESH" != "1" ]; then
   wf_phase_done phase6a-agents phase6b-build-heavy

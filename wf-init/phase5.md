@@ -66,6 +66,10 @@ Wait for the response. Only when confirmed, run in bash:
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
+
+# Validate state before phase transition
+jq -e '.answers.project_name != null' .wizard-state.json || { echo "FAIL: project_name validation failed"; exit 1; }
+
 wf_phase_done phase5 phase6a-agents
 cat "$WF_DIR/phase6a-agents.md"
 ```
