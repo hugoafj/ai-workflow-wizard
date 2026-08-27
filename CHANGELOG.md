@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.19-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.18-beta.1...v0.8.19-beta.1) (2026-08-27)
+
+
+### Bug Fixes
+
+* **wf-init:** resolve 7 state persistence and validation issues ([#127](https://github.com/hugoafj/ai-workflow-wizard/issues/127)) ([90740ff](https://github.com/hugoafj/ai-workflow-wizard/commit/90740ffabeaee39dbe7efc94b3a0c7340d41df54))
+
 ## [0.8.18-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.17-beta.1...v0.8.18-beta.1) (2026-08-26)
 
 
