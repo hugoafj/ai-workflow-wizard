@@ -49,9 +49,26 @@ source "$WF_DIR/lib/state-helpers.sh"
 
 # Extract version from doctor output (first line like "gentle-ai v0.8.18-beta.1")
 DOCTOR_VERSION=$(echo "$DOCTOR_OUTPUT" | head -1 | sed -E 's/.*v?([0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.]+)?).*/\1/')
+
+# Detect if gentle-ai is installed (doctor returns 0 if OK)
+if echo "$DOCTOR_OUTPUT" | grep -q "tool:gentle-ai.*ok"; then
+  INSTALLED=true
+else
+  INSTALLED=false
+fi
+
+# Detect OS from uname (for path/binaries decisions)
+case "$(uname -s)" in
+  Darwin) OS="darwin" ;;
+  Linux)  OS="linux" ;;
+  *)      OS="unknown" ;;
+esac
+
 wf_state_set '.gentle_ai.doctor' '"ok"'
 wf_state_set '.gentle_ai.version' "\"$DOCTOR_VERSION\""
 wf_state_set '.gentle_ai.install_choice' '"wizard"'
+wf_state_set '.gentle_ai.installed' "$INSTALLED"
+wf_state_set '.gentle_ai.os' "\"$OS\""
 ```
 
 ---
