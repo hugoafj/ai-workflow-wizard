@@ -27,6 +27,11 @@ Examples: "don't install dependencies without approval", "never touch src/legacy
 
 Save in `.wizard-state.json` → `answers.project_name`, `answers.stack_versions`, `answers.critical_constraints`.
 
+**Also persist WF_DIR for resumption (fix #11):**
+```bash
+wf_state_set '.wf_dir' '"/tmp/wf-init-phases"'
+```
+
 Phase 5 always advances to `phase6a-agents`. Every conditional phase (4.5, 4.6,
 4.6b, 4.7) already ran BEFORE Phase 5 in the wizard flow, so there is no routing
 decision left to make here — routing back to a completed conditional phase would
@@ -67,9 +72,10 @@ Wait for the response. Only when confirmed, run in bash:
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
-# Validate state before phase transition
-jq -e '.answers.project_name != null' .wizard-state.json || { echo "FAIL: project_name validation failed"; exit 1; }
+# Persist WF_DIR for resumption
+wf_state_set '.wf_dir' '"/tmp/wf-init-phases"'
 
+# Validate state before phase transition (phase-aware validation)
 wf_phase_done phase5 phase6a-agents
 cat "$WF_DIR/phase6a-agents.md"
 ```

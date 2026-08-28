@@ -59,9 +59,7 @@ Wait for the response. Only when confirmed, run in bash:
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
-# Validate state before phase transition
-jq -e '.discovery.stack.primary != null and .discovery.classification != null' .wizard-state.json || { echo "FAIL: discovery validation failed"; exit 1; }
-
+# Validate state before phase transition (phase-aware validation)
 wf_phase_done phase1 phase2
 cat "$WF_DIR/phase2.md"
 ```

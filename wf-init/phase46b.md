@@ -351,17 +351,8 @@ fi
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
-# Validate state before phase transition
-jq -e '.testing.coverage_threshold != null and .testing.visual_regression != null and .testing.page_object_model != null' .wizard-state.json || { echo "FAIL: testing extras validation failed"; exit 1; }
-
-# Recompute NEXT in this same fence (a fresh shell does not carry variables from
-# the fence above): wf_phase_done with an empty value would corrupt the pointer.
-if jq -e '.features.ci == true or .features.cd == true or .features.release_please == true' .wizard-state.json >/dev/null 2>&1; then
-  NEXT="phase47-cicd"
-else
-  NEXT="phase5"
-fi
-
+# Validate state before phase transition (phase-aware validation)
+# Note: coverage_threshold can be null if coverage extra not activated - phase-aware validator checks field exists
 wf_phase_done phase46b "$NEXT"
 echo "ℹ Next phase: $NEXT"
 cat "$WF_DIR/$NEXT.md"

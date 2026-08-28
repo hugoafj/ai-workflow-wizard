@@ -367,7 +367,12 @@ Sanity-check the backend value before trusting the file — an improvised `/sdd-
 that exist nowhere in the wizard or the skill:
 
 ```bash
-BACKEND_LINE=$(grep -E '^backend:' openspec/config.yaml 2>/dev/null | head -1 | sed 's/^backend:[[:space:]]*//')
+# Use yq for robust YAML parsing (installed in Phase 4.6, fallback to grep/sed if unavailable)
+if command -v yq &>/dev/null && yq --version 2>/dev/null | grep -q "mikefarah"; then
+  BACKEND_LINE=$(yq eval '.backend' openspec/config.yaml 2>/dev/null)
+else
+  BACKEND_LINE=$(grep -E '^backend:' openspec/config.yaml 2>/dev/null | head -1 | sed 's/^backend:[[:space:]]*//')
+fi
 case "$BACKEND_LINE" in
   engram|openspec|hybrid) echo "backend value OK: $BACKEND_LINE" ;;
   "")
@@ -432,9 +437,7 @@ Continuing with project questions...
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
-# Validate state before phase transition
-jq -e '.sdd.backend != null and .sdd.already_initialized != null' .wizard-state.json || { echo "FAIL: SDD validation failed"; exit 1; }
-
+# Validate state before phase transition (phase-aware validation)
 NEXT=
 if [ "$(jq -r '.features.tdd_protocol // false' .wizard-state.json)" = "true" ]; then
   NEXT="phase46"
