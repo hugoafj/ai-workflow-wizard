@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.24-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.23-beta.1...v0.8.24-beta.1) (2026-08-28)
+
+
+### Bug Fixes
+
+* **wf-init:** preserve valid data in openspec/config.yaml validation ([#137](https://github.com/hugoafj/ai-workflow-wizard/issues/137)) ([20caed6](https://github.com/hugoafj/ai-workflow-wizard/commit/20caed62fbba650ba3c58a8b12beb7a35a9c8f94))
+
 ## [0.8.23-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.22-beta.1...v0.8.23-beta.1) (2026-08-28)
 
 
