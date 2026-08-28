@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.23-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.22-beta.1...v0.8.23-beta.1) (2026-08-28)
+
+
+### Bug Fixes
+
+* **wf-init:** agent-driven openspec/config.yaml validation post-sdd-init ([#135](https://github.com/hugoafj/ai-workflow-wizard/issues/135)) ([f443a2a](https://github.com/hugoafj/ai-workflow-wizard/commit/f443a2accd0b793a2059f206570c19c519cea418))
+
 ## [0.8.22-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.21-beta.1...v0.8.22-beta.1) (2026-08-28)
 
 
