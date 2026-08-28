@@ -374,6 +374,13 @@ Before verifying the backend, validate that `openspec/config.yaml` conforms to t
    - Incomplete `testing.layers` (`unit`, `integration`, `e2e`)
    - Invalid value types (enums, ranges, etc.)
 
+> **CRITICAL — PRESERVE VALID DATA:** Do NOT remove or alter any section that is not explicitly invalid. Only fix structural problems:
+> - `phase_rules` → move content to `rules` and delete `phase_rules` key
+> - Scalars where maps expected → normalize to canonical map structure
+> - Add missing keys from canonical schema with sensible defaults
+> - **DO NOT REMOVE**: `project`, `stack`, `framework`, `persistence`, `strict_tdd`, `testing`, `testing.runner`, `testing.layers`, `testing.tools`, `testing.quality`, `testing.coverage_command`, `schema`, `context`, or any other valid data section
+> - Only fix structural problems within valid sections (scalars→maps, missing canonical keys with defaults)
+
 3. **Present unified diff** — show side-by-side comparison (current config vs convention) with proposed fixes.
 
 4. **Request approval** — show user the diff and ask: *"Apply automatic correction to align with canonical convention? [yes/no]"*
