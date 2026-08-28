@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.21-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.20-beta.1...v0.8.21-beta.1) (2026-08-28)
+
+
+### Bug Fixes
+
+* **wf-init:** set gentle_ai.installed and gentle_ai.os from doctor output ([#131](https://github.com/hugoafj/ai-workflow-wizard/issues/131)) ([df4ea5d](https://github.com/hugoafj/ai-workflow-wizard/commit/df4ea5d39d534ea1e8c946e6cf0c6dc2eb5959d5))
+
 ## [0.8.20-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.19-beta.1...v0.8.20-beta.1) (2026-08-28)
 
 
