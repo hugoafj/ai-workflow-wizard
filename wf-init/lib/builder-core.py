@@ -485,12 +485,37 @@ def infer_placeholder(state, key):
 
     if key == "discovery.commands":
         # Commands discovered in phase1; re-detect from package.json on refresh.
+        # Fix: Add descriptive comments for each command
+        COMMAND_DESCRIPTIONS = {
+            "dev": "Start development server",
+            "build": "Build for production",
+            "lint": "Run linter (ESLint, etc.)",
+            "preview": "Preview production build locally",
+            "test": "Run unit/integration tests",
+            "test:ui": "Run tests with UI",
+            "test:coverage": "Run tests with coverage report",
+            "test:e2e": "Run end-to-end tests",
+            "test:e2e:ui": "Run E2E tests with UI",
+            "test:e2e:report": "Show E2E test report",
+            "clean": "Clean build artifacts",
+        }
         commands = get_state_value(state, "discovery.commands", None)
         if commands is not None:
-            return commands if isinstance(commands, str) else "\n".join("- " + c for c in commands)
+            if isinstance(commands, str):
+                return commands
+            lines = []
+            for c in commands:
+                # Extract script name (after "npm run " or just the command)
+                script_name = c.replace("- npm run ", "").replace("npm run ", "").strip()
+                desc = COMMAND_DESCRIPTIONS.get(script_name, "")
+                if desc:
+                    lines.append("- %s — %s" % (c, desc))
+                else:
+                    lines.append("- %s" % c)
+            return "\n".join(lines)
         detected = detect_package_scripts()
         if detected:
-            # Convert comma-separated to bulleted format
+            # Convert comma-separated to bulleted format with descriptions
             bulleted = "\n".join("- " + c.strip() for c in detected.split(","))
             _warn_fallback(key, bulleted)
             return bulleted
@@ -533,8 +558,22 @@ def infer_placeholder(state, key):
     if key == "discovery.conventions.structure":
         structure = get_state_value(state, "discovery.conventions.structure", None)
         if structure:
+            # Fix: Format as tree if it's a flat string (one line per entry with --)
+            if isinstance(structure, str) and "\n" not in structure and "--" in structure:
+                # Parse "folder/ (purpose), folder2/ (purpose)" into tree
+                parts = [p.strip() for p in structure.split(",")]
+                lines = []
+                for part in parts:
+                    if "(" in part and ")" in part:
+                        folder = part[:part.index("(")].strip()
+                        purpose = part[part.index("(")+1:part.index(")")].strip()
+                        lines.append("  %s  # %s" % (folder, purpose))
+                    else:
+                        lines.append("  %s" % part)
+                return "\n".join(lines)
             return structure
         _warn_fallback(key, "flat")
+        return "flat"
         return "flat"
 
     if key == "testing.checks_before_done":
@@ -626,7 +665,15 @@ def resolve_placeholder(state, key):
             # answers.critical_constraints must render as readable rule
             # lists. The previous json.dumps() wrote escaped JSON arrays
             # ("aprobaci\u00f3n") straight into AGENTS.md (field report B12).
-            return "\n".join("- " + str(v) for v in value)
+            # Fix: unescape JSON strings (e.g., \u0027 -> ')
+            import codecs
+            def unescape_json(s):
+                try:
+                    # Handle unicode escapes like \u0027
+                    return codecs.decode(s, 'unicode_escape')
+                except Exception:
+                    return s
+            return "\n".join("- " + unescape_json(str(v)) for v in value)
         if isinstance(value, dict):
             return json.dumps(value, ensure_ascii=False)
         return str(value)

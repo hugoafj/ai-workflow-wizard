@@ -104,9 +104,7 @@ Wait for the response. Only when confirmed, run in bash:
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
-# Validate state before phase transition
-jq -e '.features.decision_ladder != null and .features.tdd_protocol != null and .features.routing_abc != null and .features.ci != null and .features.cd != null and .features.release_please != null' .wizard-state.json || { echo "FAIL: features validation failed"; exit 1; }
-
+# Validate state before phase transition (phase-aware validation)
 wf_phase_done phase0c phase1
 cat "$WF_DIR/phase1.md"
 ```

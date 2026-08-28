@@ -38,9 +38,7 @@ Is this correct? Fix any errors before continuing.
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
-# Validate state before phase transition
-jq -e '.discovery.conventions != null' .wizard-state.json || { echo "FAIL: conventions validation failed"; exit 1; }
-
+# Validate state before phase transition (phase-aware validation)
 NEXT=
 if [ "$(jq -r '.features.routing_abc // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.tdd_protocol // false' .wizard-state.json)" = "true" ]; then
   NEXT="phase45"

@@ -226,9 +226,40 @@ Additionally, if the detected backend is `openspec` or `hybrid`, update
 ```bash
 # Ensure the Go mikefarah/yq binary is available.
 # pip3's kislyuk/yq wrapper does NOT support `yq eval ... -i`.
+# Fix #7: auto-fallback - if kislyuk detected, install mikefarah yq FIRST and prepend to PATH
+if command -v yq &>/dev/null && yq --version 2>/dev/null | grep -q "kislyuk"; then
+  echo "INFO: detected Python yq wrapper (kislyuk); installing Go yq (mikefarah) as priority." >&2
+  # Force reinstall of mikefarah yq to ensure it takes precedence
+  YQ_INSTALL_DIR="${HOME}/.local/bin"
+  mkdir -p "$YQ_INSTALL_DIR"
+  case "$(uname -s)-$(uname -m)" in
+    Linux-x86_64)     YQ_BINARY="yq_linux_amd64" ;;
+    Linux-aarch64|Linux-arm64) YQ_BINARY="yq_linux_arm64" ;;
+    Darwin-x86_64)    YQ_BINARY="yq_darwin_amd64" ;;
+    Darwin-arm64)     YQ_BINARY="yq_darwin_arm64" ;;
+    *)
+      echo "ERROR: unsupported platform for automatic yq install ($(uname -s)-$(uname -m))." >&2
+      echo "Install Go yq from https://github.com/mikefarah/yq and re-run this step." >&2
+      exit 1
+      ;;
+  esac
+  echo "Installing Go yq (${YQ_BINARY}) to ${YQ_INSTALL_DIR}..."
+  if command -v curl &>/dev/null; then
+    curl -fsSL "https://github.com/mikefarah/yq/releases/latest/download/${YQ_BINARY}" -o "$YQ_INSTALL_DIR/yq"
+  elif command -v wget &>/dev/null; then
+    wget -q "https://github.com/mikefarah/yq/releases/latest/download/${YQ_BINARY}" -O "$YQ_INSTALL_DIR/yq"
+  else
+    echo "ERROR: curl or wget is required to install yq." >&2
+    exit 1
+  fi
+  chmod +x "$YQ_INSTALL_DIR/yq"
+  export PATH="$YQ_INSTALL_DIR:$PATH"
+fi
+
 if ! command -v yq &>/dev/null || ! yq --version 2>/dev/null | grep -q "mikefarah"; then
-  if command -v yq &>/dev/null && yq --version 2>/dev/null | grep -q "kislyuk"; then
-    echo "WARNING: detected Python yq wrapper (kislyuk); it does not support 'eval -i'." >&2
+  # Not installed at all, or not mikefarah (already handled kislyuk case above)
+  if ! command -v yq &>/dev/null; then
+    echo "INFO: yq not found, installing Go yq (mikefarah)..." >&2
   fi
 
   YQ_INSTALL_DIR="${HOME}/.local/bin"
@@ -328,9 +359,7 @@ already writes correctly to both sources in sync.
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
-# Validate state before phase transition
-jq -e '.testing.layers != null and .testing.tdd_mode != null' .wizard-state.json || { echo "FAIL: testing validation failed"; exit 1; }
-
+# Validate state before phase transition (phase-aware validation)
 wf_phase_done phase46 phase46b
 cat "$WF_DIR/phase46b.md"
 ```

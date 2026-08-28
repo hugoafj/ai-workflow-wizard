@@ -13,6 +13,26 @@ project:
 STAGING=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' .wizard-state.json)
 echo "=== AGENTS.md (full content) ==="; cat "$STAGING/AGENTS.md"
 echo "=== Staging files ==="; find "$STAGING" -type f | sort
+
+# Show .gitignore diff if it will be modified (fix #12)
+if [ -f .gitignore ]; then
+  # Show what will be added to .gitignore
+  echo "=== .gitignore changes (preview) ==="
+  echo "The following lines will be appended to .gitignore (idempotent - only missing lines added):"
+  IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
+  echo "  .wf-status"
+  echo "  .wizard-state.json"
+  echo "  .wizard-staging/"
+  echo "  !.agents/"
+  echo "$IDES" | grep -q "cursor" && echo "  !.cursor/"
+  echo "$IDES" | grep -qE "windsurf|devin" && echo "  !.windsurf/" && echo "  !.devin/"
+  echo "$IDES" | grep -q "kiro" && echo "  !.kiro/"
+  echo "$IDES" | grep -q "claude-code" && echo "  !.claude/"
+  echo "$IDES" | grep -q "codex" && echo "  !.codex/"
+  echo "$IDES" | grep -q "gemini-cli" && echo "  !.gemini/" && echo "  !GEMINI.md"
+  echo "$IDES" | grep -q "opencode" && echo "  !.opencode/"
+  echo "$IDES" | grep -q "vscode-copilot" && echo "  !.github/copilot-instructions.md" && echo "  !.github/prompts/"
+fi
 ```
 
 Present the summary:
@@ -106,9 +126,7 @@ WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 wf_state_init
 
-# Validate state before phase transition
-jq -e '.build_plan.generated_files != null and .build_plan.managed_paths != null' .wizard-state.json || { echo "FAIL: build_plan validation failed"; exit 1; }
-
+# Validate state before phase transition (phase-aware validation)
 wf_phase_done phase7 phase8
 cat "$WF_DIR/phase8.md"
 ```

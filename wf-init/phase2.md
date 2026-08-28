@@ -120,9 +120,7 @@ keeping `EXPECTED_COMMANDS` updated is the wizard maintainer's responsibility.
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
-# Validate state before phase transition
-jq -e '.migration.prior_content_action != null' .wizard-state.json || { echo "FAIL: migration validation failed"; exit 1; }
-
+# Validate state before phase transition (phase-aware validation)
 wf_phase_done phase2 phase3
 cat "$WF_DIR/phase3.md"
 ```

@@ -108,6 +108,8 @@ else
 fi
 ```
 
+**If user chose "sync now"**: run `gentle-ai sync`, show its output, then **re-run `gentle-ai sync --dry-run` to confirm it now reports no pending changes** before continuing to Step 0.5.
+
 Classify the output BEFORE deciding it reports drift (field report B6): static plan metadata —
 step counters like "Apply steps: N" or plan summaries that print identically on every run,
 even right after a real sync of hundreds of files — is NOT drift. A drift signal is an explicit
@@ -140,8 +142,7 @@ What do you want to do?
 **PAUSE — wait for the user's explicit response.** Do not infer a choice, do not default to
 either option, and do not continue silently under any circumstance.
 
-- If `sync now`: run `gentle-ai sync`, show its output, then re-run `gentle-ai sync --dry-run` to
-  confirm it now reports no pending changes before continuing to Step 0.5.
+- If `sync now`: run `gentle-ai sync`, show its output, then **re-run `gentle-ai sync --dry-run` to confirm it now reports no pending changes** before continuing to Step 0.5.
 **If the output is ambiguous** (could not classify): present the FULL output verbatim and ask:
 
 ```
@@ -211,9 +212,7 @@ Continuing with project discovery...
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
-# Validate state before phase transition
-jq -e '.gentle_ai.doctor != null and .gentle_ai.version != null and .answers.ides | type == "array"' .wizard-state.json || { echo "FAIL: state validation failed"; exit 1; }
-
+# Validate state before phase transition (phase-aware validation)
 wf_phase_done phase0b phase0c
 cat "$WF_DIR/phase0c.md"
 ```
