@@ -346,67 +346,7 @@ MESSAGE
 ```
 
 **Wait for explicit confirmation from the user** that `/sdd-init` ran in a new session and finished. 
-Do not continue or verify files until they confirm. When they reply "continue", proceed to validation.
-
----
-
-### Structural validation of openspec/config.yaml (post-sdd-init)
-
-Before proceeding with backend verification, validate the generated `openspec/config.yaml` 
-against the canonical schema installed locally by `gentle-ai sync` (`_shared/openspec-convention.md`).
-
-This catches common `sdd-init` LLM bugs like:
-- `phase_rules` legacy key (should be `rules`)
-- Scalar values where maps expected (e.g., `rules.apply: "string"` instead of map)
-- Missing required keys (`rules.apply`, `rules.verify`, `testing.runner`, etc.)
-
-```bash
-WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
-source "$WF_DIR/lib/state-helpers.sh"
-
-IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
-
-echo "=== Validating openspec/config.yaml against local canonical schema ==="
-
-# Run structural validation
-if ! validate_openspec_structure; then
-  echo ""
-  echo "⚠ Structural issues detected in openspec/config.yaml."
-  echo "The wizard can auto-fix these (remove legacy phase_rules, normalize types)."
-  echo ""
-  echo "Diff of proposed fixes:"
-  
-  # Show what would be fixed
-  if yq eval '.phase_rules' openspec/config.yaml | grep -qv '^null$'; then
-    echo "  - Will remove legacy 'phase_rules' key"
-  fi
-  
-  # Check for scalar-in-path issues
-  for key in rules.apply rules.verify testing.runner testing.coverage; do
-    TYPE=$(yq eval ".$key | type" openspec/config.yaml 2>/dev/null)
-    if [ "$TYPE" != "!!map" ] && [ "$TYPE" != "!!null" ]; then
-      echo "  - Will normalize '$key' from scalar ($TYPE) to canonical map"
-    fi
-  done
-  
-  echo ""
-  echo "¿Aplicar corrección automática? [yes/no]"
-  read -r CONFIRM
-  if [ "$CONFIRM" = "yes" ]; then
-    fix_openspec_structure "$IDES"
-    echo "✓ Fixes applied. Re-validating..."
-    if ! validate_openspec_structure; then
-      echo "ERROR: Validation still failing after fixes. Manual intervention required." >&2
-      exit 1
-    fi
-  else
-    echo "Abortado. Corrija manualmente y re-ejecute la validación."
-    exit 1
-  fi
-fi
-
-echo "✓ openspec/config.yaml structure is valid"
-```
+Do not continue or verify files until they confirm. When they reply "continue", proceed to verification.
 
 ---
 
