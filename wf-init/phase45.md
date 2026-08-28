@@ -346,19 +346,40 @@ MESSAGE
 ```
 
 **Wait for explicit confirmation from the user** that `/sdd-init` ran in a new session and finished. 
-Do not continue or verify files until they confirm. When they reply "continue", proceed to validation.
+Do not continue or verify files until they confirm. When they reply "continue", proceed to structural validation.
 
 ---
 
-### Structural validation of openspec/config.yaml (post-sdd-init)
+### Structural validation of openspec/config.yaml against canonical convention
 
-Before proceeding with backend verification, validate the generated `openspec/config.yaml` 
-against the canonical schema installed locally by `gentle-ai sync` (`_shared/openspec-convention.md`).
+Before verifying the backend, validate that `openspec/config.yaml` conforms to the canonical convention defined in `_shared/openspec-convention.md` (installed locally by `gentle-ai sync`).
 
-This catches common `sdd-init` LLM bugs like:
-- `phase_rules` legacy key (should be `rules`)
-- Scalar values where maps expected (e.g., `rules.apply: "string"` instead of map)
-- Missing required keys (`rules.apply`, `rules.verify`, `testing.runner`, etc.)
+**Agent instructions:**
+
+1. **Locate canonical schema** — search in this order:
+   - `~/.agents/skills/_shared/openspec-convention.md` (universal, wizard)
+   - `~/.config/opencode/skills/_shared/openspec-convention.md` (OpenCode)
+   - `~/.claude/skills/_shared/openspec-convention.md` (Claude Code)
+   - `~/.cursor/skills/_shared/openspec-convention.md` (Cursor)
+   - `~/.codeium/windsurf/skills/_shared/openspec-convention.md` (Windsurf/Devin)
+   - `~/.kiro/skills/_shared/openspec-convention.md` (Kiro)
+   - `~/.codex/skills/_shared/openspec-convention.md` (Codex)
+   - `~/.gemini/skills/_shared/openspec-convention.md` (Gemini CLI)
+   - `~/.gemini/antigravity/skills/_shared/openspec-convention.md` (Antigravity)
+
+2. **Semantic comparison** — read both files (project's `openspec/config.yaml` and local `_shared/openspec-convention.md`) and detect all structural deviations from canonical convention:
+   - Missing required keys (`rules.apply`, `rules.verify`, `testing.runner`, `testing.layers`, `testing.coverage`, `testing.quality`, `rules.proposal`, `rules.specs`, `rules.design`, `rules.tasks`, `rules.archive`, `testing.runner.command`, `testing.runner.framework`, `testing.quality.linter`, `testing.quality.type_checker`, `testing.quality.formatter`)
+   - Legacy/extra keys (`phase_rules`, etc.)
+   - Incorrect types (scalars where maps expected, e.g., `rules.apply: "string"` vs map)
+   - Incomplete `testing.layers` (`unit`, `integration`, `e2e`)
+   - Invalid value types (enums, ranges, etc.)
+
+3. **Present unified diff** — show side-by-side comparison (current config vs convention) with proposed fixes.
+
+4. **Request approval** — show user the diff and ask: *"Apply automatic correction to align with canonical convention? [yes/no]"*
+
+5. **If user approves** — apply fixes (remove legacy keys, normalize types, add missing keys with sensible defaults), re-verify and continue.
+   **If user rejects** — abort and request manual correction.
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
@@ -366,47 +387,15 @@ source "$WF_DIR/lib/state-helpers.sh"
 
 IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
 
-echo "=== Validating openspec/config.yaml against local canonical schema ==="
-
-# Run structural validation
-if ! validate_openspec_structure; then
-  echo ""
-  echo "⚠ Structural issues detected in openspec/config.yaml."
-  echo "The wizard can auto-fix these (remove legacy phase_rules, normalize types)."
-  echo ""
-  echo "Diff of proposed fixes:"
-  
-  # Show what would be fixed
-  if yq eval '.phase_rules' openspec/config.yaml | grep -qv '^null$'; then
-    echo "  - Will remove legacy 'phase_rules' key"
-  fi
-  
-  # Check for scalar-in-path issues
-  for key in rules.apply rules.verify testing.runner testing.coverage; do
-    TYPE=$(yq eval ".$key | type" openspec/config.yaml 2>/dev/null)
-    if [ "$TYPE" != "!!map" ] && [ "$TYPE" != "!!null" ]; then
-      echo "  - Will normalize '$key' from scalar ($TYPE) to canonical map"
-    fi
-  done
-  
-  echo ""
-  echo "¿Aplicar corrección automática? [yes/no]"
-  read -r CONFIRM
-  if [ "$CONFIRM" = "yes" ]; then
-    fix_openspec_structure "$IDES"
-    echo "✓ Fixes applied. Re-validating..."
-    if ! validate_openspec_structure; then
-      echo "ERROR: Validation still failing after fixes. Manual intervention required." >&2
-      exit 1
-    fi
-  else
-    echo "Abortado. Corrija manualmente y re-ejecute la validación."
-    exit 1
-  fi
-fi
-
-echo "✓ openspec/config.yaml structure is valid"
+# Agent (LLM) performs semantic validation here
+# No complex bash scripts — agent reads both files, compares, presents diff for approval
 ```
+
+> **Note:** This validation is semantic (agent reads both files), not a rigid bash script. Agent understands canonical convention and detects any inconsistency.
+
+---
+
+### Verification (runs after Path A or Path B)
 
 ---
 
