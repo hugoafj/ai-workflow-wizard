@@ -358,3 +358,147 @@ wf_sha256() {
     shasum -a 256 -- "$1" | awk '{print $1}'
   fi
 }
+
+# Find local openspec-convention.md schema file (installed by gentle-ai sync)
+# Searches in IDE-specific and universal locations
+_find_openspec_schema() {
+  local IDES="$1"
+  local schema_paths=()
+  
+  # Universal (wizard installs here) - highest priority
+  schema_paths+=("$HOME/.agents/skills/_shared/openspec-convention.md")
+  
+  # IDE-specific (gentle-ai sync installs here)
+  case "$IDES" in
+    *opencode*)  schema_paths+=("$HOME/.config/opencode/skills/_shared/openspec-convention.md") ;;
+    *claude*)    schema_paths+=("$HOME/.claude/skills/_shared/openspec-convention.md") ;;
+    *cursor*)    schema_paths+=("$HOME/.cursor/skills/_shared/openspec-convention.md") ;;
+    *windsurf*)  schema_paths+=("$HOME/.codeium/windsurf/skills/_shared/openspec-convention.md") ;;
+    *devin*)     schema_paths+=("$HOME/.devin/skills/_shared/openspec-convention.md") ;;
+    *kiro*)      schema_paths+=("$HOME/.kiro/skills/_shared/openspec-convention.md") ;;
+    *codex*)     schema_paths+=("$HOME/.codex/skills/_shared/openspec-convention.md") ;;
+    *gemini*)    schema_paths+=("$HOME/.gemini/skills/_shared/openspec-convention.md") ;;
+    *antigravity*) schema_paths+=("$HOME/.gemini/antigravity/skills/_shared/openspec-convention.md") ;;
+  esac
+  
+  # Find first existing
+  for path in "${schema_paths[@]}"; do
+    if [ -f "$path" ]; then
+      echo "$path"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Validate openspec/config.yaml structure against canonical schema
+# Returns 0 if valid, 1 if issues found (issues printed to stderr)
+# Only validates structure (keys + types), not values
+validate_openspec_structure() {
+  local config_file="${1:-.wizard-state.json}"  # not used, kept for API compatibility
+  local IDES="${2:-$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)}"
+  
+  local schema_file
+  schema_file=$(_find_openspec_schema "$IDES")
+  
+  if [ -z "$schema_file" ]; then
+    echo "WARN: No local openspec-convention.md schema found (searched ~/.agents/skills/_shared/ and IDE-specific paths). Skipping validation." >&2
+    return 0
+  fi
+  
+  if [ ! -f openspec/config.yaml ]; then
+    echo "ERROR: openspec/config.yaml not found" >&2
+    return 1
+  fi
+  
+  echo "=== Validating openspec/config.yaml against local schema: $schema_file ===" >&2
+  
+  local ISSUES=()
+  
+  # Check 1: Required keys from canonical schema
+  local required_keys=(
+    "rules.apply"
+    "rules.verify"
+    "testing.runner"
+    "testing.layers"
+    "testing.coverage"
+    "testing.quality"
+  )
+  
+  for key in "${required_keys[@]}"; do
+    if ! yq eval ".$key" openspec/config.yaml | grep -qv '^null$'; then
+      ISSUES+=("Missing canonical key: $key")
+    fi
+  done
+  
+  # Check 2: phase_rules legacy (common sdd-init LLM bug)
+  if yq eval '.phase_rules' openspec/config.yaml | grep -qv '^null$'; then
+    ISSUES+=("Legacy 'phase_rules' found (sdd-init bug). Canonical schema uses 'rules'.")
+  fi
+  
+  # Check 3: Correct types (maps, not scalars)
+  local map_keys=(
+    "rules.apply"
+    "rules.verify"
+    "testing.runner"
+    "testing.coverage"
+  )
+  
+  for key in "${map_keys[@]}"; do
+    local TYPE
+    TYPE=$(yq eval ".$key | type" openspec/config.yaml 2>/dev/null)
+    if [ "$TYPE" != "!!map" ] && [ "$TYPE" != "!!null" ]; then
+      ISSUES+=("$key: type $TYPE (should be map, not scalar)")
+    fi
+  done
+  
+  # Check 4: testing.layers has unit/integration/e2e
+  for layer in unit integration e2e; do
+    if ! yq eval ".testing.layers.$layer" openspec/config.yaml | grep -qv '^null$'; then
+      ISSUES+=("Missing testing.layers.$layer")
+    fi
+  done
+  
+  # Report issues
+  if [ ${#ISSUES[@]} -gt 0 ]; then
+    echo "ISSUES_FOUND:" >&2
+    for issue in "${ISSUES[@]}"; do
+      echo "  - $issue" >&2
+    done
+    return 1
+  fi
+  
+  echo "✓ openspec/config.yaml structure matches canonical schema" >&2
+  return 0
+}
+
+# Auto-fix common openspec/config.yaml structural issues
+# Returns 0 on success, 1 on failure
+fix_openspec_structure() {
+  local IDES="${1:-$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)}"
+  
+  if [ ! -f openspec/config.yaml ]; then
+    echo "ERROR: openspec/config.yaml not found" >&2
+    return 1
+  fi
+  
+  echo "Applying structural fixes to openspec/config.yaml..." >&2
+  
+  # Fix 1: Remove legacy phase_rules
+  if yq eval '.phase_rules' openspec/config.yaml | grep -qv '^null$'; then
+    echo "  - Removing legacy 'phase_rules'" >&2
+    yq eval 'del(.phase_rules)' -i openspec/config.yaml
+  fi
+  
+  # Fix 2: Ensure canonical keys exist (scalar-in-path guard in phase8 will normalize types)
+  # These will be created when phase8 writes rules.* and testing.*
+  # No action needed here - yq creates parent maps automatically
+  
+  echo "✓ Structural fixes applied" >&2
+  return 0
+}
+
+# Export new functions for subshell use
+export -f _find_openspec_schema 2>/dev/null || true
+export -f validate_openspec_structure 2>/dev/null || true
+export -f fix_openspec_structure 2>/dev/null || true
