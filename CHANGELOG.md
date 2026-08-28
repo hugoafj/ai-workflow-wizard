@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.20-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.19-beta.1...v0.8.20-beta.1) (2026-08-28)
+
+
+### Bug Fixes
+
+* **wf-init:** comprehensive fixes for 20 issues from field report ([#129](https://github.com/hugoafj/ai-workflow-wizard/issues/129)) ([5bffb54](https://github.com/hugoafj/ai-workflow-wizard/commit/5bffb5419a420828bae0fb4f5223e1a7ee3cc297))
+
 ## [0.8.19-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.18-beta.1...v0.8.19-beta.1) (2026-08-27)
 
 
