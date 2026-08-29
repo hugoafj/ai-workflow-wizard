@@ -34,7 +34,20 @@ Is this correct? Fix any errors before continuing.
 
 ---
 > **⛔ STOP HERE — do not execute anything else.**
-> **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `discovery.conventions` (the detected/corrected conventions from reverse engineering) AND `discovery.test_dir` (the detected test directory, e.g. `src/__tests__` or `src/test`). Mark `wf_phase_done phase4 <next>`.
+> **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `discovery.conventions` (the detected/corrected conventions from reverse engineering) AND `discovery.test_dir` (the detected test directory, e.g. `src/__tests__` or `src/test`). 
+>
+> **Critical for Project Structure section**: `.discovery.conventions.structure` MUST be a **multiline tree** with `# purpose` comments, one folder per line:
+> ```
+> src/  # Source code
+>   components/  # React components
+>   hooks/  # Custom hooks
+>   lib/  # Utilities and helpers
+> e2e/  # Playwright E2E tests
+> public/  # Static assets
+> ```
+> Do NOT save as comma-separated single line. The Builder falls back to filesystem scan if structure is not multiline.
+>
+> Mark `wf_phase_done phase4 <next>`.
 > Compute the next phase based on ALREADY SELECTED features. If any have been activated, route to the relevant conditional phase; otherwise phase5:
 > Wait for the response. Only when the user confirms with "yes", run in bash:
 

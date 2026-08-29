@@ -47,10 +47,41 @@ find "{PROJECT_PATH}" -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.
 # npm scripts (feeds the AGENTS.md Commands section — the Builder renders
 # them from .discovery.commands; without it the section falls back to a
 # generic re-detection)
-node -e "process.stdout.write(Object.keys(require('{PROJECT_PATH}/package.json').scripts||{}).join('\n'))" 2>/dev/null; echo
+# Detect package manager and emit "npm run X" / "pnpm X" / "yarn X"
+node <<'NODEEOF'
+const fs = require('fs');
+const path = '{PROJECT_PATH}';
+const pkg = JSON.parse(fs.readFileSync(path + '/package.json', 'utf8'));
+const scripts = pkg.scripts || {};
 
-# Root structure summary (feeds .discovery.conventions.structure)
-find "{PROJECT_PATH}" -maxdepth 1 -type d -not -name '.*' -not -path "{PROJECT_PATH}" 2>/dev/null
+// Detect package manager
+let pm = 'npm';
+if (pkg.packageManager) pm = pkg.packageManager.split('@')[0];
+else if (fs.existsSync(path + '/pnpm-lock.yaml')) pm = 'pnpm';
+else if (fs.existsSync(path + '/yarn.lock')) pm = 'yarn';
+
+const prefix = pm === 'npm' ? 'npm run' : pm;
+const cmds = Object.keys(scripts).map(s => `${prefix} ${s}`);
+process.stdout.write(cmds.join('\n'));
+NODEEOF
+echo
+
+# Root structure with purpose (one per line, feeds .discovery.conventions.structure)
+# Output format: "folder/  # Purpose" — one entry per line for multiline tree
+find "{PROJECT_PATH}" -maxdepth 1 -type d -not -name '.*' -not -path "{PROJECT_PATH}" 2>/dev/null | while read dir; do
+  base=$(basename "$dir")
+  case "$base" in
+    src) echo "src/  # Source code";;
+    components) echo "  components/  # UI components";;
+    hooks) echo "  hooks/  # Custom hooks";;
+    lib) echo "  lib/  # Utilities and helpers";;
+    types) echo "  types/  # TypeScript definitions";;
+    test|__tests__|tests) echo "  $base/  # Tests";;
+    e2e) echo "e2e/  # Playwright E2E tests";;
+    public) echo "public/  # Static assets";;
+    *) echo "$base/";;
+  esac
+done
 
 # Toolchain
 node -e "process.stdout.write(require('{PROJECT_PATH}/package.json').engines?.node||'')" 2>/dev/null; echo
