@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.26-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.25-beta.1...v0.8.26-beta.1) (2026-08-29)
+
+
+### Bug Fixes
+
+* **wf-init:** resolve AGENTS.md Commands & Structure rendering ([#141](https://github.com/hugoafj/ai-workflow-wizard/issues/141)) ([aa59ac4](https://github.com/hugoafj/ai-workflow-wizard/commit/aa59ac4a61f357b6346e7174386346519fe6664a))
+
 ## [0.8.25-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.24-beta.1...v0.8.25-beta.1) (2026-08-29)
 
 
