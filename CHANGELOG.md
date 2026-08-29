@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.27-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.26-beta.1...v0.8.27-beta.1) (2026-08-29)
+
+
+### Bug Fixes
+
+* wf-init state initialization and boolean handling ([#143](https://github.com/hugoafj/ai-workflow-wizard/issues/143)) ([c5f0184](https://github.com/hugoafj/ai-workflow-wizard/commit/c5f01844b40ad2b9d681d2858ec109403c76db35))
+
 ## [0.8.26-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.25-beta.1...v0.8.26-beta.1) (2026-08-29)
 
 
