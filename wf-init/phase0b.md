@@ -67,7 +67,7 @@ esac
 wf_state_set '.gentle_ai.doctor' '"ok"'
 wf_state_set '.gentle_ai.version' "\"$DOCTOR_VERSION\""
 wf_state_set '.gentle_ai.install_choice' '"wizard"'
-wf_state_set '.gentle_ai.installed' "$INSTALLED"
+wf_state_set '.gentle_ai.installed' $INSTALLED
 wf_state_set '.gentle_ai.os' "\"$OS\""
 ```
 
@@ -104,7 +104,7 @@ if ! SYNC_OUTPUT=$(gentle-ai sync --dry-run 2>&1); then
       ;;
     skip*)
       echo "ℹ Skipping sync check, continuing anyway"
-      wf_state_set '.gentle_ai.sync_stale_accepted' 'true'
+      wf_state_set '.gentle_ai.sync_stale_accepted' true
       ;;
     *)
       echo "Aborted."

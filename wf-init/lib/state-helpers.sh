@@ -86,12 +86,12 @@ wf_state_init() {
     "critical_constraints": []
   },
   "features": {
-    "decision_ladder": null,
-    "tdd_protocol": null,
-    "routing_abc": null,
-    "ci": null,
-    "cd": null,
-    "release_please": null
+    "decision_ladder": false,
+    "tdd_protocol": false,
+    "routing_abc": false,
+    "ci": false,
+    "cd": false,
+    "release_please": false
   },
   "agents": [],
   "sdd": {
@@ -164,16 +164,23 @@ wf_state_set() {
   tmp="$(mktemp)"
   if jq "$filter = $value | .updated_at = (now | todate)" "$WF_STATE" > "$tmp"; then
     mv "$tmp" "$WF_STATE"
-    # Verify write: read back the path
-    verify=$(jq -r "$filter // empty" "$WF_STATE" 2>/dev/null)
-    # Handle boolean false explicitly - jq returns literal 'false' not empty string
-    if [ -z "$verify" ] && [ "$value" != "null" ] && [ "$value" != '""' ] && [ "$value" != "false" ]; then
+    # Verify write: read back the path (without -r, without // empty)
+    # jq returns: "true"/"false" for booleans, "null" for missing OR explicit null, quoted string for strings
+    verify=$(jq "$filter" "$WF_STATE" 2>/dev/null)
+    # verify is "null" if missing OR explicitly set to null, "true"/"false" for booleans, or quoted string
+    # Allow explicit null as valid (caller passed "null" as value)
+    if [ "$verify" = "null" ] && [ "$value" != "null" ]; then
       echo "ERROR: wf_state_set wrote but verification failed for $filter" >&2
       return 1
     fi
     # Additional check: if value was "false", verify it reads back as "false"
     if [ "$value" = "false" ] && [ "$verify" != "false" ]; then
       echo "ERROR: wf_state_set wrote false but verification returned '$verify' for $filter" >&2
+      return 1
+    fi
+    # If value was "true", verify it reads back as "true"
+    if [ "$value" = "true" ] && [ "$verify" != "true" ]; then
+      echo "ERROR: wf_state_set wrote true but verification returned '$verify' for $filter" >&2
       return 1
     fi
   else

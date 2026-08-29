@@ -71,27 +71,74 @@ Parse the selected features and proceed.
 
 ### Persistence
 
-Save in `.wizard-state.json` under the `features` section using explicit `wf_state_set` calls:
+Save in `.wizard-state.json` under the `features` section using explicit `wf_state_set` calls.
+
+**Implementation (agent-side logic):**
+
+1. **Parse user input** — accepts both structured tool output and plain text:
+   - Structured: array like `["1", "3", "4"]`
+   - Plain text: `"1,3,4"` or `"none"`
+
+2. **Map to boolean features** (no quotes = boolean for `wf_state_set`):
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
-# Parse user selection (e.g., "1,3,4") into boolean variables
-# This is pseudo-code — implement the parsing in your agent logic
-LADDER=<true/false based on option 1>
-TDD=<true/false based on option 2>
-ROUTING=<true/false based on option 3>
-CI=<true/false based on option 4>
-CD=<true/false based on option 5>
-RELEASE=<true/false based on option 6 or if CI is true>
+# USER_SELECTION comes from the agent's parsed input (structured or plain text)
+# Examples: "1,3,4"  "none"  "2,5"  etc.
+USER_SELECTION="<parsed from user response>"
 
-wf_state_set '.features.decision_ladder' "$LADDER"
-wf_state_set '.features.tdd_protocol' "$TDD"
-wf_state_set '.features.routing_abc' "$ROUTING"
-wf_state_set '.features.ci' "$CI"
-wf_state_set '.features.cd' "$CD"
-wf_state_set '.features.release_please' "$RELEASE"
+# Initialize all to false
+LADDER=false
+TDD=false
+ROUTING=false
+CI=false
+CD=false
+RELEASE=false
+
+if [ "$USER_SELECTION" != "none" ] && [ -n "$USER_SELECTION" ]; then
+  # Split by comma, trim spaces
+  IFS=',' read -ra SELECTED <<< "$USER_SELECTION"
+  for opt in "${SELECTED[@]}"; do
+    opt=$(echo "$opt" | xargs)  # trim
+    case "$opt" in
+      1) LADDER=true ;;
+      2) TDD=true ;;
+      3) ROUTING=true ;;
+      4) CI=true ;;
+      5) CD=true ;;
+      6) RELEASE=true ;;
+    esac
+  done
+fi
+
+# Combination validations (ask before persisting)
+# 4 and 6: release-please is included in CI
+if [ "$CI" = true ] && [ "$RELEASE" = true ]; then
+  # Agent asks: "Release-please standalone is included in CI. Should I remove 6 and keep only 4?"
+  # If yes: RELEASE=false
+fi
+
+# 3 without 1: routing without ladder
+if [ "$ROUTING" = true ] && [ "$LADDER" = false ]; then
+  # Agent asks: "SDD Routing activates the full SDD-forcing policy but not the Ladder. Add option 1?"
+  # If yes: LADDER=true
+fi
+
+# 5 without 4: CD without CI
+if [ "$CD" = true ] && [ "$CI" = false ]; then
+  # Agent asks: "CD without CI works, but you won't have Quality Guard or AI review. Confirm only CD?"
+  # If no: CD=false
+fi
+
+# Persist — pass booleans WITHOUT quotes
+wf_state_set '.features.decision_ladder' $LADDER
+wf_state_set '.features.tdd_protocol' $TDD
+wf_state_set '.features.routing_abc' $ROUTING
+wf_state_set '.features.ci' $CI
+wf_state_set '.features.cd' $CD
+wf_state_set '.features.release_please' $RELEASE
 ```
 
 Mark `wf_phase_done phase0c phase1`.

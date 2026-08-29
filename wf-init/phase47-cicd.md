@@ -284,7 +284,7 @@ FEATURES_CD=$(jq -r '.features.cd // false' .wizard-state.json)
 if [ "$FEATURES_CD" = "true" ]; then
   VPS_RUNTIME=$(jq -r '.cd.vps_runtime // empty' .wizard-state.json)
   if [ -n "$VPS_RUNTIME" ]; then
-    wf_state_set '.cd.enabled' 'true'
+    wf_state_set '.cd.enabled' true
     wf_state_set '.cd.platform' '"vps"'
     # Persist the stack detected earlier so the Builder can select the deploy
     # template and resolve {{has_node_assets}} / {{compose_file}}.
@@ -305,11 +305,11 @@ if [ "$FEATURES_CD" = "true" ]; then
       wf_state_set '.cd.compose_file' '"docker-compose.prod.yml"'
     fi
   else
-    wf_state_set '.cd.enabled' 'false'
+    wf_state_set '.cd.enabled' false
     wf_state_set '.cd.platform' '"skip"'
   fi
 else
-  wf_state_set '.cd.enabled' 'false'
+  wf_state_set '.cd.enabled' false
   wf_state_set '.cd.platform' '"skip"'
 fi
 
