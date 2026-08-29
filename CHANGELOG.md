@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.25-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.24-beta.1...v0.8.25-beta.1) (2026-08-29)
+
+
+### Bug Fixes
+
+* **wf-init:** resolve 9 critical/high issues in builder and phases ([#139](https://github.com/hugoafj/ai-workflow-wizard/issues/139)) ([8a21e08](https://github.com/hugoafj/ai-workflow-wizard/commit/8a21e088e47d2b7b7aa6b5cb7a9736c5a695a0fc))
+
 ## [0.8.24-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.23-beta.1...v0.8.24-beta.1) (2026-08-28)
 
 
