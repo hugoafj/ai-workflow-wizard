@@ -424,18 +424,19 @@ that exist nowhere in the wizard or the skill:
 
 ```bash
 # Use yq for robust YAML parsing (installed in Phase 4.6, fallback to grep/sed if unavailable)
+# Canonical convention uses `persistence.mode:` not `backend:` at root level
 if command -v yq &>/dev/null && yq --version 2>/dev/null | grep -q "mikefarah"; then
-  BACKEND_LINE=$(yq eval '.backend' openspec/config.yaml 2>/dev/null)
+  BACKEND_LINE=$(yq eval '.persistence.mode' openspec/config.yaml 2>/dev/null)
 else
-  BACKEND_LINE=$(grep -E '^backend:' openspec/config.yaml 2>/dev/null | head -1 | sed 's/^backend:[[:space:]]*//')
+  BACKEND_LINE=$(grep -E '^persistence:' openspec/config.yaml 2>/dev/null | head -1 | sed 's/^persistence:[[:space:]]*//' | sed 's/^mode:[[:space:]]*//')
 fi
 case "$BACKEND_LINE" in
   engram|openspec|hybrid) echo "backend value OK: $BACKEND_LINE" ;;
   "")
-    echo "⚠ openspec/config.yaml has no readable top-level backend key." >&2
+    echo "⚠ openspec/config.yaml has no readable persistence.mode key." >&2
     echo "  Show the full file to the user and confirm it was created by /sdd-init." >&2 ;;
   *)
-    echo "⚠ Unexpected backend '$BACKEND_LINE' in openspec/config.yaml." >&2
+    echo "⚠ Unexpected persistence.mode '$BACKEND_LINE' in openspec/config.yaml." >&2
     echo "  Show the full file to the user before continuing." >&2 ;;
 esac
 ```

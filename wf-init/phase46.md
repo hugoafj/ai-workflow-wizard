@@ -289,14 +289,21 @@ if ! command -v yq &>/dev/null || ! yq --version 2>/dev/null | grep -q "mikefara
   chmod +x "$YQ_INSTALL_DIR/yq"
   export PATH="$YQ_INSTALL_DIR:$PATH"
 
+  # Verify yq is actually available (use full path as fallback)
   if ! command -v yq &>/dev/null; then
-    echo "ERROR: yq install to ${YQ_INSTALL_DIR} failed or the directory is not in PATH." >&2
-    exit 1
+    if [ -x "$YQ_INSTALL_DIR/yq" ]; then
+      YQ_CMD="$YQ_INSTALL_DIR/yq"
+    else
+      echo "ERROR: yq install to ${YQ_INSTALL_DIR} failed or the directory is not in PATH." >&2
+      exit 1
+    fi
+  else
+    YQ_CMD="yq"
   fi
 fi
 
 # Update testing.strict_tdd safely — preserves all other keys
-yq eval '.testing.strict_tdd = true' -i openspec/config.yaml
+$YQ_CMD eval '.testing.strict_tdd = true' -i openspec/config.yaml
 ```
 
 If the backend is pure `engram`, the Engram step above is already
