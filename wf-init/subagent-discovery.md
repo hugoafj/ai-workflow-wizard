@@ -126,7 +126,15 @@ For each IDE that has a directory in the project, check expected commands:
 # Conditional by feature: wf-ladder (LADDER), wf-tdd (TDD && LAYERS),
 # wf-orchestrator (ROUTING || LADDER || TDD), wf-sdd-trigger (ROUTING);
 # wf-onboard, wf-worktree, wf-settings are always emitted.
-EXPECTED_COMMANDS="wf-ladder wf-tdd wf-orchestrator wf-sdd-trigger wf-onboard wf-worktree wf-settings"
+EXPECTED_COMMANDS=(
+  "wf-ladder"
+  "wf-tdd"
+  "wf-orchestrator"
+  "wf-sdd-trigger"
+  "wf-onboard"
+  "wf-worktree"
+  "wf-settings"
+)
 ```
 
 | IDE | Base path | Extension |
@@ -148,11 +156,57 @@ Determine which IDEs are active:
 - If `.codex/` exists → codex active
 - If `.github/copilot-instructions.md` exists → vscode-copilot active
 
-For each active IDE, check file by file whether each expected command exists.
-Save missing ones with `wf_state_set`:
+For each active IDE, check file by file whether each expected command exists:
 
-```
-.migration.missing_commands → [ { ide: "claude-code", command: "wf-onboard" }, ... ]
+```bash
+# Build the missing_commands array
+MISSING_COMMANDS=()
+
+# IDE detection and command checking
+for ide_dir in ".claude" ".cursor" ".windsurf" ".devin" ".kiro" ".opencode" ".codex"; do
+  if [ -d "$ide_dir" ]; then
+    case "$ide_dir" in
+      ".claude") IDE="claude-code"; BASE=".claude/commands"; EXT=".md" ;;
+      ".cursor") IDE="cursor"; BASE=".cursor/commands"; EXT=".md" ;;
+      ".windsurf"|".devin") IDE="windsurf"; BASE=".windsurf/workflows"; EXT=".md" ;;
+      ".kiro") IDE="kiro"; BASE=".kiro/steering"; EXT=".md" ;;
+      ".opencode") IDE="opencode"; BASE=".opencode/commands"; EXT=".md" ;;
+      ".codex") IDE="codex"; BASE=".codex/commands"; EXT=".md" ;;
+    esac
+    
+    if [ -d "$BASE" ]; then
+      for cmd in "${EXPECTED_COMMANDS[@]}"; do
+        if [ ! -f "$BASE/$cmd$EXT" ]; then
+          MISSING_COMMANDS+=("{\"ide\":\"$IDE\",\"command\":\"$cmd\"}")
+        fi
+      done
+    fi
+  fi
+done
+
+# Check vscode-copilot separately (different structure)
+if [ -f ".github/copilot-instructions.md" ]; then
+  IDE="vscode-copilot"
+  BASE=".github/prompts"
+  EXT=".prompt.md"
+  for cmd in "${EXPECTED_COMMANDS[@]}"; do
+    if [ ! -f "$BASE/$cmd$EXT" ]; then
+      MISSING_COMMANDS+=("{\"ide\":\"$IDE\",\"command\":\"$cmd\"}")
+    fi
+  done
+fi
+
+# Save to state
+if [ ${#MISSING_COMMANDS[@]} -gt 0 ]; then
+  # Join array with commas (IFS method, portable across macOS/Linux)
+  OLDIFS="$IFS"
+  IFS=","
+  MIGRATION_JSON="${MISSING_COMMANDS[*]}"
+  IFS="$OLDIFS"
+  wf_state_set '.migration.missing_commands' "[$MIGRATION_JSON]"
+else
+  wf_state_set '.migration.missing_commands' '[]'
+fi
 ```
 
 ### 5. Greenfield vs legacy classification (phase3.md)
