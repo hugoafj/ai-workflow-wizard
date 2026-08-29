@@ -47,10 +47,16 @@ STACK_OVERRIDES = {
     "node": {
         "dev": "Start development server",
         "build": "Build for production",
-        "lint": "Run linter (ESLint, etc.)",
+        "lint": "Run ESLint",
         "preview": "Preview production build locally",
         "format": "Format code (Prettier, etc.)",
         "typecheck": "Run type checker (tsc, etc.)",
+        "test": "Run unit tests (Vitest)",
+        "test:ui": "Run Vitest UI",
+        "test:coverage": "Run tests with coverage (Vitest)",
+        "test:e2e": "Run E2E tests (Playwright)",
+        "test:e2e:ui": "Run Playwright UI",
+        "test:e2e:report": "Show Playwright test report",
     },
     "python": {
         "test": "Run pytest",
@@ -772,6 +778,11 @@ def resolve_placeholder(state, key):
         # (Bug 2, PR #88). Legacy states may carry only one of the two shapes.
         return stack_key(state)
     value = get_state_value(state, key, None)
+    # For discovery.commands and discovery.conventions.structure, always delegate to
+    # infer_placeholder which handles: state value if properly formatted (multiline
+    # tree with # purpose for structure, "npm run X" for commands) OR filesystem scan fallback.
+    if key in ("discovery.commands", "discovery.conventions.structure"):
+        return infer_placeholder(state, key)
     if value is not None:
         if key == "discovery.commands" and isinstance(value, list):
             # Apply descriptions for commands from state (same as infer_placeholder)
