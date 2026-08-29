@@ -315,7 +315,7 @@ wf_state_validate() {
 
   # For phase46b, coverage_threshold is optional (can be null if coverage not activated)
   if [ "$phase" = "phase46b" ]; then
-    if ! jq -e 'has("testing") and .testing | has("coverage_threshold")' "$WF_STATE" >/dev/null 2>&1; then
+    if ! jq -e 'has("testing") and (.testing | has("coverage_threshold"))' "$WF_STATE" >/dev/null 2>&1; then
       echo "ERROR: wf_state_validate - testing.coverage_threshold field missing" >&2
       valid=false
     fi

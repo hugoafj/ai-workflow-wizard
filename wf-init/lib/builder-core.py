@@ -39,6 +39,142 @@ def _ipv4_first_getaddrinfo(*args, **kwargs):
 socket.getaddrinfo = _ipv4_first_getaddrinfo
 
 # ---------------------------------------------------------------------------
+# Command description heuristics (universal + stack overrides)
+# ---------------------------------------------------------------------------
+
+# Stack-specific overrides — extensible without touching core logic
+STACK_OVERRIDES = {
+    "node": {
+        "dev": "Start development server",
+        "build": "Build for production",
+        "lint": "Run linter (ESLint, etc.)",
+        "preview": "Preview production build locally",
+        "format": "Format code (Prettier, etc.)",
+        "typecheck": "Run type checker (tsc, etc.)",
+    },
+    "python": {
+        "test": "Run pytest",
+        "lint": "Run ruff/flake8",
+        "format": "Run black/isort",
+        "typecheck": "Run mypy/pyright",
+        "migrate": "Run database migrations",
+    },
+    "go": {
+        "test": "Run go test",
+        "build": "Run go build",
+        "lint": "Run golangci-lint",
+        "vet": "Run go vet",
+        "fmt": "Run go fmt",
+    },
+    "rust": {
+        "test": "Run cargo test",
+        "build": "Run cargo build",
+        "check": "Run cargo check",
+        "clippy": "Run cargo clippy",
+        "fmt": "Run cargo fmt",
+    },
+    "java": {
+        "test": "Run maven/gradle test",
+        "build": "Run maven/gradle build",
+        "lint": "Run checkstyle/spotbugs",
+    },
+}
+
+def _heuristic_description(script_name: str) -> str:
+    """Generate description from script name using universal naming patterns."""
+    name = script_name.lower()
+    
+    # Prefix-based universal patterns
+    if name.startswith("test"):
+        if "e2e" in name: return "Run end-to-end tests"
+        if "ui" in name: return "Run tests with UI"
+        if "coverage" in name: return "Run tests with coverage report"
+        if "watch" in name: return "Run tests in watch mode"
+        if "integration" in name: return "Run integration tests"
+        return "Run tests"
+    if name.startswith("lint"): return "Run linter"
+    if name.startswith("build"): return "Build for production"
+    if name.startswith("dev"): return "Start development server"
+    if name.startswith("preview"): return "Preview production build locally"
+    if name.startswith("format"): return "Format code"
+    if name.startswith("typecheck") or name.startswith("type-check"): return "Run type checker"
+    if name.startswith("db:") or name.startswith("db-"): return "Database operations"
+    if name.startswith("docker"): return "Docker operations"
+    if name.startswith("deploy"): return "Deploy application"
+    if name.startswith("release"): return "Release workflow"
+    if name.startswith("generate"): return "Code generation"
+    if name.startswith("migrate"): return "Run migrations"
+    if name.startswith("seed"): return "Seed database"
+    if name.startswith("clean"): return "Clean build artifacts"
+    if name.startswith("install"): return "Install dependencies"
+    if name.startswith("update"): return "Update dependencies"
+    if name.startswith("check"): return "Run checks"
+    if name.startswith("fmt") or name.startswith("format"): return "Format code"
+    if name.startswith("vet"): return "Run static analysis"
+    if name.startswith("clippy"): return "Run linter (clippy)"
+    if name.startswith("bench"): return "Run benchmarks"
+    if name.startswith("doc"): return "Generate documentation"
+    
+    # Exact common names
+    if name in ("dev", "start", "serve"): return "Start development server"
+    if name in ("build", "compile"): return "Build for production"
+    if name in ("test", "tests"): return "Run tests"
+    if name in ("lint", "check"): return "Run linter"
+    if name in ("fmt", "format"): return "Format code"
+    if name in ("clean", "distclean"): return "Clean build artifacts"
+    if name in ("install", "ci"): return "Install dependencies"
+    
+    # Fallback
+    return f"Run {script_name} script"
+
+def describe_command(script_name: str, stack_key: str = "") -> str:
+    """Get description for a command: stack override > heuristic > generic."""
+    stack = (stack_key or "").lower()
+    # Match stack prefix (e.g., "node-react" -> "node")
+    for prefix, overrides in STACK_OVERRIDES.items():
+        if stack.startswith(prefix) and script_name in overrides:
+            return overrides[script_name]
+    return _heuristic_description(script_name)
+
+def detect_project_structure(project_root: str) -> str:
+    """Generate tree from actual filesystem (respecting common ignore patterns)."""
+    import os
+    
+    ignore_dirs = {".git", "node_modules", ".next", "dist", "build", ".turbo", 
+                   "coverage", ".vercel", ".netlify", "__pycache__", ".pytest_cache",
+                   "venv", ".venv", "env", ".env", "target", "vendor", ".idea", ".vscode"}
+    ignore_files = {".DS_Store", "Thumbs.db"}
+    
+    lines = []
+    try:
+        for root, dirs, files in os.walk(project_root):
+            # Filter ignored dirs in-place
+            dirs[:] = [d for d in dirs if d not in ignore_dirs and not d.startswith(".")]
+            
+            rel_root = os.path.relpath(root, project_root)
+            if rel_root == ".":
+                continue
+                
+            depth = rel_root.count(os.sep)
+            indent = "  " * depth
+            folder_name = os.path.basename(root) + "/"
+            lines.append(f"{indent}{folder_name}")
+            
+            # List key config/entry files
+            key_files = sorted(f for f in files 
+                             if f not in ignore_files and 
+                             (f.endswith((".json", ".ts", ".js", ".py", ".rs", ".go", ".java", ".toml", ".yaml", ".yml")) 
+                              or f in ("package.json", "tsconfig.json", "vite.config.ts", "next.config.js",
+                                       "main.py", "app.py", "Cargo.toml", "go.mod", "pom.xml", "build.gradle",
+                                       "requirements.txt", "pyproject.toml", "composer.json", "Makefile")))
+            for f in key_files:
+                lines.append(f"{indent}  {f}")
+    except Exception:
+        pass
+    
+    return "\n".join(lines) if lines else "flat"
+
+# ---------------------------------------------------------------------------
 # B1. State loading
 # ---------------------------------------------------------------------------
 
@@ -485,21 +621,9 @@ def infer_placeholder(state, key):
 
     if key == "discovery.commands":
         # Commands discovered in phase1; re-detect from package.json on refresh.
-        # Fix: Add descriptive comments for each command
-        COMMAND_DESCRIPTIONS = {
-            "dev": "Start development server",
-            "build": "Build for production",
-            "lint": "Run linter (ESLint, etc.)",
-            "preview": "Preview production build locally",
-            "test": "Run unit/integration tests",
-            "test:ui": "Run tests with UI",
-            "test:coverage": "Run tests with coverage report",
-            "test:e2e": "Run end-to-end tests",
-            "test:e2e:ui": "Run E2E tests with UI",
-            "test:e2e:report": "Show E2E test report",
-            "clean": "Clean build artifacts",
-        }
+        # Priority: state (agent-enriched) > detected scripts with heuristic > fallback
         commands = get_state_value(state, "discovery.commands", None)
+        stack = stack_key(state)
         if commands is not None:
             if isinstance(commands, str):
                 return commands
@@ -507,20 +631,23 @@ def infer_placeholder(state, key):
             for c in commands:
                 # Extract script name (after "npm run " or just the command)
                 script_name = c.replace("- npm run ", "").replace("npm run ", "").strip()
-                desc = COMMAND_DESCRIPTIONS.get(script_name, "")
-                if desc:
-                    lines.append("- %s — %s" % (c, desc))
-                else:
-                    lines.append("- %s" % c)
+                desc = describe_command(script_name, stack)
+                lines.append("- %s — %s" % (c, desc))
             return "\n".join(lines)
         detected = detect_package_scripts()
         if detected:
-            # Convert comma-separated to bulleted format with descriptions
-            bulleted = "\n".join("- " + c.strip() for c in detected.split(","))
+            # Convert comma-separated to bulleted format with heuristic descriptions
+            bulleted_lines = []
+            for c in detected.split(","):
+                c = c.strip()
+                script_name = c.replace("npm run ", "").strip()
+                desc = describe_command(script_name, stack)
+                bulleted_lines.append("- %s — %s" % (c, desc))
+            bulleted = "\n".join(bulleted_lines)
             _warn_fallback(key, bulleted)
             return bulleted
-        _warn_fallback(key, "- npm run build")
-        return "- npm run build"
+        _warn_fallback(key, "- npm run build — Build for production")
+        return "- npm run build — Build for production"
 
     if key == "discovery.conventions.code_style":
         # FU3b: Compose code_style from structured conventions fields.
@@ -556,25 +683,14 @@ def infer_placeholder(state, key):
         return "camelCase"
 
     if key == "discovery.conventions.structure":
+        # Priority: state (agent-enriched with # purpose) > filesystem scan
         structure = get_state_value(state, "discovery.conventions.structure", None)
-        if structure:
-            # Fix: Format as tree if it's a flat string (one line per entry with --)
-            if isinstance(structure, str) and "\n" not in structure and "--" in structure:
-                # Parse "folder/ (purpose), folder2/ (purpose)" into tree
-                parts = [p.strip() for p in structure.split(",")]
-                lines = []
-                for part in parts:
-                    if "(" in part and ")" in part:
-                        folder = part[:part.index("(")].strip()
-                        purpose = part[part.index("(")+1:part.index(")")].strip()
-                        lines.append("  %s  # %s" % (folder, purpose))
-                    else:
-                        lines.append("  %s" % part)
-                return "\n".join(lines)
+        if structure and isinstance(structure, str) and "\n" in structure:
+            # Already enriched by agent (has newlines = tree format with comments)
             return structure
-        _warn_fallback(key, "flat")
-        return "flat"
-        return "flat"
+        # Fallback: scan actual filesystem
+        project_root = os.getcwd()
+        return detect_project_structure(project_root)
 
     if key == "testing.checks_before_done":
         # Gate on the active test layers, not features.testing (which the state
@@ -658,8 +774,14 @@ def resolve_placeholder(state, key):
     value = get_state_value(state, key, None)
     if value is not None:
         if key == "discovery.commands" and isinstance(value, list):
-            # Same shape as the re-detection fallback: "- npm run <script>".
-            return "\n".join("- npm run %s" % v for v in value)
+            # Apply descriptions for commands from state (same as infer_placeholder)
+            stack = stack_key(state)
+            lines = []
+            for v in value:
+                script_name = v.replace("- npm run ", "").replace("npm run ", "").strip()
+                desc = describe_command(script_name, stack)
+                lines.append("- %s — %s" % (v, desc))
+            return "\n".join(lines)
         if isinstance(value, list):
             # Markdown bullets (UTF-8): list-typed placeholders such as
             # answers.critical_constraints must render as readable rule
@@ -668,11 +790,16 @@ def resolve_placeholder(state, key):
             # Fix: unescape JSON strings (e.g., \u0027 -> ')
             import codecs
             def unescape_json(s):
-                try:
-                    # Handle unicode escapes like \u0027
-                    return codecs.decode(s, 'unicode_escape')
-                except Exception:
-                    return s
+                # Only decode when actual \u escapes are present.
+                # Applying unicode_escape to valid UTF-8 corrupts non-ASCII chars
+                # (e.g. "aprobación" -> "aprobaciÃ³n") because it interprets
+                # UTF-8 bytes as escape sequences.
+                if '\\u' in s:
+                    try:
+                        return codecs.decode(s, 'unicode_escape')
+                    except Exception:
+                        pass
+                return s
             return "\n".join("- " + unescape_json(str(v)) for v in value)
         if isinstance(value, dict):
             return json.dumps(value, ensure_ascii=False)
