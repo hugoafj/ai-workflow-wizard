@@ -237,26 +237,15 @@ _wf_pending_remove() {
 # manifest file and return 3 (distinct from abort 2 and success 0/no 1).
 # The R5 gate will collect ALL pending prompts and emit GENTLE_AI_WF_REFRESH_NEEDS.
 # Optional second argument "cancel": in non-tty mode without a default answer,
-# treat the empty/garbage reply as NO (return 1) instead of aborting.
+# treat as NO (return 1) instead of recording pending.
 _ask_yesno_safe() {
   local prompt="$1"
   local cancel_on_empty="${2:-}"
   local reply leftover
-  if ! read -p "$prompt [y/n] " -n 1 -r reply 2>/dev/null; then
-    reply=""
-  fi
-  echo
+
+  # FIX: check TTY FIRST — in non-tty, NEVER attempt to read stdin
   if [[ ! -t 0 ]]; then
-    # Drain the rest of the piped line so a leftover does not corrupt the next
-    # question.
-    read -r leftover 2>/dev/null || true
-    reply="${reply//[$'\n\r']/}"
-    if [[ "$reply" =~ ^[Yy]$ ]]; then
-      return 0
-    elif [[ "$reply" =~ ^[Nn]$ ]]; then
-      return 1
-    fi
-    # Per-question answer first (exact prompt match), then the global default.
+    # Non-tty flow: look up answers, default, or record pending
     local pq
     pq=$(_wf_answers_get "$prompt")
     if [ -n "$pq" ]; then
@@ -271,8 +260,6 @@ _ask_yesno_safe() {
         exit 2
       fi
     fi
-    # Non-tty with an empty/garbage reply (e.g. a leftover newline): use
-    # WF_REFRESH_DEFAULT_ANSWER or record as pending instead of failing.
     if [ "${WF_REFRESH_DEFAULT_ANSWER:-}" = "yes" ]; then
       _wf_pending_remove "$prompt"
       echo "(non-interactive — using WF_REFRESH_DEFAULT_ANSWER=yes)"
@@ -293,7 +280,15 @@ _ask_yesno_safe() {
       return 3
     fi
   fi
-  # TTY: any non-y/n reply is NO (interactive users can simply re-run).
+
+  # TTY flow: interactive read (unchanged)
+  if ! read -p "$prompt [y/n] " -n 1 -r reply 2>/dev/null; then
+    reply=""
+  fi
+  echo
+  # Drain rest of line
+  read -r leftover 2>/dev/null || true
+  reply="${reply//[$'\n\r']/}"
   if [[ "$reply" =~ ^[Yy]$ ]]; then
     return 0
   else
