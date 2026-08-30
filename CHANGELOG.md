@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.32-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.31-beta.1...v0.8.32-beta.1) (2026-08-30)
+
+
+### Bug Fixes
+
+* **copilot:** self-contained always-on copilot-instructions.md satellite ([#153](https://github.com/hugoafj/ai-workflow-wizard/issues/153)) ([0ecdd2f](https://github.com/hugoafj/ai-workflow-wizard/commit/0ecdd2f7fa7d2e377b8b464ea74171f8610b4d5e))
+
 ## [0.8.31-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.30-beta.1...v0.8.31-beta.1) (2026-08-30)
 
 
