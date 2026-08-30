@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.30-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.29-beta.1...v0.8.30-beta.1) (2026-08-30)
+
+
+### Bug Fixes
+
+* **wf-init:** husky devDependency + PR Agent issues scope (Bugs [#1](https://github.com/hugoafj/ai-workflow-wizard/issues/1), [#2](https://github.com/hugoafj/ai-workflow-wizard/issues/2)) ([#149](https://github.com/hugoafj/ai-workflow-wizard/issues/149)) ([d897d6a](https://github.com/hugoafj/ai-workflow-wizard/commit/d897d6a327d97cd83e4a20612ecac38dedc79981))
+
 ## [0.8.29-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.28-beta.1...v0.8.29-beta.1) (2026-08-30)
 
 
