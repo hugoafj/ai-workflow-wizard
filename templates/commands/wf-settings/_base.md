@@ -1247,14 +1247,13 @@ Generate everything related for the chosen IDE, downloading from `$WF_RAW`:
    `cursor` → `.cursor/rules/project.mdc`, `windsurf` → `.windsurf/rules/project.md`,
    `kiro` → `.kiro/steering/project-context.md`, `gemini-cli` → `GEMINI.md`,
    `antigravity` → `ANTIGRAVITY.md`. Create parent directories as needed.
-2. **Commands** — every command in the catalog (same list as Builder B7:
-   `wf-worktree`, `wf-settings`, `wf-onboard`, plus `wf-ladder` if active) → the IDE's
-   command directory
-   (`.claude/commands/`, `.cursor/commands/`, `.windsurf/workflows/`, `.kiro/steering/`,
-   `.opencode/commands/`, `.github/prompts/`, `.codex/commands/`), applying the per-IDE
-   frontmatter (protocol `ides`, routing-table.section.md).
+2. **Commands** — every command in the catalog (full command catalog from Builder B7: 3-7 commands depending on active features) → the IDE's
+    command directory
+    (`.claude/commands/`, `.cursor/commands/`, `.windsurf/workflows/`, `.kiro/steering/`,
+    `.opencode/commands/`, `.github/prompts/` **with `.prompt.md` suffix**, `.codex/commands/`), applying the per-IDE
+    frontmatter (protocol `ides`, routing-table.section.md).
 3. **Skills** — the packaged protocol skills → the IDE's native skills directory
-   (`.claude/skills/`, `.cursor/skills/`, `.kiro/skills/`, `.codex/skills/`, `.windsurf/skills/`, `.devin/skills/`, `.gemini/skills/`, `.opencode/skills/`, `.agents/skills/`).
+    (`.claude/skills/`, `.cursor/skills/`, `.kiro/skills/`, `.codex/skills/`, `.windsurf/skills/`, `.devin/skills/`, `.gemini/skills/`, `.opencode/skills/`, `.agents/skills/`, `.github/skills/`).
 4. **Windsurf fix** — ONLY if the added IDE is Windsurf/Devin: apply the same logic as
    Option 17 (AGENTS.md "Gentle AI — Legacy Path Bridge" rule + `.windsurf/workflows/sdd-new.md`).
 

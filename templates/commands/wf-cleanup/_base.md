@@ -99,7 +99,7 @@ fi
 
 # 1. Wizard skills (Do NOT confuse with gentle-ai skills)
 echo "📦 Wizard skills:"
-for dir in .claude/skills .cursor/skills .gemini/skills .agents/skills .kiro/skills .codex/skills .opencode/skills .windsurf/skills .devin/skills; do
+for dir in .claude/skills .cursor/skills .gemini/skills .agents/skills .kiro/skills .codex/skills .opencode/skills .windsurf/skills .devin/skills .github/skills; do
   if [ -d "$dir" ]; then
     for skill in "$dir"/*/; do
       skill_name=$(basename "$skill")
@@ -352,7 +352,10 @@ rm -rf .claude/skills/wf-ladder .claude/skills/wf-tdd \
        .devin/skills/wf-onboard .devin/skills/wf-worktree .devin/skills/wf-settings \
        .agents/skills/wf-ladder .agents/skills/wf-tdd \
        .agents/skills/wf-orchestrator .agents/skills/wf-sdd-trigger \
-       .agents/skills/wf-onboard .agents/skills/wf-worktree .agents/skills/wf-settings
+       .agents/skills/wf-onboard .agents/skills/wf-worktree .agents/skills/wf-settings \
+       .github/skills/wf-ladder .github/skills/wf-tdd \
+       .github/skills/wf-orchestrator .github/skills/wf-sdd-trigger \
+       .github/skills/wf-onboard .github/skills/wf-worktree .github/skills/wf-settings
 ```
 
 ### Commands

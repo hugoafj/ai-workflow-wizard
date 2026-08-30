@@ -1556,7 +1556,15 @@ for IDE in $IDES; do
     cursor)      EXPECTED+=(.cursor/commands/wf-worktree.md .cursor/commands/wf-settings.md .cursor/commands/wf-onboard.md) ;;
     windsurf)    EXPECTED+=(.windsurf/workflows/wf-worktree.md .windsurf/workflows/wf-settings.md .windsurf/workflows/wf-onboard.md .windsurf/workflows/sdd-new.md) ;;
     kiro)        EXPECTED+=(.kiro/steering/wf-worktree.md .kiro/steering/wf-settings.md .kiro/steering/wf-onboard.md) ;;
-    vscode-copilot) EXPECTED+=(.github/prompts/wf-worktree.prompt.md .github/prompts/wf-settings.prompt.md .github/prompts/wf-onboard.prompt.md) ;;
+    vscode-copilot)
+      # Base commands always present
+      EXPECTED+=(.github/prompts/wf-worktree.prompt.md .github/prompts/wf-settings.prompt.md .github/prompts/wf-onboard.prompt.md)
+      # Conditional commands based on active features (match builder-heavy.py active_command_names)
+      [ "$LADDER" = "true" ] && EXPECTED+=(.github/prompts/wf-ladder.prompt.md)
+      [ "$TDD" = "true" ] && [ -n "$LAYERS" ] && EXPECTED+=(.github/prompts/wf-tdd.prompt.md)
+      { [ "$ROUTING" = "true" ] || [ "$LADDER" = "true" ] || [ "$TDD" = "true" ]; } && EXPECTED+=(.github/prompts/wf-orchestrator.prompt.md)
+      [ "$ROUTING" = "true" ] && EXPECTED+=(.github/prompts/wf-sdd-trigger.prompt.md)
+      ;;
     codex)       EXPECTED+=(.codex/commands/wf-worktree.md .codex/commands/wf-settings.md .codex/commands/wf-onboard.md) ;;
   esac
 done
