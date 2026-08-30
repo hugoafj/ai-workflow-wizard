@@ -1,5 +1,232 @@
-# GitHub Copilot Instructions
-Apply the conventions defined in `AGENTS.md` in all your responses.
-[See AGENTS.md](../AGENTS.md)
+<!--
+  Self-contained, always-on GitHub Copilot instructions (rendered to
+  .github/copilot-instructions.md by builder-core write_satellites).
 
-<!-- MIGRATION NOTE: Copilot does not read AGENTS.md natively. Delete when adopted. -->
+  This template deliberately does NOT rely on Copilot's progressive skill
+  disclosure: everything Copilot needs to comply is inline. It resolves the
+  same feature conditionals and placeholder substitution as AGENTS.router.md
+  (shared render_resolved pipeline), so project facts and active protocols
+  never drift from AGENTS.md. The if-tag blocks are resolved by the builder;
+  editor tooling may flag them as unbalanced until rendered.
+-->
+# GitHub Copilot Instructions — {{answers.project_name}}
+
+{{answers.stack_versions}}. You are the coding agent for this repo.
+These instructions are ALWAYS in effect for every request. Follow them before doing anything.
+AGENTS.md is the canonical source of this project's conventions and commands; these instructions
+inline the same facts so no extra reads are required — consult AGENTS.md only if a project detail
+is missing below.
+
+---
+
+<if state.features.routing_abc or state.features.decision_ladder or state.features.tdd_protocol>
+
+## ⛔ MANDATORY WORKFLOW GATE (before ANY edit, write, or generation)
+
+This project has these wizard features **ACTIVE** (from `.wizard-state.json`). Do NOT re-detect
+them, do NOT search for config, do NOT mark them `n/a`:
+
+| Feature | Status | What it requires |
+|---|---|---|
+<if state.features.decision_ladder>
+| `wf-ladder` | ACTIVE | Emit the 7-rung analysis and STOP for confirmation (below) |
+</if><if state.features.routing_abc>
+| `wf-sdd-trigger` (routing) | ACTIVE | Classify the route, emit `wf-preflight`, STOP for confirmation |
+</if><if state.features.tdd_protocol>
+| `wf-tdd` | ACTIVE (<if state.testing.tdd_mode == 'strict'>strict</if><if not state.testing.tdd_mode == 'strict'>standard</if>) | Emit the <if state.testing.tdd_mode == 'strict'>RED→GREEN evidence</if><if not state.testing.tdd_mode == 'strict'>TDD PROPOSAL</if> before any production code |
+</if>
+
+Before you write, edit, or generate any file, you MUST visibly satisfy this checklist in your reply:
+
+```
+GATE CONFIRMATION CHECKLIST:
+<if state.features.decision_ladder>
+  [ ] wf-ladder completed (7 rungs declared aloud, stopped at first "yes") → [✓/✗]
+</if><if state.features.routing_abc>
+  [ ] wf-sdd-trigger shown and user chose the outcome (wf-no-sdd / wf-force-sdd) → [✓/✗]
+  [ ] wf-preflight displayed with decision visible                          → [✓/✗]
+</if><if state.features.tdd_protocol>
+  [ ] wf-tdd ritual DONE (<if state.testing.tdd_mode == 'strict'>RED→GREEN evidence with the runner shown</if><if not state.testing.tdd_mode == 'strict'>TDD PROPOSAL emitted</if>) → [✓/✗]
+</if>
+Rules:
+- IF ANY is ✗ → STOP. Do not edit. Wait for explicit user confirmation.
+- An active feature MUST be completed. "n/a" is NEVER valid for an active feature.
+- Output this checklist block VERBATIM in every substantive reply, before any other content.
+  Marking gates "done" in a to-do list or "internally" is NOT compliance, and a to-do list is
+  NOT a substitute for this block.
+```
+
+### Hard rule: one turn = one action
+
+- A turn that requests confirmation MUST NOT contain any file edit. End the turn with the
+  request and STOP.
+- Only after the user replies with an explicit confirmation ("sí", "continue", "dale", etc.)
+  may the next turn apply changes.
+- If you already edited without the gate: STOP, surface exactly what you changed, and ask
+  whether to keep it or revert. Never continue editing "to make up for it".
+
+---
+
+<if state.features.decision_ladder>
+## 🪜 wf-ladder (ACTIVE — run it first, before classifying)
+
+Walk the rungs top to bottom, stop at the first "yes", declare each evaluated rung aloud with
+its answer, then STOP and wait for the user to confirm the rungs.
+
+| Rung | Question | If yes |
+|---|---|---|
+| 1 | Does this really need to exist? | Skip it |
+| 2 | Does it already exist in this codebase? | Reuse it instead of rewriting |
+| 3 | Does the language's standard library already do it? | Use the standard library |
+| 4 | Is it a native platform feature? | Use the native approach |
+| 5 | Is there an already installed dependency that works? | Use it |
+| 6 | Can it be done in a single line? | Do it in one line |
+| 7 | (only if none above apply) | Write the minimum necessary code that works |
+
+Emit this and stop:
+
+```
+🪜 WF-LADDER
+  1. Does it need to exist? → <answer and brief reason>
+  2. Does it already exist in the code? → <answer and brief reason>
+  ...
+  ✓ Rung N — <what is used or done and why>
+Review these rungs and say "continue" or "no, let me clarify X".
+```
+</if>
+
+<if state.features.routing_abc>
+## 🔍 wf-sdd-trigger (ACTIVE — only AFTER the ladder is confirmed)
+
+Classify the change and emit the preflight, then STOP for confirmation:
+
+| Route | When | What the confirmation authorizes |
+|---|---|---|
+| **`wf-no-sdd`** | UI/style tweaks, icons, single-component or layout changes, mechanical edits, 2–3 files without new abstractions | <if state.features.tdd_protocol>TDD ritual → </if>implement directly |
+| **`wf-force-sdd`** | Cross-cutting architecture, new subsystems, uncertain scope, or the user explicitly says "usa SDD" | SDD pipeline: `sdd-new <feature>` → propose → spec → design → tasks<if state.features.tdd_protocol> → TDD proposal</if> → `sdd-apply` |
+
+```
+🔍 WF-SDD-TRIGGER
+  Criterion applied: <why this change is no-sdd or force-sdd>
+  Proposal: <wf-no-sdd | wf-force-sdd>
+  Confirm? [sí → proceed | no → clarify]
+```
+
+### Route contract — what "confirm" actually authorizes
+
+**After the user confirms `wf-no-sdd`:**
+<if state.features.tdd_protocol>
+1. wf-tdd: emit the TDD PROPOSAL and wait for confirmation.
+2. Write the test (red) → implement (green) → run the project's tests.
+</if><if not state.features.tdd_protocol>
+1. Implement directly — no further protocol gates.
+</if>
+
+**After the user confirms `wf-force-sdd`:**
+<if state.sdd.backend != null>
+1. Your NEXT action is to run gentle-ai's SDD pipeline: invoke `sdd-new <feature or fix>` with
+   the user's request as the input (the `sdd-*` skills are installed for this IDE at
+   `~/.copilot/skills/` and `~/.agents/skills/`). This yields propose → spec → design → tasks.
+</if><if state.sdd.backend == null>
+1. Report that this project has no SDD backend configured (`.wizard-state.json` has no
+   `state.sdd.backend`) and ask the user how to proceed — do not invent a pipeline.
+</if>
+2. Until `sdd-tasks` has produced tasks, you are FORBIDDEN from writing or editing ANY test or
+   code file. "usa SDD" means start the SDD pipeline — it does NOT mean "write tests first".
+3. Only after `sdd-tasks` completes: <if state.features.tdd_protocol>emit the 🧪 TDD PROPOSAL, wait for confirmation, then </if>invoke `sdd-apply` (it is headless and cannot ask).
+4. Do NOT skip or reorder steps. Writing tests/UI first and never running SDD breaks the
+   workflow — the order above is binding.
+
+If an `sdd-*` skill does not surface automatically, state it explicitly ("invoking skill
+sdd-propose"), and read/apply its SKILL.md. If you truly cannot load it, STOP and tell the user
+that SDD cannot run in this IDE.
+</if>
+
+<if state.features.tdd_protocol>
+## 🧪 wf-tdd (ACTIVE — <if state.testing.tdd_mode == 'strict'>strict</if><if not state.testing.tdd_mode == 'strict'>standard</if> mode)
+
+Never write production code without the TDD ritual:
+
+<if state.testing.tdd_mode == 'strict'>
+1. Emit the test-first proposal: which test(s) you will write first, and which behavior they pin.
+2. Wait for user confirmation.
+3. Write the test(s), run them to see them fail (red), implement (green), and show the runner
+   output as RED→GREEN evidence before moving on.
+</if><if not state.testing.tdd_mode == 'strict'>
+1. Emit a `🧪 TDD PROPOSAL`: which test(s) you will write first, and which behavior they pin.
+2. Wait for user confirmation.
+3. Write the test(s), run them to see them fail (red), then implement (green).
+</if>
+
+Where the ritual sits depends on the confirmed route:
+- After `wf-no-sdd`: FIRST, before any implementation.
+<if state.features.routing_abc>
+- After `wf-force-sdd`: BETWEEN `sdd-tasks` and `sdd-apply` — never earlier, because `sdd-apply`
+  is headless and cannot ask, and SDD must shape the tasks before TDD pins their behavior.
+</if>
+
+`sdd-*` skills are gentle-ai's own, not this wizard's; read their SKILL.md if you invoke them.
+</if>
+
+---
+
+</if>
+
+## Project facts (always apply)
+
+### Commands
+
+{{discovery.commands}}
+
+### Code Style & Conventions
+
+{{discovery.conventions.code_style}}
+
+### Layout
+
+{{discovery.conventions.structure}}
+
+<if state.testing.layers not empty>
+### Testing Approach
+
+{{protocols/testing/testing-approach.section.md}}
+</if>
+
+### Project MCPs
+
+{{mcps.table}}
+
+### Critical constraints
+
+{{answers.critical_constraints}}
+
+### Validate before done
+
+{{testing.checks_before_done}}
+
+---
+
+## Deep-dive references (only when the inline gates above leave a question)
+
+<if state.features.routing_abc or state.features.decision_ladder or state.features.tdd_protocol>
+- `.github/skills/wf-orchestrator/SKILL.md` — entry point to the wizard's protocols.
+</if><if state.features.decision_ladder>
+- `.github/skills/wf-ladder/SKILL.md`.
+</if><if state.features.routing_abc>
+- `.github/skills/wf-sdd-trigger/SKILL.md`.
+</if><if state.features.tdd_protocol>
+- `.github/skills/wf-tdd/SKILL.md`.
+</if>
+- Registered `/` commands in this repo:
+<if state.features.routing_abc or state.features.decision_ladder or state.features.tdd_protocol>
+  - `/wf-orchestrator`
+</if><if state.features.decision_ladder>
+  - `/wf-ladder`
+</if><if state.features.routing_abc>
+  - `/wf-sdd-trigger`
+</if><if state.features.tdd_protocol>
+  - `/wf-tdd`
+</if>
+  - `/wf-worktree`, `/wf-settings`, `/wf-onboard`
+
+<!-- wf-version: {{wizard_version}} | source: github.com/hugoafj/ai-workflow-wizard | stack: {{discovery.stack.stack_key}} | features: ladder={{features.decision_ladder_yesno}}, tdd={{features.tdd_protocol_yesno}}, routing={{features.routing_abc_yesno}}, ci={{features.ci_yesno}}, cd={{features.cd_yesno}}, release={{features.release_please_yesno}} -->
