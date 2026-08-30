@@ -538,6 +538,17 @@ def eval_boolean(expr, state):
     safe = re.sub(r"state\.([A-Za-z0-9_.]+)\s*!=\s*null\b", _ne_null_repl, safe)
     safe = re.sub(r"state\.([A-Za-z0-9_.]+)\s*==\s*null\b", _eq_null_repl, safe)
 
+    # Replace `state.X == 'literal'` / `state.X != 'literal'` comparisons with
+    # raw-value lookups. The generic path patch below resolves every state path
+    # through truthy(), so a bare comparison would evaluate `True == 'strict'`
+    # and always be False; string-literal modes (e.g. tdd_mode) need the raw
+    # value. Runs before the generic patch so the emitted __GV_RAW(...) token
+    # is not re-matched.
+    def _lit_cmp_repl(m):
+        return "__GV_RAW('%s') %s '%s'" % (m.group(1), m.group(2), m.group(3))
+
+    safe = re.sub(r"state\.([A-Za-z0-9_.]+)\s*(==|!=)\s*'([^']*)'", _lit_cmp_repl, safe)
+
     # Replace `X not empty` phrase with a callable emptiness check.
     def _not_empty_repl(m):
         return "__NE__('%s')" % m.group(1)
@@ -1049,12 +1060,25 @@ def _collapse_blank_lines_outside_fences(text):
     return "\n".join(out)
 
 
-def render_router(raw, state):
-    """Render templates/AGENTS.router.md with full placeholder and <if> resolution."""
-    router = fetch_with_retries(base_url(raw, "templates/AGENTS.router.md"))
+def render_resolved(raw, state, text, strip_comments=True):
+    """Render a template through the full deterministic pipeline.
 
+    Shared by render_router (AGENTS.md) and render_satellite (per-IDE files) so
+    architectural content (feature-conditional gates, project-fact includes)
+    resolves identically in both. Order matters:
+      1. nested <if CONDITION>...</if> blocks,
+      2. {{protocols/...}} includes,
+      3. remaining {{key}} placeholders,
+      4. GH Action escape wrappers,
+      5. strip builder-instruction HTML comments (keep the WF: DO NOT REGENERATE
+         markers and the wf-version footer line) — router only; satellite
+         templates ship their own intentional comments (migration notes etc.),
+         so render_satellite passes strip_comments=False,
+      6. blank-line collapse + trailing whitespace,
+      7. hard-fail on leftover placeholder residue.
+    """
     # Step 1: resolve nested <if CONDITION> ... </if> blocks.
-    router = resolve_router_ifs(router, state)
+    text = resolve_router_ifs(text, state)
 
     # Step 2: resolve {{protocols/...}} includes.
     def _proto_repl(m):
@@ -1084,34 +1108,36 @@ def render_router(raw, state):
             return build_protocol_body(raw, name, state)
         raise ValueError("cannot parse protocol include: %s" % spec)
 
-    router = re.sub(r"\{\{protocols/([^}]+)\}\}", _proto_repl, router)
+    text = re.sub(r"\{\{protocols/([^}]+)\}\}", _proto_repl, text)
 
     # Step 3: resolve remaining {{key}} placeholders.
     def _ph_repl(m):
         return resolve_placeholder(state, m.group(1).strip())
 
-    router = re.sub(r"\{\{([A-Za-z0-9_.]+)\}\}", _ph_repl, router)
+    text = re.sub(r"\{\{([A-Za-z0-9_.]+)\}\}", _ph_repl, text)
 
     # Step 4: collapse GH Action escape wrappers (placeholder text resolved first,
     # so inner `secrets.X` references are already literal).
-    def _router_resolver(key):
+    def _resolver(key):
         try:
             return resolve_placeholder(state, key)
         except ValueError:
             raise KeyError(key)
 
-    router = resolve_gh_escapes(router, _router_resolver)
+    text = resolve_gh_escapes(text, _resolver)
 
     # Step 5: strip builder-instruction HTML comments from the shipped file,
     # preserving the WF: DO NOT REGENERATE markers (read by /wf-refresh) and
     # the wf-version footer line (read by /wf-settings and /wf-refresh).
-    def _keep_comment(m):
-        c = m.group(0)
-        if "DO NOT REGENERATE" in c or c.startswith("<!-- wf-version:"):
-            return c
-        return ""
+    # Router only: satellites ship their own intentional comments.
+    if strip_comments:
+        def _keep_comment(m):
+            c = m.group(0)
+            if "DO NOT REGENERATE" in c or c.startswith("<!-- wf-version:"):
+                return c
+            return ""
 
-    router = re.sub(r"<!--.*?-->", _keep_comment, router, flags=re.DOTALL)
+        text = re.sub(r"<!--.*?-->", _keep_comment, text, flags=re.DOTALL)
 
     # Step 6: collapse 3+ consecutive newlines to one blank line (the <if>/</if>
     # resolver can leave gaps that break markdown tables) and drop trailing
@@ -1119,15 +1145,21 @@ def render_router(raw, state):
     # placeholder would render as a hard break in CommonMark). The collapse only
     # applies OUTSIDE fenced code blocks, so intentional multi-blank-line
     # content inside ``` fences is preserved.
-    router = _collapse_blank_lines_outside_fences(router)
-    router = re.sub(r"[ \t]+$", "", router, flags=re.MULTILINE)
+    text = _collapse_blank_lines_outside_fences(text)
+    text = re.sub(r"[ \t]+$", "", text, flags=re.MULTILINE)
 
     # Step 7: hard-fail on any leftover {{ or }} placeholder residue.
-    if re.search(r"\{\{|\}\}", router):
-        left = re.findall(r"\{\{[^}]*\}\}", router)[:5]
-        raise ValueError("unresolved placeholders remain in AGENTS.md: %s" % left)
+    if re.search(r"\{\{|\}\}", text):
+        left = re.findall(r"\{\{[^}]*\}\}", text)[:5]
+        raise ValueError("unresolved placeholders remain in rendered template: %s" % left)
 
-    return router
+    return text
+
+
+def render_router(raw, state):
+    """Render templates/AGENTS.router.md with full placeholder and <if> resolution."""
+    router = fetch_with_retries(base_url(raw, "templates/AGENTS.router.md"))
+    return render_resolved(raw, state, router)
 
 
 # ---------------------------------------------------------------------------
@@ -1305,7 +1337,7 @@ def write_satellites(raw, state, staging):
         except RuntimeError as exc:
             failures.append("%s: %s" % (ide, exc))
             continue
-        rendered = render_satellite(text, state)
+        rendered = render_satellite(text, state, raw, strip_leading_comment=(tmpl_name == "copilot.tmpl"))
         target = os.path.join(staging, rel)
         os.makedirs(os.path.dirname(target), exist_ok=True)
         with open(target, "w", encoding="utf-8") as fh:
@@ -1321,7 +1353,7 @@ def write_satellites(raw, state, staging):
         except RuntimeError as exc:
             failures.append("devin: %s" % exc)
         if text:
-            rendered = render_satellite(text, state)
+            rendered = render_satellite(text, state, raw, strip_leading_comment=False)
             target = os.path.join(staging, ".devin/rules/project.md")
             os.makedirs(os.path.dirname(target), exist_ok=True)
             with open(target, "w", encoding="utf-8") as fh:
@@ -1332,14 +1364,21 @@ def write_satellites(raw, state, staging):
     return created
 
 
-def render_satellite(text, state):
-    """Resolve placeholders inside a satellite template; fail on leftovers."""
-    def _repl(m):
-        return resolve_placeholder(state, m.group(1).strip())
+def render_satellite(text, state, raw=None, strip_leading_comment=False):
+    """Render a satellite template with the same deterministic pipeline as the
+    router, then trim surrounding whitespace.
 
-    rendered = re.sub(r"\{\{([A-Za-z0-9_.]+)\}\}", _repl, text)
-    if re.search(r"\{\{|\}\}", rendered):
-        raise ValueError("unresolved placeholders in satellite")
+    Satellites previously resolved only {{key}} placeholders; <if> blocks and
+    {{protocols/...}} includes were router-only. The self-contained Copilot
+    satellite needs the full pipeline (feature-conditional gates plus
+    project-fact includes sourced from the same placeholders as AGENTS.md, so
+    the two never drift). Intentional satellite comments (migration notes etc.)
+    are preserved; strip_leading_comment removes only a leading builder-instruction
+    block (used for copilot.tmpl, whose note must not ship to projects).
+    """
+    rendered = render_resolved(raw, state, text, strip_comments=False)
+    if strip_leading_comment:
+        rendered = strip_internal_comment(rendered)
     return rendered.strip()
 
 

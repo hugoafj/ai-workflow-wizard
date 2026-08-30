@@ -564,7 +564,7 @@ These live in the repo. Each one connects its specific IDE to THIS project's `AG
 
 - `AGENTS.md` — the content (source of truth).
 - `CLAUDE.md` with `@AGENTS.md` — only when Claude Code is an active IDE (Claude Code does not read AGENTS.md natively).
-- `.github/copilot-instructions.md` (Copilot does not read AGENTS.md).
+- `.github/copilot-instructions.md` — self-contained always-on gates + project facts (Copilot's progressive skill disclosure is unreliable, so the wizard inlines what Copilot must comply with; see "Satellite templates" below).
 - `.cursor/rules/project.mdc` (optional in 2026; Cursor already reads AGENTS.md natively).
 - `.windsurf/rules/project.md` with `trigger: always_on` (Windsurf does not read AGENTS.md).
 - `.kiro/steering/project-context.md` (Kiro partial).
@@ -603,14 +603,30 @@ native support, delete this file. Feature request: github.com/anthropics/claude-
 -->
 ```
 
-**`.github/copilot-instructions.md`**:
+**`.github/copilot-instructions.md`** (self-contained, always-on):
+
+Copilot does read `AGENTS.md` natively in 2026, but its **skill discovery is progressive**:
+only the `name+description` of a skill stays resident, and the SKILL.md body only loads when
+the model decides it is relevant. That makes chained wizard protocols (ladder → sdd-trigger →
+tdd) unreliable when they live only in skills/AGENTS.md. The wizard therefore generates a
+self-contained instructions file that inlines the mandatory gate checklist, the active
+protocols' requirements, and the project facts — with zero dependence on AGENTS.md or on skill
+discovery. It is rendered by the shared `render_resolved` pipeline (same `<if>` conditionals
+and `{{placeholders}}` as `AGENTS.router.md`), so the active protocols and facts never drift
+from AGENTS.md.
 
 ```markdown
-# GitHub Copilot Instructions
-Apply the conventions defined in `AGENTS.md` in all your responses.
-[See AGENTS.md](../AGENTS.md)
-
-<!-- MIGRATION NOTE: Copilot does not read AGENTS.md natively. Delete when adopted. -->
+# GitHub Copilot Instructions — <project>
+...
+## ⛔ MANDATORY WORKFLOW GATE (before ANY edit, write, or generation)
+- Features table (only ACTIVE features) + GATE CONFIRMATION CHECKLIST, output VERBATIM
+- Hard rule: one turn = one action
+- Active protocol sections (only those the user enabled): 🪜 wf-ladder, 🔍 wf-sdd-trigger
+  with Route Contract, 🧪 wf-tdd (standard/strict per state)
+- Project facts (same placeholders as AGENTS.md): Commands, Code Style, Layout, Testing
+  Approach, Project MCPs, Critical constraints, Validate before done
+- Deep-dive references to .github/skills/* and registered / commands
+<!-- wf-version: ... features: ladder=..., tdd=..., routing=... -->
 ```
 
 **`.cursor/rules/project.mdc`** (OPTIONAL in 2026):

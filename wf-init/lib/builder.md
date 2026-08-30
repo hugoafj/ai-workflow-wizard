@@ -364,6 +364,14 @@ a short key, not the full IDE key):
 For example, for `claude-code` read `$WF_ROOT/templates/satellites/claude.tmpl`,
 not `$WF_ROOT/templates/satellites/claude-code.tmpl`.
 
+Satellites are rendered by the SAME deterministic pipeline as the AGENTS.md router
+(`render_resolved` in `builder-core.py`): nested `<if>` conditionals, `{{protocols/...}}`
+includes, `{{placeholders}}`, and a hard-fail on unresolved placeholders. Today only
+`copilot.tmpl` uses the full feature set — it inlines the mandatory gate checklist and the
+ACTIVE protocols (ladder/routing/tdd per state) because Copilot's progressive skill
+discovery does not reliably load chained protocols. The other satellite templates contain no
+`<if>` or `{{protocols/...}}` markers, so they render identically to a plain placeholder pass.
+
 `CLAUDE.md` (and its `.claude/` satellite directory) is generated ONLY when
 `claude-code` ∈ IDES — exactly like every other IDE's satellite. No IDE is
 special-cased: if `claude-code` was not selected, neither `CLAUDE.md` nor
