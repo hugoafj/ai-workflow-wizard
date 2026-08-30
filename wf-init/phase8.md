@@ -12,10 +12,11 @@ Only run because the user explicitly approved in Phase 7.
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
-# Add trap for staging cleanup on error (fix #19)
-# Use absolute /bin/rm so cleanup works even if PATH is corrupted (Bug 4)
+# Add trap for staging cleanup on INTERRUPTION only (not normal EXIT)
+# Use absolute /bin/rm so cleanup works even if PATH is corrupted
 STAGING=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' .wizard-state.json)
-trap 'echo "Phase 8 interrupted - cleaning up staging"; /bin/rm -rf "$STAGING"; /bin/rm -f .wizard-state.json.tmp' EXIT INT TERM
+PHASE8_INTERRUPTED=0
+trap 'PHASE8_INTERRUPTED=1; echo "Phase 8 interrupted - cleaning up staging"; /bin/rm -rf "$STAGING"; /bin/rm -f .wizard-state.json.tmp; exit 1' INT TERM
 
 # Active IDEs (used to gate IDE-specific artifacts below)
 IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
@@ -559,9 +560,9 @@ fi
 ```
 
 **Playwright MCP** (only if the e2e layer is active): register `@playwright/mcp` in the active
-IDE's MCP settings. The exact per-IDE format is in `playwright-mcp.settings.tmpl.md` (Claude:
+IDE's MCP settings. The exact per-IDE format is in `$WF_DIR/templates/protocols/testing/playwright-mcp.settings.tmpl.md` (Claude:
 `.claude/settings.json` or `.claude/settings.local.json` to avoid committing it; Cursor:
-`.cursor/mcp.json`; Windsurf: `.windsurf/mcp.json`). If the format isn't clear for any active IDE,
+`.cursor/mcp.json`; Windsurf: `.windsurf/mcp.json` — **Windsurf only supports global scope at `~/.codeium/windsurf/mcp_config.json`, not project-level**). If the format isn't clear for any active IDE,
 tell the user which files to create and with what content, and wait for confirmation before writing.
 `@playwright/mcp` needs no API key — it is reasonable to commit it so the whole team has it.
 
@@ -721,7 +722,8 @@ git add -f .gemini/ 2>/dev/null || true
 git add -f .github/copilot-instructions.md .github/prompts/ 2>/dev/null || true
 # CI/CD (Block 6): workflows, conventional commits, husky, release-please, .gga
 git add -f .github/workflows/ 2>/dev/null || true
-git add -f .husky/ .commitlintrc.json .gga release-please-config.json .release-please-manifest.json 2>/dev/null || true
+# CRITICAL: do NOT suppress errors here — these files MUST be committed (Bug 1 fix)
+git add -f .husky/ .commitlintrc.json .gga release-please-config.json .release-please-manifest.json
 [ -f package.json ] && git add package.json 2>/dev/null || true
 [ -f package-lock.json ] && git add package-lock.json 2>/dev/null || true
 # SDD artifacts (openspec/): created by /sdd-init in Phase 4.5 + targeted edit in 8.1d
@@ -745,6 +747,21 @@ git commit -m "chore: initialize AI Workflow Wizard
 - Update .gitignore for AI workflow files
 
 Powered by wf-init v$WF_VER | gentle-ai $GA_VER"
+
+# Post-commit verification: ensure all managed files from build_plan.generated_files were committed (Bug 1 fix)
+COMMITTED_FILES=$(git diff --name-only HEAD~1..HEAD 2>/dev/null || git ls-files)
+MISSING=0
+for f in $(jq -r '.build_plan.generated_files[].path' .wizard-state.json 2>/dev/null); do
+  if [ -n "$f" ] && ! echo "$COMMITTED_FILES" | grep -qx "$f"; then
+    echo "ERROR: $f was NOT committed!" >&2
+    MISSING=1
+  fi
+done
+if [ "$MISSING" -eq 1 ]; then
+  echo "ERROR: One or more wizard-managed files missing from commit. Aborting." >&2
+  exit 1
+fi
+echo "8.4 OK — all wizard-managed files verified in commit"
 ```
 
 **Does NOT `git push` — that's for the user to decide.**
@@ -816,9 +833,11 @@ Next steps:
 ### 8.6 Closing
 
 ```bash
-# Clean up temporary staging
-STAGING=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' .wizard-state.json)
-rm -rf "$STAGING"
+# Clean up temporary staging (only if not already cleaned up by interruption trap)
+if [ "${PHASE8_INTERRUPTED:-0}" -eq 0 ]; then
+  STAGING=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' .wizard-state.json)
+  rm -rf "$STAGING"
+fi
 ```
 
 ```bash
