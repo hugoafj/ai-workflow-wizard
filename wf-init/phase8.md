@@ -13,8 +13,9 @@ WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
 # Add trap for staging cleanup on error (fix #19)
+# Use absolute /bin/rm so cleanup works even if PATH is corrupted (Bug 4)
 STAGING=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' .wizard-state.json)
-trap 'echo "Phase 8 interrupted - cleaning up staging"; rm -rf "$STAGING"' EXIT INT TERM
+trap 'echo "Phase 8 interrupted - cleaning up staging"; /bin/rm -rf "$STAGING"; /bin/rm -f .wizard-state.json.tmp' EXIT INT TERM
 
 # Active IDEs (used to gate IDE-specific artifacts below)
 IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
@@ -83,22 +84,10 @@ if echo "$IDES" | grep -q "windsurf"; then
 fi
 
 # Recompute managed files after in-place edits (AGENTS.md bridge reinsert)
-# Use heredoc to avoid fragile quoting; wf_sha256 sourced from state-helpers.sh
-source "$WF_DIR/lib/state-helpers.sh"
-GENERATED_FILES="[]"
-MANAGED_PATHS="[]"
-while IFS= read -r -d '' path; do
-  if [ -f "$path" ]; then
-    HASH=$(wf_sha256 "$path")
-    GENERATED_FILES=$(jq --arg path "$path" --arg hash "$HASH" '. += [{"path": $path, "hash": $hash, "managed": true}]' <<< "$GENERATED_FILES")
-  fi
-  MANAGED_PATHS=$(jq --arg path "$path" '. += [$path]' <<< "$MANAGED_PATHS")
-done < <(jq -j '(.build_plan.managed_paths // [])[]? + "\u0000"' .wizard-state.json)
-
-jq --argjson files "$GENERATED_FILES" --argjson paths "$MANAGED_PATHS" \
-   '.build_plan.generated_files = $files | .build_plan.managed_paths = $paths' \
-   .wizard-state.json > .wizard-state.json.tmp
-mv .wizard-state.json.tmp .wizard-state.json
+# Use Python helper (recompute-managed.py) to avoid fragile NUL-delimited bash loop (Bug 1).
+# The helper computes SHA256 via hashlib (stdlib), writes atomically with validation (Bug 3).
+python3 "$WF_DIR/lib/recompute-managed.py" --state .wizard-state.json --in-place
+echo "8.1 OK — managed files recomputed"
 
 
 # Validate the AGENTS.md wf-version footer — NEVER accept "latest" or an unresolved placeholder.
@@ -149,8 +138,8 @@ if [ "$(jq -r '.ci.conventional_commits' .wizard-state.json)" = "true" ]; then
   # from staging; otherwise replace ONLY the untouched factory sample with an
   # inert hook. A pre-existing user hook is never clobbered — it is reported.
   if [ -f .husky/pre-commit ] && ! grep -q "gga run" .husky/pre-commit 2>/dev/null; then
-    PC_ACTIVE=$(grep -vE '^\s*(#|$)' .husky/pre-commit 2>/dev/null | tr -d ' \t' | tr '\n' ';')
-    if [ "$PC_ACTIVE" = "npmtest" ] || [ "$PC_ACTIVE" = "npmruntest" ]; then
+    # Bug 2 fix: grep -qx matches exact line without trailing semicolon from tr
+    if grep -qx 'npm test' .husky/pre-commit 2>/dev/null; then
       printf '%s\n' \
         '# Intentionally inert — enable real pre-commit checks deliberately.' \
         '# The wizard replaced Husky'"'"'s factory "npm test": with watch-mode test' \
@@ -160,7 +149,7 @@ if [ "$(jq -r '.ci.conventional_commits' .wizard-state.json)" = "true" ]; then
         > .husky/pre-commit
       chmod +x .husky/pre-commit
       echo "8.1b — factory .husky/pre-commit (npm test) replaced with an inert hook (watch-mode hang risk)."
-    elif [ -n "$PC_ACTIVE" ]; then
+    elif [ -n "$(grep -vE '^\s*(#|$)' .husky/pre-commit 2>/dev/null | head -1)" ]; then
       echo "8.1b WARNING — .husky/pre-commit holds a non-factory script; left untouched." >&2
       echo "            Verify it terminates (no watch mode) or every commit will hang." >&2
     fi
@@ -198,35 +187,60 @@ HAS_TESTING=$(jq -r '.testing.layers[]?' .wizard-state.json 2>/dev/null | wc -l)
 HAS_CONVENTIONAL=$(jq -r '.ci.conventional_commits // false' .wizard-state.json)
 
 # Install dependencies by stack — only if testing or conventional commits are active
-if [ "$HAS_TESTING" -gt 0 ] || [ "$HAS_CONVENTIONAL" = "true" ]; then
-  case "$STACK_KEY" in
-    node-*|*-react|*-vue|*-nextjs|*-node)
-      # Node-based stacks: npm install for vitest, playwright, testing-library, commitlint
-      if [ "$HAS_TESTING" -gt 0 ]; then
-        # Check for unit/integration layers
-        if jq -e '.testing.layers[] | select(. == "unit" or . == "integration")' .wizard-state.json >/dev/null 2>&1; then
-          npm install --save-dev vitest @testing-library/react @testing-library/user-event @testing-library/jest-dom @testing-library/dom jsdom @vitest/ui @vitest/coverage-v8 @vitejs/plugin-react 2>/dev/null || true
+  if [ "$HAS_TESTING" -gt 0 ] || [ "$HAS_CONVENTIONAL" = "true" ]; then
+    case "$STACK_KEY" in
+      node-*|*-react|*-vue|*-nextjs|*-node)
+        # Node-based stacks: npm install for vitest, playwright, testing-library, commitlint
+        if [ "$HAS_TESTING" -gt 0 ]; then
+          # Check for unit/integration layers
+          if jq -e '.testing.layers[] | select(. == "unit" or . == "integration")' .wizard-state.json >/dev/null 2>&1; then
+            echo "8.1c — installing vitest + testing-library..."
+            if npm install --save-dev vitest @testing-library/react @testing-library/user-event @testing-library/jest-dom @testing-library/dom jsdom @vitest/ui @vitest/coverage-v8 @vitejs/plugin-react; then
+              echo "8.1c OK — vitest + testing-library installed"
+            else
+              echo "8.1c WARNING — npm install failed (exit $?). Check package.json and network." >&2
+            fi
+          fi
+          # Check for e2e layer
+          if jq -e '.testing.layers[] | select(. == "e2e")' .wizard-state.json >/dev/null 2>&1; then
+            echo "8.1c — installing @playwright/test..."
+            if npm install --save-dev @playwright/test; then
+              echo "8.1c OK — @playwright/test installed"
+            else
+              echo "8.1c WARNING — npm install failed (exit $?)." >&2
+            fi
+            echo "8.1c — installing Playwright chromium..."
+            if npx playwright install --with-deps chromium; then
+              echo "8.1c OK — Playwright chromium installed"
+            else
+              echo "8.1c WARNING — Playwright chromium install failed (exit $?). If e2e tests need browsers later, run: npx playwright install chromium" >&2
+            fi
+          fi
         fi
-        # Check for e2e layer
-        if jq -e '.testing.layers[] | select(. == "e2e")' .wizard-state.json >/dev/null 2>&1; then
-          npm install --save-dev @playwright/test 2>/dev/null || true
-          npx playwright install --with-deps chromium 2>/dev/null || true
+        # commitlint for conventional commits (needed by Husky commit-msg hook)
+        if [ "$HAS_CONVENTIONAL" = "true" ]; then
+          echo "8.1c — installing commitlint..."
+          if npm install --save-dev commitlint; then
+            echo "8.1c OK — commitlint installed"
+          else
+            echo "8.1c WARNING — npm install failed (exit $?)." >&2
+          fi
         fi
-      fi
-      # commitlint for conventional commits (needed by Husky commit-msg hook)
-      if [ "$HAS_CONVENTIONAL" = "true" ]; then
-        npm install --save-dev commitlint 2>/dev/null || true
-      fi
-      ;;
-    php-*|laravel|symfony)
-      # PHP stacks: composer require for phpunit
-      if [ "$HAS_TESTING" -gt 0 ]; then
-        composer require --dev phpunit/phpunit 2>/dev/null || true
-      fi
-      ;;
-    # Add more stacks as needed
-  esac
-fi
+        ;;
+      php-*|laravel|symfony)
+        # PHP stacks: composer require for phpunit
+        if [ "$HAS_TESTING" -gt 0 ]; then
+          echo "8.1c — installing phpunit..."
+          if composer require --dev phpunit/phpunit; then
+            echo "8.1c OK — phpunit installed"
+          else
+            echo "8.1c WARNING — composer require failed (exit $?)." >&2
+          fi
+        fi
+        ;;
+      # Add more stacks as needed
+    esac
+  fi
 
 # Generate test dummy for Node if unit tests are enabled but NO TEST FILES exist.
 # Field report B9: the original check tested ONE hardcoded path, contradicting
@@ -571,6 +585,7 @@ _gi_add() {
 
 _gi_add '.wf-status'
 _gi_add '.wizard-state.json'
+_gi_add '.wizard-state.json.tmp'
 _gi_add '.wizard-staging/'
 
 # Exceptions for satellites that must be versioned (only generated ones, single quotes)
@@ -613,21 +628,13 @@ WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
 # Recompute managed files from the actual promoted files
-GENERATED_FILES="[]"
-MANAGED_PATHS="[]"
-while IFS= read -r -d '' path; do
-  if [ -f "$path" ]; then
-    HASH=$(wf_sha256 "$path")
-    GENERATED_FILES=$(jq --arg path "$path" --arg hash "$HASH" '. += [{"path": $path, "hash": $hash, "managed": true}]' <<< "$GENERATED_FILES")
-  fi
-  MANAGED_PATHS=$(jq --arg path "$path" '. += [$path]' <<< "$MANAGED_PATHS")
-done < <(jq -j '(.build_plan.managed_paths // [])[]? + "\u0000"' .wizard-state.json)
+# Use Python helper (recompute-managed.py) to avoid fragile NUL-delimited bash loop (Bug 1).
+# The helper computes SHA256 via hashlib (stdlib), writes atomically with validation (Bug 3).
+python3 "$WF_DIR/lib/recompute-managed.py" --state .wizard-state.json --in-place
+echo "8.3 OK — managed files recomputed"
 
-# Persist refreshed hashes to state
-jq --argjson files "$GENERATED_FILES" --argjson paths "$MANAGED_PATHS" \
-   '.build_plan.generated_files = $files | .build_plan.managed_paths = $paths' \
-   .wizard-state.json > .wizard-state.json.tmp
-mv .wizard-state.json.tmp .wizard-state.json
+# Read back the recomputed generated_files for the manifest
+GENERATED_FILES=$(jq -c '.build_plan.generated_files' .wizard-state.json)
 
 WIZARD_VERSION=$(jq -r '.wizard_version // "0.7.1-beta.1"' .wizard-state.json)
 GENERATED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -657,7 +664,12 @@ IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
 # Windsurf/Devin discover project skills natively from filesystem — no-op for them.
 SKILL_REGISTRY_IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null | grep -E 'claude-code|opencode|cursor|kiro|codex' || true)
 if [ -n "$SKILL_REGISTRY_IDES" ] && command -v gentle-ai &>/dev/null; then
-  gentle-ai skill-registry refresh --quiet 2>/dev/null || true
+  echo "8.4 — refreshing gentle-ai skill registry..."
+  if gentle-ai skill-registry refresh --quiet; then
+    echo "8.4 OK — gentle-ai skill registry refreshed"
+  else
+    echo "8.4 WARNING — gentle-ai skill-registry refresh failed (exit $?). Run manually later if needed." >&2
+  fi
 fi
 
 # Fix: Re-apply Windsurf sdd-new.md after any gentle-ai sync that may have overwritten it

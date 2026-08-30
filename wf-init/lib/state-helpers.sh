@@ -16,7 +16,15 @@ export -f wf_phase_done 2>/dev/null || true
 export -f wf_sha256 2>/dev/null || true
 
 # Ensure PATH includes Homebrew locations for macOS subshells (fixes #4)
-export PATH="/opt/homebrew/bin:/usr/local/bin:${PATH}"
+# Idempotent prepend: only add if not already present (avoids PATH pollution in persistent shells)
+case ":${PATH}:" in
+  *":/opt/homebrew/bin:"*) ;;
+  *) export PATH="/opt/homebrew/bin:${PATH}" ;;
+esac
+case ":${PATH}:" in
+  *":/usr/local/bin:"*) ;;
+  *) export PATH="/usr/local/bin:${PATH}" ;;
+esac
 
 # Get wizard version. Single source of truth: the wizard repo's VERSION file
 # (no 'v' prefix). Falls back to a local VERSION file, then GitHub

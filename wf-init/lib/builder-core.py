@@ -784,6 +784,24 @@ def resolve_placeholder(state, key):
     if key in ("discovery.commands", "discovery.conventions.structure"):
         return infer_placeholder(state, key)
     if value is not None:
+        if key == "answers.stack_versions" and isinstance(value, dict):
+            # Cosmetic fix: render stack versions as readable list instead of raw JSON
+            # e.g., {"react": "^19.2.4", "typescript": "^5.3.0"} -> "React ^19.2.4, TypeScript ^5.3.0"
+            parts = []
+            for k, v in sorted(value.items()):
+                # Capitalize common names
+                name = k.replace("-", " ").title()
+                # Special cases
+                if k.lower() in ("node", "nodejs"):
+                    name = "Node.js"
+                elif k.lower() == "npm":
+                    name = "npm"
+                elif k.lower() == "pnpm":
+                    name = "pnpm"
+                elif k.lower() == "yarn":
+                    name = "Yarn"
+                parts.append("%s %s" % (name, v))
+            return ", ".join(parts)
         if key == "discovery.commands" and isinstance(value, list):
             # Apply descriptions for commands from state (same as infer_placeholder)
             stack = stack_key(state)
