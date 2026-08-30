@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.31-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.30-beta.1...v0.8.31-beta.1) (2026-08-30)
+
+
+### Bug Fixes
+
+* **copilot:** resolve 6 wizard issues for GitHub Copilot support ([#151](https://github.com/hugoafj/ai-workflow-wizard/issues/151)) ([46ab827](https://github.com/hugoafj/ai-workflow-wizard/commit/46ab827fca2219a3568b0414c1377cf32c2fa2b4))
+
 ## [0.8.30-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.29-beta.1...v0.8.30-beta.1) (2026-08-30)
 
 
