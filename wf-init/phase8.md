@@ -120,6 +120,11 @@ activation command (run AFTER the files exist):
 ```bash
 # Conventional commits: initialize Husky if configured (core.hooksPath → .husky)
 if [ "$(jq -r '.ci.conventional_commits' .wizard-state.json)" = "true" ]; then
+  # Install husky as devDependency FIRST so it persists in package.json/package-lock.json
+  # (npx husky init adds "prepare": "husky" but does NOT install the package)
+  if command -v npm >/dev/null 2>&1; then
+    npm install --save-dev husky
+  fi
   command -v npx >/dev/null 2>&1 && npx husky init 2>/dev/null || true
   # Migrate the drift hook into Husky: when the builder ran on a project WITHOUT
   # .husky/ it wrote .git/hooks/post-commit (builder-heavy.py B8). After
