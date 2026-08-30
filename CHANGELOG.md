@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.33-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.32-beta.1...v0.8.33-beta.1) (2026-08-30)
+
+
+### Bug Fixes
+
+* prevent _ask_yesno_safe from blocking on stdin in non-tty ([#155](https://github.com/hugoafj/ai-workflow-wizard/issues/155)) ([5284024](https://github.com/hugoafj/ai-workflow-wizard/commit/528402479d197ca69ecf33d12f80f15b40bf033f))
+
 ## [0.8.32-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.31-beta.1...v0.8.32-beta.1) (2026-08-30)
 
 
