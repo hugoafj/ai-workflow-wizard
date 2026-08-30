@@ -7,7 +7,7 @@
 | Windsurf/Devin | `.windsurf/workflows/` | Frontmatter with `description:` required |
 | Kiro | `.kiro/steering/` | Frontmatter with `inclusion: manual` |
 | OpenCode | `.opencode/commands/` | Plain markdown, no frontmatter |
-| Copilot | `.github/prompts/` | Suffix `.prompt.md` + frontmatter `mode: agent` |
+| Copilot | `.github/prompts/` | Suffix `.prompt.md` + frontmatter `agent: 'agent'` |
 | Codex | `.codex/commands/` | Plain markdown, no frontmatter |
 | Antigravity | `.agents/skills/<name>/SKILL.md` | Frontmatter `name:` + `description:` — the SKILL.md itself works as a slash command |
 

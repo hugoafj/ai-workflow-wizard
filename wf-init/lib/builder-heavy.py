@@ -47,14 +47,14 @@ COMMAND_PATHS = {
     "codex": (".codex/commands/%s.md", None),
     "windsurf": (".windsurf/workflows/%s.md", "description"),
     "kiro": (".kiro/steering/%s.md", "inclusion"),
-    "vscode-copilot": (".github/prompts/%s.prompt.md", "mode"),
+    "vscode-copilot": (".github/prompts/%s.prompt.md", "agent"),
     "antigravity": (".agents/skills/%s/SKILL.md", "name"),
 }
 
 FRONTMATTER = {
     "description": "---\ndescription: \"%s\"\n---\n\n",
     "inclusion": "---\ninclusion: manual\ndescription: \"%s\"\n---\n\n",
-    "mode": "---\nmode: agent\ndescription: \"%s\"\n---\n\n",
+    "agent": "---\nagent: 'agent'\ndescription: \"%s\"\n---\n\n",
     "name": "---\nname: %s\ndescription: \"%s\"\n---\n\n",
 }
 

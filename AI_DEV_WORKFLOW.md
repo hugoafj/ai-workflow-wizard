@@ -1800,7 +1800,7 @@ Commands the wizard generates in Phases 6a/6b and writes in Phase 8. They are pr
 | Windsurf/Devin | `.windsurf/workflows/` | Frontmatter with `description:` required |
 | Kiro | `.kiro/steering/` | Frontmatter with `inclusion: manual` |
 | OpenCode | `.opencode/commands/` | Plain markdown, no frontmatter |
-| Copilot | `.github/prompts/` | Suffix `.prompt.md` + `mode: agent` |
+| Copilot | `.github/prompts/` | Suffix `.prompt.md` + `agent: 'agent'` |
 
 **Important**: `.cursor/rules/` and `.windsurf/rules/` are for context rules (always-on) — a different concept from slash commands. In Kiro, `inclusion: manual` turns a file into a slash command; `inclusion: always` makes it always-on (already covered by satellites).
 
@@ -2123,7 +2123,7 @@ Same as `wf-ladder` and `wf-onboard`, `/wf-worktree` is generated in Phases 6a/6
 | Windsurf | `.windsurf/workflows/wf-worktree.md` | Frontmatter with `description:` required |
 | Kiro | `.kiro/steering/wf-worktree.md` | Frontmatter with `inclusion: manual` |
 | OpenCode | `.opencode/commands/wf-worktree.md` | Plain markdown, no frontmatter |
-| Copilot | `.github/prompts/wf-worktree.prompt.md` | Suffix `.prompt.md` + frontmatter `mode: agent` |
+| Copilot | `.github/prompts/wf-worktree.prompt.md` | Suffix `.prompt.md` + frontmatter `agent: 'agent'` |
 
 It is a **project-specific** command (like `wf-ladder`), not global — depends on the repo you're in, although its internal logic is generic.
 
