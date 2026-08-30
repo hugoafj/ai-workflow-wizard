@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.29-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.28-beta.1...v0.8.29-beta.1) (2026-08-30)
+
+
+### Bug Fixes
+
+* **wf-init:** resolve remaining 3 bugs + cosmetic trap ([#147](https://github.com/hugoafj/ai-workflow-wizard/issues/147)) ([3b3ffc6](https://github.com/hugoafj/ai-workflow-wizard/commit/3b3ffc6422efa4d74b115b8d1b10bcdb1fb53365))
+
 ## [0.8.28-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.27-beta.1...v0.8.28-beta.1) (2026-08-30)
 
 
