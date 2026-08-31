@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.34-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.33-beta.1...v0.8.34-beta.1) (2026-08-31)
+
+
+### Bug Fixes
+
+* **wf-refresh:** handle exit 3, accurate commit msg, feedback summary, validation, cleanup ([#157](https://github.com/hugoafj/ai-workflow-wizard/issues/157)) ([c31cd39](https://github.com/hugoafj/ai-workflow-wizard/commit/c31cd394bfcd91b86ba6549287bd3bb453d1f49b))
+
 ## [0.8.33-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.32-beta.1...v0.8.33-beta.1) (2026-08-30)
 
 
