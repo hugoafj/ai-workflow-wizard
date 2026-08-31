@@ -34,6 +34,25 @@ fi
 rsync -a "$STAGING/" ./
 # Note: run from a staging whose root mirrors the project root.
 
+# ═══════════════════════════════════════════════════════════════
+# MANDATORY: Verify ALL generated files were promoted from staging
+# ═══════════════════════════════════════════════════════════════
+# Check every file in build_plan.generated_files exists in project root
+PROMOTE_FAILED=0
+for f in $(jq -r '.build_plan.generated_files[].path // empty' .wizard-state.json 2>/dev/null); do
+  if [ -n "$f" ] && [ ! -f "$f" ]; then
+    echo "ERROR: Promoted file missing: $f" >&2
+    PROMOTE_FAILED=1
+  fi
+done
+if [ "$PROMOTE_FAILED" -ne 0 ]; then
+  echo "ERROR: One or more files failed to promote from .wizard-staging/" >&2
+  echo "       Staging dir: $STAGING" >&2
+  echo "       Run 'ls -la $STAGING/' to debug" >&2
+  exit 1
+fi
+echo "✓ All $(jq -r '.build_plan.generated_files | length' .wizard-state.json) generated files verified in project root"
+
 # The hook needs execute permission
 [ -f .git/hooks/post-commit ] && chmod +x .git/hooks/post-commit
 
@@ -842,6 +861,16 @@ Next steps:
 if [ "${PHASE8_INTERRUPTED:-0}" -eq 0 ]; then
   STAGING=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' .wizard-state.json)
   rm -rf "$STAGING"
+  
+  # ═══════════════════════════════════════════════════════════════
+  # MANDATORY: Verify staging directory was actually removed
+  # ═══════════════════════════════════════════════════════════════
+  if [ -d "$STAGING" ]; then
+    echo "ERROR: Staging directory $STAGING still exists after cleanup!" >&2
+    echo "       This indicates the rm -rf failed or directory was recreated." >&2
+    exit 1
+  fi
+  echo "✓ Staging directory $STAGING successfully removed"
 fi
 ```
 
