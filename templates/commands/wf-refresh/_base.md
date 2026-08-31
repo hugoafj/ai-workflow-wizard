@@ -94,6 +94,17 @@ mkdir -p "$WF_DIR/lib"
 # .wizard-resume-phase). The cksum suffix discriminates projects sharing /tmp.
 export WF_STATE_DIR="${TMPDIR:-/tmp}/wf-refresh-state-$(printf %s "$(pwd)" | cksum | cut -d' ' -f1)"
 mkdir -p "$WF_STATE_DIR"
+
+# Cleanup trap: ensure staging/plan/baseline are removed on ANY exit (success, error, exit 3)
+# Covers early exits from R-1 (exit 3), R5 (exit 3), or any failure.
+_cleanup_all() {
+  rm -rf "${WF_DIR:-/tmp/wf-refresh-phases}"
+  rm -f refresh-plan.json
+  rm -f .wizard-refresh-baseline.json
+  rm -rf .wizard-staging
+}
+trap _cleanup_all EXIT
+
 if [[ -s "$WF_STATE_DIR/.wizard-resume-phase" ]]; then
   echo "ℹ Previous refresh interrupted at phase: $(cat "$WF_STATE_DIR/.wizard-resume-phase")"
   echo "  Re-run with WF_REFRESH_RESUME=1 to resume it."
@@ -257,7 +268,23 @@ _run_phase "Setup: create helper library" "${WF_DIR}/phase-setup.sh" || exit $?
 
 # Phase R-1: Global command refresh
 _extract_phase "Phase R-1" "${WF_DIR}/phase-r1.sh"
-_run_phase "Phase R-1" "${WF_DIR}/phase-r1.sh" || exit $?
+# R-1 can exit 3 = "global commands updated, restart required".
+# Handle it explicitly: show clear message and exit 0 (not error).
+if bash "${WF_DIR}/phase-r1.sh"; then
+  echo "✓ Phase R-1 completed"
+else
+  exit_code=$?
+  if [[ $exit_code -eq 3 ]]; then
+    echo ""
+    echo "⚠ Global commands updated to the latest version."
+    echo "  The wizard code downloaded at session start is now stale."
+    echo "  Open a NEW terminal and re-run /wf-refresh so the updated wizard drives the refresh."
+    echo ""
+    exit 0
+  fi
+  echo "✗ Phase R-1 failed with exit code $exit_code" >&2
+  exit $exit_code
+fi
 
 # Phase R0: Project validation
 _extract_phase "Phase R0" "${WF_DIR}/phase-r0.sh"
@@ -352,6 +379,41 @@ A missing value emits `GENTLE_AI_WF_REFRESH_NEEDS=apply_mode=` with exit 3 (same
 
 - **Issue**: Git operations fail
 - **Solution**: Check git status; may need to commit or stash changes first
+
+---
+
+## Agent / Copilot Integration Guide
+
+The following sections explain how AI agents (GitHub Copilot, Claude Code, etc.) should handle the `/wf-refresh` non-interactive protocol. This is not a bug — it is the designed contract for headless/agent-driven runs.
+
+### Agent Handling: Phase R-1 exits with code 3 (global command updated)
+
+- **What happens**: R-1 runs `install.sh` successfully and exits with code 3. This means "the wizard binary/global commands have been updated; the code downloaded at session start is now stale."
+- **Agent MUST**: 
+  1. Capture the output (it contains "Global commands updated to X.Y.Z")
+  2. Present this message to the user clearly: "⚠ Global commands updated. Open a NEW terminal and re-run /wf-refresh"
+  3. **DO NOT** re-run the same orchestrator script — it still holds the old downloaded phase scripts
+  4. **DO NOT** treat exit 3 as an error
+- **Why**: The orchestrator downloads phase scripts ONCE at startup. After `install.sh`, the on-disk global commands are new, but the in-memory `/tmp/wf-refresh-phases/*` scripts are old. A fresh session picks up the new versions.
+
+### Agent Handling: GENTLE_AI_WF_REFRESH_NEEDS manifest (exit 3 from R1/R2/R5)
+
+- **What happens**: A phase emits `GENTLE_AI_WF_REFRESH_NEEDS=prompt=...|apply_mode=` and exits 3. This is the protocol asking for user decisions.
+- **Agent MUST**:
+  1. Parse the manifest (format: `prompt=Question?|prompt=Question2?|apply_mode=`)
+  2. Present each prompt to the user with clear context (what is being approved, what files affected)
+  3. Collect yes/no answers from the user
+  4. Set `WF_REFRESH_ANSWERS='Prompt A=yes|Prompt B=no|...'` and `WF_REFRESH_APPLY_MODE=commit|apply-only|cancel`
+  5. Re-run the orchestrator with `WF_REFRESH_RESUME=1`
+- **Why**: The protocol is designed for exactly this — the agent is the interactive bridge between the headless script and the human.
+
+### Agent Handling: Do NOT run phases in background without capturing output
+
+- **Anti-pattern**: `bash phase-r5.sh &` or any fire-and-forget that discards stdout/stderr
+- **Correct**: Run each phase synchronously, capture full output, parse for `GENTLE_AI_WF_REFRESH_NEEDS`, then act on it.
+- **Why**: The prompts and manifest are emitted to stdout. Background execution loses them, leaving the user confused and the refresh stuck.
+
+---
 
 ---
 
