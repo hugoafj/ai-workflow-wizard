@@ -2479,14 +2479,20 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
   if [ -s "$COMMIT_PATHS" ]; then
     # Commit message via temp file to avoid nested heredoc parsing issues (zsh/bash)
     COMMIT_MSG_FILE=$(mktemp)
+    # Count only approved categories for accurate commit message
+    ADDED_COUNT=0; UPDATED_COUNT=0; DELETED_COUNT=0; DELETED_MODIFIED_COUNT=0
+    [[ "$APPROVE_ADDED" == "true" ]] && ADDED_COUNT=$(jq '.added | length' "$PLAN")
+    [[ "$APPROVE_UPDATED" == "true" ]] && UPDATED_COUNT=$(jq '.updated | length' "$PLAN")
+    [[ "$APPROVE_DELETED" == "true" ]] && DELETED_COUNT=$(jq '.deleted | length' "$PLAN")
+    [[ "$APPROVE_DELETED_MODIFIED" == "true" ]] && DELETED_MODIFIED_COUNT=$(jq '.deleted_modified | length' "$PLAN")
     cat > "$COMMIT_MSG_FILE" <<MSG_EOF
 chore: refresh workflow to v$TARGET_VERSION
 
 - Updated AGENTS.md with new project info
-- Added $(jq '.added | length' "$PLAN") new files
-- Updated $(jq '.updated | length' "$PLAN") files
-- Removed $(jq '.deleted | length' "$PLAN") deprecated files
-- Removed $(jq '.deleted_modified | length' "$PLAN") modified-deprecated files
+- Added $ADDED_COUNT new files
+- Updated $UPDATED_COUNT files
+- Removed $DELETED_COUNT deprecated files
+- Removed $DELETED_MODIFIED_COUNT modified-deprecated files
 
 Generated with /wf-refresh
 MSG_EOF
@@ -2526,15 +2532,43 @@ else
 fi
 
 # Promote staging state to root (single source of truth for next refresh).
-# apply_only is a per-run decision: drop it so the promoted state stays clean.
-if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ "$APPROVE_DELETED" == "true" ]] || [[ "$APPROVE_DELETED_MODIFIED" == "true" ]] || [[ "$APPROVE_GITIGNORE" == "true" ]]; then
-  if [[ "$APPLY_ONLY" == "true" ]]; then
-    jq 'del(.build_plan.apply_only)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
-    mv "$STAGING_STATE.tmp" "$STAGING_STATE"
+  # apply_only is a per-run decision: drop it so the promoted state stays clean.
+  if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ "$APPROVE_DELETED" == "true" ]] || [[ "$APPROVE_DELETED_MODIFIED" == "true" ]] || [[ "$APPROVE_GITIGNORE" == "true" ]]; then
+    if [[ "$APPLY_ONLY" == "true" ]]; then
+      jq 'del(.build_plan.apply_only)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
+      mv "$STAGING_STATE.tmp" "$STAGING_STATE"
+    fi
+    cp "$STAGING_STATE" "$WF_STATE"
+    echo "✓ State promoted from staging to root"
   fi
-  cp "$STAGING_STATE" "$WF_STATE"
-  echo "✓ State promoted from staging to root"
-fi
+
+  # Explicit feedback summary: what was approved vs committed vs skipped
+  echo ""
+  echo "=== R6 APPLICATION SUMMARY ==="
+  echo "Approved categories:"
+  [[ "$APPROVE_ADDED" == "true" ]] && echo "  ✓ Added: $ADDED_COUNT files"
+  [[ "$APPROVE_UPDATED" == "true" ]] && echo "  ✓ Updated: $UPDATED_COUNT files"
+  [[ "$APPROVE_DELETED" == "true" ]] && echo "  ✓ Deleted: $DELETED_COUNT files"
+  [[ "$APPROVE_DELETED_MODIFIED" == "true" ]] && echo "  ✓ Deleted-modified: $DELETED_MODIFIED_COUNT files"
+  [[ "$APPROVE_GITIGNORE" == "true" ]] && echo "  ✓ Gitignore entries"
+  [[ "$APPROVE_OVERWRITE_LOCAL" == "true" ]] && echo "  ✓ Overwrite locally-modified"
+  [[ "$APPROVE_ADDED" != "true" && "$APPROVE_UPDATED" != "true" && "$APPROVE_DELETED" != "true" && "$APPROVE_DELETED_MODIFIED" != "true" && "$APPROVE_GITIGNORE" != "true" ]] && echo "  (none)"
+
+  if [[ "$APPLY_ONLY" != "true" ]]; then
+    # Count actually committed files from COMMIT_PATHS
+    COMMITTED_COUNT=0
+    [[ -s "$COMMIT_PATHS" ]] && COMMITTED_COUNT=$(tr -cd '\0' < "$COMMIT_PATHS" | wc -c)
+    echo "Committed to git: $COMMITTED_COUNT files"
+
+    # Cross-validation warning: approved vs committed
+    TOTAL_APPROVED=$((ADDED_COUNT + UPDATED_COUNT + DELETED_COUNT + DELETED_MODIFIED_COUNT))
+    if [[ $TOTAL_APPROVED -gt 0 && $COMMITTED_COUNT -ne $TOTAL_APPROVED ]]; then
+      echo "⚠ WARNING: $TOTAL_APPROVED files approved but $COMMITTED_COUNT committed (difference: $((TOTAL_APPROVED - COMMITTED_COUNT)))"
+      echo "  This can happen if files were already up-to-date, or .gitignore filtered some paths."
+    fi
+  else
+    echo "Apply-only mode: changes left unstaged in working tree"
+  fi
 
 # Staging and plan are cleaned by the EXIT trap installed above.
 
