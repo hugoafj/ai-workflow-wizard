@@ -301,16 +301,22 @@ If `testing.tdd_mode` is not in the state (phase 46 hasn't run yet), the prompt 
 
 ---
 
-**Required: Run `/sdd-init` in a NEW session**
+**Required: Run `/sdd-init` in a NEW session — BLOCKING PROMPT**
 
 The wizard has just written the new rules and skills to your IDE's configuration. For those
 to be loaded correctly by gentle-ai's own orchestrator, **sdd-init MUST run in a fresh session**
 where the new context is available. Running it in the current session would use the old (or 
 missing) context.
 
+⛔ **AGENT INSTRUCTION — MANDATORY BLOCKING BEHAVIOR:**
+- You MUST show the exact message below to the user.
+- You MUST STOP and WAIT for the user to reply "continue".
+- You MUST NOT advance to structural validation, next phase, or any other step until the user explicitly confirms.
+- This is a BLOCKING PROMPT — treat it like a question that requires an answer before proceeding.
+
 Do NOT try to delegate sdd-init inline in this conversation. Instead:
 
-Show the user this message:
+Show the user this EXACT message (substitute the variables):
 
 ```bash
 SDD_BACKEND=$(jq -r '.sdd.backend // "hybrid"' .wizard-state.json)
@@ -318,20 +324,30 @@ TDD_MODE=$(jq -r '.testing.tdd_mode // "standard"' .wizard-state.json)
 if [ "$TDD_MODE" = "strict" ]; then STRICT_TDD="enabled"; else STRICT_TDD="disabled"; fi
 
 cat <<MESSAGE
-To continue, you need to initialize SDD with this configuration.
+═══════════════════════════════════════════════════════════════
+🚀  SDD INITIALIZATION REQUIRED — ACTION NEEDED
+═══════════════════════════════════════════════════════════════
 
-⚠️ IMPORTANT — OPEN A NEW SESSION/CHAT:
+To continue, you need to initialize SDD with this configuration:
+  • Backend: ${SDD_BACKEND}
+  • Strict TDD: ${STRICT_TDD}
+
+⚠️  IMPORTANT — YOU MUST OPEN A NEW SESSION/CHAT:
 
   1. Open a NEW chat/session in your IDE/CLI — do NOT run this in the current
      wf-init session. The wizard has just written new rules and skills to your
      IDE configuration; they only load in a fresh session.
+
   2. In that NEW session, say exactly:
 
        Initialize the gentle-ai sdd-init skill in ${SDD_BACKEND} mode with Strict TDD ${STRICT_TDD}
 
   3. When the skill finishes and you see openspec/config.yaml, openspec/changes/,
-     and openspec/specs/ were created, return to THIS session and reply **continue**
-     so I can verify and proceed.
+     and openspec/specs/ were created, return to THIS session and reply:
+
+       continue
+
+     (Type exactly "continue" — this is required for the wizard to proceed.)
 
 Important notes:
 - `/sdd-init` is a gentle-ai skill, not a terminal command. If your IDE supports it, you can try
@@ -342,11 +358,14 @@ Important notes:
 - If your IDE is Windsurf/Devin: verify the project AGENTS.md contains the
   "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule BEFORE opening the new
   session (the wizard applies it in this phase).
+
+═══════════════════════════════════════════════════════════════
 MESSAGE
 ```
 
-**Wait for explicit confirmation from the user** that `/sdd-init` ran in a new session and finished. 
-Do not continue or verify files until they confirm. When they reply "continue", proceed to structural validation.
+**AGENT: WAIT HERE. Do not continue. Do not verify. Do not advance phase.**
+Only when the user explicitly replies "continue" (case-insensitive), proceed to structural validation below.
+If the user replies anything else, remind them to type "continue" after completing sdd-init in the new session.
 
 ---
 

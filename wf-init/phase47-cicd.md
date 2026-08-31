@@ -51,12 +51,25 @@ option text). Collect in `state.ci`:
    support 5, display the `cicd` protocol PHASE 1 options as plain text and
    wait for typed response. Parse the user's choice (1, 2, 3, 4, or 5).
 
-   - If `gga`: ask `state.ci.gga_provider` (claude/gemini/codex/opencode/ollama/...)
+   - If `gga` (option 1): ask `state.ci.gga_provider` (claude/gemini/codex/opencode/ollama/...)
      and `state.ci.gga_modes` ⊆ `{local, ci}` (recommended: both).
+   - If `claude` (option 3): set `state.ci.ai_reviewer = "claude"`. **Do NOT set `gga_provider`** (leave null).
+   - If `gemini` (option 4): set `state.ci.ai_reviewer = "gemini"`. **Do NOT set `gga_provider`** (leave null).
+   - If `copilot` (option 2) or `none` (option 5): set `state.ci.ai_reviewer` accordingly. **Do NOT set `gga_provider`** (leave null).
+
+   > ⚠️ **CRITICAL RULE FOR AGENT**: `state.ci.gga_provider` is ONLY meaningful when `ai_reviewer == "gga"`.
+   > For all other choices (copilot, claude, gemini, none), the agent MUST NOT write `gga_provider` to state.
+   > The builder (builder-heavy.py) defaults to "claude" ONLY when ai_reviewer=="gga" and gga_provider is missing.
+   > Writing gga_provider for non-GGA reviewers pollutes state and confuses downstream tools.
 2. **Dedicated security review** (`cicd` protocol PHASE 3) → `state.ci.security_review`
    (`false` | `claude` | `gemini`).
 3. **Conventional commits** (`cicd` protocol PHASE 4) → `state.ci.conventional_commits`
    (bool, recommended `true`). Includes migration of drift hook to Husky.
+
+   > **UX RULE FOR AGENT**: Present the FULL question text from `cicd` protocol PHASE 4
+   > ("Do you want to configure local enforcement of conventional commits: ...") BEFORE
+   > showing options. Never show bare "true/false" or "yes/no" without the full context.
+   > The user must understand what they're enabling before choosing.
 4. **release-please** (`cicd` protocol PHASE 5) → `state.ci.release_please` (bool) and, if yes,
     `state.ci.release_ai_summary` (bool, optional AI summary for the release PR).
     - If yes → ask `state.ci.release_ai_provider` ∈ `{gemini, claude, openai}`.
