@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.39-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.38-beta.1...v0.8.39-beta.1) (2026-09-01)
+
+
+### Bug Fixes
+
+* add missing phase0, phase3, phase4 validation cases ([#167](https://github.com/hugoafj/ai-workflow-wizard/issues/167)) ([18c30bc](https://github.com/hugoafj/ai-workflow-wizard/commit/18c30bc07925b656e9aa797d1d65067be8cf5647))
+
 ## [0.8.38-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.37-beta.1...v0.8.38-beta.1) (2026-09-01)
 
 
