@@ -1,7 +1,9 @@
 ### Step 0.4 — Check health status with gentle-ai doctor
 
 ```bash
-gentle-ai doctor
+# Capture doctor output for evaluation and persistence
+DOCTOR_OUTPUT=$(gentle-ai doctor)
+echo "$DOCTOR_OUTPUT"
 ```
 
 Evaluate the output:
