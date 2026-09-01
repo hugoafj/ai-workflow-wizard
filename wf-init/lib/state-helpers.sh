@@ -164,28 +164,48 @@ JSON
 # Read a field (e.g. wf_state_get '.answers.project_name')
 wf_state_get() { jq -r "$1 // empty" "$WF_STATE" 2>/dev/null; }
 
-# Write a field (e.g. wf_state_set '.discovery.classification' '"legacy"')
+# Write a field safely using jq --arg to prevent injection/escaping issues
+# 
+# USAGE:
+#   wf_state_set '.field' "string_value"          — writes as JSON string
+#   wf_state_set '.field' "true"                   — writes as JSON boolean (jq parses it)
+#   wf_state_set '.field' "false"                  — writes as JSON boolean (jq parses it)
+#   wf_state_set '.field' "42"                     — writes as JSON number (jq parses it)
+#   wf_state_set '.field' "null"                   — writes as JSON null (jq parses it)
+#
+# The second argument is ALWAYS passed as a bash string to jq --arg, which:
+#   1. Safely handles any string content (quotes, newlines, backslashes, etc.)
+#   2. Attempts to parse it as JSON (true/false/null/numbers/arrays/objects)
+#   3. Falls back to treating it as a literal string if not valid JSON
+#
 # Returns 0 on success, 1 on failure. Verifies the write by reading back the path.
-# Fixed: properly handles boolean `false` values (fixes #2)
 wf_state_set() {
   local filter="$1" value="$2" tmp verify
   tmp="$(mktemp)"
-  if jq "$filter = $value | .updated_at = (now | todate)" "$WF_STATE" > "$tmp"; then
+  
+  # Use jq --arg to safely pass the value, preventing injection and escaping issues.
+  # Use try-catch because fromjson? treats 'false' as empty (jq quirk where false is falsy).
+  # try: parse as JSON, catch: if invalid JSON, use literal string (or null if $val=="null").
+  if jq --arg val "$value" "$filter = (try (\$val | fromjson) catch (if \$val == \"null\" then null else \$val end)) | .updated_at = (now | todate)" "$WF_STATE" > "$tmp" 2>/dev/null; then
     mv "$tmp" "$WF_STATE"
+    
     # Verify write: read back the path (without -r, without // empty)
     # jq returns: "true"/"false" for booleans, "null" for missing OR explicit null, quoted string for strings
     verify=$(jq "$filter" "$WF_STATE" 2>/dev/null)
+    
     # verify is "null" if missing OR explicitly set to null, "true"/"false" for booleans, or quoted string
     # Allow explicit null as valid (caller passed "null" as value)
     if [ "$verify" = "null" ] && [ "$value" != "null" ]; then
       echo "ERROR: wf_state_set wrote but verification failed for $filter" >&2
       return 1
     fi
+    
     # Additional check: if value was "false", verify it reads back as "false"
     if [ "$value" = "false" ] && [ "$verify" != "false" ]; then
       echo "ERROR: wf_state_set wrote false but verification returned '$verify' for $filter" >&2
       return 1
     fi
+    
     # If value was "true", verify it reads back as "true"
     if [ "$value" = "true" ] && [ "$verify" != "true" ]; then
       echo "ERROR: wf_state_set wrote true but verification returned '$verify' for $filter" >&2

@@ -297,8 +297,8 @@ FEATURES_CD=$(jq -r '.features.cd // false' .wizard-state.json)
 if [ "$FEATURES_CD" = "true" ]; then
   VPS_RUNTIME=$(jq -r '.cd.vps_runtime // empty' .wizard-state.json)
   if [ -n "$VPS_RUNTIME" ]; then
-    wf_state_set '.cd.enabled' true
-    wf_state_set '.cd.platform' '"vps"'
+    wf_state_set '.cd.enabled' "true"
+    wf_state_set '.cd.platform' "vps"
     # Persist the stack detected earlier so the Builder can select the deploy
     # template and resolve {{has_node_assets}} / {{compose_file}}.
     STACK_DETECTED=$(jq -r '.cd.stack_detected // empty' .wizard-state.json)
@@ -310,20 +310,20 @@ if [ "$FEATURES_CD" = "true" ]; then
       else
         STACK_DETECTED="node_pure"
       fi
-      wf_state_set '.cd.stack_detected' "\"$STACK_DETECTED\""
+      wf_state_set '.cd.stack_detected' "$STACK_DETECTED"
     fi
     # Persist the compose file for docker runtime (default docker-compose.prod.yml).
     COMPOSE_FILE=$(jq -r '.cd.compose_file // empty' .wizard-state.json)
     if [ "$VPS_RUNTIME" = "docker" ] && [ -z "$COMPOSE_FILE" ]; then
-      wf_state_set '.cd.compose_file' '"docker-compose.prod.yml"'
+      wf_state_set '.cd.compose_file' "docker-compose.prod.yml"
     fi
   else
-    wf_state_set '.cd.enabled' false
-    wf_state_set '.cd.platform' '"skip"'
+    wf_state_set '.cd.enabled' "false"
+    wf_state_set '.cd.platform' "skip"
   fi
 else
-  wf_state_set '.cd.enabled' false
-  wf_state_set '.cd.platform' '"skip"'
+  wf_state_set '.cd.enabled' "false"
+  wf_state_set '.cd.platform' "skip"
 fi
 
 PHASE5_DONE=$(jq -r '.phases.phase5.status // "not-started"' .wizard-state.json)

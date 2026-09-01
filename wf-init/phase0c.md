@@ -132,13 +132,13 @@ if [ "$CD" = true ] && [ "$CI" = false ]; then
   # If no: CD=false
 fi
 
-# Persist — pass booleans WITHOUT quotes
-wf_state_set '.features.decision_ladder' $LADDER
-wf_state_set '.features.tdd_protocol' $TDD
-wf_state_set '.features.routing_abc' $ROUTING
-wf_state_set '.features.ci' $CI
-wf_state_set '.features.cd' $CD
-wf_state_set '.features.release_please' $RELEASE
+# Persist — pass booleans as strings, jq --arg in wf_state_set will parse them correctly
+wf_state_set '.features.decision_ladder' "$LADDER"
+wf_state_set '.features.tdd_protocol' "$TDD"
+wf_state_set '.features.routing_abc' "$ROUTING"
+wf_state_set '.features.ci' "$CI"
+wf_state_set '.features.cd' "$CD"
+wf_state_set '.features.release_please' "$RELEASE"
 ```
 
 Mark `wf_phase_done phase0c phase1`.

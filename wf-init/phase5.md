@@ -29,7 +29,7 @@ Save in `.wizard-state.json` → `answers.project_name`, `answers.stack_versions
 
 **Also persist WF_DIR for resumption (fix #11):**
 ```bash
-wf_state_set '.wf_dir' '"/tmp/wf-init-phases"'
+wf_state_set '.wf_dir' "/tmp/wf-init-phases"
 ```
 
 Phase 5 always advances to `phase6a-agents`. Every conditional phase (4.5, 4.6,
