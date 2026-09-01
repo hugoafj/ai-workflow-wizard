@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.38-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.37-beta.1...v0.8.38-beta.1) (2026-09-01)
+
+
+### Bug Fixes
+
+* make phase45 windsurf AGENTS.md patch and validation executable ([#165](https://github.com/hugoafj/ai-workflow-wizard/issues/165)) ([8c2d24f](https://github.com/hugoafj/ai-workflow-wizard/commit/8c2d24fd9b28dfbf654c3ab1627d82ab04c2d50f))
+
 ## [0.8.37-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.36-beta.1...v0.8.37-beta.1) (2026-09-01)
 
 
