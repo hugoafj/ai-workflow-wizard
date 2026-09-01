@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.36-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.35-beta.1...v0.8.36-beta.1) (2026-09-01)
+
+
+### Bug Fixes
+
+* use jq try-catch for safe state value handling ([#161](https://github.com/hugoafj/ai-workflow-wizard/issues/161)) ([6d3f87f](https://github.com/hugoafj/ai-workflow-wizard/commit/6d3f87f4f6807337b00ca70d5d6cb018cff0791c))
+
 ## [0.8.35-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.34-beta.1...v0.8.35-beta.1) (2026-08-31)
 
 
