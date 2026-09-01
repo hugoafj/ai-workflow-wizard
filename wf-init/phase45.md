@@ -466,6 +466,7 @@ if [ ! -f "openspec/config.yaml" ]; then
   exit 1
 fi
 
+# Verify critical fields exist
 CRITICAL_FIELDS=("rules" "testing" "testing.runner" "testing.layers")
 for field in "${CRITICAL_FIELDS[@]}"; do
   if ! jq -e "$field" openspec/config.yaml > /dev/null 2>&1; then
@@ -474,14 +475,31 @@ for field in "${CRITICAL_FIELDS[@]}"; do
   fi
 done
 
+# Verify strict_tdd coherence: config.yaml must match .wizard-state.json selection
+WIZARD_STRICT_TDD=$(jq -r '.testing.tdd_mode // "standard"' .wizard-state.json)
+CONFIG_STRICT_TDD=$(jq -r '.strict_tdd // null' openspec/config.yaml)
+
+# Convert wizard value (standard/strict) to boolean for comparison
+if [ "$WIZARD_STRICT_TDD" = "strict" ]; then
+  EXPECTED_STRICT="true"
+else
+  EXPECTED_STRICT="false"
+fi
+
+if [ "$CONFIG_STRICT_TDD" != "$EXPECTED_STRICT" ]; then
+  echo "ERROR: strict_tdd mismatch in openspec/config.yaml" >&2
+  echo "  Expected (from wizard selection): $EXPECTED_STRICT" >&2
+  echo "  Found in config.yaml: $CONFIG_STRICT_TDD" >&2
+  echo "  Wizard TDD mode was: $WIZARD_STRICT_TDD" >&2
+  exit 1
+fi
+
 echo "✓ Structural validation complete and verified"
+echo "✓ Configuration coherence verified (strict_tdd: $CONFIG_STRICT_TDD matches selection)"
 ```
 
 ---
 
-### Verification (runs after Path A or Path B)
-
----
 
 ### Verification (runs after Path A or Path B)
 
