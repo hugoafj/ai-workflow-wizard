@@ -199,7 +199,12 @@ Available helpers:
 - `wf_state_init` — Initialize `.wizard-state.json` if it doesn't exist.
 - `wf_sha256 <file>` — Compute SHA256 hash of a file (portable macOS/Linux fallback).
 - `wf_state_get '<jq-filter>'` — Read a field from state.
-- `wf_state_set '<jq-filter>' '<value>'` — Write a field to state.
+- `wf_state_set '<jq-filter>' '<value>'` — Write a field to state. Values are passed safely via `jq --arg`, so:
+  - Strings: `wf_state_set '.field' "value"` (no escaping needed, jq handles it)
+  - Booleans: `wf_state_set '.field' "true"` (pass as string, jq parses it)
+  - Numbers: `wf_state_set '.field' "42"` (pass as string, jq parses it)
+  - JSON structures: `wf_state_set '.field' "[item1,item2]"` (pass valid JSON as string, jq parses it)
+  - Null: `wf_state_set '.field' "null"` (pass as string, jq parses it)
 - `wf_phase_done <done_phase> <next>` — Mark a phase done and advance pointer.
 ```
 

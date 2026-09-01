@@ -203,9 +203,11 @@ if [ ${#MISSING_COMMANDS[@]} -gt 0 ]; then
   IFS=","
   MIGRATION_JSON="${MISSING_COMMANDS[*]}"
   IFS="$OLDIFS"
+  # wf_state_set with jq --arg will safely parse the JSON array
   wf_state_set '.migration.missing_commands' "[$MIGRATION_JSON]"
 else
-  wf_state_set '.migration.missing_commands' '[]'
+  # Empty array
+  wf_state_set '.migration.missing_commands' "[]"
 fi
 ```
 

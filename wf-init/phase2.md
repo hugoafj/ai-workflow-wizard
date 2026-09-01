@@ -26,7 +26,7 @@ If `.wizard-state.json` has `migration.prior_content_action = "migrate"`:
 # Mark in state that custom content will be wrapped with protection markers
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
-wf_state_set '.migration.wrap_custom_in_markers' true
+wf_state_set '.migration.wrap_custom_in_markers' "true"
 ```
 
 Inform the user:
