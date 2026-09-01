@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.37-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.36-beta.1...v0.8.37-beta.1) (2026-09-01)
+
+
+### Bug Fixes
+
+* capture doctor output in phase0b for state persistence ([#163](https://github.com/hugoafj/ai-workflow-wizard/issues/163)) ([34c0bbc](https://github.com/hugoafj/ai-workflow-wizard/commit/34c0bbc537d2d22928d158a2fdbcb05a894331ad))
+
 ## [0.8.36-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.35-beta.1...v0.8.36-beta.1) (2026-09-01)
 
 
