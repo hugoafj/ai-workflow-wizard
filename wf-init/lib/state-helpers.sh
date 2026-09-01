@@ -228,6 +228,17 @@ wf_state_validate() {
   local valid=true
 
   case "$phase" in
+    phase0)
+      # Phase 0 initializes: gentle_ai.*, answers.ides (empty array), features.*, discovery.* (all null)
+      # Only validate that the state file exists and has basic structure
+      required_fields=(
+        ".gentle_ai.installed"
+        ".gentle_ai.version"
+        ".gentle_ai.install_choice"
+        ".gentle_ai.os"
+        ".answers.ides"
+      )
+      ;;
     phase0b)
       # Phase 0b writes: gentle_ai.doctor, gentle_ai.version, gentle_ai.install_choice, answers.ides
       required_fields=(
@@ -258,6 +269,19 @@ wf_state_validate() {
       # Phase 2 writes: migration.prior_content_action
       required_fields=(
         ".migration.prior_content_action"
+      )
+      ;;
+    phase3)
+      # Phase 3 writes: discovery.classification (greenfield|legacy)
+      required_fields=(
+        ".discovery.classification"
+      )
+      ;;
+    phase4)
+      # Phase 4 writes: discovery.conventions, discovery.test_dir
+      required_fields=(
+        ".discovery.conventions"
+        ".discovery.test_dir"
       )
       ;;
     phase45)
