@@ -33,42 +33,63 @@ fi
 the gentle-ai compatibility workaround:
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
+# Check if Windsurf is in the active IDEs list
 IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
 if echo "$IDES" | grep -q "windsurf"; then
   WINDSURF_ACTIVE=true
 else
   WINDSURF_ACTIVE=false
 fi
+
+# If Windsurf is active, apply the compatibility patch
+if [ "$WINDSURF_ACTIVE" = "true" ]; then
+  # AGENTS.md Windsurf rule patch: copy template if greenfield, or insert rule if legacy
+  if [ ! -f AGENTS.md ]; then
+    # Greenfield: copy entire template file (contains "Gentle AI — Legacy Path Bridge for Windsurf/Devin")
+    if [ -f "$WF_DIR/temp-files/AGENTS.md" ]; then
+      cp "$WF_DIR/temp-files/AGENTS.md" AGENTS.md
+      echo "✓ AGENTS.md created from Windsurf template"
+    else
+      echo "ERROR: Windsurf template not found at $WF_DIR/temp-files/AGENTS.md" >&2
+      exit 1
+    fi
+  else
+    # Legacy: verify the rule is already present
+    if ! grep -q "Gentle AI — Legacy Path Bridge" AGENTS.md; then
+      echo "ERROR: AGENTS.md exists but missing Windsurf compatibility rule" >&2
+      echo "Run /sdd-init again or manually add the rule from temp-files/AGENTS.md" >&2
+      exit 1
+    fi
+  fi
+
+  # Verify the rule is now present
+  if grep -q "Gentle AI — Legacy Path Bridge" AGENTS.md; then
+    echo "✓ Windsurf compatibility rule verified in AGENTS.md"
+  else
+    echo "ERROR: Windsurf rule verification failed" >&2
+    exit 1
+  fi
+fi
 ```
 
-**If Windsurf is active** (`WINDSURF_ACTIVE=true`):
+**Why this patch matters**:
 
-1. **Merge the AGENTS.md rule** (read temp-files/AGENTS.md and fuse into the project's AGENTS.md):
-   - If `AGENTS.md` does NOT exist (greenfield — the Builder generates it later in Phase 6):
-     copy the whole file `$WF_DIR/temp-files/AGENTS.md` → `AGENTS.md`. That file IS the
-     "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule and must exist before
-     `/sdd-init` runs in the new Windsurf session.
-   - If `AGENTS.md` already exists (legacy project): read the rule from
-     `$WF_DIR/temp-files/AGENTS.md` (the **Gentle AI — Legacy Path Bridge for Windsurf/Devin** section),
-     insert it at the top (after the title and before other content) so it loads first, and save.
-   - Verify the rule is present: `grep -q "Gentle AI — Legacy Path Bridge" AGENTS.md`.
-     If it is not, fix it before continuing.
-
-   **Why**: gentle-ai installs SDD skills into Windsurf's legacy paths (`~/.codeium/windsurf/skills/`), not the Devin paths. This rule tells the agent where to find them. Without it, sdd-init will not load the skills correctly in Windsurf. Phase 45 runs BEFORE the Builder (Phase 6) creates AGENTS.md, so a greenfield project needs the rule file created here directly.
-
-2. **Create `.windsurf/workflows/sdd-new.md`** (to replace the legacy version):
-   - This file is generated in **Phase 5**, after `answers.project_name` is collected
-     (the template needs the project name).
-   - See the "Windsurf workflow setup (if applicable)" step in `phase5.md`.
+- Windsurf has legacy paths (`~/.codeium/windsurf/skills/`) where gentle-ai installs SDD skills.
+- This rule in AGENTS.md tells the agent where to find them at runtime.
+- Without it, `sdd-init` will not load the skills correctly in Windsurf.
+- Phase 4.5 runs BEFORE the Builder (Phase 6) creates AGENTS.md, so a greenfield Windsurf project needs this rule created here directly.
 
 Tell the user:
 
 ```
 ⚙️ Windsurf compatibility setup:
   ✓ AGENTS.md: gentle-ai Windsurf paths rule in place (created if it did not exist)
-  ⏳ `.windsurf/workflows/sdd-new.md` will be generated after you choose the SDD backend.
 
-This is a temporary workaround for a gentle-ai bug with Windsurf.
+This is a required workaround for Windsurf's legacy skill paths. The rule
+is documented in AGENTS.md under "Gentle AI — Legacy Path Bridge for Windsurf/Devin".
 ```
 
 ---
@@ -373,57 +394,112 @@ If the user replies anything else, remind them to type "continue" after completi
 
 Before verifying the backend, validate that `openspec/config.yaml` conforms to the canonical convention defined in `_shared/openspec-convention.md` (installed locally by `gentle-ai sync`).
 
-**Agent instructions:**
-
-1. **Locate canonical schema** — search in this order:
-   - `~/.agents/skills/_shared/openspec-convention.md` (universal, wizard)
-   - `~/.config/opencode/skills/_shared/openspec-convention.md` (OpenCode)
-   - `~/.claude/skills/_shared/openspec-convention.md` (Claude Code)
-   - `~/.cursor/skills/_shared/openspec-convention.md` (Cursor)
-   - `~/.codeium/windsurf/skills/_shared/openspec-convention.md` (Windsurf/Devin)
-   - `~/.kiro/skills/_shared/openspec-convention.md` (Kiro)
-   - `~/.codex/skills/_shared/openspec-convention.md` (Codex)
-   - `~/.gemini/skills/_shared/openspec-convention.md` (Gemini CLI)
-   - `~/.gemini/antigravity/skills/_shared/openspec-convention.md` (Antigravity)
-
-2. **Semantic comparison** — read both files (project's `openspec/config.yaml` and local `_shared/openspec-convention.md`) and detect all structural deviations from canonical convention:
-   - Missing required keys (`rules.apply`, `rules.verify`, `testing.runner`, `testing.layers`, `testing.coverage`, `testing.quality`, `rules.proposal`, `rules.specs`, `rules.design`, `rules.tasks`, `rules.archive`, `testing.runner.command`, `testing.runner.framework`, `testing.quality.linter`, `testing.quality.type_checker`, `testing.quality.formatter`)
-   - Legacy/extra keys (`phase_rules`, etc.)
-   - Incorrect types (scalars where maps expected, e.g., `rules.apply: "string"` vs map)
-   - Incomplete `testing.layers` (`unit`, `integration`, `e2e`)
-   - Invalid value types (enums, ranges, etc.)
-
-> **CRITICAL — PRESERVE VALID DATA:** Do NOT remove or alter any section that is not explicitly invalid. Only fix structural problems:
-> - `phase_rules` → move content to `rules` and delete `phase_rules` key
-> - Scalars where maps expected → normalize to canonical map structure
-> - Add missing keys from canonical schema with sensible defaults
-> - **DO NOT REMOVE**: `project`, `stack`, `framework`, `persistence`, `strict_tdd`, `testing`, `testing.runner`, `testing.layers`, `testing.tools`, `testing.quality`, `testing.coverage_command`, `schema`, `context`, or any other valid data section
-> - Only fix structural problems within valid sections (scalars→maps, missing canonical keys with defaults)
-
-3. **Present unified diff** — show side-by-side comparison (current config vs convention) with proposed fixes.
-
-4. **Request approval** — show user the diff and ask: *"Apply automatic correction to align with canonical convention? [yes/no]"*
-
-5. **If user approves** — apply fixes (remove legacy keys, normalize types, add missing keys with sensible defaults), re-verify and continue.
-   **If user rejects** — abort and request manual correction.
-
 ```bash
+# PHASE 1: Bash — Prerequisites check
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
-IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
+if [ ! -f "openspec/config.yaml" ]; then
+  echo "ERROR: openspec/config.yaml not found" >&2
+  exit 1
+fi
 
-# Agent (LLM) performs semantic validation here
-# No complex bash scripts — agent reads both files, compares, presents diff for approval
+echo "✓ openspec/config.yaml exists"
+echo ""
+echo "═══════════════════════════════════════════════════════"
+echo "AGENT VALIDATION TASK (MANDATORY — CANNOT SKIP)"
+echo "═══════════════════════════════════════════════════════"
+echo ""
 ```
 
-> **Note:** This validation is semantic (agent reads both files), not a rigid bash script. Agent understands canonical convention and detects any inconsistency.
+**AGENT MUST FOLLOW THESE RULES EXACTLY:**
+
+**Rule 1: Locate canonical schema**
+
+Search for `openspec-convention.md` in this order:
+- `~/.agents/skills/_shared/openspec-convention.md` (universal, wizard)
+- `~/.config/opencode/skills/_shared/openspec-convention.md` (OpenCode)
+- `~/.claude/skills/_shared/openspec-convention.md` (Claude Code)
+- `~/.cursor/skills/_shared/openspec-convention.md` (Cursor)
+- `~/.codeium/windsurf/skills/_shared/openspec-convention.md` (Windsurf/Devin)
+- `~/.kiro/skills/_shared/openspec-convention.md` (Kiro)
+- `~/.codex/skills/_shared/openspec-convention.md` (Codex)
+- `~/.gemini/skills/_shared/openspec-convention.md` (Gemini CLI)
+- `~/.gemini/antigravity/skills/_shared/openspec-convention.md` (Antigravity)
+
+**Rule 2: Semantic comparison — Detect ALL deviations**
+
+Read both files (project's `openspec/config.yaml` and local `_shared/openspec-convention.md`) and detect all structural deviations from canonical convention:
+- Missing required keys: `rules`, `rules.apply`, `rules.verify`, `testing`, `testing.runner`, `testing.layers`, `testing.coverage`, `testing.quality`, `rules.proposal`, `rules.specs`, `rules.design`, `rules.tasks`, `rules.archive`, `testing.runner.command`, `testing.runner.framework`, `testing.quality.linter`, `testing.quality.type_checker`, `testing.quality.formatter`
+- Legacy/extra keys: `phase_rules`
+- Incorrect types: scalars where maps expected (e.g., `rules.apply: "string"` vs map)
+- Incomplete `testing.layers`: must have `unit`, `integration`, `e2e`
+- Invalid value types (enums, ranges, etc.)
+
+**Rule 3: PRESERVE VALID DATA**
+
+Do NOT remove or alter any section that is not explicitly invalid. Only fix structural problems:
+- `phase_rules` → move content to `rules` and delete `phase_rules` key
+- Scalars where maps expected → normalize to canonical map structure
+- Add missing keys from canonical schema with sensible defaults
+- **DO NOT REMOVE**: `project`, `stack`, `framework`, `persistence`, `strict_tdd`, `testing`, `testing.runner`, `testing.layers`, `testing.tools`, `testing.quality`, `testing.coverage_command`, `schema`, `context`, or any other valid data section
+- Only fix structural problems within valid sections (scalars→maps, missing canonical keys with defaults)
+
+**Rule 4: Present unified diff**
+
+Show side-by-side comparison (current config vs convention) with proposed fixes clearly marked.
+
+**Rule 5: Request approval**
+
+Show user the diff and ask: *"Apply automatic correction to align with canonical convention? [yes/no]"*
+- If user says YES → apply fixes (remove legacy keys, normalize types, add missing keys with sensible defaults), re-verify, continue
+- If user says NO → abort and request manual correction
+
+```bash
+echo ""
+echo "═══════════════════════════════════════════════════════"
+echo ""
+
+# PHASE 3: Bash — Verify after LLM completes validation
+if [ ! -f "openspec/config.yaml" ]; then
+  echo "ERROR: openspec/config.yaml missing after validation" >&2
+  exit 1
+fi
+
+# Verify critical fields exist
+CRITICAL_FIELDS=("rules" "testing" "testing.runner" "testing.layers")
+for field in "${CRITICAL_FIELDS[@]}"; do
+  if ! jq -e "$field" openspec/config.yaml > /dev/null 2>&1; then
+    echo "ERROR: Critical field missing after validation: $field" >&2
+    exit 1
+  fi
+done
+
+# Verify strict_tdd coherence: config.yaml must match .wizard-state.json selection
+WIZARD_STRICT_TDD=$(jq -r '.testing.tdd_mode // "standard"' .wizard-state.json)
+CONFIG_STRICT_TDD=$(jq -r '.strict_tdd // null' openspec/config.yaml)
+
+# Convert wizard value (standard/strict) to boolean for comparison
+if [ "$WIZARD_STRICT_TDD" = "strict" ]; then
+  EXPECTED_STRICT="true"
+else
+  EXPECTED_STRICT="false"
+fi
+
+if [ "$CONFIG_STRICT_TDD" != "$EXPECTED_STRICT" ]; then
+  echo "ERROR: strict_tdd mismatch in openspec/config.yaml" >&2
+  echo "  Expected (from wizard selection): $EXPECTED_STRICT" >&2
+  echo "  Found in config.yaml: $CONFIG_STRICT_TDD" >&2
+  echo "  Wizard TDD mode was: $WIZARD_STRICT_TDD" >&2
+  exit 1
+fi
+
+echo "✓ Structural validation complete and verified"
+echo "✓ Configuration coherence verified (strict_tdd: $CONFIG_STRICT_TDD matches selection)"
+```
 
 ---
 
-### Verification (runs after Path A or Path B)
-
----
 
 ### Verification (runs after Path A or Path B)
 
