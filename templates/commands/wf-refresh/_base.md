@@ -125,7 +125,6 @@ curl -fsSL "${WF_RAW}/wf-init/phase6a-agents.md" > "${WF_DIR}/phase6a-agents.md"
 curl -fsSL "${WF_RAW}/wf-init/phase6b-build-heavy.md" > "${WF_DIR}/phase6b-build-heavy.md" 2>/dev/null || true
 mkdir -p "${WF_DIR}/temp-files"
 curl -fsSL "${WF_RAW}/temp-files/AGENTS.md" > "${WF_DIR}/temp-files/AGENTS.md" 2>/dev/null || true
-curl -fsSL "${WF_RAW}/temp-files/sdd-new.md" > "${WF_DIR}/temp-files/sdd-new.md" 2>/dev/null || true
 
 REQUIRED_FILES=(
   "${WF_DIR}/lib/refresher.md"
@@ -135,7 +134,6 @@ REQUIRED_FILES=(
   "${WF_DIR}/phase6a-agents.md"
   "${WF_DIR}/phase6b-build-heavy.md"
   "${WF_DIR}/temp-files/AGENTS.md"
-  "${WF_DIR}/temp-files/sdd-new.md"
 )
 
 missing=false
@@ -200,7 +198,7 @@ _extract_phase() {
 
   # Defense in depth: verify block coverage. A silent truncation here used to
   # surface much later as wrong plan classifications (R3 block 2 never ran ->
-  # sdd-new.md was classified deleted_modified instead of updated). Die loudly
+  # files were classified deleted_modified instead of updated). Die loudly
   # at extraction time instead.
   local total extracted
   total=$(awk -v phase="$phase_name" -v srcfile="$refresher" '

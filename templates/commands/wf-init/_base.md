@@ -86,7 +86,6 @@ done
 mkdir -p "$WF_DIR/temp-files"
 mkdir -p "$WF_DIR/templates/protocols/testing"
 curl -fsSL "${WF_RAW}/temp-files/AGENTS.md" > "${WF_DIR}/temp-files/AGENTS.md" 2>/dev/null
-curl -fsSL "${WF_RAW}/temp-files/sdd-new.md" > "${WF_DIR}/temp-files/sdd-new.md" 2>/dev/null
 curl -fsSL "${WF_RAW}/templates/protocols/testing/playwright-mcp.settings.tmpl.md" > "${WF_DIR}/templates/protocols/testing/playwright-mcp.settings.tmpl.md" 2>/dev/null
 
 missing=false
@@ -99,11 +98,6 @@ done
 
 if [ ! -s "$WF_DIR/temp-files/AGENTS.md" ]; then
   echo "Error: could not download temp-files/AGENTS.md from GitHub." >&2
-  missing=true
-fi
-
-if [ ! -s "$WF_DIR/temp-files/sdd-new.md" ]; then
-  echo "Error: could not download temp-files/sdd-new.md from GitHub." >&2
   missing=true
 fi
 

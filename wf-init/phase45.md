@@ -264,9 +264,9 @@ If the user switches to hybrid, use that option.
 
 ---
 
-### Persist backend and generate Windsurf `sdd-new.md`
+### Persist backend
 
-The chosen backend must be written to `.wizard-state.json` **before** any `/sdd-init` prompt or `.windsurf/workflows/sdd-new.md` templating, so the values cannot be out of sync.
+The chosen backend must be written to `.wizard-state.json` **before** any `/sdd-init` prompt, so the values cannot be out of sync.
 
 Map the user's answer to `engram`, `openspec`, or `hybrid` and persist it:
 
@@ -289,24 +289,15 @@ jq --arg backend "${SDD_BACKEND:-hybrid}" \
 mv .wizard-state.json.tmp .wizard-state.json
 ```
 
-NOTE: Windsurf workflow generation is deferred to Phase 5.
-At this point, `.answers.project_name` has not yet been collected.
-The `.windsurf/workflows/sdd-new.md` file will be generated in Phase 5 AFTER project_name is saved.
-
 Then update the Windsurf status:
 
 ### [USER MESSAGE]
 ```
 ⚙️ Windsurf compatibility setup:
   ✓ AGENTS.md: gentle-ai Windsurf paths rule in place (created if it did not exist)
-  ⏳ `.windsurf/workflows/sdd-new.md` will be generated in Phase 5 (needs answers.project_name)
 
 This is a temporary workaround for a gentle-ai bug with Windsurf. The agent will now
 be able to find and run SDD skills correctly.
-
-Note: After /sdd-init runs, gentle-ai sync may overwrite .windsurf/workflows/sdd-new.md
-with the legacy version. If that happens, run /wf-settings → "Fix Windsurf gentle-ai"
-to reapply this fix.
 ```
 
 ### Running `/sdd-init` (gentle-ai skill)

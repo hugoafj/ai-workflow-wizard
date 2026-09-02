@@ -1505,32 +1505,6 @@ if [[ -f AGENTS.md ]] && [[ -f "$STAGING/AGENTS.md" ]]; then
 fi
 reinsert_legacy_bridge "$STAGING"
 
-# Windsurf workflow setup (if applicable): /wf-init Phase 5 generates
-# .windsurf/workflows/sdd-new.md at init time. Re-run the same substitution
-# here so a refresh keeps it in sync with the current state (backend/project).
-# Runs BEFORE the EXPECTED[] check below, which requires the file to exist.
-IDES=$(jq -r '.answers.ides[]?' "$STAGING_STATE" 2>/dev/null)
-if echo "$IDES" | grep -q "windsurf"; then
-  if [[ -f "$WF_DIR/temp-files/sdd-new.md" ]]; then
-    SDD_BACKEND=$(jq -r '.sdd.backend // "hybrid"' "$STAGING_STATE")
-    PROJECT_NAME=$(jq -r '.answers.project_name' "$STAGING_STATE")
-    SDD_PATH="$SDD_BACKEND"
-    [ "$SDD_BACKEND" = "hybrid" ] && SDD_PATH="openspec"
-    mkdir -p "$STAGING/.windsurf/workflows"
-    cp "$WF_DIR/temp-files/sdd-new.md" "$STAGING/.windsurf/workflows/sdd-new.md"
-    if [ "$SDD_BACKEND" = "engram" ]; then
-      sed -i.bak "s|{{sdd.backend}}/changes/<name>/proposal.md|Engram memory:|g" "$STAGING/.windsurf/workflows/sdd-new.md"
-    else
-      sed -i.bak "s|{{sdd.backend}}/changes/|$SDD_PATH/changes/|g" "$STAGING/.windsurf/workflows/sdd-new.md"
-    fi
-    sed -i.bak "s/{{sdd.backend}}/$SDD_BACKEND/g" "$STAGING/.windsurf/workflows/sdd-new.md"
-    sed -i.bak "s|{project}|$PROJECT_NAME|g" "$STAGING/.windsurf/workflows/sdd-new.md"
-    rm -f "$STAGING/.windsurf/workflows/sdd-new.md.bak"
-  else
-    echo "⚠ $WF_DIR/temp-files/sdd-new.md not found; skipping .windsurf/workflows/sdd-new.md regeneration"
-  fi
-fi
-
 # Dynamic EXPECTED[] validation: every artifact the features imply must exist in
 # staging. A missing file means Builder-Core or Builder-Heavy did not run fully.
 EXPECTED=()
@@ -1549,7 +1523,7 @@ for IDE in $IDES; do
     claude-code) EXPECTED+=(.claude/commands/wf-worktree.md .claude/commands/wf-settings.md .claude/commands/wf-onboard.md) ;;
     opencode)    EXPECTED+=(.opencode/commands/wf-worktree.md .opencode/commands/wf-settings.md .opencode/commands/wf-onboard.md) ;;
     cursor)      EXPECTED+=(.cursor/commands/wf-worktree.md .cursor/commands/wf-settings.md .cursor/commands/wf-onboard.md) ;;
-    windsurf)    EXPECTED+=(.windsurf/workflows/wf-worktree.md .windsurf/workflows/wf-settings.md .windsurf/workflows/wf-onboard.md .windsurf/workflows/sdd-new.md) ;;
+    windsurf)    EXPECTED+=(.windsurf/workflows/wf-worktree.md .windsurf/workflows/wf-settings.md .windsurf/workflows/wf-onboard.md) ;;
     kiro)        EXPECTED+=(.kiro/steering/wf-worktree.md .kiro/steering/wf-settings.md .kiro/steering/wf-onboard.md) ;;
     vscode-copilot)
       # Base commands always present

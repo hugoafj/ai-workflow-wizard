@@ -55,34 +55,6 @@ re-run it (regression: phase5↔phase45 / phase5↔phase47-cicd loop).
 
 ---
 
-### Windsurf workflow setup (if applicable)
-
-If Windsurf is active, generate `.windsurf/workflows/sdd-new.md` now that project_name is available:
-
-### [WIZARD ACTION]
-```bash
-IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
-if echo "$IDES" | grep -q "windsurf"; then
-  SDD_BACKEND=$(jq -r '.sdd.backend // "hybrid"' .wizard-state.json)
-  PROJECT_NAME=$(jq -r '.answers.project_name' .wizard-state.json)
-  WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
-  SDD_PATH="$SDD_BACKEND"
-  [ "$SDD_BACKEND" = "hybrid" ] && SDD_PATH="openspec"
-  mkdir -p .windsurf/workflows
-  cp "$WF_DIR/temp-files/sdd-new.md" .windsurf/workflows/sdd-new.md
-  if [ "$SDD_BACKEND" = "engram" ]; then
-    sed -i.bak "s|{{sdd.backend}}/changes/<name>/proposal.md|Engram memory:|g" .windsurf/workflows/sdd-new.md
-  else
-    sed -i.bak "s|{{sdd.backend}}/changes/|$SDD_PATH/changes/|g" .windsurf/workflows/sdd-new.md
-  fi
-  sed -i.bak "s/{{sdd.backend}}/$SDD_BACKEND/g" .windsurf/workflows/sdd-new.md
-  sed -i.bak "s|{project}|$PROJECT_NAME|g" .windsurf/workflows/sdd-new.md
-  rm -f .windsurf/workflows/sdd-new.md.bak
-fi
-```
-
----
-
 ═══════════════════════════════════════════════════════
 ⛔ PHASE 5 COMPLETE — Ready for Phase 6a-agents
 ⏸ PAUSE — Waiting for user to confirm "continue"
