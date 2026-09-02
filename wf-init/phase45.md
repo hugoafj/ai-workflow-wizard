@@ -3,6 +3,7 @@
 > **Gate**: runs only if `features.routing_abc == true` or `features.tdd_protocol == true`.
 > Otherwise, skip to the next applicable phase.
 
+### [WIZARD ACTION]
 ```bash
 # WF_DIR fallback before sourcing (only phase that sourced without it).
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
@@ -32,6 +33,7 @@ fi
 **Before SDD initialization**, check if Windsurf (or Devin) is in the project's active IDEs and apply
 the gentle-ai compatibility workaround:
 
+### [WIZARD ACTION]
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
@@ -82,8 +84,7 @@ fi
 - Without it, `sdd-init` will not load the skills correctly in Windsurf.
 - Phase 4.5 runs BEFORE the Builder (Phase 6) creates AGENTS.md, so a greenfield Windsurf project needs this rule created here directly.
 
-Tell the user:
-
+### [USER MESSAGE]
 ```
 ⚙️ Windsurf compatibility setup:
   ✓ AGENTS.md: gentle-ai Windsurf paths rule in place (created if it did not exist)
@@ -100,6 +101,7 @@ This phase runs here — after reverse engineering (Phase 4) — because the wiz
 
 **If `openspec/config.yaml` already exists**, read the current backend and display:
 
+### [USER MESSAGE]
 ```
 SDD was already initialized in this repo.
   Current backend: <backend detected from config>
@@ -114,6 +116,9 @@ The post-commit hook installed in Phase 8 will notify you when that happens.
 Do you want to refresh the configuration now? [yes / no, continue]
 ```
 
+### ⏸ PAUSE — Waiting for user response...
+
+### [WIZARD ACTION]
 If the user says "no, continue": skip to the end of this phase.
 If "yes": continue with the backend selection below.
 
@@ -125,6 +130,7 @@ If "yes": continue with the backend selection below.
 
 Before running `/sdd-init`, the user must choose the backend. To make the right recommendation, the wizard evaluates the project context discovered in Phases 1-4:
 
+### [WIZARD ACTION]
 ```bash
 # How many unique committers in the history?
 # CRITICAL: must use explicit `HEAD` and `< /dev/null` — without this, `git shortlog`
@@ -143,6 +149,7 @@ The wizard uses this information to prefill the recommendation in the message to
 
 Always present all three options in full — the user decides, not the wizard. The wizard only indicates which one it recommends based on context:
 
+### [USER MESSAGE]
 ```
 To initialize SDD in this project, I need to know which persistence backend
 to use. Here are the three options with their real implications:
@@ -233,8 +240,12 @@ to use. Here are the three options with their real implications:
 What backend do you choose? [1 / 2 / 3]
 ```
 
+### ⏸ PAUSE — Waiting for user choice...
+
+### [WIZARD ACTION]
 **If the user chooses 1 (engram)**, ask for explicit confirmation:
 
+### [USER MESSAGE]
 ```
 You chose engram. Confirmation before continuing:
 
@@ -246,6 +257,9 @@ You chose engram. Confirmation before continuing:
 Do you confirm? [yes, I understand and accept / no, I prefer hybrid]
 ```
 
+### ⏸ PAUSE — Waiting for user confirmation...
+
+### [WIZARD ACTION]
 If the user switches to hybrid, use that option.
 
 ---
@@ -256,6 +270,7 @@ The chosen backend must be written to `.wizard-state.json` **before** any `/sdd-
 
 Map the user's answer to `engram`, `openspec`, or `hybrid` and persist it:
 
+### [WIZARD ACTION]
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
@@ -280,6 +295,7 @@ The `.windsurf/workflows/sdd-new.md` file will be generated in Phase 5 AFTER pro
 
 Then update the Windsurf status:
 
+### [USER MESSAGE]
 ```
 ⚙️ Windsurf compatibility setup:
   ✓ AGENTS.md: gentle-ai Windsurf paths rule in place (created if it did not exist)
@@ -307,6 +323,7 @@ to reapply this fix.
 
 Read from the current state to build the exact prompt with resolved values:
 
+### [WIZARD ACTION]
 ```bash
 SDD_BACKEND=$(jq -r '.sdd.backend // "hybrid"' .wizard-state.json)
 TDD_MODE=$(jq -r '.testing.tdd_mode // "standard"' .wizard-state.json)
@@ -322,7 +339,7 @@ If `testing.tdd_mode` is not in the state (phase 46 hasn't run yet), the prompt 
 
 ---
 
-**Required: Run `/sdd-init` in a NEW session — BLOCKING PROMPT**
+### Required: Run `/sdd-init` in a NEW session — BLOCKING PROMPT
 
 The wizard has just written the new rules and skills to your IDE's configuration. For those
 to be loaded correctly by gentle-ai's own orchestrator, **sdd-init MUST run in a fresh session**
@@ -339,15 +356,16 @@ Do NOT try to delegate sdd-init inline in this conversation. Instead:
 
 Show the user this EXACT message (substitute the variables):
 
+### [WIZARD ACTION]
 ```bash
 SDD_BACKEND=$(jq -r '.sdd.backend // "hybrid"' .wizard-state.json)
 TDD_MODE=$(jq -r '.testing.tdd_mode // "standard"' .wizard-state.json)
 if [ "$TDD_MODE" = "strict" ]; then STRICT_TDD="enabled"; else STRICT_TDD="disabled"; fi
 
 cat <<MESSAGE
-═══════════════════════════════════════════════════════════════
+════════════════════════════════════════════════════════════════
 🚀  SDD INITIALIZATION REQUIRED — ACTION NEEDED
-═══════════════════════════════════════════════════════════════
+════════════════════════════════════════════════════════════════
 
 To continue, you need to initialize SDD with this configuration:
   • Backend: ${SDD_BACKEND}
@@ -368,7 +386,7 @@ To continue, you need to initialize SDD with this configuration:
 
        continue
 
-     (Type exactly "continue" — this is required for the wizard to proceed.)
+      (Type exactly "continue" — this is required for the wizard to proceed.)
 
 Important notes:
 - `/sdd-init` is a gentle-ai skill, not a terminal command. If your IDE supports it, you can try
@@ -383,6 +401,8 @@ Important notes:
 ═══════════════════════════════════════════════════════════════
 MESSAGE
 ```
+
+### ⏸ PAUSE — BLOCKING: Wait for user to reply "continue"...
 
 **AGENT: WAIT HERE. Do not continue. Do not verify. Do not advance phase.**
 Only when the user explicitly replies "continue" (case-insensitive), proceed to structural validation below.
@@ -564,6 +584,7 @@ Stop the wizard until the verification passes.
 
 ### ✓ PHASE 4.5 COMPLETED
 
+### [USER MESSAGE]
 ```
 SDD initialized:
   Backend: <chosen backend>
@@ -576,14 +597,22 @@ re-running /sdd-init and will notify in .wf-status.
 
 Continuing with project questions...
 ```
-**PAUSE — Wait for "continue" or "yes" to move to the next phase (depending on features).**
 
----
-> **⛔ STOP HERE — do not execute anything else.**
-> **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `sdd.backend` (`engram`|`openspec`|`hybrid`) and `sdd.already_initialized`. Mark `wf_phase_done phase45 <next>`.
+### ⏸ PAUSE — Wait for "continue" or "yes" to move to the next phase (depending on features).
+
+> **📝 PERSISTENCE** (contract `wf-init/lib/state.md`): use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `sdd.backend` (`engram`|`openspec`|`hybrid`) and `sdd.already_initialized`. Mark `wf_phase_done phase45 <next>`.
 > Calculate the next phase based on features: `phase46` if `features.tdd_protocol = true`; else `phase47-cicd` if `features.ci`, `features.cd`, or `features.release_please` is true; else `phase5`.
 > Tell the user: *"SDD initialized. Reply **continue** when you are ready to proceed."*
 > Wait for the response. Only when they confirm, run in bash:
+
+---
+
+═══════════════════════════════════════════════════════
+⛔ PHASE 4.5 COMPLETE — Ready for Next Phase
+⏸ PAUSE — Waiting for user to confirm "continue"
+
+### [WIZARD ACTION]
+When user confirms, run EXACTLY:
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"

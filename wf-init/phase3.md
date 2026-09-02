@@ -5,8 +5,7 @@ Determine the mode using these signals:
 - **Greenfield** if: `git log` has fewer than 5 commits, or almost all code files are from the same day, or the `package.json` was created recently without significant production dependencies.
 - **Legacy** if: there are commits with real history, there are significant production dependencies, there is code in `src/` with established patterns.
 
-Inform and wait for confirmation:
-
+### [USER MESSAGE]
 ```
 Classification: GREENFIELD / LEGACY
 
@@ -20,10 +19,11 @@ Then ask explicitly with these visible options:
 - `no, it's greenfield` — correct and continue as greenfield
 - `no, it's legacy` — correct and continue as legacy
 
-**PAUSE — Wait for user response before continuing.**
+### ⏸ PAUSE — Wait for user response before continuing.
 
 **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `discovery.classification` (`greenfield` | `legacy`). The routing below is decided by reading that field from state, not from memory.
 
+### [WIZARD ACTION]
 If the user confirms **LEGACY**, run in bash:
 
 ```bash

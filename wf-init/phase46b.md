@@ -61,7 +61,7 @@ Optional testing extras — none are activated unless you ask:
 Which ones do I activate? [comma-separated numbers / none for now]
 ```
 
-**Wait for user response.**
+### ⏸ PAUSE — Waiting for user response...
 
 **If they activated extra 1 (coverage targets)**, ask for the threshold. It is stored in
 `state.testing.coverage_threshold` (persistence below); the builder injects the
@@ -331,11 +331,12 @@ Testing stack configured (in memory — everything is written in Phase 8):
 > in Phase 0c (feature selection), it was already asked here in Phase 4.6. It's the documentation of the
 > behavior that the testing stack enables.
 
-**PAUSE — Wait for "continue" or "yes" to move to the next phase (based on features chosen in Phase 0c).**
+### [USER MESSAGE]
+Testing stack configured. Reply **continue** to continue.
 
----
-> **⛔ STOP HERE — don't execute anything else.**
-> **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `testing.coverage_threshold` (number or null, if the coverage extra was activated), `testing.visual_regression` (bool), `testing.page_object_model` (bool), `mcps` (project MCPs to configure). Mark `wf_phase_done phase46b <next>`.
+### ⏸ PAUSE — Waiting for user to confirm "continue"...
+
+> **📝 PERSISTENCE** (contract `wf-init/lib/state.md`): use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `testing.coverage_threshold` (number or null, if the coverage extra was activated), `testing.visual_regression` (bool), `testing.page_object_model` (bool), `mcps` (project MCPs to configure). Mark `wf_phase_done phase46b <next>`.
 > Calculate the next phase based on features:
 ```bash
 NEXT=
@@ -347,12 +348,32 @@ fi
 ```
 > Tell the user: *"Testing stack configured. Reply **continue** to continue."*
 > Wait for the response. Only when they confirm, execute in bash:
+> - `wf_state_set '.testing.coverage_threshold' '<number>'` — if coverage extra activated, else `null`
+> - `wf_state_set '.testing.visual_regression' 'true'` or `'false'`
+> - `wf_state_set '.testing.page_object_model' 'true'` or `'false'`
+> - `wf_state_set '.mcps' '<array of selected MCPs>'`
+
+---
+
+═══════════════════════════════════════════════════════
+⛔ PHASE 4.6b COMPLETE — Ready for Next Phase
+⏸ PAUSE — Waiting for user to confirm "continue"
+
+### [WIZARD ACTION]
+When user confirms, run EXACTLY:
+
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
 # Validate state before phase transition (phase-aware validation)
 # Note: coverage_threshold can be null if coverage extra not activated - phase-aware validator checks field exists
+NEXT=
+if jq -e '.features.ci == true or .features.cd == true or .features.release_please == true' .wizard-state.json >/dev/null; then
+  NEXT="phase47-cicd"
+else
+  NEXT="phase5"
+fi
 wf_phase_done phase46b "$NEXT"
 echo "ℹ Next phase: $NEXT"
 cat "$WF_DIR/$NEXT.md"

@@ -2,6 +2,7 @@
 
 If previous workflow artifacts with **own content** exist (not empty stubs nor current wizard templates):
 
+### [USER MESSAGE]
 ```
 I found previous workflow artifacts with customized content:
   <brief list of each one's content>
@@ -12,7 +13,7 @@ What should I do with them?
   [review first] — Show me each file before I decide.
 ```
 
-**PAUSE — Wait for response.**
+### ⏸ PAUSE — Waiting for response.
 
 If no previous artifacts with own content exist: tell the user and continue to Phase 3 directly.
 
@@ -22,6 +23,7 @@ If no previous artifacts with own content exist: tell the user and continue to P
 
 If `.wizard-state.json` has `migration.prior_content_action = "migrate"`:
 
+### [WIZARD ACTION]
 ```bash
 # Mark in state that custom content will be wrapped with protection markers
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
@@ -29,8 +31,7 @@ source "$WF_DIR/lib/state-helpers.sh"
 wf_state_set '.migration.wrap_custom_in_markers' "true"
 ```
 
-Inform the user:
-
+### [USER MESSAGE]
 ```
 ✓ Migration plan saved.
 
@@ -60,6 +61,7 @@ You will see the protected content in Phase 7 before I write any files.
 For each active IDE in the project (detected in Phase 2 or confirmed in Phase 0c),
 check file by file — not just whether the directory exists:
 
+### [WIZARD ACTION]
 ```bash
 # List of commands expected by this wizard version (update every
 # version that adds new commands)
@@ -94,6 +96,7 @@ If the `EXPECTED_COMMANDS` of this wizard version differs from the one the previ
 detected version had (for example, an upgrade that added `wf-onboard` and
 `wf-tdd` as new commands), tell the user:
 
+### [USER MESSAGE]
 ```
 Command verification — <IDE>:
   ✓ wf-ladder.md
@@ -110,11 +113,18 @@ Always verify the full list, file by file, for each active IDE. This
 check is repeated in every future wizard version that adds new commands —
 keeping `EXPECTED_COMMANDS` updated is the wizard maintainer's responsibility.
 
----
-> **⛔ STOP HERE — do not execute anything else.**
-> **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `migration.prior_content_action` (migrate/replace/review) and `migration.missing_commands` (the ones detected as missing). Mark `wf_phase_done phase2 phase3`.
+> **📝 PERSISTENCE** (contract `wf-init/lib/state.md`): use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `migration.prior_content_action` (migrate/replace/review) and `migration.missing_commands` (the ones detected as missing). Mark `wf_phase_done phase2 phase3`.
 > Tell the user: *"Migration reviewed. Reply **continue** when you're ready for project classification."*
 > Wait for the response. Only when they confirm, run in bash:
+
+---
+
+═══════════════════════════════════════════════════════
+⛔ PHASE 2 COMPLETE — Ready for Phase 3
+⏸ PAUSE — Waiting for user to confirm "continue"
+
+### [WIZARD ACTION]
+When user confirms, run EXACTLY:
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"

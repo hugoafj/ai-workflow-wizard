@@ -4,7 +4,7 @@
 > The chosen features determine which wizard phases are executed and which
 > protocols are packaged in AGENTS.md.
 
-Read the current state (in case of resumption):
+### [WIZARD ACTION] — Read current state (in case of resumption)
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
@@ -20,13 +20,11 @@ fi
 
 ### Question — Feature selection
 
-Try the IDE's structured input tool (`question`, `ask_user_question`,
-`AskQuestion`, or equivalent) with all 6 options plus "none". If the
-tool is unavailable or doesn't support that many options, display:
+Try the IDE's structured input tool (`question`, `ask_user_question`, `AskQuestion`, or equivalent) with all 6 options plus "none". If the tool is unavailable or doesn't support that many options, display:
 
+### [USER MESSAGE]
 ```
-What features do you want to configure in this project? Choose the numbers
-separated by commas, or "none":
+What features do you want to configure in this project? Choose the numbers separated by commas, or "none":
 
 ────────────────────────────────────────────────────────────
 1. 🪜 wf-ladder (anti-over-engineering — 7 rungs
@@ -60,14 +58,16 @@ Examples:
   "none"   → Only .gitignore + maintenance commands (wf-onboard, wf-worktree, wf-settings)
 ```
 
-**Wait for user response** (via structured input tool or plain text fallback).
+### ⏸ PAUSE — Waiting for user response...
+
+### [WIZARD ACTION]
 Parse the selected features and proceed.
 
 ### Combination validations
 
-- If they choose 4 and 6: "Release-please standalone is included in CI. Should I remove 6 and keep only 4? [yes / no]"
-- If they choose 3 without 1: "SDD Routing activates the full SDD-forcing policy (wf-sdd-trigger + wf-preflight) but not the Ladder. If you want anti-over-engineering rungs, also add option 1. Should I add 1? [yes / no]"
-- If they choose 5 without 4: "CD without CI works, but you won't have Quality Guard or AI review on your PRs. Do you confirm only CD? [yes / no]"
+- If they choose 4 and 6: ask "Release-please standalone is included in CI. Should I remove 6 and keep only 4? [yes / no]"
+- If they choose 3 without 1: ask "SDD Routing activates the full SDD-forcing policy (wf-sdd-trigger + wf-preflight) but not the Ladder. If you want anti-over-engineering rungs, also add option 1. Should I add 1? [yes / no]"
+- If they choose 5 without 4: ask "CD without CI works, but you won't have Quality Guard or AI review on your PRs. Do you confirm only CD? [yes / no]"
 
 ### Persistence
 
@@ -141,11 +141,13 @@ wf_state_set '.features.cd' "$CD"
 wf_state_set '.features.release_please' "$RELEASE"
 ```
 
-Mark `wf_phase_done phase0c phase1`.
+### [USER MESSAGE]
+Features selected. Reply **continue** to start project discovery.
 
-Tell the user: *"Features selected. Reply **continue** to start project discovery."*
+### ⏸ PAUSE — Waiting for user to confirm "continue"...
 
-Wait for the response. Only when confirmed, run in bash:
+### [WIZARD ACTION]
+When user confirms, run EXACTLY:
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"

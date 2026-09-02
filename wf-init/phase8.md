@@ -8,6 +8,7 @@ Only run because the user explicitly approved in Phase 7.
 
 ### 8.1 Promote staging files
 
+### [WIZARD ACTION]
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
@@ -136,6 +137,7 @@ fi
 CI/CD files were already copied from staging. Some pieces need an
 activation command (run AFTER the files exist):
 
+### [WIZARD ACTION]
 ```bash
 # Conventional commits: initialize Husky if configured (core.hooksPath → .husky)
 if [ "$(jq -r '.ci.conventional_commits' .wizard-state.json)" = "true" ]; then

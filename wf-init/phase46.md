@@ -52,6 +52,7 @@ crashing.
 
 **If there's no test runner**, ask what layers to activate:
 
+### [USER MESSAGE]
 ```
 No configured testing framework detected.
 
@@ -65,7 +66,7 @@ What testing layers would you like to configure now?
 
    WHAT IT DOES: tests functions, hooks, and utilities in isolation.
    INSTALLS: vitest, @testing-library/react, @testing-library/user-event,
-            @testing-library/jest-dom, jsdom, @vitest/ui, @vitest/coverage-v8
+             @testing-library/jest-dom, jsdom, @vitest/ui, @vitest/coverage-v8
    GENERATES: vitest.config.ts, src/test/setup.ts
    ADDS SCRIPTS: "test", "test:ui", "test:coverage"
    CONVENTION: Component.test.tsx next to the tested file.
@@ -91,12 +92,13 @@ What testing layers would you like to configure now?
 What do I activate? [1 / 2 / 1,2 / 1,2,3 / 3 only / none for now]
 ```
 
-**Wait for user response.**
+### ⏸ PAUSE — Waiting for user response...
 
 ### TDD Mode (only if they activated layer 1, 2, or both)
 
 If the user activated unit and/or integration tests, ask what TDD discipline mode they prefer. This is an exclusive choice — they don't combine, one replaces the other:
 
+### [USER MESSAGE]
 ```
 What TDD mode do you want for this project?
 
@@ -132,7 +134,7 @@ What TDD mode do you want for this project?
 Which do you prefer? [1 / 2]
 ```
 
-**Wait for user response.**
+### ⏸ PAUSE — Waiting for user response...
 
 **If they chose option 1 (Standard TDD Protocol)**: the Builder writes the standard protocol
 (source `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-tdd/variants/standard.md`) in the AGENTS.md.
@@ -337,6 +339,7 @@ gentle-ai sync --strict-tdd
 
 Inform the user:
 
+### [USER MESSAGE]
 ```
 Activated Strict TDD Mode.
 
@@ -356,11 +359,21 @@ How to deactivate it later if you change your mind: use /wf-settings — it
 already writes correctly to both sources in sync.
 ```
 
----
-> **⛔ STOP HERE — don't execute anything else.**
-> **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `testing.layers` (activated layers), `testing.tdd_mode` (`standard`|`strict`), `testing.runner_detected`. Mark `wf_phase_done phase46 phase46b`.
+> **📝 PERSISTENCE** (contract `wf-init/lib/state.md`): use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `testing.layers` (activated layers), `testing.tdd_mode` (`standard`|`strict`), `testing.runner_detected`. Mark `wf_phase_done phase46 phase46b`.
+> - `wf_state_set '.testing.layers' '<activated layers array>'` — e.g. `["unit","integration","e2e"]`
+> - `wf_state_set '.testing.tdd_mode' '"standard"'` or `'"strict"'`
+> - `wf_state_set '.testing.runner_detected' '"<runner>"'` — e.g. `"vitest"`, `"playwright"`
 > Tell the user: *"Testing and TDD mode configured. Reply **continue** to review optional testing extras (coverage, visual regression, POM) and generate configs."*
 > Wait for the response. Only when they confirm, execute in bash:
+
+---
+
+═══════════════════════════════════════════════════════
+⛔ PHASE 4.6 COMPLETE — Ready for Phase 4.6b
+⏸ PAUSE — Waiting for user to confirm "continue"
+
+### [WIZARD ACTION]
+When user confirms, run EXACTLY:
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"

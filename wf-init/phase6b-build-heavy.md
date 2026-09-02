@@ -9,6 +9,7 @@
 
 Builder-Core should have completed. Verify:
 
+### [WIZARD ACTION]
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
@@ -27,6 +28,7 @@ echo "✓ Builder-Core staging verified"
 
 Builder-Heavy is a deterministic Python script — no sub-agent delegation, no inline fallback:
 
+### [WIZARD ACTION]
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
@@ -46,6 +48,7 @@ python3 "$WF_DIR/lib/builder-heavy.py" \
 
 If Builder-Core did not run yet (no `AGENTS.md` in staging), run it first:
 
+### [WIZARD ACTION]
 ```bash
 python3 "$WF_DIR/lib/builder-core.py" \
   --state ".wizard-state.json" \
@@ -64,6 +67,7 @@ specification reference.
 
 Regardless of delegation or inline, validate the complete assembly:
 
+### [WIZARD ACTION]
 ```bash
 if [ ! -d .wizard-staging ]; then
   echo "ERROR: .wizard-staging/ was lost or not updated."
@@ -155,6 +159,7 @@ echo "✓ Builder-Heavy validation passed"
 
 Mark the Builder phases done and advance the pointer **only if the current phase_pointer is still one of the Builder phases**. This makes the phase safe to reuse during `/wf-refresh`, when the project may already be past phase 7:
 
+### [WIZARD ACTION]
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
@@ -174,12 +179,22 @@ fi
 
 Then inform the user:
 
+### [USER MESSAGE]
 ```
 All artifacts are assembled in .wizard-staging/.
 Reply **continue** to see the full review before writing anything.
 ```
 
-Wait for user confirmation. Only then:
+### ⏸ PAUSE — Waiting for user to confirm "continue"...
+
+---
+
+═══════════════════════════════════════════════════════
+⛔ PHASE 6b COMPLETE — Ready for Phase 7
+⏸ PAUSE — Waiting for user to confirm "continue"
+
+### [WIZARD ACTION]
+When user confirms, run EXACTLY:
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"

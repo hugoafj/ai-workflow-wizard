@@ -6,6 +6,7 @@
 
 ### Step 1: Run Builder-Core (deterministic script)
 
+### [WIZARD ACTION]
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
@@ -34,6 +35,7 @@ sub-agent or manual inline path anymore; `_archive/subagent-builder-core.md` and
 
 Validate that `.wizard-staging/` was created and contains expected files:
 
+### [WIZARD ACTION]
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
@@ -70,6 +72,15 @@ echo "✓ Builder-Core validation passed"
 ### Step 4: Mark Builder-Core done and continue to Builder-Heavy
 
 If validation succeeds, mark this phase done and continue with part B:
+
+---
+
+═══════════════════════════════════════════════════════
+⛔ PHASE 6a COMPLETE — Ready for Phase 6b-build-heavy
+⏸ PAUSE — Waiting for user to confirm "continue"
+
+### [WIZARD ACTION]
+When user confirms, run EXACTLY:
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"

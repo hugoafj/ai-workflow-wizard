@@ -6,6 +6,7 @@
 
 ### Delegation to discovery sub-agent
 
+### [WIZARD ACTION]
 1. Read the sub-agent prompt from `subagent-discovery.md`:
    ```bash
    cat "$WF_DIR/subagent-discovery.md"
@@ -21,39 +22,45 @@
 
 4. When the sub-agent finishes, show the report to the user:
 
-   ```
-   DISCOVERY REPORT
-   ================
-   Detected stack: <stack>
-   Code files: ~<N>
-   Git commits: <N>
+### [USER MESSAGE]
+```
+DISCOVERY REPORT
+================
+Detected stack: <stack>
+Code files: ~<N>
+Git commits: <N>
 
-   Previous workflow artifacts:
-     AGENTS.md: <exists / does not exist>
-     CLAUDE.md: <exists / does not exist>
-     Satellites: <list or "none">
-     Post-commit hook: <exists / does not exist>
+Previous workflow artifacts:
+  AGENTS.md: <exists / does not exist>
+  CLAUDE.md: <exists / does not exist>
+  Satellites: <list or "none">
+  Post-commit hook: <exists / does not exist>
 
-   Classification: GREENFIELD / LEGACY
+Classification: GREENFIELD / LEGACY
 
-   Should I continue with artifact migration? [yes]
-   ```
+Should I continue with artifact migration? [yes]
+```
 
-   **PAUSE — Wait for user confirmation before continuing.**
+### ⏸ PAUSE — Wait for user confirmation before continuing.
 
 ### Persistence
 
 The sub-agent already saved the data in `.wizard-state.json`. Just verify it exists:
 
+### [WIZARD ACTION]
 ```bash
 cat .wizard-state.json | jq '.discovery, .migration, .phases'
 ```
 
 If something is missing, complete it manually.
 
-Tell the user: *"Discovery completed. Reply **continue** to review any previous artifacts to migrate."*
+### [USER MESSAGE]
+Discovery completed. Reply **continue** to review any previous artifacts to migrate.
 
-Wait for the response. Only when confirmed, run in bash:
+### ⏸ PAUSE — Waiting for user to confirm "continue"...
+
+### [WIZARD ACTION]
+When user confirms, run EXACTLY:
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
