@@ -12,15 +12,16 @@
 # `conventions`, `checks_before_done`) — no gentle-ai consumer reads them.
 #
 # What gentle-ai actually reads:
-#   - sdd-apply          → strict_tdd + `testing` section (runner detection); overrides in
-#                          `rules.apply.test_command`
+#   - sdd-apply          → strict_tdd (enables strict TDD module); the test RUNNER and its
+#                          command come from cached capabilities (Engram, sdd-init), not
+#                          from `testing.runner.command`; overrides in `rules.apply.test_command`
 #   - sdd-verify         → `rules.verify.test_command`, `rules.verify.build_command`,
 #                          `rules.verify.coverage_threshold`
-#   - sdd-init           → writes the file; caches capabilities in `testing.*`
+#   - sdd-init           → writes the file; caches capabilities in Engram (`testing-capabilities`
+#                          topic) and/or `testing.*` here
 #
 # Wizard-Allowed Field Edits (leaf fields, resolve placeholders from state):
 #   {{strict_tdd}}          → true/false based on TDD mode (Phase 4.6 owns this — leave alone)
-#   {{runner_command}}      → test command, e.g. "npm test"
 #   {{runner_framework}}    → vitest | playwright | vitest+playwright
 #   {{layer_unit}}          → true/false
 #   {{layer_integration}}   → true/false
@@ -30,6 +31,11 @@
 #   {{coverage_threshold}}  → number (e.g., 80) from testing.coverage_threshold
 #   {{test_command}}        → e.g. "npm test"
 #   {{build_command}}       → e.g. "npm run build"
+#
+# NOTE: there is NO {{runner_command}} edit. Phase 8.1d writes only
+# `testing.runner.framework`; the actual command lives in `rules.apply.test_command` /
+# `rules.verify.test_command` (and sdd-apply detects it from cached capabilities /
+# Engram, not from a `testing.runner.command` config key that no consumer reads).
 #
 # Canonical shape (only the leaf fields the wizard may touch; omit what isn't activated):
 
@@ -44,10 +50,9 @@ rules:
     coverage_threshold: {{coverage_threshold}}
 
 testing:
-  strict_tdd: {{strict_tdd}}
+  strict_tdd: {{strict_tdd}}        # Phase 4.6 writes this (informational)
   runner:
-    command: {{runner_command}}
-    framework: {{runner_framework}}
+    framework: {{runner_framework}} # 8.1d writes framework only — no `command` child
   layers:
     unit:
       available: {{layer_unit}}

@@ -24,6 +24,8 @@ In your IDE or CLI agent, run:
 
 > **IMPORTANT**: This wizard requires [gentle-ai](https://github.com/Gentleman-Programming/gentle-ai), the foundation ecosystem that powers SDD, Engram (persistent memory), skills, and multi-IDE routing. If gentle-ai is not installed, the wizard will guide you through installation automatically. **Before running `/wf-init`, take 5 minutes to read the [gentle-ai documentation](https://github.com/Gentleman-Programming/gentle-ai#readme)** — understanding how gentle-ai works is essential to getting the most out of this workflow. Skipping this step means missing critical features like the SDD orchestrator and persistent memory between sessions.
 
+> **⚠️ WARNING — Use capable models**: The wizard is instruction-driven: agents must follow multi-step procedures exactly. **Fast or small models (Haiku-class or equivalent) are, by nature, prone to skipping instructions and steps** — they do not follow procedural prompts reliably. This is worse on **VS Code / GitHub Copilot**, where the harness hides context and the model cuts corners. Use a **Sonnet-class or better** model to run `/wf-init` (wizard initialization). **This warning applies to the wizard bootstrap only — for day-to-day development, SDD work, and anything else in the initialized repo, any model works fine.** See [Known Issues & Workarounds](#copilot--vs-code-use-capable-models) below.
+
 The wizard discovers your stack, installs [gentle-ai](https://github.com/Gentleman-Programming/gentle-ai) (the foundation ecosystem), generates `AGENTS.md`, configures satellites per IDE, sets up git hooks, and prepares CI/CD templates.
 
 ## Protecting Custom Content
@@ -45,6 +47,15 @@ When you run `/wf-refresh`, the wizard will update everything EXCEPT these marke
 **Why this matters**: Your team's policies, constraints, and decisions are yours to maintain. The wizard adapts around them, never replaces them.
 
 ## Known Issues & Workarounds
+
+### Copilot / VS Code: Use Capable Models
+
+The wizard's phases are procedural instructions: each one expects the agent to execute every step in order and persist state exactly. **Fast or small models (Haiku-class or equivalent) skip instructions by nature** — they cut steps, invent state fields, and do not reliably follow long procedure chains. This is amplified on GitHub Copilot / VS Code, whose progressive skill disclosure only loads instructions when the model decides they are relevant.
+
+- **The issue**: fast/small models do not follow multi-step instructions reliably; the problem compounds on Copilot / VS Code harnesses that hide context.
+- **The fix**: use a **Sonnet-class or better** model only to run `/wf-init` (wizard initialization). If a capable model is unavailable, expect to review every phase step manually — the wizard cannot compensate for a model that ignores its instructions.
+- **Scope**: this applies to the wizard bootstrap **only** — once the repo is initialized, day-to-day development, SDD work, and anything else work with any model, including fast/small ones.
+- **What works**: OpenCode and Claude Code expose full context and respect tool/agent boundaries; Copilot's harness is the least reliable for instruction-driven workflows, regardless of model.
 
 ### Windsurf / Devin: Legacy Path Bridge
 

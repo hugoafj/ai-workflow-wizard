@@ -347,7 +347,7 @@ testing:
 ```
 
 Map the wizard's activated extras onto THESE fields (not onto invented ones):
-`testing.runner.{command,framework}`, `testing.layers.<layer>.{available,tool}`,
+`testing.runner.framework`, `testing.layers.<layer>.{available,tool}`,
 `testing.coverage.{available,command}` (coverage extra), `rules.verify.coverage_threshold`
 (coverage extra), `rules.apply.test_command` + `rules.verify.{test_command,build_command}`
 (always). `visual_regression` and `page_object_model` stay in `.wizard-state.json` only —
