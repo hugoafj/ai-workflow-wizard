@@ -1119,10 +1119,8 @@ jq '.cd.trigger = "<new_trigger>"' .wizard-state.json > .wizard-state.json.tmp &
 **Gate**: Only show this option if Windsurf or Devin is in `state.answers.ides`.
 
 ```
-Fix Windsurf gentle-ai — Reapply the workaround for gentle-ai's legacy path bug
-
-This reapplies the AGENTS.md rule and .windsurf/workflows/sdd-new.md
-in case they were overwritten by a manual "gentle-ai sync".
+Fix Windsurf gentle-ai — Reapply the AGENTS.md "Legacy Path Bridge" rule
+in case it was overwritten by a manual "gentle-ai sync".
 
 Do you want to reapply the Windsurf fix now? [yes / no, skip]
 ```
@@ -1140,28 +1138,11 @@ Do you want to reapply the Windsurf fix now? [yes / no, skip]
      refreshes preserve it.
    - If already present, skip (do not duplicate).
 
-2. **Rewrite .windsurf/workflows/sdd-new.md**:
-   - Read `.windsurf/workflows/sdd-new.md` if it exists.
-   - If it matches the legacy version (check for "legacy" string or old content), replace it.
-   - Write the modern version from temp-files/sdd-new.md.
-   - Adapt the backend reference to match `state.sdd.backend`.
-
 ```bash
-SDD_BACKEND=$(jq -r '.sdd.backend // "hybrid"' .wizard-state.json)
 WF_DIR="${WF_DIR:-/tmp/wf-settings-phases}"
 WF_RAW="${WF_RAW:-https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main}"
 
-# Resolve backend-specific artifact path or Engram topic key
-if [ "$SDD_BACKEND" = "engram" ]; then
-  SDD_BACKEND_PATH="engram"
-  SDD_PROPOSAL_PATH="sdd/{change-name}/proposal"
-else
-  SDD_BACKEND_PATH="$SDD_BACKEND"
-  [ "$SDD_BACKEND" = "hybrid" ] && SDD_BACKEND_PATH="openspec"
-  SDD_PROPOSAL_PATH="$SDD_BACKEND_PATH/changes/<name>/proposal.md"
-fi
-
-mkdir -p "$WF_DIR/temp-files" .windsurf/workflows
+mkdir -p "$WF_DIR/temp-files"
 
 # Download the AGENTS.md bridge rule and merge it if missing
 [ -f "$WF_DIR/temp-files/AGENTS.md" ] || curl -fsSL "$WF_RAW/temp-files/AGENTS.md" -o "$WF_DIR/temp-files/AGENTS.md" 2>/dev/null
@@ -1180,20 +1161,12 @@ if [ -f "$WF_DIR/temp-files/AGENTS.md" ] && [ -f AGENTS.md ]; then
     fi
   fi
 fi
-
-# Rewrite .windsurf/workflows/sdd-new.md
-[ -f "$WF_DIR/temp-files/sdd-new.md" ] || curl -fsSL "$WF_RAW/temp-files/sdd-new.md" -o "$WF_DIR/temp-files/sdd-new.md" 2>/dev/null
-cp "$WF_DIR/temp-files/sdd-new.md" .windsurf/workflows/sdd-new.md
-sed -i.bak "s|{{sdd.backend}}/changes/<name>/proposal.md|$SDD_PROPOSAL_PATH|g" .windsurf/workflows/sdd-new.md
-sed -i.bak "s/{{sdd.backend}}/$SDD_BACKEND_PATH/g" .windsurf/workflows/sdd-new.md
-rm -f .windsurf/workflows/sdd-new.md.bak
 ```
 
 Confirm:
 ```
 ✓ Windsurf gentle-ai fix reapplied
 ✓ AGENTS.md rule: in place
-✓ .windsurf/workflows/sdd-new.md: updated to modern version
 ```
 
 ---
@@ -1255,7 +1228,7 @@ Generate everything related for the chosen IDE, downloading from `$WF_RAW`:
 3. **Skills** — the packaged protocol skills → the IDE's native skills directory
     (`.claude/skills/`, `.cursor/skills/`, `.kiro/skills/`, `.codex/skills/`, `.windsurf/skills/`, `.devin/skills/`, `.gemini/skills/`, `.opencode/skills/`, `.agents/skills/`, `.github/skills/`).
 4. **Windsurf fix** — ONLY if the added IDE is Windsurf/Devin: apply the same logic as
-   Option 17 (AGENTS.md "Gentle AI — Legacy Path Bridge" rule + `.windsurf/workflows/sdd-new.md`).
+   Option 17 (AGENTS.md "Gentle AI — Legacy Path Bridge" rule).
 
 Confirm:
 ```
@@ -1287,7 +1260,7 @@ Removing <IDE> deletes:
   - <satellite path>
   - <N> commands in <command dir>
   - <N> skills in <skills dir>
-  <if Windsurf/Devin>: - AGENTS.md "Legacy Path Bridge" rule + .windsurf/workflows/sdd-new.md
+  <if Windsurf/Devin>: - AGENTS.md "Legacy Path Bridge" rule
 
 Confirm deletion? [yes / no]
 ```
@@ -1296,7 +1269,7 @@ Confirm deletion? [yes / no]
   Never touch `~/.<ide>/` or gentle-ai's global config.
 - If some of the files are already gone, just remove what exists and update the state.
 - If the IDE is Windsurf/Devin, also remove the "Legacy Path Bridge" rule from AGENTS.md
-  (revert the Option 17 logic) and delete `.windsurf/workflows/sdd-new.md`.
+  (revert the Option 17 logic).
 
 Confirm:
 ```

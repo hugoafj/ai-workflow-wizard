@@ -83,11 +83,8 @@ if [ -n "$MANAGED_PATHS" ]; then
       .gitignore)
         echo "  ⚙ $p (special → revert wizard entries only, keep the file)"
         ;;
-      .claude/settings.json|.claude/settings.local.json|.cursor/mcp.json|.windsurf/mcp.json)
+      .claude/settings.json|.claude/settings.local.json|.cursor/mcp.json|.windsurf/mcp.json|.opencode/mcp.json)
         echo "  ⚙ $p (special → remove only the wizard MCP entry)"
-        ;;
-      .windsurf/workflows/sdd-new.md)
-        echo "  ⏭ $p (gentle-ai bridge — DO NOT delete)"
         ;;
       *)
         [ -e "$p" ] && echo "  🗑 $p (manifest)"
@@ -121,10 +118,6 @@ for dir in .claude/skills .cursor/skills .gemini/skills .agents/skills .kiro/ski
 done
 
 # 2. Wizard commands
-# NOTE: .windsurf/workflows/sdd-new.md is INTENTIONALLY not classified as wizard-owned.
-# gentle-ai creates that file; the wizard only overwrites it to apply a fix, and
-# gentle-ai sync may rewrite it. Landing in "not from wizard" is correct — never
-# delete it, and do not "fix" this classification to treat it as wizard-owned.
 echo ""
 echo "📋 Wizard commands:"
 for dir in .claude/commands .cursor/commands .windsurf/workflows .kiro/steering .github/prompts .opencode/commands .codex/commands; do
@@ -173,6 +166,7 @@ done
 echo ""
 echo "📡 Wizard satellites:"
 for f in CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/copilot-instructions.md \
+         .opencode/AGENTS.md .codex/AGENTS.md \
          .cursor/rules/project.mdc .windsurf/rules/project.md .devin/rules/project.md \
          .kiro/steering/project-context.md; do
   if [ -f "$f" ]; then
@@ -209,7 +203,7 @@ fi
 # 4b. MCP settings (Playwright MCP registered by the wizard in phase8)
 echo ""
 echo "🔌 Wizard MCP settings:"
-for f in .claude/settings.json .claude/settings.local.json .cursor/mcp.json .windsurf/mcp.json; do
+for f in .claude/settings.json .claude/settings.local.json .cursor/mcp.json .windsurf/mcp.json .opencode/mcp.json; do
   if [ -f "$f" ] && grep -q "playwright" "$f" 2>/dev/null; then
     echo "  🗑 $f (wizard — Playwright MCP entry)"
   fi
@@ -373,6 +367,7 @@ Remove each wizard satellite detected in Phase 0:
 
 ```bash
 rm -f CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/copilot-instructions.md \
+      .opencode/AGENTS.md .codex/AGENTS.md \
       .cursor/rules/project.mdc .windsurf/rules/project.md .devin/rules/project.md \
       .kiro/steering/project-context.md
 ```
