@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.42-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.41-beta.1...v0.8.42-beta.1) (2026-09-02)
+
+
+### Bug Fixes
+
+* **wf-init,wf-cleanup:** remove windsurf sdd-new patch and add missing opencode/codex cleanup paths ([#173](https://github.com/hugoafj/ai-workflow-wizard/issues/173)) ([8d31656](https://github.com/hugoafj/ai-workflow-wizard/commit/8d31656cf2f36e5782c0c09692547402732ae84f))
+
 ## [0.8.41-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.40-beta.1...v0.8.41-beta.1) (2026-09-02)
 
 
