@@ -1,5 +1,6 @@
 ### Step 0.4 — Check health status with gentle-ai doctor
 
+### [WIZARD ACTION]
 ```bash
 # Capture doctor output for evaluation and persistence
 DOCTOR_OUTPUT=$(gentle-ai doctor)
@@ -22,6 +23,7 @@ Evaluate the output:
 
 If there are `[fail]` critical checks:
 
+### [USER MESSAGE]
 ```
 gentle-ai doctor reports issues blocking the workflow:
 
@@ -34,8 +36,11 @@ Please resolve these issues and run /wf-init again.
 The wizard cannot continue in this state.
 ```
 
+### ⏸ PAUSE — Wizard cannot continue, user must fix issues first...
+
 If everything is `ok` or non-critical `[!!]`, show a clean summary:
 
+### [USER MESSAGE]
 ```
 ✓ gentle-ai doctor — OK
   Version: <version>
@@ -87,6 +92,7 @@ wf_state_set '.gentle_ai.os' "$OS"
 
 First, capture the dry-run output to a variable:
 
+### [WIZARD ACTION]
 ```bash
 # Run sync dry-run, capturing both stdout and stderr
 if ! SYNC_OUTPUT=$(gentle-ai sync --dry-run 2>&1); then
@@ -144,6 +150,7 @@ message needed.
 the user verbatim (do not summarize or paraphrase what would change), then STOP and wait — the
 agent must NOT decide on the user's behalf to continue or to sync:
 
+### [USER MESSAGE]
 ```
 ⚠ gentle-ai's native content for your IDE(s) is out of sync with the installed gentle-ai version.
 
@@ -159,12 +166,14 @@ What do you want to do?
   [continue anyway]  — proceed without syncing. You explicitly accept the risk described above.
 ```
 
-**PAUSE — wait for the user's explicit response.** Do not infer a choice, do not default to
-either option, and do not continue silently under any circumstance.
+### ⏸ PAUSE — wait for the user's explicit response. Do not infer a choice, do not default to either option, and do not continue silently under any circumstance.
 
+### [WIZARD ACTION]
 - If `sync now`: run `gentle-ai sync`, show its output, then **re-run `gentle-ai sync --dry-run` to confirm it now reports no pending changes** before continuing to Step 0.5.
+
 **If the output is ambiguous** (could not classify): present the FULL output verbatim and ask:
 
+### [USER MESSAGE]
 ```
 ⚠ gentle-ai sync --dry-run output could not be automatically classified:
 
@@ -175,12 +184,15 @@ Does this indicate pending changes that should be synced?
   [no, continue]     — proceed without syncing (record as sync_stale_accepted=true)
 ```
 
+### ⏸ PAUSE — Waiting for user response...
+
 ---
 
 ### Step 0.5 — Confirm active agents
 
 Show the list of agents that `gentle-ai doctor` / `gentle-ai status` reported as configured. Ask:
 
+### [USER MESSAGE]
 ```
 AI agents detected and configured with gentle-ai:
   <list>
@@ -191,7 +203,10 @@ The project satellites (per-IDE context files) will be generated
 in Phase 6b only for the agents you confirm here.
 ```
 
-**Wait for user response.** Save the final agent list in `state.answers.ides` (used by the Builder to generate satellites).
+### ⏸ PAUSE — Waiting for user response...
+
+### [WIZARD ACTION]
+Save the final agent list in `state.answers.ides` (used by the Builder to generate satellites).
 
 **Persist confirmed IDEs to state:**
 
@@ -207,6 +222,7 @@ wf_state_set '.answers.ides' "$CONFIRMED_IDES_ARRAY"
 
 ### ✓ PHASE 0 COMPLETED
 
+### [USER MESSAGE]
 ```
 Prerequisite verified:
   gentle-ai: v<version> ✓
@@ -216,17 +232,24 @@ Prerequisite verified:
 Continuing with project discovery...
 ```
 
-**PAUSE — The user must respond "continue" or "yes" to proceed to Phase 0c (feature selection).**
+### ⏸ PAUSE — The user must respond "continue" or "yes" to proceed to Phase 0c (feature selection).
 
----
-> **⛔ STOP HERE — do not execute anything else.**
-> **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `gentle_ai.doctor`, `gentle_ai.version`, `gentle_ai.install_choice`, `gentle_ai.sync_stale_accepted`, `answers.ides` (final confirmed agent list). Mark `wf_phase_done phase0b phase0c`.
+> **📝 PERSISTENCE** (contract `wf-init/lib/state.md`): use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `gentle_ai.doctor`, `gentle_ai.version`, `gentle_ai.install_choice`, `gentle_ai.sync_stale_accepted`, `answers.ides` (final confirmed agent list). Mark `wf_phase_done phase0b phase0c`.
 > **Validation**: before `wf_phase_done`, verify critical fields are not null:
 > ```bash
 > jq -e '.gentle_ai.doctor != null and .gentle_ai.version != null and .answers.ides | type == "array"' .wizard-state.json || { echo "FAIL: state validation failed"; exit 1; }
 > ```
 > Tell the user: *"Phase 0 completed. Reply **continue** to choose which features to configure."*
 > Wait for the response. Only when confirmed, run in bash:
+
+---
+
+═══════════════════════════════════════════════════════
+⛔ PHASE 0b COMPLETE — Ready for Phase 0c
+⏸ PAUSE — Waiting for user to confirm "continue"
+
+### [WIZARD ACTION]
+When user confirms, run EXACTLY:
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"

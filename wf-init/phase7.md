@@ -37,6 +37,7 @@ fi
 
 Present the summary:
 
+### [USER MESSAGE]
 ```
 REVIEW GATE — Review before I write any files
 ===========================================================
@@ -65,6 +66,7 @@ Changes to .gitignore:
 Side effects that Phase 8 will apply AFTER your approval — visible now so the approval
 covers them (field report B14: installs were invisible at review time):
 
+### [USER MESSAGE]
 ```
 SIDE EFFECTS in Phase 8 (installs + package.json changes):
 <if state.ci.conventional_commits == true>:
@@ -88,6 +90,7 @@ Include only the lines whose condition matches `.wizard-state.json` — if none 
 
 If custom content was migrated from a previous AGENTS.md:
 
+### [USER MESSAGE]
 ```
 CUSTOM CONTENT — Automatically protected
 =========================================================
@@ -108,19 +111,26 @@ Do you approve? [yes / edit first: <describe the change>]
 
 If no custom content: skip this section.
 
-**PAUSE — Wait for explicit approval.**
+### ⏸ PAUSE — Wait for explicit approval.
 
 If the user asks to edit something: adjust the data in `.wizard-state.json`, re-run the
 Builder (Phase 6) to regenerate the STAGING, and show the review again. Never edit the
 staging manually bypassing the state — the state is the source of truth.
 
 ---
-> **⛔ STOP HERE — DO NOT write any files outside staging yet.**
-> Tell the user exactly this: *"Review complete. Reply **yes** to approve and write all files, or **edit first: [description]** to adjust something."*
 
-> **Only when the user explicitly replies "yes"**: run the block below to advance the
-> state, then read the next phase: `cat "$WF_DIR/phase8.md"`. Do NOT read phase8
-> before the approval — it writes to the project.
+═══════════════════════════════════════════════════════
+⛔ PHASE 7 COMPLETE — Review approved, ready for Phase 8
+⏸ PAUSE — Waiting for user to confirm "yes" to approve and write all files
+
+### [USER MESSAGE]
+Review complete. Reply **yes** to approve and write all files, or **edit first: [description]** to adjust something.
+
+### [WIZARD ACTION]
+**Only when the user explicitly replies "yes"**: run the block below to advance the
+state, then read the next phase: `cat "$WF_DIR/phase8.md"`. Do NOT read phase8
+before the approval — it writes to the project.
+
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"

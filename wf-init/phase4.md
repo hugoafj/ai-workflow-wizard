@@ -2,6 +2,7 @@
 
 Read the code to detect real conventions:
 
+### [WIZARD ACTION]
 ```bash
 # Examples of main components/modules
 ls src/ 2>/dev/null
@@ -14,6 +15,7 @@ find . -path ./node_modules -prune -o -type f \( -name '*.test.*' -o -name '*.sp
 
 Report the detected conventions and **wait for correction or confirmation**:
 
+### [USER MESSAGE]
 ```
 DETECTED CONVENTIONS
 ====================
@@ -30,9 +32,10 @@ Is this correct? Fix any errors before continuing.
   [fix: <describe the error>] — adjust the incorrect field and show again
 ```
 
-**PAUSE — Wait for user response. If they correct something, update and show again before continuing.**
+### ⏸ PAUSE — Wait for user response. If they correct something, update and show again before continuing.
 
 ---
+
 > **⛔ STOP HERE — do not execute anything else.**
 > **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `discovery.conventions` (the detected/corrected conventions from reverse engineering) AND `discovery.test_dir` (the detected test directory, e.g. `src/__tests__` or `src/test`). 
 >
@@ -47,9 +50,15 @@ Is this correct? Fix any errors before continuing.
 > ```
 > Do NOT save as comma-separated single line. The Builder falls back to filesystem scan if structure is not multiline.
 >
-> Mark `wf_phase_done phase4 <next>`.
 > Compute the next phase based on ALREADY SELECTED features. If any have been activated, route to the relevant conditional phase; otherwise phase5:
-> Wait for the response. Only when the user confirms with "yes", run in bash:
+
+### [USER MESSAGE]
+Wait for the response. Only when the user confirms with "yes", continue.
+
+### ⏸ PAUSE — Waiting for user to confirm "yes"...
+
+### [WIZARD ACTION]
+When user confirms, run EXACTLY:
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"

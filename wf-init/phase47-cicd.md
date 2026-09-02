@@ -273,20 +273,26 @@ On your server make sure you have:
 
 ---
 
-### PAUSE
-
-**PAUSE — ask the CI and CD questions (all at once or one by one) and wait for the responses.**
+### ⏸ PAUSE — ask the CI and CD questions (all at once or one by one) and wait for the responses.
 
 ---
 
-> **⛔ STOP HERE — do not execute anything else.**
-> **Persistence**: use `wf_state_set` or the `edit` tool to save in `.wizard-state.json`:
-> - `ci` (all CI decisions + `github_remote`)
-> - `cd` (all CD decisions)
-> - `features.ci`, `features.cd`, `features.release_please` (toggles)
-> Mark `wf_phase_done phase47-cicd phase5`.
-> Tell the user: *"CI/CD configured. Reply **continue** so I can assemble the artifacts (Builder → staging on disk, not in memory)."*
-> Wait for the response. Only when they confirm, run in bash:
+> **📝 PERSISTENCE CHECKLIST** (execute during this phase, before STOP):
+> - `state.ci.ai_reviewer`, `state.ci.gga_provider`, `state.ci.gga_modes`, `state.ci.security_review`, `state.ci.conventional_commits`, `state.ci.release_please`, `state.ci.release_ai_summary`, `state.ci.release_ai_provider`, `state.ci.e2e_in_ci`, `state.ci.github_remote`
+> - `state.cd.enabled`, `state.cd.platform`, `state.cd.trigger`, `state.cd.vps_runtime`, `state.cd.stack_detected`, `state.cd.deploy_path`, `state.cd.compose_file`, `state.cd.missing_secrets`
+> - `features.ci`, `features.cd`, `features.release_please`
+
+---
+
+═══════════════════════════════════════════════════════
+⛔ PHASE 4.7 COMPLETE — Ready for Phase 5
+⏸ PAUSE — Waiting for user to confirm "continue"
+
+### [USER MESSAGE]
+CI/CD configured. Reply **continue** so I can assemble the artifacts (Builder → staging on disk, not in memory).
+
+### [WIZARD ACTION]
+When user confirms, run EXACTLY:
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"

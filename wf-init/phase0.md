@@ -13,8 +13,7 @@ which gentle-ai 2>/dev/null && gentle-ai --version 2>/dev/null
 
 **Path A — gentle-ai is NOT installed** (the previous command fails or returns no output):
 
-Tell the user:
-
+### [USER MESSAGE]
 ```
 gentle-ai is not installed on this machine.
 
@@ -36,8 +35,9 @@ I am going to install it now. Shall I continue with the automatic installation? 
              Blocks that depend on it will be marked as pending.
 ```
 
-**Wait for user response.**
+### ⏸ PAUSE — Waiting for user confirmation...
 
+### [WIZARD ACTION]
 If they respond "yes", run the installation (Step 0.2).
 If they respond "no", terminate the wizard with a clear message.
 If they respond "later", continue to Phase 1 but add a visible warning at the
@@ -68,6 +68,8 @@ which brew 2>/dev/null
 ```
 
 If Homebrew is available, install with:
+
+### [WIZARD ACTION]
 ```bash
 brew tap Gentleman-Programming/homebrew-tap
 brew trust --formula gentleman-programming/tap/gentle-ai
@@ -75,6 +77,8 @@ brew install gentle-ai
 ```
 
 If Homebrew is NOT available, inform:
+
+### [USER MESSAGE]
 ```
 Homebrew is not installed. Options:
 1. Install Homebrew first: https://brew.sh — then re-run /wf-init.
@@ -83,22 +87,31 @@ Homebrew is not installed. Options:
 3. Install manually by downloading the binary from:
    https://github.com/Gentleman-Programming/gentle-ai/releases
 ```
+
+### ⏸ PAUSE — Waiting for user to choose an option...
+
 Stop the wizard and ask the user to choose an option.
 
 **On Windows (Scoop)**:
 
 Verify if Scoop is available:
+
+### [WIZARD ACTION]
 ```bash
 where scoop 2>/dev/null || powershell -Command "Get-Command scoop" 2>/dev/null
 ```
 
 If available:
+
+### [WIZARD ACTION]
 ```bash
 scoop bucket add gentleman https://github.com/Gentleman-Programming/scoop-bucket
 scoop install gentle-ai
 ```
 
 If Scoop is NOT available:
+
+### [USER MESSAGE]
 ```
 Scoop is not installed. Options on Windows:
 1. Install Scoop first: https://scoop.sh — then re-run /wf-init.
@@ -107,13 +120,16 @@ Scoop is not installed. Options on Windows:
    and place it in a folder that is in your PATH.
 ```
 
+### ⏸ PAUSE — Waiting for user to choose an option...
+
 **After installing the binary**, run the agent setup:
 
+### [WIZARD ACTION]
 ```bash
 gentle-ai install
 ```
 
-Tell the user:
+### [USER MESSAGE]
 ```
 gentle-ai installed successfully. I will now configure the AI agents
 detected on your machine with the "full-gentleman" preset.
@@ -125,7 +141,7 @@ Mark the ones you commonly use. You can add more later with:
 Proceed with the interactive agent installation and let me know when it finishes.
 ```
 
-**Wait for user confirmation that `gentle-ai install` finished.**
+### ⏸ PAUSE — Waiting for user confirmation that `gentle-ai install` finished...
 
 ---
 
@@ -157,6 +173,7 @@ that this is NOT a technical problem they can resolve on their own, and offer
 the step-by-step manual installation workaround as an alternative while they
 resolve the block with their IT team:
 
+### [USER MESSAGE]
 ```
 ⚠ gentle-ai installation appears to be blocked by your organization's
 security policy (not a missing Homebrew/Scoop issue).
@@ -211,8 +228,9 @@ Were you able to complete these steps, or should I note this as pending
 and continue without gentle-ai for now? [completed / pending — continue without gentle-ai]
 ```
 
-**PAUSE — Wait for developer response.**
+### ⏸ PAUSE — Waiting for developer response...
 
+### [WIZARD ACTION]
 - If `completed`: verify with `which gentle-ai && gentle-ai --version` and
   continue the wizard normally from where it stopped.
 - If `pending`: continue the wizard as in the "gentle-ai not
@@ -232,12 +250,14 @@ that, the only correct path is IT approval.
 
 With gentle-ai installed, get the local version:
 
+### [WIZARD ACTION]
 ```bash
 gentle-ai --version
 ```
 
 Then try to get the latest remote version. First check if there is network access:
 
+### [WIZARD ACTION]
 ```bash
 curl -s --max-time 5 "https://api.github.com/repos/Gentleman-Programming/gentle-ai/releases/latest" 2>/dev/null | grep '"tag_name"' | head -1
 ```
@@ -252,6 +272,7 @@ Compare local vs remote version. Decide if the update is critical using this heu
 
 Present the result to the user with a clear recommendation:
 
+### [USER MESSAGE]
 ```
 gentle-ai installed: v<LOCAL>
 gentle-ai available: v<REMOTE>
@@ -274,8 +295,10 @@ gentle-ai available: v<REMOTE>
   gentle-ai is up to date. ✓
 ```
 
-If the user confirms update, run:
+### ⏸ PAUSE — Waiting for user response on update...
 
+### [WIZARD ACTION]
+If the user confirms update, run:
 ```bash
 brew upgrade gentle-ai   # macOS/Linux with Homebrew
 # or
@@ -299,6 +322,7 @@ Reuse the GitHub API response from Step 0.3 (the `body` field from
 `/releases/latest` already contains the full release text — no additional
 network call is needed):
 
+### [WIZARD ACTION]
 ```bash
 curl -s --max-time 5 "https://api.github.com/repos/Gentleman-Programming/gentle-ai/releases/latest" 2>/dev/null | grep -A 200 '"body"'
 ```
@@ -321,6 +345,7 @@ it does not trigger any smoke tests against the actual installation.
 
 **If risk signals ARE detected**, inform the developer at that moment:
 
+### [USER MESSAGE]
 ```
 ⚠ Possible compatibility change detected in gentle-ai v<REMOTE>
 
@@ -341,8 +366,9 @@ What would you prefer?
                 before continuing.
 ```
 
-**PAUSE — Wait for developer response.**
+### ⏸ PAUSE — Waiting for developer response...
 
+### [WIZARD ACTION]
 Regardless of the response, write a local file with the finding
 (never committed — it is wizard scratch, not project):
 
@@ -375,6 +401,7 @@ EOF
 
 Inform the developer where the file was saved and offer the action, without executing it yet:
 
+### [USER MESSAGE]
 ```
 I saved the details to /tmp/wf-compat-issue-<timestamp>.md, including the
 `gh issue create` command already assembled to report it to the wizard repo.
@@ -382,6 +409,9 @@ I saved the details to /tmp/wf-compat-issue-<timestamp>.md, including the
 Would you like me to report it right now with that command? [yes / no, I will do it later]
 ```
 
+### ⏸ PAUSE — Waiting for developer response...
+
+### [WIZARD ACTION]
 **If the developer responds "yes"**: run the `gh issue create` command as it
 was assembled. If it fails due to missing authentication (`gh auth login` not configured)
 or any other reason, show the error as-is and do not retry with another
@@ -399,10 +429,18 @@ correct behavior, not a bug you should solve through another path.
 
 ---
 
-> **⛔ STOP HERE — do not execute anything else.**
-> **Persistence (contract `wf-init/lib/state.md`)**: before advancing, `wf_state_init` if it doesn't exist, and save in `.wizard-state.json` → `gentle_ai` (`installed`, `version`, `install_choice`, `os`, and `warning_incomplete=true` if the user chose "later"). Mark `phases.phase0.status=done` and `phase_pointer="phase0b"` (`wf_phase_done phase0 phase0b`).
+> **📝 PERSISTENCE** (contract `wf-init/lib/state.md`): before advancing, `wf_state_init` if it doesn't exist, and save in `.wizard-state.json` → `gentle_ai` (`installed`, `version`, `install_choice`, `os`, and `warning_incomplete=true` if the user chose "later"). Mark `phases.phase0.status=done` and `phase_pointer="phase0b"` (`wf_phase_done phase0 phase0b`).
 > Tell the user: *"Installation and version verified. Reply **continue** to run the gentle-ai health check."*
 > Wait for the response. Only when they confirm, execute in bash:
+
+---
+
+═══════════════════════════════════════════════════════
+⛔ PHASE 0 COMPLETE — Ready for Phase 0b
+⏸ PAUSE — Waiting for user to confirm "continue"
+
+### [WIZARD ACTION]
+When user confirms, run EXACTLY:
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
