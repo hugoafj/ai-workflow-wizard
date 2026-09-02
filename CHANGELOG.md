@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.40-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.39-beta.1...v0.8.40-beta.1) (2026-09-02)
+
+
+### Bug Fixes
+
+* **wf-init:** add wizard-action & pause markers across all wf-init phases ([#169](https://github.com/hugoafj/ai-workflow-wizard/issues/169)) ([a90188c](https://github.com/hugoafj/ai-workflow-wizard/commit/a90188c82188cf60a3c9502a273c76727ac84998))
+
 ## [0.8.39-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.38-beta.1...v0.8.39-beta.1) (2026-09-01)
 
 
