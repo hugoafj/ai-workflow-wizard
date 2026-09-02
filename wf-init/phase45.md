@@ -450,10 +450,10 @@ Search for `openspec-convention.md` in this order:
 **Rule 2: Semantic comparison — Detect ALL deviations**
 
 Read both files (project's `openspec/config.yaml` and local `_shared/openspec-convention.md`) and detect all structural deviations from canonical convention:
-- Missing required keys: `rules`, `rules.apply`, `rules.verify`, `testing`, `testing.runner`, `testing.layers`, `testing.coverage`, `testing.quality`, `rules.proposal`, `rules.specs`, `rules.design`, `rules.tasks`, `rules.archive`, `testing.runner.command`, `testing.runner.framework`, `testing.quality.linter`, `testing.quality.type_checker`, `testing.quality.formatter`
+- Missing required keys (what `/sdd-init` guarantees): `schema`, `context`, `rules`, `rules.proposal`, `rules.specs`, `rules.design`, `rules.tasks`, `rules.apply`, `rules.verify`, `rules.archive`. Do NOT require `testing:*` here: `/sdd-init` may cache testing capabilities in Engram instead of the config, and the wizard completes `testing:*` in Phase 8, step 8.1d.
 - Legacy/extra keys: `phase_rules`
 - Incorrect types: scalars where maps expected (e.g., `rules.apply: "string"` vs map)
-- Incomplete `testing.layers`: must have `unit`, `integration`, `e2e`
+- Only if a `testing:` section already exists: verify `testing.layers` completeness (`unit`, `integration`, `e2e`). A missing `testing:` section is NOT a deviation at this phase — it may live in Engram (`sdd/{project}/testing-capabilities`) and is completed in the config by Phase 8, step 8.1d.
 - Invalid value types (enums, ranges, etc.)
 
 **Rule 3: PRESERVE VALID DATA**
@@ -462,7 +462,7 @@ Do NOT remove or alter any section that is not explicitly invalid. Only fix stru
 - `phase_rules` → move content to `rules` and delete `phase_rules` key
 - Scalars where maps expected → normalize to canonical map structure
 - Add missing keys from canonical schema with sensible defaults
-- **DO NOT REMOVE**: `project`, `stack`, `framework`, `persistence`, `strict_tdd`, `testing`, `testing.runner`, `testing.layers`, `testing.tools`, `testing.quality`, `testing.coverage_command`, `schema`, `context`, or any other valid data section
+- **DO NOT REMOVE**: `schema`, `context`, `strict_tdd`, `rules`, or any other valid data section. If a `testing:` section or `projects:` entries already exist (written by `/sdd-init`), preserve them — they are valid data, not deviations. Only add missing canonical keys for sections the convention declares; do not invent top-level keys like `persistence`, `phase_rules`, `configured`, or `planned` — no gentle-ai consumer reads them.
 - Only fix structural problems within valid sections (scalars→maps, missing canonical keys with defaults)
 
 **Rule 4: Present unified diff**
@@ -486,8 +486,9 @@ if [ ! -f "openspec/config.yaml" ]; then
   exit 1
 fi
 
-# Verify critical fields exist
-CRITICAL_FIELDS=("rules" "testing" "testing.runner" "testing.layers")
+# Verify critical fields exist — schema/context/rules are what /sdd-init guarantees.
+# testing.* is NOT required here: it may live in Engram and is completed by Phase 8.1d.
+CRITICAL_FIELDS=("schema" "context" "rules" "rules.apply" "rules.verify")
 for field in "${CRITICAL_FIELDS[@]}"; do
   if ! jq -e "$field" openspec/config.yaml > /dev/null 2>&1; then
     echo "ERROR: Critical field missing after validation: $field" >&2
@@ -533,27 +534,27 @@ fi
 
 For `openspec`/`hybrid` backends, all three must exist when the check runs. Show the `config.yaml` contents to the user so they can see and confirm it reflects their choice.
 
-Sanity-check the backend value before trusting the file — an improvised `/sdd-init` run
-(field report B11) wrote invented legacy keys like `phases.*.template: ".sdd/templates/*"`
-that exist nowhere in the wizard or the skill:
+Sanity-check the backend before trusting the file — the backend decision lives in
+`.wizard-state.json` (`sdd.backend`), NOT in `openspec/config.yaml`: gentle-ai's canonical
+convention has no `persistence.mode` / `backend` root key in the config. An improvised
+`/sdd-init` run (field report B11) wrote invented legacy keys like `phases.*.template:
+".sdd/templates/*"` that exist nowhere in the wizard or the skill. Use the state value and
+detect invented keys instead:
 
 ```bash
-# Use yq for robust YAML parsing (installed in Phase 4.6, fallback to grep/sed if unavailable)
-# Canonical convention uses `persistence.mode:` not `backend:` at root level
-if command -v yq &>/dev/null && yq --version 2>/dev/null | grep -q "mikefarah"; then
-  BACKEND_LINE=$(yq eval '.persistence.mode' openspec/config.yaml 2>/dev/null)
-else
-  BACKEND_LINE=$(grep -E '^persistence:' openspec/config.yaml 2>/dev/null | head -1 | sed 's/^persistence:[[:space:]]*//' | sed 's/^mode:[[:space:]]*//')
-fi
-case "$BACKEND_LINE" in
-  engram|openspec|hybrid) echo "backend value OK: $BACKEND_LINE" ;;
-  "")
-    echo "⚠ openspec/config.yaml has no readable persistence.mode key." >&2
-    echo "  Show the full file to the user and confirm it was created by /sdd-init." >&2 ;;
+# Backend authority is .wizard-state.json (sdd.backend), written earlier in this phase.
+case "$SDD_BACKEND" in
+  engram|openspec|hybrid) echo "backend value OK: $SDD_BACKEND (from .wizard-state.json)" ;;
   *)
-    echo "⚠ Unexpected persistence.mode '$BACKEND_LINE' in openspec/config.yaml." >&2
-    echo "  Show the full file to the user before continuing." >&2 ;;
+    echo "⚠ Unexpected sdd.backend '$SDD_BACKEND' in .wizard-state.json." >&2
+    echo "  Show the full config to the user before continuing." >&2 ;;
 esac
+
+# Detect invented legacy keys — no canonical convention key uses these.
+if grep -Eq '^persistence:|^phase_rules:|phases\..*\.template' openspec/config.yaml 2>/dev/null; then
+  echo "⚠ openspec/config.yaml contains invented legacy keys (persistence / phase_rules / phases.*.template)." >&2
+  echo "  Show the full file to the user and confirm it was created by /sdd-init." >&2
+fi
 ```
 
 If there is any problem (missing files, unreadable backend, or the user reports the
