@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.41-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.40-beta.1...v0.8.41-beta.1) (2026-09-02)
+
+
+### Bug Fixes
+
+* **wf-init:** relax SDD config validation to canonical structure and document capable-model requirement ([#171](https://github.com/hugoafj/ai-workflow-wizard/issues/171)) ([2dca669](https://github.com/hugoafj/ai-workflow-wizard/commit/2dca669f52d7240b9424cef4a9a39c4e36e07256))
+
 ## [0.8.40-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.39-beta.1...v0.8.40-beta.1) (2026-09-02)
 
 
