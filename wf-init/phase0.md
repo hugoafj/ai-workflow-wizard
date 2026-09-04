@@ -332,12 +332,13 @@ Terms hardcoded by this wizard that warrant monitoring (keep this list updated i
 ```
 gentle-orchestrator, sdd-orchestrator, gentle-ai doctor, gentle-ai sync,
 gentle-ai install, gentle-ai upgrade, gentle-ai skill-registry, engram,
-sdd-init, sdd-propose, sdd-tasks, sdd-design, sdd-apply, sdd-verify
+sdd-init, sdd-propose, sdd-tasks, sdd-design, sdd-apply, sdd-verify,
+gentle-sdd, prefix, rename, adapter-specific
 ```
 
 Search the release text, near those terms, for words indicating
 disruptive change: `renamed`, `removed`, `breaking`, `deprecated`, `changed to`,
-`migrated`, `no longer`, or the Spanish equivalents if the release is in
+`migrated`, `no longer`, `instead of`, `now use`, or the Spanish equivalents if the release is in
 Spanish. This is text analysis by the agent, not command execution —
 it does not trigger any smoke tests against the actual installation.
 

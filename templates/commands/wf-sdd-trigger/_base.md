@@ -69,7 +69,7 @@ requesting** gentle-ai's SDD? See `reference/edge-cases.md` for the full rationa
    to execute gentle-ai's full SDD pipeline. This satisfies gentle-ai's own
    `explicit_request_or_accepted_proposal` gate. 
    - **Important**: `sdd-new` is NOT a bash terminal command. It is a natural-language skill invocation that YOU (the agent) execute directly in this conversation, not in a shell.
-   - **Slash fallback**: if your adapter only supports native slash syntax to trigger skills, invoke `/sdd-new <feature or fix description>` instead — gentle-ai recognizes it as a skill invocation. Default to the slash-less form.
+   - **Slash fallback**: if your adapter only supports native slash syntax to trigger skills, invoke `/sdd-new <feature or fix description>` instead — except in Claude Code, where gentle-ai's adapter renames SDD slash commands with a `gentle-sdd-` prefix, so use `/gentle-sdd-new` there. Default to the slash-less form.
    - Never describe the delegation mechanism — gentle-ai's native orchestrator handles that.
 6. If confirmed as `wf-no-sdd`: proceed to implement directly (or to `wf-tdd` if that feature is
    active, per the `wf-orchestrator` sequencing).

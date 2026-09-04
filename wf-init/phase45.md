@@ -62,7 +62,7 @@ if [ "$WINDSURF_ACTIVE" = "true" ]; then
     # Legacy: verify the rule is already present
     if ! grep -q "Gentle AI — Legacy Path Bridge" AGENTS.md; then
       echo "ERROR: AGENTS.md exists but missing Windsurf compatibility rule" >&2
-      echo "Run /sdd-init again or manually add the rule from temp-files/AGENTS.md" >&2
+      echo "Run the sdd-init skill again (slash: /sdd-init, or /gentle-sdd-init in Claude Code) or manually add the rule from temp-files/AGENTS.md" >&2
       exit 1
     fi
   fi
@@ -97,7 +97,7 @@ is documented in AGENTS.md under "Gentle AI — Legacy Path Bridge for Windsurf/
 
 This phase runs here — after reverse engineering (Phase 4) — because the wizard already knows the project: whether it's greenfield or legacy, how many committers it has, what stack it uses. With that context it can make a well-founded persistence backend recommendation instead of a generic question.
 
-> **Note**: the official gentle-ai documentation states that the SDD orchestrator runs `/sdd-init` automatically if it doesn't detect SDD context in the project. This means that if the user starts SDD without having run `/sdd-init` manually, the orchestrator does it on its own — but it will use its defaults (likely engram). Wizard Phase 4.5 ensures the backend choice is deliberate, not a silent default.
+> **Note**: the official gentle-ai documentation states that the SDD orchestrator runs the `sdd-init` skill (slash: `/sdd-init`, or `/gentle-sdd-init` in Claude Code) automatically if it doesn't detect SDD context in the project. This means that if the user starts SDD without having run it manually, the orchestrator does it on its own — but it will use its defaults (likely engram). Wizard Phase 4.5 ensures the backend choice is deliberate, not a silent default.
 
 **If `openspec/config.yaml` already exists**, read the current backend and display:
 
@@ -109,7 +109,8 @@ SDD was already initialized in this repo.
   openspec/changes/ ✓
   openspec/specs/ ✓
 
-Official documentation recommends re-running /sdd-init when the project's
+Official documentation recommends re-running the sdd-init skill (slash:
+/sdd-init, or /gentle-sdd-init in Claude Code) when the project's
 capabilities change: testing tools, core dependencies, team size, or stack.
 The post-commit hook installed in Phase 8 will notify you when that happens.
 
@@ -380,8 +381,10 @@ To continue, you need to initialize SDD with this configuration:
       (Type exactly "continue" — this is required for the wizard to proceed.)
 
 Important notes:
-- `/sdd-init` is a gentle-ai skill, not a terminal command. If your IDE supports it, you can try
-  `/sdd-init` as a slash command. If not, say exactly: "Initialize the gentle-ai sdd-init skill
+- `sdd-init` is a gentle-ai skill, not a terminal command. If your IDE supports it, you can try
+  `/sdd-init` as a slash command — except in Claude Code, where gentle-ai's adapter renames
+  SDD slash commands with a `gentle-sdd-` prefix, so use `/gentle-sdd-init` there. If your
+  adapter has no slash support, say exactly: "Initialize the gentle-ai sdd-init skill
   in ${SDD_BACKEND} mode with Strict TDD ${STRICT_TDD}".
 - Some adapters (e.g., Codex/ChatGPT) may not have slash command support — use the plain 
   language instruction instead.

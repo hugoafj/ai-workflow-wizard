@@ -23,6 +23,13 @@
 
 ## ⛔ BLOCK RULE (hard rule) — never create SDD artifacts by hand
 
+> **Prefix note**: every `/sdd-*` mention in this file refers to the slash form.
+> In Claude Code, gentle-ai's adapter renames these to `/gentle-sdd-*` (e.g.
+> `/gentle-sdd-init`, `/gentle-sdd-explore`, `/gentle-sdd-new`); every other
+> adapter (Cursor, Windsurf, Kiro, OpenCode, Gemini CLI, Antigravity CLI, Codex
+> CLI) keeps the bare `/sdd-*` form. Skill names themselves (`sdd-init`,
+> `sdd-apply`, etc.) are never prefixed on any adapter.
+
 > This rule is INVOLABLE and applies in ALL cases (phase45 of wf-init, wf-refresh,
 > wf-settings, or any flow that touches SDD). It corrects a recurring
 > behavior: the agent, unable to invoke `/sdd-init`, "helps" by creating the files

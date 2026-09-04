@@ -31,8 +31,9 @@ available right now, use it. If you don't, execute inline as the solo executor.
 Invoke the skill as the literal string `sdd-new <feature or fix>` WITHOUT the leading slash — that
 is the canonical natural-language trigger that gentle-ai's orchestrator recognizes on every adapter
 (e.g., Codex/ChatGPT, and historically Devin when it lacks subagent tooling). If your adapter only
-supports native slash syntax, use `/sdd-new <feature or fix>` instead — gentle-ai recognizes it as
-a skill invocation either way.
+supports native slash syntax, use `/sdd-new <feature or fix>` instead — except in Claude Code,
+where gentle-ai's adapter renames SDD slash commands with a `gentle-sdd-` prefix, so use
+`/gentle-sdd-new` there. Skill names themselves are never prefixed on any adapter.
 
 ## Worked examples
 
