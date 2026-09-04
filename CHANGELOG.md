@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.43-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.42-beta.1...v0.8.43-beta.1) (2026-09-04)
+
+
+### Bug Fixes
+
+* adapt templates to gentle-ai v2.5.0's gentle-sdd- prefix for Claude Code ([#176](https://github.com/hugoafj/ai-workflow-wizard/issues/176)) ([197d5d0](https://github.com/hugoafj/ai-workflow-wizard/commit/197d5d0bbaa50995a61d3b8439cccc0c16ac8f98))
+
 ## [0.8.42-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.41-beta.1...v0.8.42-beta.1) (2026-09-02)
 
 
