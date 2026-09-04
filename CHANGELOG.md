@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.9.0-beta.1...v0.9.1-beta.1) (2026-09-04)
+
+
+### Bug Fixes
+
+* **wf-init:** use managed_paths instead of generated_files[].path for verification ([#180](https://github.com/hugoafj/ai-workflow-wizard/issues/180)) ([76f57f5](https://github.com/hugoafj/ai-workflow-wizard/commit/76f57f5cb187db814cfacd947d91acd1c1e58846))
+
 ## [0.9.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.43-beta.1...v0.9.0-beta.1) (2026-09-04)
 
 
