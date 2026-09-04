@@ -142,7 +142,8 @@ If this is a problem, talk to the team about migrating to "hybrid".
 ```
 
 **If `openspec/` does not exist**: inform that SDD is not initialized. It is not blocking
-for work, but the agent will not be able to start SDD phases until someone runs `/sdd-init`.
+for work, but the agent will not be able to start SDD phases until someone runs the
+`sdd-init` skill (slash: `/sdd-init`, or `/gentle-sdd-init` in Claude Code).
 
 ---
 

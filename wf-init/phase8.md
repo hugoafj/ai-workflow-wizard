@@ -302,11 +302,12 @@ fi
 
 ### 8.1d SDD config.yaml targeted edit (openspec/hybrid backend only)
 
-**Gate**: only if `openspec/config.yaml` exists (created by gentle-ai's `/sdd-init` in
-Phase 4.5). Skip entirely if the backend is engram-only — there is no config.yaml to edit.
+**Gate**: only if `openspec/config.yaml` exists (created by gentle-ai's `sdd-init` skill,
+slash: `/sdd-init`, or `/gentle-sdd-init` in Claude Code, in Phase 4.5). Skip entirely if the
+backend is engram-only — there is no config.yaml to edit.
 
 The wizard NEVER regenerates or stamps `openspec/config.yaml` — it is the exclusive artifact
-of `/sdd-init` (BLOCK RULE, protocol `sdd`, "Wizard-Allowed Field Edits"). This step performs
+of the `sdd-init` skill (BLOCK RULE, protocol `sdd`, "Wizard-Allowed Field Edits"). This step performs
 the targeted leaf-field edit deferred from Phase 4.6b: it writes the activated testing
 configuration into the EXISTING file using gentle-ai's canonical schema — the exact shape its
 SDD skills read. Do NOT invent new top-level keys (`configured`, `planned`, `extras`,
@@ -341,7 +342,7 @@ testing:
     available: true           # ← capability cache
     command: "npm run test:coverage"
   quality:
-    linter: {...}             # leave as-is — detected by /sdd-init
+    linter: {...}             # leave as-is — detected by sdd-init
     type_checker: {...}
     formatter: {...}
 ```
@@ -456,14 +457,14 @@ if [ -f openspec/config.yaml ]; then
   if [ -n "$YQ_CMD" ]; then
     # 3a. Scalar-in-path guard (field report B1): `yq eval '.a.b = v'` over a
     # path whose parent holds a SCALAR is a silent no-op — neither error nor
-    # write. Some /sdd-init runs leave `runner: vitest` (string) or
+    # write. Some sdd-init runs leave `runner: vitest` (string) or
     # `coverage: true` (bool) behind; setting their sub-keys then loses data.
     # Delete any non-map node first so the canonical maps below are recreated.
     for LEAF_PATH in .testing.runner .testing.coverage \
                      .testing.layers.unit .testing.layers.integration .testing.layers.e2e; do
       KIND=$($YQ_CMD eval "${LEAF_PATH} | type" openspec/config.yaml)
       if [ -n "$KIND" ] && [ "$KIND" != "!!map" ] && [ "$KIND" != "!!null" ]; then
-        echo "8.1d INFO — ${LEAF_PATH} held a scalar (${KIND}); normalized to canonical map (expected for /sdd-init output)."
+        echo "8.1d INFO — ${LEAF_PATH} held a scalar (${KIND}); normalized to canonical map (expected for sdd-init output)."
         $YQ_CMD eval "del(${LEAF_PATH})" -i openspec/config.yaml
       fi
     done
@@ -514,9 +515,9 @@ fi
 
 Never copy from `templates/protocols/sdd/config.yaml.tmpl.md` — it is a field reference, not a
 file to stamp. Leave `strict_tdd` alone — Phase 4.6 owns that field. `yq` writes to the canonical
-nesting (`rules.verify.*`, `testing.*`) even when the real file was written by `/sdd-init` at a
+nesting (`rules.verify.*`, `testing.*`) even when the real file was written by `sdd-init` at a
 different nesting — that is correct: gentle-ai's consumers read the canonical location. If you
-find the file already carries the same value at a non-canonical nesting (older `/sdd-init`
+find the file already carries the same value at a non-canonical nesting (older `sdd-init`
 output), leave the old key in place and confirm the canonical one is now set; if in doubt, ask
 the user.
 
@@ -731,7 +732,7 @@ git add -f .github/workflows/ 2>/dev/null || true
 git add -f .husky/ .commitlintrc.json .gga release-please-config.json .release-please-manifest.json
 [ -f package.json ] && git add package.json 2>/dev/null || true
 [ -f package-lock.json ] && git add package-lock.json 2>/dev/null || true
-# SDD artifacts (openspec/): created by /sdd-init in Phase 4.5 + targeted edit in 8.1d
+# SDD artifacts (openspec/): created by sdd-init in Phase 4.5 + targeted edit in 8.1d
 git add openspec/ 2>/dev/null || true
 git add .gitignore
 

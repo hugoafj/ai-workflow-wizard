@@ -125,7 +125,7 @@ bloating the context. They are NOT written in full here — they live in dedicat
 >
 > **No combined PRECHECK**: after the user confirms the `wf-preflight`, proceed directly to the chosen route. Summary of the outcome (details in the `wf-sdd-trigger` protocol):
 > - **`wf-no-sdd`**: implement directly (or with 🧪 `wf-tdd` if active). No SDD request needed.
-> - **`wf-force-sdd`**: declare the explicit SDD request to gentle-ai via `sdd-new <feature or fix>` (or `/sdd-new` if your adapter only supports native slash syntax). How gentle-ai delegates/executes is entirely its own decision per adapter — never re-specified by this wizard.
+> - **`wf-force-sdd`**: declare the explicit SDD request to gentle-ai via `sdd-new <feature or fix>` (or `/sdd-new` if your adapter only supports native slash syntax — except in Claude Code, where gentle-ai's adapter renames SDD slash commands with a `gentle-sdd-` prefix, so use `/gentle-sdd-new` there). How gentle-ai delegates/executes is entirely its own decision per adapter — never re-specified by this wizard.
 <if state.features.tdd_protocol>
 > - **`wf-tdd`**: never production code without the mode's TDD ritual (🧪 TDD PROPOSAL in standard / RED→GREEN evidence in strict). On `wf-no-sdd` it goes before implementing. **When `wf-force-sdd` was requested, the `🧪 TDD PROPOSAL` (standard mode) is issued by you (the orchestrator) BEFORE making the `sdd-apply` request — since `sdd-apply` is headless and cannot ask — and only then is the request made with the *baked* decision + a reference to `wf-tdd` (see row above).**
 </if>

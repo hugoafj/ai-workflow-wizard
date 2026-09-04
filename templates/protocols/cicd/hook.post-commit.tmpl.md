@@ -9,14 +9,14 @@ REFRESH_FILES="package.json composer.json pyproject.toml Cargo.toml \
   next.config.ts next.config.js \
   tailwind.config.ts tailwind.config.js"
 
-# Files that trigger /sdd-init refresh (project capabilities tracked by SDD)
+# Files that trigger an sdd-init refresh (project capabilities tracked by SDD)
 SDD_FILES="package.json \
   vitest.config.ts vitest.config.js \
   jest.config.ts jest.config.js \
   playwright.config.ts playwright.config.js"
-# openspec/config.yaml is excluded: it is the output of /sdd-init.
-# Including it causes a loop: /sdd-init writes the file → commit → hook notifies
-# re-run /sdd-init → guaranteed loop.
+# openspec/config.yaml is excluded: it is the output of the sdd-init skill.
+# Including it causes a loop: sdd-init writes the file → commit → hook notifies
+# re-run sdd-init → guaranteed loop.
 
 # Config/IDE files that trigger /wf-refresh (AGENTS.md, IDE settings, satellites, commands)
 CONFIG_FILES="AGENTS.md \
@@ -94,7 +94,7 @@ fi
 
 if [ -n "$CHANGED_SDD" ]; then
   printf '  SDD drift:%s\n' "$CHANGED_SDD" >&2
-  printf '  → Run /sdd-init in your IDE/CLI to refresh SDD project capabilities\n' >&2
+  printf '  → Run the sdd-init skill (slash: /sdd-init, or /gentle-sdd-init in Claude Code)\n' >&2
 fi
 
 if [ -n "$CHANGED_CONFIG" ]; then
@@ -135,7 +135,8 @@ COMMIT_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date)
     echo ""
     for f in $CHANGED_SDD; do echo "- \`$f\`"; done
     echo ""
-    echo "**Action**: run \`/sdd-init\` in your IDE/CLI to refresh SDD context,"
+    echo "**Action**: run the \`sdd-init\` skill to refresh SDD context"
+    echo "(slash: \`/sdd-init\`, or \`/gentle-sdd-init\` in Claude Code),"
     echo "or \`rm .wf-status\` if these changes don't affect SDD."
     echo ""
   fi
@@ -161,7 +162,7 @@ COMMIT_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date)
 if command -v osascript > /dev/null 2>&1; then
   NOTIF_TEXT=""
   [ -n "$CHANGED_REFRESH" ] && NOTIF_TEXT="Run /wf-refresh"
-  [ -n "$CHANGED_SDD" ] && NOTIF_TEXT="${NOTIF_TEXT:+$NOTIF_TEXT · }/sdd-init"
+  [ -n "$CHANGED_SDD" ] && NOTIF_TEXT="${NOTIF_TEXT:+$NOTIF_TEXT · }sdd-init (Claude Code: /gentle-sdd-init)"
   [ -n "$CHANGED_CONFIG" ] && NOTIF_TEXT="${NOTIF_TEXT:+$NOTIF_TEXT · }Config/IDE drift"
   osascript -e "display notification \"$NOTIF_TEXT\" with title \"⚠ Workflow drift detected\"" 2>/dev/null || true
 fi

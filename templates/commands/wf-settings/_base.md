@@ -210,7 +210,8 @@ Do you want to keep it as is or change it?
 **If they choose keep**: move to the next option.
 
 **If they want to change (enable)**: inject the TDD Protocol section into
-`AGENTS.md`. Run `/sdd-init` so it detects the test runner and configures
+`AGENTS.md`. Run the `sdd-init` skill (slash: `/sdd-init`, or `/gentle-sdd-init`
+in Claude Code) so it detects the test runner and configures
 Testing Capabilities. Ensure `wf-orchestrator` is also present (it must be
 built whenever `wf-ladder`, `wf-sdd-trigger`, or `wf-tdd` is active).
 **Update the footer** to `tdd=yes`.
@@ -247,7 +248,8 @@ Which one do you want to switch to?
 
 **If switching to Strict TDD**: write directly to the real sources,
 with the exact format of the official `sdd-init` template (confirmed in
-`references/init-details.md` — do not delegate to `/sdd-init` for this change:
+`references/init-details.md` — do not delegate to the `sdd-init` skill
+(slash: `/sdd-init`, or `/gentle-sdd-init` in Claude Code) for this change:
 empirically confirmed that this skill does not rewrite anything if `openspec/`
 already exists, and never asks about Strict TDD interactively — it only uses
 an existing value or applies its own automatic default).
@@ -547,7 +549,8 @@ value to the new backend, and preserve `context.*`, `sdd.*`, `notes`, and every 
 > - **Migrating to `openspec` or `hybrid`** (from pure `engram`, where
 >   `openspec/` NEVER EXISTED): unlike the TDD mode change in an
 >   already existing structure (which is written directly), here it does make sense
->   to ask the user to run `/sdd-init` — because it is a new
+>   to ask the user to run the `sdd-init` skill (slash: `/sdd-init`, or
+>   `/gentle-sdd-init` in Claude Code) — because it is a new
 >   `openspec/` initialization, not a re-write of something already initialized, and there
 >   the real skill does its full work. The Hard Rule of "do not rewrite
 >   if it already exists" does not apply to this case because `openspec/` genuinely
@@ -1350,10 +1353,11 @@ git commit -m "chore: update workflow settings
   end, except in the Phase 5 summary, which is consolidated.
 - **Write `strict_tdd` directly with `engram save` (type `config`, not
   `convention`) and by editing `openspec/config.yaml`** — empirically
-  confirmed that `/sdd-init` does NOT work for this change: it never asks
+  confirmed that the `sdd-init` skill (slash: `/sdd-init`, or `/gentle-sdd-init`
+  in Claude Code) does NOT work for this change: it never asks
   about Strict TDD interactively, and it does not rewrite anything if `openspec/`
   already exists (it only reports and asks before touching, according to its own Hard
-Rule). Use `/sdd-init` ONLY when `openspec/` does not yet exist (option
+Rule). Use it ONLY when `openspec/` does not yet exist (option
 8, migrating to `openspec`/`hybrid` from pure `engram`) — there it is
   a real initialization, not a re-write, and the skill does its full work.
 - **SDD backend migration (option 8) is the only one that requires

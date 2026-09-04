@@ -1,7 +1,8 @@
 # openspec/config.yaml — Wizard-Allowed Field Reference (NOT a file to copy)
 #
 # ⚠️ This is NOT a template to stamp into `openspec/config.yaml`. That file is the
-# exclusive artifact of gentle-ai's `/sdd-init` (see protocol `sdd`, BLOCK RULE).
+# exclusive artifact of gentle-ai's `/sdd-init` skill (slash: `/sdd-init`, or
+# `/gentle-sdd-init` in Claude Code — see protocol `sdd`, BLOCK RULE).
 #
 # This block documents the SPECIFIC canonical leaf fields the wizard is allowed to ask the
 # agent to add/update inside the EXISTING file (Phase 8, step 8.1d), always via a targeted,
