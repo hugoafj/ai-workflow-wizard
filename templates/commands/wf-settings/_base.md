@@ -67,6 +67,7 @@ jq -r '.ci.gga_provider // "none"' .wizard-state.json 2>/dev/null
 jq -r '.ci.security_review // false' .wizard-state.json 2>/dev/null
 jq -r '.ci.auto_improve // true' .wizard-state.json 2>/dev/null
 jq -r '.ci.inline_suggestions // true' .wizard-state.json 2>/dev/null
+jq -r '.features.branch_pr_override // false' .wizard-state.json 2>/dev/null
 ```
 
 **If `.wizard-state.json` does not exist**: the project was not initialized with
@@ -115,6 +116,7 @@ Workflow settings — current state:
 17. Fix Windsurf gentle-ai — <Reapply workaround>
 </if>
 18. IDEs/CLIs — <comma-separated active list>
+19. branch-pr override (issue linkage optional) — <ON/OFF>
 
 Which number do you want to adjust?
 
@@ -1290,6 +1292,89 @@ jq '.answers.ides -= ["<ide>"]' .wizard-state.json > .wizard-state.json.tmp && m
 
 **If they say something other than `add` or `remove`**: show the current list again and
 repeat the question. Do not guess.
+
+---
+
+### 19 — branch-pr override (issue linkage optional)
+
+```
+branch-pr override: <ON/OFF>
+
+Do you want to change it? [yes / no]
+```
+
+This option installs/removes a project-local `branch-pr` skill that overrides
+gentle-ai's globally installed one. The project-local version makes GitHub issue
+linkage optional (the global skill requires every PR to link an approved issue,
+which blocks projects that don't use GitHub Issues).
+
+**If they want to enable it (currently OFF → ON)**:
+
+```bash
+WF_RAW="${WF_RAW:-https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main}"
+```
+
+1. Download the permissive skill template:
+   ```bash
+   curl -fsSL "$WF_RAW/templates/skills/branch-pr/SKILL.md" -o .agents/skills/branch-pr/SKILL.md
+   ```
+2. Copy it to every active IDE's native skill path (read from
+   `state.answers.ides`):
+   - `claude-code` → `.claude/skills/branch-pr/SKILL.md`
+   - `opencode` → `.opencode/skills/branch-pr/SKILL.md`
+   - `cursor` → `.cursor/skills/branch-pr/SKILL.md`
+   - `codex` → `.codex/skills/branch-pr/SKILL.md`
+   - `kiro` → `.kiro/skills/branch-pr/SKILL.md`
+   - `gemini-cli` → `.gemini/skills/branch-pr/SKILL.md`
+   - `windsurf` → `.windsurf/skills/branch-pr/SKILL.md` and
+     `.devin/skills/branch-pr/SKILL.md`
+3. Add the "Project-local skill overrides" section to AGENTS.md (see the
+   `templates/AGENTS.router.md` template for the exact wording — do not invent
+   it). Update the footer's `branch_pr=` token:
+   ```bash
+   sed -i.bak -E 's/(features: [^|]*branch_pr=)[a-z]*/\1yes/' AGENTS.md && rm AGENTS.md.bak
+   ```
+4. Update `.wizard-state.json`:
+   ```bash
+   jq '.features.branch_pr_override = true' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+   ```
+
+Confirm:
+```
+✓ branch-pr override: enabled
+✓ .agents/skills/branch-pr/SKILL.md written
+✓ <per-IDE> skills written
+✓ AGENTS.md: Project-local skill overrides section added
+✓ .wizard-state.json: features.branch_pr_override = true
+```
+
+**If they want to disable it (currently ON → OFF)**:
+
+1. Delete the project-local skill files (only this project's copies, never
+   `~/.<ide>/` or gentle-ai's global config):
+   - `.agents/skills/branch-pr/SKILL.md`
+   - `.claude/skills/branch-pr/SKILL.md`, `.opencode/skills/branch-pr/SKILL.md`,
+     `.cursor/skills/branch-pr/SKILL.md`, `.codex/skills/branch-pr/SKILL.md`,
+     `.kiro/skills/branch-pr/SKILL.md`, `.gemini/skills/branch-pr/SKILL.md`,
+     `.windsurf/skills/branch-pr/SKILL.md`, `.devin/skills/branch-pr/SKILL.md`
+     (whichever exist)
+2. Remove the "Project-local skill overrides" section from AGENTS.md.
+3. Update the footer's `branch_pr=` token:
+   ```bash
+   sed -i.bak -E 's/(features: [^|]*branch_pr=)[a-z]*/\1no/' AGENTS.md && rm AGENTS.md.bak
+   ```
+4. Update `.wizard-state.json`:
+   ```bash
+   jq '.features.branch_pr_override = false' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+   ```
+
+Confirm:
+```
+✓ branch-pr override: disabled
+✓ <N> skill files removed
+✓ AGENTS.md: Project-local skill overrides section removed
+✓ .wizard-state.json: features.branch_pr_override = false
+```
 
 ---
 

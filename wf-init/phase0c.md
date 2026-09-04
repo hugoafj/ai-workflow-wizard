@@ -141,6 +141,35 @@ wf_state_set '.features.cd' "$CD"
 wf_state_set '.features.release_please' "$RELEASE"
 ```
 
+---
+
+### Question — Branch PR override
+
+gentle-ai installs a global `branch-pr` skill that requires every PR to link
+a GitHub issue with `status:approved`. This blocks PR creation for projects
+that don't use GitHub Issues.
+
+Do you want a permissive project-local `branch-pr` skill that makes issue
+linkage optional? [yes / no]
+
+  yes → project-local skill overrides the global one for this repo only
+  no  → keep the global skill as-is (issue linkage remains mandatory)
+
+### ⏸ PAUSE — Waiting for user response...
+
+### [WIZARD ACTION]
+
+```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+
+# USER_ANSWER: "yes" or "no" from the user's response
+BRANCH_PR_OVERRIDE="false"
+# If user answered "yes": BRANCH_PR_OVERRIDE="true"
+
+wf_state_set '.features.branch_pr_override' "$BRANCH_PR_OVERRIDE"
+```
+
 ### [USER MESSAGE]
 Features selected. Reply **continue** to start project discovery.
 

@@ -196,6 +196,19 @@ From the SAME `build_protocol_body(name)`:
    inlined into the skill body, only linked from its `## References` section, so it costs no
    tokens until the model explicitly reads it. Currently applies to `wf-sdd-trigger`.
 
+### Step B4.5 — Project-local `branch-pr` override (optional)
+
+If `features.branch_pr_override == true`, fetch
+`templates/skills/branch-pr/SKILL.md` and write it to:
+- `STAGING/.agents/skills/branch-pr/SKILL.md` — universal fallback (always)
+- `STAGING/<ide-native-skills-path>/branch-pr/SKILL.md` for every active IDE
+  (same `SKILL_PATHS` table as B4; Windsurf also gets `.devin/skills/branch-pr/`)
+
+This permissive version overrides gentle-ai's global `branch-pr` skill via the
+skill-registry dedup rule (same `name: branch-pr`, project-local wins). It makes
+issue linkage optional while keeping exactly-one `type:*` label and conventional
+commits. If the template fetch fails, the block is skipped silently.
+
 ### Step B5 — Assemble AGENTS.md (thin router)
 
 **Implementation**: Use Python for robust template processing (handles file placeholders, conditionals, guide comment stripping, validation).

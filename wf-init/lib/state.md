@@ -90,7 +90,8 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
     "routing_abc": null,
     "ci": null,
     "cd": null,
-    "release_please": null
+    "release_please": null,
+    "branch_pr_override": null
   },
 
   "agents": [],
