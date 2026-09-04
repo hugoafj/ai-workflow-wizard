@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.43-beta.1...v0.9.0-beta.1) (2026-09-04)
+
+
+### Features
+
+* **branch-pr:** add permissive project-local branch-pr skill override ([#178](https://github.com/hugoafj/ai-workflow-wizard/issues/178)) ([9dd0148](https://github.com/hugoafj/ai-workflow-wizard/commit/9dd0148490be625d3def3ab6aafac0c4379dc250))
+
 ## [0.8.43-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.8.42-beta.1...v0.8.43-beta.1) (2026-09-04)
 
 
