@@ -1434,6 +1434,26 @@ def main(argv=None):
     flat_created = write_flat_protocols(raw, state, staging)
     skills_created = write_skills(raw, state, staging)
 
+    # B4.5: project-local branch-pr override (permissive issue linkage).
+    if bool_feature(state, "branch_pr_override"):
+        branch_pr_url = base_url(raw, "templates/skills/branch-pr/SKILL.md")
+        try:
+            branch_pr_text = fetch_with_retries(branch_pr_url)
+            branch_pr_targets = [os.path.join(staging, ".agents", "skills", "branch-pr")]
+            for ide in active_ides(state):
+                ide_skill_path = SKILL_PATHS.get(ide)
+                if ide_skill_path:
+                    branch_pr_targets.append(os.path.join(staging, ide_skill_path, "branch-pr"))
+            if "windsurf" in active_ides(state):
+                branch_pr_targets.append(os.path.join(staging, DEVIN_SKILLS, "branch-pr"))
+            for tgt in dict.fromkeys(branch_pr_targets):
+                os.makedirs(tgt, exist_ok=True)
+                with open(os.path.join(tgt, "SKILL.md"), "w", encoding="utf-8") as fh:
+                    fh.write(branch_pr_text.rstrip() + "\n")
+                skills_created.append(os.path.relpath(os.path.join(tgt, "SKILL.md"), staging))
+        except RuntimeError:
+            pass  # template not found — skip silently
+
     # B5: AGENTS.md (router).
     router_text = render_router(raw, state)
     agents_rel = os.path.join("AGENTS.md")
