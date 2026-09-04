@@ -40,7 +40,7 @@ rsync -a "$STAGING/" ./
 # ═══════════════════════════════════════════════════════════════
 # Check every file in build_plan.generated_files exists in project root
 PROMOTE_FAILED=0
-for f in $(jq -r '.build_plan.generated_files[].path // empty' .wizard-state.json 2>/dev/null); do
+for f in $(jq -r '.build_plan.managed_paths[] // empty' .wizard-state.json 2>/dev/null); do
   if [ -n "$f" ] && [ ! -f "$f" ]; then
     echo "ERROR: Promoted file missing: $f" >&2
     PROMOTE_FAILED=1
@@ -52,7 +52,7 @@ if [ "$PROMOTE_FAILED" -ne 0 ]; then
   echo "       Run 'ls -la $STAGING/' to debug" >&2
   exit 1
 fi
-echo "✓ All $(jq -r '.build_plan.generated_files | length' .wizard-state.json) generated files verified in project root"
+echo "✓ All $(jq -r '.build_plan.managed_paths | length' .wizard-state.json) generated files verified in project root"
 
 # The hook needs execute permission
 [ -f .git/hooks/post-commit ] && chmod +x .git/hooks/post-commit
@@ -757,7 +757,7 @@ Powered by wf-init v$WF_VER | gentle-ai $GA_VER"
 # Post-commit verification: ensure all managed files from build_plan.generated_files were committed (Bug 1 fix)
 COMMITTED_FILES=$(git diff --name-only HEAD~1..HEAD 2>/dev/null || git ls-files)
 MISSING=0
-for f in $(jq -r '.build_plan.generated_files[].path' .wizard-state.json 2>/dev/null); do
+for f in $(jq -r '.build_plan.managed_paths[]' .wizard-state.json 2>/dev/null); do
   if [ -n "$f" ] && ! echo "$COMMITTED_FILES" | grep -qx "$f"; then
     echo "ERROR: $f was NOT committed!" >&2
     MISSING=1
