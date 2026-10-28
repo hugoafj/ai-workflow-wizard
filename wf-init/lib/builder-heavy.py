@@ -66,16 +66,9 @@ def active_command_names(state):
     """Return the command list for this state (B7)."""
     names = list(ALWAYS_COMMANDS)
     ladder = builder_core.bool_feature(state, "decision_ladder")
-    tdd = builder_core.bool_feature(state, "tdd_protocol")
-    routing = builder_core.bool_feature(state, "routing_abc")
     if ladder:
         names.append("wf-ladder")
-    if tdd:
-        names.append("wf-tdd")
-    if routing or ladder or tdd:
         names.append("wf-orchestrator")
-    if routing:
-        names.append("wf-sdd-trigger")
     return names
 
 
@@ -251,8 +244,8 @@ def write_testing_configs(raw, state, staging):
         # POM extra (field report B3): phase 4.6b offers "Page Object Model"
         # in its menu and the docs promised e2e/pages/, but neither builder
         # generated anything. Stage the minimal scaffold when active; real
-        # page objects emerge with features via sdd-apply following the
-        # AGENTS.md convention line.
+        # page objects emerge with features following the AGENTS.md
+        # convention line.
         if builder_core.get_state_value(state, "testing.page_object_model", False):
             pom = builder_core.fetch_with_retries(
                 builder_core.base_url(raw, "templates/protocols/testing/pom-example.tmpl.md"))

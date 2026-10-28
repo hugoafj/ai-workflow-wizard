@@ -334,13 +334,13 @@ def unresolved_placeholders(text):
 # ---------------------------------------------------------------------------
 
 # SPLIT protocols live under templates/commands/; pure protocols under templates/protocols/.
-SPLIT_PROTOCOLS = {"wf-ladder", "wf-tdd", "wf-orchestrator", "wf-sdd-trigger"}
+SPLIT_PROTOCOLS = {"wf-ladder", "wf-orchestrator"}
 # Maintenance commands also live under templates/commands/ and ship skills.
 MAINTENANCE_COMMANDS = ["wf-onboard", "wf-worktree", "wf-settings"]
 # Everything resolved from templates/commands/ (SPLIT + maintenance).
 COMMAND_PROTOCOLS = SPLIT_PROTOCOLS | set(MAINTENANCE_COMMANDS)
 PURE_PROTOCOLS = {
-    "architecture", "cicd", "commands", "ides", "sdd", "testing", "workflow",
+    "architecture", "cicd", "commands", "ides", "testing", "workflow",
 }
 
 
@@ -377,30 +377,11 @@ def build_protocol_body(raw, name, state):
         rest = body[m.start():] if m else body
         return (header + "\n\n" + rest).strip()
 
-    if name == "wf-tdd":
-        tdd_mode = get_state_value(state, "answers.tdd_mode") or \
-                   get_state_value(state, "testing.tdd_mode") or "standard"
-        variant_url = base_url(raw, "templates/commands/wf-tdd/variants/%s.md" % (tdd_mode))
-        try:
-            variant = fetch_with_retries(variant_url)
-        except RuntimeError:
-            variant = ""
-        # Replace the TDD_MODE_VARIANT marker (HTML comment form) with the variant body.
-        body = re.sub(
-            r"<!--\s*\{\{TDD_MODE_VARIANT[^}]*\}\}.*?-->",
-            lambda m: variant.strip(),
-            body,
-            flags=re.DOTALL,
-        )
-        # Resolve semantic <if ...>: blocks against layers.
-        body = resolve_if_blocks(body, state, raw)
-        return body.strip()
-
     return body
 
 
 # ---------------------------------------------------------------------------
-# Semantic <if ...>: block resolution (wf-tdd, quality-guard)
+# Semantic <if ...>: block resolution (quality-guard)
 # ---------------------------------------------------------------------------
 
 def resolve_if_blocks(text, state, raw=None):
@@ -541,9 +522,8 @@ def eval_boolean(expr, state):
     # Replace `state.X == 'literal'` / `state.X != 'literal'` comparisons with
     # raw-value lookups. The generic path patch below resolves every state path
     # through truthy(), so a bare comparison would evaluate `True == 'strict'`
-    # and always be False; string-literal modes (e.g. tdd_mode) need the raw
-    # value. Runs before the generic patch so the emitted __GV_RAW(...) token
-    # is not re-matched.
+    # and always be False; string-literal modes need the raw value. Runs before
+    # the generic patch so the emitted __GV_RAW(...) token is not re-matched.
     def _lit_cmp_repl(m):
         return "__GV_RAW('%s') %s '%s'" % (m.group(1), m.group(2), m.group(3))
 
@@ -631,8 +611,7 @@ def _warn_fallback(key, value):
 def infer_placeholder(state, key):
     """Resolve placeholders that have no state field, deterministically.
 
-    These five are documented as inference-resolved from state + manifest in
-    openspec/changes/fix-judgment-day-v070/tasks.md.
+    These keys are inferred from state + manifest, not stored in state.
     """
     layers = normalize_layers(state)
 
@@ -710,8 +689,8 @@ def infer_placeholder(state, key):
         return detect_project_structure(project_root)
 
     if key == "testing.checks_before_done":
-        # Gate on the active test layers, not features.testing (which the state
-        # schema does not define). lint + build are always part of the done gate;
+        # Gate on the active test layers, not features.testing. lint + build are
+        # always part of the done gate;
         # test / test:e2e follow the unit/integration/e2e layers.
         checks = ["lint", "build"]
         if "unit" in layers or "integration" in layers:
@@ -886,7 +865,7 @@ def resolve_gh_escapes(text, resolve=None):
 def resolve_router_ifs(text, state):
     """Resolve nested `<if COND>...</if>` blocks with a stack parser.
 
-    Supports arbitrary nesting (e.g. routing wrapping tdd, inline table cells).
+    Supports arbitrary nesting (e.g. nested conditionals, inline table cells).
     """
     stack = []  # list of [condition, buffer]
     out = []
@@ -1210,22 +1189,11 @@ def active_protocols(state):
     # Pure protocols are always active.
     for name in ["architecture", "cicd", "commands", "ides", "testing", "workflow"]:
         out.append(name)
-    # sdd is active when a backend was selected.
-    backend = get_state_value(state, "sdd.backend", None)
-    if backend:
-        out.append("sdd")
     # wf protocols follow features.
     ladder = bool_feature(state, "decision_ladder")
-    tdd = bool_feature(state, "tdd_protocol")
-    routing = bool_feature(state, "routing_abc")
     if ladder:
         out.append("wf-ladder")
-    if tdd and (get_state_value(state, "testing.layers", None) or bool_feature(state, "testing")):
-        out.append("wf-tdd")
-    if routing or ladder or tdd:
         out.append("wf-orchestrator")
-    if routing:
-        out.append("wf-sdd-trigger")
     return out
 
 
@@ -1266,9 +1234,6 @@ def write_skills(raw, state, staging):
             flags=re.DOTALL,
         )
         rendered = strip_internal_comment(rendered)
-        # NOTE: remaining `{{...}}` in the body are RUNTIME literals of the
-        # command itself (e.g. `{{sdd.backend}}` used as a sed pattern by
-        # wf-settings), not builder placeholders. They must stay verbatim.
 
         # Universal skill dir (always) + per-IDE dirs.
         targets = [os.path.join(staging, ".agents", "skills", name)]

@@ -62,7 +62,7 @@ wf_state_init() {
   local version
   version=$(wf_fetch_version)
   cat > "$WF_STATE" <<JSON
-{ "schema_version": 3, "wizard_version": "$version", "phase_pointer": "phase0", "started_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")", "updated_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+{ "schema_version": 4, "wizard_version": "$version", "phase_pointer": "phase0", "started_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")", "updated_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
   "phases": {},
   "wf_dir": "/tmp/wf-init-phases",
   "gentle_ai": {
@@ -95,22 +95,15 @@ wf_state_init() {
   },
   "features": {
     "decision_ladder": false,
-    "tdd_protocol": false,
-    "routing_abc": false,
+    "testing": false,
     "ci": false,
     "cd": false,
     "release_please": false
   },
   "agents": [],
-  "sdd": {
-    "backend": null,
-    "already_initialized": false,
-    "refresh_requested": null
-  },
   "testing": {
     "runner_detected": null,
     "layers": [],
-    "tdd_mode": null,
     "coverage_threshold": null,
     "visual_regression": false,
     "page_object_model": false
@@ -248,11 +241,10 @@ wf_state_validate() {
       )
       ;;
     phase0c)
-      # Phase 0c writes: all 6 features
+      # Phase 0c writes: all features
       required_fields=(
         ".features.decision_ladder"
-        ".features.tdd_protocol"
-        ".features.routing_abc"
+        ".features.testing"
         ".features.ci"
         ".features.cd"
         ".features.release_please"
@@ -284,18 +276,10 @@ wf_state_validate() {
         ".discovery.test_dir"
       )
       ;;
-    phase45)
-      # Phase 4.5 writes: sdd.backend, sdd.already_initialized
-      required_fields=(
-        ".sdd.backend"
-        ".sdd.already_initialized"
-      )
-      ;;
     phase46)
-      # Phase 4.6 writes: testing.layers, testing.tdd_mode, testing.runner_detected
+      # Phase 4.6 writes: testing.layers, testing.runner_detected
       required_fields=(
         ".testing.layers"
-        ".testing.tdd_mode"
       )
       ;;
     phase46b)
@@ -347,8 +331,7 @@ wf_state_validate() {
       required_fields=(
         ".answers.ides"
         ".features.decision_ladder"
-        ".features.tdd_protocol"
-        ".features.routing_abc"
+        ".features.testing"
         ".features.ci"
         ".features.cd"
         ".features.release_please"
@@ -373,6 +356,7 @@ wf_state_validate() {
   fi
 
   # For phase46b, coverage_threshold is optional (can be null if coverage not activated)
+  # TODO(T2): remove with phase46b
   if [ "$phase" = "phase46b" ]; then
     if ! jq -e 'has("testing") and (.testing | has("coverage_threshold"))' "$WF_STATE" >/dev/null 2>&1; then
       echo "ERROR: wf_state_validate - testing.coverage_threshold field missing" >&2
