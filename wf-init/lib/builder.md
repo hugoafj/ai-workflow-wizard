@@ -98,11 +98,11 @@ For each active protocol, build its BODY once:
 
 ```
 build_protocol_body(name):
-  # SPLIT wizard protocols (wf-ladder, wf-orchestrator) are self-contained under
+  # The SPLIT wizard protocol (wf-ladder) is self-contained under
   # templates/commands/<name>/ (command body + skill + flat, single source). Pure
   # flat-only protocols (architecture, cicd, commands, ides, testing, workflow) stay
   # under templates/protocols/<name>/.
-  if name in (wf-ladder, wf-orchestrator):
+  if name == wf-ladder:
     base_dir = $WF_ROOT/templates/commands/<name>
   else:
     base_dir = $WF_ROOT/templates/protocols/<name>
@@ -119,17 +119,15 @@ build_protocol_body(name):
   return body
 ```
 
-Special case: this wizard's own protocols (`wf-ladder`, `wf-orchestrator`; replaces the old,
-retired `decision-ladder` bundle; see `AI_DEV_WORKFLOW.md` §6.3 for the naming/scope
-rationale). Two independent protocols, NEVER split or summarize their bodies:
+Special case: this wizard's own protocol `wf-ladder` (replaces the old, retired
+`decision-ladder` bundle; see `AI_DEV_WORKFLOW.md` §6.3 for the naming/scope rationale). It is
+NEVER split or summarized:
 - `wf-ladder` (7 rungs) is OPTIONAL: included only if `LADDER == true` (state field kept as
   `features.decision_ladder`).
-- `wf-orchestrator` (single entry point) is built whenever `LADDER == true`. It never duplicates
-  `wf-ladder`'s content; it only sequences the active `wf-` protocols.
-- If `LADDER` is false: neither `wf-` protocol is built.
+- If `LADDER` is false: no `wf-` protocol is built.
 
 Protocols to build (conditional by features):
-- `wf-orchestrator`, `wf-ladder`: per the rules above.
+- `wf-ladder`: per the rules above.
 - `architecture`: always.
 - (`testing`, `cicd`, `ides`, `commands`, `workflow`: flat file only — pure protocols never
   package skills or commands; the router references only the applicable ones.)
@@ -138,11 +136,11 @@ Protocols to build (conditional by features):
 From the SAME `build_protocol_body(name)`:
 1. **Flat file** → `STAGING/.agents/protocols/<name>.md` = body (universal fallback, `<name>` is
    the protocol's source folder name — under `templates/protocols/` for pure protocols,
-   `templates/commands/` for the 5 wizard commands that ship skills).
+   `templates/commands/` for the 4 wizard commands that ship skills).
 2. **Native skills** per IDE that supports SKILL.md — **presence-driven**: only if
    `<base_dir>/skill/SKILL.md` exists (same SPLIT/pure `base_dir` rule as B3 — all pure
-   protocols are flat-only now; only the 5 wizard commands ship skills: the 2 SPLIT
-   `wf-ladder`, `wf-orchestrator` plus the 3 maintenance `wf-onboard`, `wf-worktree`,
+   protocols are flat-only now; only the 4 wizard commands ship skills: the 1 SPLIT
+   `wf-ladder` plus the 3 maintenance `wf-onboard`, `wf-worktree`,
    `wf-settings`). For each IDE
    in `IDES` that has a native skill path, emit a copy of the frontmatter from
    `<base_dir>/skill/SKILL.md` (replacing `{{PROTOCOL_BODY: ...}}` with the body) in its
@@ -382,7 +380,6 @@ Commands **always** included (maintenance):
 
 Commands **conditional** by feature:
 - `/wf-ladder`: only if `LADDER == true` (the command to explicitly invoke the wf-ladder steps).
-- `/wf-orchestrator`: only if `LADDER == true`.
 
 For each command in the catalog (protocol `commands`) and each IDE ∈ IDES:
 - body = `$WF_ROOT/templates/commands/<cmd>/_base.md`.
@@ -397,7 +394,7 @@ For each command in the catalog (protocol `commands`) and each IDE ∈ IDES:
 
 > **Skill 1:1** — every command in this catalog is also packaged as a skill (step B4): native
 > SKILL.md per IDE + universal `.agents/skills/<cmd>/SKILL.md` + flat
-> `.agents/protocols/<cmd>.md`. All 5 wizard commands (2 SPLIT + 3 maintenance) ship skills.
+> `.agents/protocols/<cmd>.md`. All 4 wizard commands (1 SPLIT + 3 maintenance) ship skills.
 
 ### Step B8 — Hook + testing configs
 

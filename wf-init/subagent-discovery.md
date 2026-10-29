@@ -34,7 +34,7 @@ cat "{PROJECT_PATH}/package.json" 2>/dev/null || cat "{PROJECT_PATH}/composer.js
 
 # Previous workflow artifacts
 ls "{PROJECT_PATH}/AGENTS.md" "{PROJECT_PATH}/CLAUDE.md" "{PROJECT_PATH}/GEMINI.md" 2>/dev/null
-ls -d "{PROJECT_PATH}/.cursor" "{PROJECT_PATH}/.windsurf" "{PROJECT_PATH}/.devin" "{PROJECT_PATH}/.kiro" "{PROJECT_PATH}/openspec" 2>/dev/null
+ls -d "{PROJECT_PATH}/.cursor" "{PROJECT_PATH}/.windsurf" "{PROJECT_PATH}/.devin" "{PROJECT_PATH}/.kiro" 2>/dev/null
 ls "{PROJECT_PATH}/.github/copilot-instructions.md" 2>/dev/null
 ls "{PROJECT_PATH}/.git/hooks/post-commit" 2>/dev/null
 
@@ -123,14 +123,10 @@ Use `wf_state_set` to persist to `.wizard-state.json`:
 For each IDE that has a directory in the project, check expected commands:
 
 ```bash
-# Conditional by feature: wf-ladder (LADDER), wf-tdd (TDD && LAYERS),
-# wf-orchestrator (ROUTING || LADDER || TDD), wf-sdd-trigger (ROUTING);
+# Conditional by feature: wf-ladder (LADDER);
 # wf-onboard, wf-worktree, wf-settings are always emitted.
 EXPECTED_COMMANDS=(
   "wf-ladder"
-  "wf-tdd"
-  "wf-orchestrator"
-  "wf-sdd-trigger"
   "wf-onboard"
   "wf-worktree"
   "wf-settings"

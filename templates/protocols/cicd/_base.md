@@ -469,7 +469,7 @@ Commit: chore: configure CI/CD pipeline (Block 6)
 ### PHASE 7 — CD (Continuous Delivery)
 
 > **Implemented**. CD is configured as an independent feature in `/wf-init` (Phase 4.7
-> PART B) and in `/wf-settings` option 15. The wizard detects the project stack and generates
+> PART B) and in `/wf-settings` option 12. The wizard detects the project stack and generates
 > the corresponding deploy workflow.
 
 #### How it works
@@ -527,11 +527,9 @@ in the CD configuration without attempting to solve it automatically.
 - Body template: `hook.post-commit.tmpl.md` (VERBATIM from this template). It is the ONLY
   source of the drift logic used by `/wf-init`, `/wf-refresh`, and the root `post-commit`
   file (which is the extracted bash body of the template).
-- Detects three drift categories and only **notifies** (never acts):
+- Detects two drift categories and only **notifies** (never acts):
   - **AGENTS.md drift** (`REFRESH_FILES`) → suggests `/wf-refresh`.
-  - **SDD drift** (`SDD_FILES`) → suggests `/sdd-init`.
   - **Config/IDE drift** (`CONFIG_FILES`: `AGENTS.md`, IDE settings, satellites, commands) → suggests `/wf-refresh`.
-- `openspec/config.yaml` **excluded** (it is the output of /sdd-init; avoids loop).
 - Writes persistent `.wf-status` between sessions + macOS notification (osascript).
 - Refreshes gentle-ai's skill registry opportunistically (non-blocking, silent) so new
   wizard skills are picked up without manual intervention.

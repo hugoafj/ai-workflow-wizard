@@ -9,7 +9,7 @@
 
 ## Two layers (don't overlap)
 
-1. **Foundation · gentle-ai** (global, installed per machine): SDD orchestrator, Engram,
+1. **Foundation · gentle-ai** (global, installed per machine): ODD orchestration, Engram,
    curated skills, multi-IDE routing.
 2. **Custom project-specific** (versioned in the repo): AGENTS.md router + satellites +
    commands + packed protocols + hook. This is what this wizard generates.
@@ -26,13 +26,11 @@ The AGENTS.md no longer contains the heavy embedded mechanism. It contains ONLY:
   for Claude Code; `.agents/protocols/<n>.md` referenced for the rest).
 - **Footer `wf-version`** (last line, mandatory — read by /wf-settings and /wf-refresh).
 
-> The flow control mechanism (`wf-ladder`, `wf-sdd-trigger`, `wf-orchestrator`, `wf-tdd`)
-> **no longer lives inside AGENTS.md**: it lives in the SPLIT wizard protocol folders
+> The optional flow control mechanism (`wf-ladder`)
+> **no longer lives inside AGENTS.md**: it lives in the SPLIT wizard protocol folder
 > (`https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-ladder/_base.md`,
-> `.../templates/commands/wf-tdd/_base.md`, `.../templates/commands/wf-orchestrator/_base.md`,
-> `.../templates/commands/wf-sdd-trigger/_base.md` — each self-contained: command body + skill
-> + flat file, single source)
-> and is packaged as a skill + flat file. The router points to them. This eliminates the
+> self-contained: command body + skill + flat file, single source)
+> and is packaged as a skill + flat file. The router points to it. This eliminates the
 > accumulation of 350-450 lines of mechanism in AGENTS.md.
 
 ### What does NOT go in AGENTS.md

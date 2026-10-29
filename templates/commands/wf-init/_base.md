@@ -16,10 +16,7 @@
 > - `/wf-onboard` — onboarding for developers who clone the repo.
 > - `/wf-worktree` — git worktree management.
 > - `/wf-settings` — toggle optional modules.
-> - `/wf-ladder` — anti-over-engineering (only if wf-ladder active).
-> - `/wf-tdd` — TDD protocol (only if TDD + layers active).
-> - `/wf-orchestrator` — single entry point (only if routing, ladder, or TDD active).
-> - `/wf-sdd-trigger` — SDD decision gate (only if routing active).
+> - `/wf-ladder`: anti-over-engineering (optional, only if the decision ladder is selected).
 > - `/wf-refresh` — updates AGENTS.md when the project evolves (global command).
 
 You are an interactive wizard that initializes the AI Workflow Wizard in this repository.
@@ -65,9 +62,7 @@ PHASES=(
   "phase2.md"
   "phase3.md"
   "phase4.md"
-  "phase45.md"
   "phase46.md"
-  "phase46b.md"
   "phase47-cicd.md"
   "phase5.md"
   "phase6a-agents.md"
@@ -77,7 +72,7 @@ PHASES=(
   "phase8.md"
 )
 
-WF_RAW="https://raw.githubusercontent.com/${WIZARD_REPO}/${WIZARD_BRANCH}"
+WF_RAW="${WF_RAW:-https://raw.githubusercontent.com/${WIZARD_REPO}/${WIZARD_BRANCH}}"
 
 for phase in "${PHASES[@]}"; do
   curl -fsSL "${WF_RAW}/wf-init/${phase}" > "${WF_DIR}/${phase}" 2>/dev/null
@@ -122,16 +117,14 @@ ls "$WF_DIR"
 |-------|------|-------------|
 | 0a | `phase0.md` | Install/verify gentle-ai + version |
 | 0b | `phase0b.md` | Health check (doctor) + confirm agents |
-| 0c | `phase0c.md` | **FEATURE SELECTION** (Ladder, TDD, SDD Routing, CI/CD, release-please) |
+| 0c | `phase0c.md` | **FEATURE SELECTION** (Ladder, Testing, CI/CD, release-please) |
 | 1 | `phase1.md` | Discovery report |
 | 2 | `phase2.md` | Previous artifact migration |
 | 3 | `phase3.md` | Greenfield vs legacy classification |
 | 4 | `phase4.md` | Reverse engineering (legacy only) |
-| 5 | `phase5.md` | Questions: project name, stack, critical constraints |
-| 4.5 | `phase45.md` | SDD initialization — **only if SDD Routing or TDD active** |
-| 4.6 | `phase46.md` | Testing stack configuration (layers + TDD mode) — **only if TDD active** |
-| 4.6b | `phase46b.md` | Optional testing extras — **only if TDD active** |
+| 4.6 | `phase46.md` | Testing stack: layers, wiring check, test infra and optional extras. **Only if testing active** |
 | 4.7 | `phase47-cicd.md` | CI/CD configuration — **only if CI/CD or release-please active** |
+| 5 | `phase5.md` | Questions: project name, stack, critical constraints |
 | 6a | `phase6a-agents.md` | Runs deterministic Builder-Core: B1-B6 (AGENTS.md, protocols, satellites → staging) |
 | 6b | `phase6b-build-heavy.md` | Runs deterministic Builder-Heavy: B7-B9 (commands × IDEs, CI/CD, hook, testing configs → staging) |
 | — | `subagent-discovery.md` | Prompt for sub-agent 1: phases 1-4 (detection + classification) |
@@ -152,6 +145,10 @@ First, check if there is an existing run in progress (resumption):
 ```bash
 if [ -f .wizard-state.json ]; then
   PTR=$(jq -r '.phase_pointer' .wizard-state.json 2>/dev/null)
+  # Pointers saved by removed phases (4.5 and 4.6b, folded into 4.6) resume at phase46
+  case "$PTR" in
+    phase45|phase46b) PTR="phase46" ;;
+  esac
   echo "wf-init run in progress detected. Current phase: $PTR"
   echo "Resume from $PTR, or restart (deletes .wizard-state.json)? [resume / restart]"
   # If resume: cat "$WF_DIR/${PTR}.md"  (or that phase's file)
@@ -179,7 +176,7 @@ receiving user confirmation**.
 - **State lives in `.wizard-state.json`, NOT in your context** (contract:
   `wf-init/lib/state.md`). Each phase READs the state upon entry and WRITEs its section before
   pausing. Do not rely on remembering past decisions: IDEs (Phase 0/5),
-  greenfield/legacy classification (Phase 3), SDD backend (Phase 4.5), testing layers
+  greenfield/legacy classification (Phase 3), testing layers
   (Phase 4.6), answers (Phase 5) — everything is read from `.wizard-state.json` in Phases 6-8.
 - **Permanent knowledge never travels fully through the context**: when a phase
   needs a rule/protocol, it downloads the corresponding file from

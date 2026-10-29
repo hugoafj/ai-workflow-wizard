@@ -277,18 +277,14 @@ wf_state_validate() {
       )
       ;;
     phase46)
-      # Phase 4.6 writes: testing.layers, testing.runner_detected
+      # Phase 4.6 writes: testing.layers, testing.runner_detected, testing.coverage_threshold,
+      # testing.visual_regression, testing.page_object_model
       required_fields=(
         ".testing.layers"
-      )
-      ;;
-    phase46b)
-      # Phase 4.6b writes: testing.coverage_threshold, testing.visual_regression, testing.page_object_model, mcps
-      required_fields=(
         ".testing.visual_regression"
         ".testing.page_object_model"
       )
-      # coverage_threshold can be null if not activated - check field exists not value
+      # coverage_threshold is checked below (field must exist; a number when coverage is active)
       ;;
     phase47-cicd)
       # Phase 4.7 writes: ci.*, cd.*
@@ -355,11 +351,11 @@ wf_state_validate() {
     valid=false
   fi
 
-  # For phase46b, coverage_threshold is optional (can be null if coverage not activated)
-  # TODO(T2): remove with phase46b
-  if [ "$phase" = "phase46b" ]; then
-    if ! jq -e 'has("testing") and (.testing | has("coverage_threshold"))' "$WF_STATE" >/dev/null 2>&1; then
-      echo "ERROR: wf_state_validate - testing.coverage_threshold field missing" >&2
+  # For phase46, coverage_threshold may be null (coverage extra not activated) but the field must exist.
+  # When coverage is active it must hold a number.
+  if [ "$phase" = "phase46" ]; then
+    if ! jq -e '.testing | has("coverage_threshold") and (.coverage_threshold == null or (.coverage_threshold | type == "number"))' "$WF_STATE" >/dev/null 2>&1; then
+      echo "ERROR: wf_state_validate - testing.coverage_threshold missing or not a number" >&2
       valid=false
     fi
   fi

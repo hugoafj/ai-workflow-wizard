@@ -66,8 +66,8 @@ source "$WF_DIR/lib/state-helpers.sh"
 
 # Validate state before phase transition (phase-aware validation)
 NEXT=
-if [ "$(jq -r '.features.routing_abc // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.tdd_protocol // false' .wizard-state.json)" = "true" ]; then
-  NEXT="phase45"
+if [ "$(jq -r '.features.testing // false' .wizard-state.json)" = "true" ]; then
+  NEXT="phase46"
 elif [ "$(jq -r '.features.ci // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.cd // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.release_please // false' .wizard-state.json)" = "true" ]; then
   NEXT="phase47-cicd"
 else
