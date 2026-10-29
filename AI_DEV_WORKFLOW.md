@@ -1605,7 +1605,7 @@ Should I run cleanup now (/wf-worktree clean) or would you prefer to leave them 
 
 #### 8.4.7 Natural language recognition — where it lives
 
-The mapping of natural language phrases to the four operations (`new`, `list`, `clean`, `parallel`) lives **inside `wf-worktree.md`**, as internal instructions of the file itself — it is not added to `AGENTS.md`. This maintains the convention already established with `wf-ladder`: those commands also live as standalone files briefly referenced from `AGENTS.md`, not duplicated there. Putting the full mapping in `AGENTS.md` inflates its target size (150-200 lines, see Appendix D) unnecessarily — `AGENTS.md` is a lightweight index, not the source of truth for every feature.
+The mapping of natural language phrases to the four operations (`new`, `list`, `clean`, `parallel`) lives **inside `wf-worktree.md`**, as internal instructions of the file itself — it is not added to `AGENTS.md`. This maintains the convention already established with `wf-ladder`: those commands also live as standalone files briefly referenced from `AGENTS.md`, not duplicated there. Putting the full mapping in `AGENTS.md` inflates its target size (150-200 lines) unnecessarily — `AGENTS.md` is a lightweight index, not the source of truth for every feature.
 
 The command stub in `AGENTS.md` (or in the IDE's commands directory) simply indicates: "if the user asks for something equivalent to create/list/clean/merge worktrees in parallel in natural language, follow the instructions in `wf-worktree.md`". The file itself contains the example phrases and decision logic.
 
