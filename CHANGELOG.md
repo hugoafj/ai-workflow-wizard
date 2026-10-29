@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.9.1-beta.1...v0.10.0-beta.1) (2026-10-29)
+
+
+### Miscellaneous Chores
+
+* release 0.10.0-beta.1 ([#186](https://github.com/hugoafj/ai-workflow-wizard/issues/186)) ([f04c15f](https://github.com/hugoafj/ai-workflow-wizard/commit/f04c15fccf45eb3bd512caed810be201a2744964))
+
 ## [0.9.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.9.0-beta.1...v0.9.1-beta.1) (2026-09-04)
 
 
