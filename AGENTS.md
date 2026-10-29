@@ -28,14 +28,14 @@ templates/        — single source of truth
   satellites/     — per-IDE context files
 wf-init/          — wizard phases
   lib/            — builder.md, state.md, state-helpers.sh, refresher.md (contracts/helpers)
-  phase*.md       — phases 0-8 (plus 0b, 0c, 4.5, 4.6, 4.6b, 4.7, 6a, 6b)
+  phase*.md       : phases 0-8 (plus 0b, 0c, 4.6, 4.7, 6a, 6b)
   subagent-*.md   — sub-agent prompts (discovery, builder-core, builder-heavy)
 ```
 
 <!-- WF: DO NOT REGENERATE -->
 ## Artifact Store
 
-This project declares **OpenSpec** as the SDD artifact store; change artifacts live in `openspec/changes/<change-name>/`.
+Change artifacts for substantial work live in `odd/tasks/<feature-name>.md`, with an Engram mirror under topic `odd/<feature-name>/tasks`. The OpenSpec store was retired with SDD in gentle-ai v4.
 <!-- /WF: DO NOT REGENERATE -->
 
 ## Critical Constraints
@@ -82,7 +82,7 @@ Manual review and validation; no automated lint/build for this markdown-only rep
 ---
 
 <!-- WF: DO NOT REGENERATE -->
-<!-- No agent protocols: the project does not use wf-ladder, wf-sdd-trigger, or wf-tdd. -->
+<!-- No agent protocols: the project does not use wf-ladder. -->
 <!-- /WF: DO NOT REGENERATE -->
 
-<!-- wf-version: 0.7.1-beta.1 | source: github.com/hugoafj/ai-workflow-wizard | stack: markdown-docs | features: ladder=no, tdd=no, routing=no, ci=no, cd=no, release=yes -->
+<!-- wf-version: 0.7.1-beta.1 | source: github.com/hugoafj/ai-workflow-wizard | stack: markdown-docs | features: ladder=no, ci=no, cd=no, release=yes -->

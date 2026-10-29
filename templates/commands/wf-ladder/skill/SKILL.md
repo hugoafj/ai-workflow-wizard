@@ -1,6 +1,6 @@
 ---
 name: wf-ladder
-description: "Trigger: before writing code, over-engineering, reuse existing code, decision ladder. Wizard-owned anti-over-engineering discipline (7 rungs) — no gentle-ai equivalent. Load before wf-preflight."
+description: "Trigger: before writing code, over-engineering, reuse existing code, decision ladder. Wizard-owned anti-over-engineering discipline (7 rungs), no gentle-ai equivalent."
 license: MIT
 metadata:
   author: hugoafj

@@ -66,16 +66,8 @@ def active_command_names(state):
     """Return the command list for this state (B7)."""
     names = list(ALWAYS_COMMANDS)
     ladder = builder_core.bool_feature(state, "decision_ladder")
-    tdd = builder_core.bool_feature(state, "tdd_protocol")
-    routing = builder_core.bool_feature(state, "routing_abc")
     if ladder:
         names.append("wf-ladder")
-    if tdd:
-        names.append("wf-tdd")
-    if routing or ladder or tdd:
-        names.append("wf-orchestrator")
-    if routing:
-        names.append("wf-sdd-trigger")
     return names
 
 
@@ -215,15 +207,17 @@ def write_testing_configs(raw, state, staging):
         cfg = builder_core.fetch_with_retries(
             builder_core.base_url(raw, "templates/protocols/testing/vitest.config.tmpl.md"))
         cfg = builder_core.extract_block(cfg, "typescript")
-        # Inject coverage fragment inside the test: { } block.
-        frag = builder_core.fetch_with_retries(
-            builder_core.base_url(raw, "templates/protocols/testing/coverage-thresholds.tmpl.md"))
-        frag = builder_core.strip_prose_header(frag)
+        # Inject coverage fragment inside the test: { } block. Skipped when the
+        # threshold is null, otherwise the config would render "lines: None".
         threshold = builder_core.get_state_value(state, "testing.coverage_threshold", "80")
-        frag = frag.replace("{{threshold}}", str(threshold))
-        # Indent the fragment to sit inside the test: { } block (F11).
-        frag = textwrap.indent(frag, "    ")
-        cfg = cfg.replace("test: {\n", "test: {\n" + frag + "\n")
+        if threshold is not None:
+            frag = builder_core.fetch_with_retries(
+                builder_core.base_url(raw, "templates/protocols/testing/coverage-thresholds.tmpl.md"))
+            frag = builder_core.strip_prose_header(frag)
+            frag = frag.replace("{{threshold}}", str(threshold))
+            # Indent the fragment to sit inside the test: { } block (F11).
+            frag = textwrap.indent(frag, "    ")
+            cfg = cfg.replace("test: {\n", "test: {\n" + frag + "\n")
         target = os.path.join(staging, "vitest.config.ts")
         with open(target, "w", encoding="utf-8") as fh:
             fh.write(cfg + "\n")
@@ -251,8 +245,8 @@ def write_testing_configs(raw, state, staging):
         # POM extra (field report B3): phase 4.6b offers "Page Object Model"
         # in its menu and the docs promised e2e/pages/, but neither builder
         # generated anything. Stage the minimal scaffold when active; real
-        # page objects emerge with features via sdd-apply following the
-        # AGENTS.md convention line.
+        # page objects emerge with features following the AGENTS.md
+        # convention line.
         if builder_core.get_state_value(state, "testing.page_object_model", False):
             pom = builder_core.fetch_with_retries(
                 builder_core.base_url(raw, "templates/protocols/testing/pom-example.tmpl.md"))

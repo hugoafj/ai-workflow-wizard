@@ -81,85 +81,52 @@ wf_state_set '.gentle_ai.os' "$OS"
 
 ---
 
-### Step 0.4b — Check gentle-ai sync freshness (hard stop, non-ignorable)
+### Step 0.4b: Check installed asset freshness (hard stop, non-ignorable)
 
-> **Why this step exists**: gentle-ai's own native SDD orchestrator/routing content (installed
-> per adapter — e.g. `~/.codeium/windsurf/memories/global_rules.md` for Windsurf/Devin) is only
-> updated by `gentle-ai sync`. If the user upgraded the `gentle-ai` binary but never ran `sync`,
-> that native content can be stale relative to the current binary — a documented, reproducible
-> source of agents skipping or inventing SDD phases (a stale orchestrator prompt). This check is
-> NOT optional and its result is NOT something the agent may silently decide to ignore.
+> **Why this step exists**: the ODD orchestrator content gentle-ai installs for each IDE
+> (e.g. `~/.codeium/windsurf/memories/global_rules.md` for Windsurf/Devin) is only updated by
+> `gentle-ai sync`. If the user upgraded the `gentle-ai` binary but never ran `sync`, the ODD
+> orchestrator content may be stale relative to the current binary, a documented source of agents
+> skipping or inventing workflow phases. This check is NOT optional and its result is NOT something
+> the agent may silently decide to ignore.
 
-First, capture the dry-run output to a variable:
+Read the asset check from `gentle-ai doctor` (read-only):
 
 ### [WIZARD ACTION]
 ```bash
-# Run sync dry-run, capturing both stdout and stderr
-if ! SYNC_OUTPUT=$(gentle-ai sync --dry-run 2>&1); then
-  SYNC_EXIT=$?
-  echo "⚠ gentle-ai sync --dry-run failed (exit $SYNC_EXIT):"
-  echo "$SYNC_OUTPUT"
-  echo ""
-  echo "Cannot determine sync status. What do you want to do?"
-  echo "  [retry]         — run gentle-ai sync --dry-run again"
-  echo "  [skip check]    — continue without sync verification (not recommended)"
-  echo "  [abort]         — stop wizard, fix gentle-ai first"
-  read -r SYNC_CHOICE
-  case "$SYNC_CHOICE" in
-    retry)
-      # Re-run the sync check (user must re-trigger this step)
-      echo "Please re-run the sync check step."
-      exit 1
-      ;;
-    skip*)
-      echo "ℹ Skipping sync check, continuing anyway"
-      wf_state_set '.gentle_ai.sync_stale_accepted' true
-      ;;
-    *)
-      echo "Aborted."
-      exit 1
-      ;;
-  esac
-else
-  # Classify output: "Apply steps: N" where N > 0 = REAL drift (gentle-ai doesn't list files in dry-run)
-  # "Apply steps: 0" / "Nothing to do" / "Up to date" = no drift
-  # Anything else / ambiguous = show verbatim and ask
-  if echo "$SYNC_OUTPUT" | grep -qE 'Apply steps: [1-9][0-9]*'; then
-    SYNC_HAS_DRIFT=true
-  elif echo "$SYNC_OUTPUT" | grep -qiE 'Apply steps: 0|Nothing to do|Up to date|up.to.date|no changes|no pending'; then
-    SYNC_HAS_DRIFT=false
-  else
-    SYNC_HAS_DRIFT="ambiguous"
-  fi
-fi
+# installed:asset_version compares the assets' recorded binary version with the running binary.
+# "[ok]" = current. "[!!]" = stale, and its remedy line says to run gentle-ai sync.
+DOCTOR_OUTPUT=$(gentle-ai doctor 2>&1)
+ASSET_LINE=$(echo "$DOCTOR_OUTPUT" | grep -E 'installed:asset_version' | head -1)
+
+case "$ASSET_LINE" in
+  *"[ok]"*) ASSET_STATUS="current" ;;
+  # A [!!] line, a missing line, or any other marker is NOT current: hard stop below.
+  *)        ASSET_STATUS="stale_or_unknown" ;;
+esac
+echo "ASSET_STATUS=$ASSET_STATUS"
 ```
 
-**If user chose "sync now"**: run `gentle-ai sync`, show its output, then **re-run `gentle-ai sync --dry-run` to confirm it now reports no pending changes** before continuing to Step 0.5.
+`gentle-ai sync --dry-run` is NOT used for this decision: its "Apply steps: N" counter is static plan
+metadata that prints the same value on every run, even right after a successful sync (field report B6),
+so it cannot prove freshness. Only the `[ok]` marker on the `installed:asset_version` line counts as
+current.
 
-Classify the output BEFORE deciding it reports drift (field report B6): static plan metadata —
-step counters like "Apply steps: N" or plan summaries that print identically on every run,
-even right after a real sync of hundreds of files — is NOT drift. A drift signal is an explicit
-statement about specific files that WOULD change/write/update now. Only such a listing counts
-as pending changes; if the output is ambiguous, show it verbatim to the user and ask instead
-of deciding either way.
+**If the line is `[ok]`**: continue silently to Step 0.5, no message needed.
 
-**If the output reports NO pending changes** (sync is current): continue silently to Step 0.5, no
-message needed.
-
-**If the output reports ANY pending changes**: this is a **hard stop**. Present the FULL output to
-the user verbatim (do not summarize or paraphrase what would change), then STOP and wait — the
-agent must NOT decide on the user's behalf to continue or to sync:
+**If the line is anything else** (a `[!!]` warning, a missing line, or an unrecognized marker): this is a
+**hard stop**. Present the line verbatim (or the full doctor output when the line is missing), then STOP
+and wait. The agent must NOT decide on the user's behalf to continue or to sync:
 
 ### [USER MESSAGE]
 ```
-⚠ gentle-ai's native content for your IDE(s) is out of sync with the installed gentle-ai version.
+⚠ gentle-ai reports that the installed assets for your IDE(s) are not current with the running binary:
 
-<paste $SYNC_OUTPUT here, verbatim>
+<paste the installed:asset_version line from gentle-ai doctor, verbatim>
 
-This matters because gentle-ai's own SDD orchestrator/routing rules — which this wizard's own
-protocols (wf-orchestrator, wf-sdd-trigger, wf-ladder, wf-tdd) explicitly defer to for all
-routing and delegation — may be stale until you sync. Continuing with stale native content is a
-known source of the agent skipping or inventing SDD phases.
+This matters because the ODD orchestrator content installed for your IDE(s) may be stale until you sync.
+Continuing with stale native content is a known source of the agent skipping or inventing
+workflow phases.
 
 What do you want to do?
   [sync now]         — run `gentle-ai sync` before continuing this wizard.
@@ -169,22 +136,8 @@ What do you want to do?
 ### ⏸ PAUSE — wait for the user's explicit response. Do not infer a choice, do not default to either option, and do not continue silently under any circumstance.
 
 ### [WIZARD ACTION]
-- If `sync now`: run `gentle-ai sync`, show its output, then **re-run `gentle-ai sync --dry-run` to confirm it now reports no pending changes** before continuing to Step 0.5.
-
-**If the output is ambiguous** (could not classify): present the FULL output verbatim and ask:
-
-### [USER MESSAGE]
-```
-⚠ gentle-ai sync --dry-run output could not be automatically classified:
-
-<paste $SYNC_OUTPUT here, verbatim>
-
-Does this indicate pending changes that should be synced?
-  [yes, sync now]    — run `gentle-ai sync` before continuing
-  [no, continue]     — proceed without syncing (record as sync_stale_accepted=true)
-```
-
-### ⏸ PAUSE — Waiting for user response...
+- If `sync now`: run `gentle-ai sync`, show its output, then **re-run `gentle-ai doctor` to confirm the `installed:asset_version` line is `[ok]`** before continuing to Step 0.5. If it is still not `[ok]`, present this hard stop again.
+- If `continue anyway`: run `wf_state_set '.gentle_ai.sync_stale_accepted' true`, then continue to Step 0.5.
 
 ---
 

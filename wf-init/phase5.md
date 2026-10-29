@@ -48,10 +48,10 @@ Examples: "don't install dependencies without approval", "never touch src/legacy
 wf_state_set '.wf_dir' '"/tmp/wf-init-phases"'
 ```
 
-Phase 5 always advances to `phase6a-agents`. Every conditional phase (4.5, 4.6,
-4.6b, 4.7) already ran BEFORE Phase 5 in the wizard flow, so there is no routing
-decision left to make here — routing back to a completed conditional phase would
-re-run it (regression: phase5↔phase45 / phase5↔phase47-cicd loop).
+Phase 5 always advances to `phase6a-agents`. Every conditional phase (4.6, 4.7)
+already ran BEFORE Phase 5 in the wizard flow, so there is no routing decision
+left to make here. Routing back to a completed conditional phase would re-run it
+(regression: phase5↔phase46 / phase5↔phase47-cicd loop).
 
 ---
 

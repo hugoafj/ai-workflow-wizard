@@ -20,41 +20,35 @@ fi
 
 ### Question — Feature selection
 
-Try the IDE's structured input tool (`question`, `ask_user_question`, `AskQuestion`, or equivalent) with all 6 options plus "none". If the tool is unavailable or doesn't support that many options, display:
+Try the IDE's structured input tool (`question`, `ask_user_question`, `AskQuestion`, or equivalent) with all 5 options plus "none". If the tool is unavailable or doesn't support that many options, display:
 
 ### [USER MESSAGE]
 ```
 What features do you want to configure in this project? Choose the numbers separated by commas, or "none":
 
 ────────────────────────────────────────────────────────────
-1. 🪜 wf-ladder (anti-over-engineering — 7 rungs
-   before implementing, without depending on wf-sdd-trigger or gentle-ai's SDD)
+1. 🪜 wf-ladder (anti-over-engineering: 7 rungs
+   before implementing. Optional)
 
-2. 🧪 wf-tdd (RED→GREEN per task. Independent from SDD
-   — only requires configured tests)
+2. 🧪 Set up testing (unit/integration/e2e)?
+   (test runner, configs and scripts for the layers you pick in Phase 4.6)
 
-3. 🚦 wf-sdd-trigger + wf-preflight + PRECHECK
-   (this wizard's own policy for when to explicitly request gentle-ai's SDD:
-   decision tree, wf-no-sdd/wf-force-sdd outcomes lock menu,
-   PRECHECK enforcement gate. Never redecides how gentle-ai itself routes or
-   delegates — that stays gentle-ai's own native authority)
-
-4. 🔧 CI (Quality Guard + AI review + conventional commits
+3. 🔧 CI (Quality Guard + AI review + conventional commits
    + release-please + optional security review + hooks)
 
-5. 🚀 CD (automatic deploy to VPS via GitHub Actions
+4. 🚀 CD (automatic deploy to VPS via GitHub Actions
    — PM2, Nginx+PHP-FPM, Docker)
 
-6. 📦 Release-please only
+5. 📦 Release-please only
    (automatic versioning on PRs via conventional commits +
    Husky hook. Only if you did NOT choose CI)
 ────────────────────────────────────────────────────────────
 
 Examples:
-  "1,2,3"  → Ladder + TDD + Routing (no CI/CD)
-  "1,3,4"  → Ladder + Routing + CI (no CD)
-  "4,5"    → Full CI + CD
-  "6"      → Release-please only (automatic versioning)
+  "1,2,3"  → Ladder + Testing + CI (no CD)
+  "3,4"    → Full CI + CD
+  "2"      → Testing only
+  "5"      → Release-please only (automatic versioning)
   "none"   → Only .gitignore + maintenance commands (wf-onboard, wf-worktree, wf-settings)
 ```
 
@@ -65,9 +59,8 @@ Parse the selected features and proceed.
 
 ### Combination validations
 
-- If they choose 4 and 6: ask "Release-please standalone is included in CI. Should I remove 6 and keep only 4? [yes / no]"
-- If they choose 3 without 1: ask "SDD Routing activates the full SDD-forcing policy (wf-sdd-trigger + wf-preflight) but not the Ladder. If you want anti-over-engineering rungs, also add option 1. Should I add 1? [yes / no]"
-- If they choose 5 without 4: ask "CD without CI works, but you won't have Quality Guard or AI review on your PRs. Do you confirm only CD? [yes / no]"
+- If they choose 3 and 5: ask "Release-please standalone is included in CI. Should I remove 5 and keep only 3? [yes / no]"
+- If they choose 4 without 3: ask "CD without CI works, but you won't have Quality Guard or AI review on your PRs. Do you confirm only CD? [yes / no]"
 
 ### Persistence
 
@@ -91,8 +84,7 @@ USER_SELECTION="<parsed from user response>"
 
 # Initialize all to false
 LADDER=false
-TDD=false
-ROUTING=false
+TESTING=false
 CI=false
 CD=false
 RELEASE=false
@@ -104,29 +96,22 @@ if [ "$USER_SELECTION" != "none" ] && [ -n "$USER_SELECTION" ]; then
     opt=$(echo "$opt" | xargs)  # trim
     case "$opt" in
       1) LADDER=true ;;
-      2) TDD=true ;;
-      3) ROUTING=true ;;
-      4) CI=true ;;
-      5) CD=true ;;
-      6) RELEASE=true ;;
+      2) TESTING=true ;;
+      3) CI=true ;;
+      4) CD=true ;;
+      5) RELEASE=true ;;
     esac
   done
 fi
 
 # Combination validations (ask before persisting)
-# 4 and 6: release-please is included in CI
+# 3 and 5: release-please is included in CI
 if [ "$CI" = true ] && [ "$RELEASE" = true ]; then
-  # Agent asks: "Release-please standalone is included in CI. Should I remove 6 and keep only 4?"
+  # Agent asks: "Release-please standalone is included in CI. Should I remove 5 and keep only 3?"
   # If yes: RELEASE=false
 fi
 
-# 3 without 1: routing without ladder
-if [ "$ROUTING" = true ] && [ "$LADDER" = false ]; then
-  # Agent asks: "SDD Routing activates the full SDD-forcing policy but not the Ladder. Add option 1?"
-  # If yes: LADDER=true
-fi
-
-# 5 without 4: CD without CI
+# 4 without 3: CD without CI
 if [ "$CD" = true ] && [ "$CI" = false ]; then
   # Agent asks: "CD without CI works, but you won't have Quality Guard or AI review. Confirm only CD?"
   # If no: CD=false
@@ -134,8 +119,7 @@ fi
 
 # Persist — pass booleans as strings, jq --arg in wf_state_set will parse them correctly
 wf_state_set '.features.decision_ladder' "$LADDER"
-wf_state_set '.features.tdd_protocol' "$TDD"
-wf_state_set '.features.routing_abc' "$ROUTING"
+wf_state_set '.features.testing' "$TESTING"
 wf_state_set '.features.ci' "$CI"
 wf_state_set '.features.cd' "$CD"
 wf_state_set '.features.release_please' "$RELEASE"

@@ -3,14 +3,12 @@
 Explicitly apply this wizard's own `wf-ladder` (Decision Ladder) for the next implementation.
 
 This is a wizard-owned command (prefix `wf-`), independent from gentle-ai. It never decides
-whether to use gentle-ai's SDD, nor how gentle-ai delegates — see `wf-sdd-trigger` for that axis.
+how gentle-ai delegates or routes work.
 
 ## Activation Contract
 
-Load before proposing any implementation, and before `wf-preflight` (see `wf-sdd-trigger`, when
-this project has the routing feature active) — regardless of whether the change ends up as direct
-work or forced SDD. This is a wizard-owned protocol (prefix `wf-`), independent from gentle-ai:
-it never decides whether to use gentle-ai's SDD, nor how to delegate.
+Load before proposing any implementation. This is a wizard-owned protocol (prefix `wf-`),
+independent from gentle-ai: it never decides how to delegate.
 
 ## Hard Rules
 
@@ -38,12 +36,7 @@ it never decides whether to use gentle-ai's SDD, nor how to delegate.
 3. Emit the Output Contract with the rungs evaluated up to that point.
 4. Pause explicitly and wait for the user to review and confirm the ladder rungs before
    continuing (e.g., "Review these rungs and say 'continue' or 'no, let me clarify X'").
-5. After user confirmation: if this project's routing feature is active, continue to
-   `wf-sdd-trigger` — its classification uses this result as input (e.g. detecting "already exists
-   in the code" at rung 2 may inform the SDD decision). If routing is not active, proceed directly
-   to `wf-tdd` (if active) or to implementation.
-6. When routing is active and `wf-sdd-trigger` results in forced SDD, repeat this ladder once per
-   task inside gentle-ai's `sdd-apply`, once delegated — not for the full pipeline.
+5. After user confirmation, proceed to the implementation, using the ladder result as its basis.
 
 ## Output Contract
 
@@ -54,8 +47,3 @@ it never decides whether to use gentle-ai's SDD, nor how to delegate.
   ...
   ✓ Rung N — <what is used or done and why>
 ```
-
-## References
-
-- `wf-sdd-trigger` — (when this project has the routing feature active) consumes this result as input to `wf-preflight`.
-- `wf-orchestrator` — single entry point that sequences this protocol with `wf-sdd-trigger`/`wf-tdd`.

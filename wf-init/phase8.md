@@ -300,272 +300,6 @@ fi
 > Use heredocs for any file you manually rewrite (avoid variable
 > expansion). The hook already comes VERBATIM from the template; don't edit it when copying.
 
-### 8.1d SDD config.yaml targeted edit (openspec/hybrid backend only)
-
-**Gate**: only if `openspec/config.yaml` exists (created by gentle-ai's `sdd-init` skill,
-slash: `/sdd-init`, or `/gentle-sdd-init` in Claude Code, in Phase 4.5). Skip entirely if the
-backend is engram-only — there is no config.yaml to edit.
-
-The wizard NEVER regenerates or stamps `openspec/config.yaml` — it is the exclusive artifact
-of the `sdd-init` skill (BLOCK RULE, protocol `sdd`, "Wizard-Allowed Field Edits"). This step performs
-the targeted leaf-field edit deferred from Phase 4.6b: it writes the activated testing
-configuration into the EXISTING file using gentle-ai's canonical schema — the exact shape its
-SDD skills read. Do NOT invent new top-level keys (`configured`, `planned`, `extras`,
-`conventions`, `checks_before_done`): no gentle-ai consumer reads them, and they would just
-accumulate dead data in the file.
-
-**Canonical schema (gentle-ai source of truth — `_shared/openspec-convention.md`,
-`docs/openspec-config.md`, the repo's own `openspec/config.yaml`):**
-
-```yaml
-strict_tdd: true              # top-level — Phase 4.6 owns this, leave it alone
-rules:
-  apply:
-    guidelines: [...]         # phase rules; leave as-is
-    tdd: false                # leave as-is
-    test_command: "npm test"  # ← sdd-apply strict-tdd reads rules.apply.test_command (override)
-  verify:
-    test_command: "npm run test:coverage"  # ← sdd-verify runs {test_command} --coverage (Step 5d); use the coverage script so the report is real — npm swallows a bare --coverage flag
-    build_command: "npm run build"         # ← sdd-verify runs this
-    coverage_threshold: 0     # ← sdd-verify enforces this (docs/openspec-config.md)
-testing:
-  strict_tdd: true            # Phase 4.6 owns this, leave it alone
-  detected: "YYYY-MM-DD"      # leave as-is
-  runner:
-    command: "npm test"       # ← sdd-apply detects the runner here (testing section)
-    framework: "Vitest"
-  layers:
-    unit:        {available: true, tool: "vitest"}       # ← capability cache
-    integration: {available: true, tool: "vitest"}
-    e2e:         {available: true, tool: "playwright"}
-  coverage:
-    available: true           # ← capability cache
-    command: "npm run test:coverage"
-  quality:
-    linter: {...}             # leave as-is — detected by sdd-init
-    type_checker: {...}
-    formatter: {...}
-```
-
-Map the wizard's activated extras onto THESE fields (not onto invented ones):
-`testing.runner.framework`, `testing.layers.<layer>.{available,tool}`,
-`testing.coverage.{available,command}` (coverage extra), `rules.verify.coverage_threshold`
-(coverage extra), `rules.apply.test_command` + `rules.verify.{test_command,build_command}`
-(always). `visual_regression` and `page_object_model` stay in `.wizard-state.json` only —
-gentle-ai has no field for them; they surface in the generated `playwright.config.ts` / `e2e/pages/`.
-
-Resolve the values from state (flat schema — `testing.coverage_threshold`, not `testing.extras.*`):
-
-```bash
-if [ -f openspec/config.yaml ]; then
-  UNIT=$(jq -r '.testing.layers | index("unit") != null' .wizard-state.json)
-  INTEGRATION=$(jq -r '.testing.layers | index("integration") != null' .wizard-state.json)
-  E2E=$(jq -r '.testing.layers | index("e2e") != null' .wizard-state.json)
-  if [ "$UNIT" = "true" ] && [ "$E2E" = "true" ]; then FRAMEWORK="Vitest + Playwright"
-  elif [ "$E2E" = "true" ]; then FRAMEWORK="Playwright"
-  else FRAMEWORK="Vitest"; fi
-  COVERAGE=$(jq -r '.testing.coverage_threshold != null' .wizard-state.json)
-  COVERAGE_THRESHOLD=$(jq -r '.testing.coverage_threshold // null' .wizard-state.json)
-else
-  echo "8.1d skipped — no openspec/config.yaml (engram backend or /sdd-init not run)."
-fi
-```
-
-Apply the edits with `yq` (same tool Phase 4.6 already uses for `strict_tdd`) — atomic,
-idempotent, preserves every other key byte-for-byte. `yq` creates any missing parent keys in the
-canonical location, so this also works when `/sdd-init` wrote a file without a top-level
-`testing:`/`rules:` block.
-
-**If `yq` is unavailable** (install failed or no package manager): do NOT skip this step and
-do NOT tell the user to update the file by hand. Apply the same edits with your `edit` tool on
-`openspec/config.yaml` — changing ONLY the allowed leaf fields (Wizard-Allowed Field Edits),
-preserving every other line byte-for-byte, and creating missing parent keys
-(`testing.runner`, `testing.layers.<layer>`, `rules.verify`) only when the file lacks them:
-
-| Value | Apply if |
-|---|---|
-| `testing.runner.framework = "$FRAMEWORK"` | always |
-| `testing.layers.unit.available = true` + `testing.layers.unit.tool = "vitest"` | unit or integration active |
-| `testing.layers.integration.available = true` + `testing.layers.integration.tool = "vitest"` | integration active |
-| `testing.layers.e2e.available = true` + `testing.layers.e2e.tool = "playwright"` | e2e active |
-| `testing.coverage.available = true` + `testing.coverage.command = "npm run test:coverage"` + `rules.verify.coverage_threshold = $COVERAGE_THRESHOLD` | coverage activated |
-| `rules.apply.test_command = "npm test"` + `rules.verify.test_command = "npm test"` + `rules.verify.build_command = "npm run build"` | always when testing configured |
-| `rules.verify.test_command = "npm run test:coverage"` **instead of** `"npm test"` | coverage activated — npm swallows a bare `--coverage` flag (`npm test --coverage` runs WITHOUT coverage), so the test_command must be a script that already enables it for sdd-verify's `{test_command} --coverage` (strict-tdd-verify Step 5d) to produce a real report |
-
-With `yq` available, apply the edits atomically in a single bash subshell (variables resolved + used
-in same scope):
-
-```bash
-if [ -f openspec/config.yaml ]; then
-  # 1. Resolve values from state
-  UNIT=$(jq -r '.testing.layers | index("unit") != null' .wizard-state.json)
-  INTEGRATION=$(jq -r '.testing.layers | index("integration") != null' .wizard-state.json)
-  E2E=$(jq -r '.testing.layers | index("e2e") != null' .wizard-state.json)
-  if [ "$UNIT" = "true" ] && [ "$E2E" = "true" ]; then FRAMEWORK="Vitest + Playwright"
-  elif [ "$E2E" = "true" ]; then FRAMEWORK="Playwright"
-  else FRAMEWORK="Vitest"; fi
-  COVERAGE=$(jq -r '.testing.coverage_threshold != null' .wizard-state.json)
-  COVERAGE_THRESHOLD=$(jq -r '.testing.coverage_threshold // null' .wizard-state.json)
-
-  # 2. Ensure Go mikefarah/yq is available (pip3's kislyuk/yq does NOT support `eval -i`)
-  if ! command -v yq &>/dev/null || ! yq --version 2>/dev/null | grep -q "mikefarah"; then
-    if command -v yq &>/dev/null && yq --version 2>/dev/null | grep -q "kislyuk"; then
-      echo "8.1d WARNING — detected Python yq wrapper (kislyuk); it does not support 'eval -i'." >&2
-    fi
-
-    YQ_INSTALL_DIR="${HOME}/.local/bin"
-    mkdir -p "$YQ_INSTALL_DIR"
-
-    case "$(uname -s)-$(uname -m)" in
-      Linux-x86_64)     YQ_BINARY="yq_linux_amd64" ;;
-      Linux-aarch64|Linux-arm64) YQ_BINARY="yq_linux_arm64" ;;
-      Darwin-x86_64)    YQ_BINARY="yq_darwin_amd64" ;;
-      Darwin-arm64)     YQ_BINARY="yq_darwin_arm64" ;;
-      *)
-        echo "8.1d ERROR — unsupported platform for automatic yq install ($(uname -s)-$(uname -m))." >&2
-        echo "        Install Go yq from https://github.com/mikefarah/yq and re-run this step." >&2
-        exit 1
-        ;;
-    esac
-
-    echo "8.1d INFO — installing Go yq (${YQ_BINARY}) to ${YQ_INSTALL_DIR}..."
-    if command -v curl &>/dev/null; then
-      curl -fsSL "https://github.com/mikefarah/yq/releases/latest/download/${YQ_BINARY}" -o "$YQ_INSTALL_DIR/yq"
-    elif command -v wget &>/dev/null; then
-      wget -q "https://github.com/mikefarah/yq/releases/latest/download/${YQ_BINARY}" -O "$YQ_INSTALL_DIR/yq"
-    else
-      echo "8.1d ERROR — curl or wget is required to install yq." >&2
-      exit 1
-    fi
-    chmod +x "$YQ_INSTALL_DIR/yq"
-    export PATH="$YQ_INSTALL_DIR:$PATH"
-
-    # Verify yq is actually available (use full path as fallback)
-    if ! command -v yq &>/dev/null; then
-      if [ -x "$YQ_INSTALL_DIR/yq" ]; then
-        YQ_CMD="$YQ_INSTALL_DIR/yq"
-      else
-        echo "8.1d ERROR — yq install to ${YQ_INSTALL_DIR} failed or the directory is not in PATH." >&2
-        exit 1
-      fi
-    else
-      YQ_CMD="yq"
-    fi
-  fi
-
-  # 3. Apply edits with yq (variables UNIT, E2E, FRAMEWORK now available in same subshell)
-  if [ -n "$YQ_CMD" ]; then
-    # 3a. Scalar-in-path guard (field report B1): `yq eval '.a.b = v'` over a
-    # path whose parent holds a SCALAR is a silent no-op — neither error nor
-    # write. Some sdd-init runs leave `runner: vitest` (string) or
-    # `coverage: true` (bool) behind; setting their sub-keys then loses data.
-    # Delete any non-map node first so the canonical maps below are recreated.
-    for LEAF_PATH in .testing.runner .testing.coverage \
-                     .testing.layers.unit .testing.layers.integration .testing.layers.e2e; do
-      KIND=$($YQ_CMD eval "${LEAF_PATH} | type" openspec/config.yaml)
-      if [ -n "$KIND" ] && [ "$KIND" != "!!map" ] && [ "$KIND" != "!!null" ]; then
-        echo "8.1d INFO — ${LEAF_PATH} held a scalar (${KIND}); normalized to canonical map (expected for sdd-init output)."
-        $YQ_CMD eval "del(${LEAF_PATH})" -i openspec/config.yaml
-      fi
-    done
-
-    # Runner: sdd-apply detects it from the testing section
-    $YQ_CMD eval ".testing.runner.framework = \"$FRAMEWORK\"" -i openspec/config.yaml
-
-    # Layers capability cache: sdd-apply/verify uses available + tool per layer
-    if [ "$UNIT" = "true" ] || [ "$INTEGRATION" = "true" ]; then
-      $YQ_CMD eval '.testing.layers.unit.available = true' -i openspec/config.yaml
-      $YQ_CMD eval '.testing.layers.unit.tool = "vitest"' -i openspec/config.yaml
-    fi
-    if [ "$INTEGRATION" = "true" ]; then
-      $YQ_CMD eval '.testing.layers.integration.available = true' -i openspec/config.yaml
-      $YQ_CMD eval '.testing.layers.integration.tool = "vitest"' -i openspec/config.yaml
-    fi
-    if [ "$E2E" = "true" ]; then
-      $YQ_CMD eval '.testing.layers.e2e.available = true' -i openspec/config.yaml
-      $YQ_CMD eval '.testing.layers.e2e.tool = "playwright"' -i openspec/config.yaml
-    fi
-
-    # Coverage: capability cache + sdd-verify threshold (only if activated)
-    if [ "$COVERAGE" = "true" ]; then
-      $YQ_CMD eval '.testing.coverage.available = true' -i openspec/config.yaml
-      $YQ_CMD eval '.testing.coverage.command = "npm run test:coverage"' -i openspec/config.yaml
-      $YQ_CMD eval ".rules.verify.coverage_threshold = $COVERAGE_THRESHOLD" -i openspec/config.yaml
-    fi
-
-    # Command overrides: always when testing configured
-    $YQ_CMD eval '.rules.apply.test_command = "npm test"' -i openspec/config.yaml
-    # npm swallows bare --coverage: `npm test --coverage` runs WITHOUT coverage.
-    # sdd-verify runs {test_command} --coverage (strict-tdd Step 5d), so when coverage
-    # is activated the verify command must be the script that already enables it.
-    if [ "$COVERAGE" = "true" ]; then
-      $YQ_CMD eval '.rules.verify.test_command = "npm run test:coverage"' -i openspec/config.yaml
-    else
-      $YQ_CMD eval '.rules.verify.test_command = "npm test"' -i openspec/config.yaml
-    fi
-    $YQ_CMD eval '.rules.verify.build_command = "npm run build"' -i openspec/config.yaml
-  else
-    echo "8.1d ERROR — yq is not available and could not be installed." >&2
-    echo "        Apply the openspec edits with your edit tool using the table above," >&2
-    echo "        then re-run this step. Do NOT continue without applying them." >&2
-    exit 1
-  fi
-fi
-```
-
-Never copy from `templates/protocols/sdd/config.yaml.tmpl.md` — it is a field reference, not a
-file to stamp. Leave `strict_tdd` alone — Phase 4.6 owns that field. `yq` writes to the canonical
-nesting (`rules.verify.*`, `testing.*`) even when the real file was written by `sdd-init` at a
-different nesting — that is correct: gentle-ai's consumers read the canonical location. If you
-find the file already carries the same value at a non-canonical nesting (older `sdd-init`
-output), leave the old key in place and confirm the canonical one is now set; if in doubt, ask
-the user.
-
-Verify EVERY edit landed — assert each written field reads back with its exact value before
-declaring OK (field report B1: two writes were lost silently and only a per-field readback
-would have caught them):
-
-```bash
-if [ -f openspec/config.yaml ]; then
-  ASSERT_FAIL=0
-  _assert_eq() {
-    GOT=$($YQ_CMD eval "$1" openspec/config.yaml)
-    if [ "$GOT" != "$2" ]; then
-      echo "8.1d ERROR — $1 => '$GOT' (expected '$2') — the write did NOT land." >&2
-      ASSERT_FAIL=1
-    fi
-  }
-  _assert_eq '.testing.runner.framework' "$FRAMEWORK"
-  if [ "$UNIT" = "true" ]; then
-    _assert_eq '.testing.layers.unit.available' "true"
-    _assert_eq '.testing.layers.unit.tool' "vitest"
-  fi
-  if [ "$INTEGRATION" = "true" ]; then
-    _assert_eq '.testing.layers.integration.available' "true"
-    _assert_eq '.testing.layers.integration.tool' "vitest"
-  fi
-  if [ "$E2E" = "true" ]; then
-    _assert_eq '.testing.layers.e2e.available' "true"
-    _assert_eq '.testing.layers.e2e.tool' "playwright"
-  fi
-  if [ "$COVERAGE" = "true" ]; then
-    _assert_eq '.testing.coverage.available' "true"
-    _assert_eq '.testing.coverage.command' "npm run test:coverage"
-    _assert_eq '.rules.verify.coverage_threshold' "$COVERAGE_THRESHOLD"
-    _assert_eq '.rules.verify.test_command' "npm run test:coverage"
-  else
-    _assert_eq '.rules.verify.test_command' "npm test"
-  fi
-  _assert_eq '.rules.apply.test_command' "npm test"
-  _assert_eq '.rules.verify.build_command' "npm run build"
-  if [ "$ASSERT_FAIL" -ne 0 ]; then
-    echo "8.1d ERROR — one or more canonical fields missing after write; do not continue." >&2
-    exit 1
-  fi
-  echo "8.1d OK — all canonical fields verified"
-fi
-```
-
 ### 8.1e Testing scripts + Playwright MCP registration (project files, only if testing configured)
 
 The builder only stages NEW files. `package.json` and the IDE MCP settings are real project
@@ -685,8 +419,7 @@ fi
 IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
 
 # Refresh gentle-ai's skill registry so its own Skill Resolver Protocol picks up
-# this project's wf-* skills (wf-orchestrator, wf-ladder, wf-sdd-trigger, wf-tdd,
-# wf-onboard, wf-worktree, wf-settings)
+# this project's wf-* skills (wf-ladder, wf-onboard, wf-worktree, wf-settings)
 # right away, instead of waiting for the next commit's post-commit hook.
 # Fix #20: Only run for IDEs that use .atl/skill-registry.md (Claude Code, OpenCode, Cursor, Kiro, Codex)
 # Windsurf/Devin discover project skills natively from filesystem — no-op for them.
@@ -732,8 +465,6 @@ git add -f .github/workflows/ 2>/dev/null || true
 git add -f .husky/ .commitlintrc.json .gga release-please-config.json .release-please-manifest.json
 [ -f package.json ] && git add package.json 2>/dev/null || true
 [ -f package-lock.json ] && git add package-lock.json 2>/dev/null || true
-# SDD artifacts (openspec/): created by sdd-init in Phase 4.5 + targeted edit in 8.1d
-git add openspec/ 2>/dev/null || true
 git add .gitignore
 
 WF_VER=$(jq -r '.wizard_version // "0.0.0"' .wizard-state.json)
@@ -746,7 +477,7 @@ git commit -m "chore: initialize AI Workflow Wizard
 - Add AGENTS.md router (thin) pointing to packaged protocols
 - Add protocols as IDE native skills + universal .agents/skills + flat files (.agents/protocols)
 - Add satellite files for configured IDEs
-- Add project commands: wf-ladder, wf-tdd, wf-orchestrator, wf-sdd-trigger
+- Add project command: wf-ladder (when the decision ladder is selected)
 - Add project commands: wf-onboard, wf-worktree, wf-settings
 - Add post-commit hook for drift detection
 - Add CI/CD (Block 6): AI review, quality guard, conventional commits
@@ -802,8 +533,8 @@ Next steps:
 5. To validate: ask the agent "read AGENTS.md and tell me its main sections".
 
 6. For your first task, describe it in natural language.
-   The agent (via `wf-orchestrator`/`wf-sdd-trigger`) will classify it as `wf-no-sdd` (direct),
-   or confirmed `wf-force-sdd` route.
+   The agent applies gentle-ai's native ODD workflow: it explores first and
+   only writes code when the request explicitly asks for a change.
 
 7. When the project evolves (new dependencies, new test frameworks, etc.),
    run /wf-refresh to keep AGENTS.md synchronized.
@@ -877,7 +608,7 @@ Next steps:
   1. Open the project in your preferred AI IDE.
   2. Start a new session — the agent will read AGENTS.md automatically.
   3. To validate: ask the agent "read AGENTS.md and tell me its main sections".
-  4. For your first SDD feature, describe the task in natural language.
+  4. For your first feature, describe the task in natural language.
 
 <if state.cd.missing_secrets is non-empty>:
   ⚠ MISSING SECRETS — these workflows will fail until you configure them:

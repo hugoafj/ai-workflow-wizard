@@ -69,7 +69,7 @@ create the worktrees ("launch a worktree for X"), it's `new` — the developer
 will work there themselves later, in another session. If the developer describes
 the changes themselves AND asks for the result to end up merged ("I want change A
 and change B... in the end merge to this branch"), it's `parallel` — the agent
-itself implements, commits, and merges end to end, with the Phase 4.5 review
+itself implements, commits, and merges end to end, with the Step 4.5 review
 gate before touching your current branch.
 
 If the phrase is ambiguous (for example, "worktree for feature x" without a
@@ -415,9 +415,8 @@ implementation.
 
 For each created worktree, in its own folder (`cd ../<repo>-<task>`),
 implement the corresponding change as described by the developer.
-Treat it as a direct natural language small change — **without invoking
-SDD or requiring tests**, unless the developer explicitly asked for it
-for that change.
+Treat it as a direct natural language small change, **without requiring
+tests** unless the developer explicitly asked for them for that change.
 
 Before committing each one, show what you are going to commit and wait for
 confirmation — the commit inside each worktree is not an exception to your

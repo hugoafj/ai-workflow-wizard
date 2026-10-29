@@ -1,6 +1,6 @@
 ---
 name: wf-settings
-description: "Trigger: change wizard settings, toggle TDD mode, testing extras, decision ladder, SDD backend, IDEs/CLIs. Wizard-owned settings — toggles optional workflow modules after installation."
+description: "Trigger: change wizard settings, toggle testing infrastructure, testing extras, decision ladder, IDEs/CLIs. Wizard-owned settings that toggle optional workflow modules after installation."
 license: MIT
 metadata:
   author: hugoafj

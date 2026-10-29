@@ -21,7 +21,7 @@ Detects project drift and applies updates safely:
 5. **Phase R3**: Re-run Builder (B1-B9) to generate all artifacts into `.wizard-staging/` (first snapshots the pre-Builder `managed_paths`/`generated_files` into `.wizard-refresh-baseline.json`)
 6. **Phase R4**: Compare the R3 baseline snapshot with staging using SHA256 hashes; classify files as add/update/delete/unchanged, with `deleted_modified` flagged when the user edited a file since the last refresh
 7. **Phase R5**: Show a real content preview (added → staged content; updated → `diff -u` against staging; deleted/deleted_modified → current content) and collect your approvals
-8. **Phase R6**: Apply approved changes only; on approval update state, write `.wizard-managed-files.json`, and commit via an explicit pathspec; a fully declined refresh writes nothing
+8. **Phase R6**: Apply approved changes only; on approval commit via an explicit pathspec, then update state and write `.wizard-managed-files.json` (a failed commit rolls the working tree, index and state back); a fully declined refresh writes nothing
 
 ---
 
@@ -79,10 +79,10 @@ fi
 # Wizard repository
 WIZARD_REPO="hugoafj/ai-workflow-wizard"
 WIZARD_BRANCH="main"
-WF_RAW="https://raw.githubusercontent.com/${WIZARD_REPO}/${WIZARD_BRANCH}"
+WF_RAW="${WF_RAW:-https://raw.githubusercontent.com/${WIZARD_REPO}/${WIZARD_BRANCH}}"
 
 # Local directory for downloaded refresh files (temporary, can be cleaned later)
-WF_DIR="/tmp/wf-refresh-phases"
+WF_DIR="${WF_DIR:-/tmp/wf-refresh-phases}"
 rm -rf "$WF_DIR"
 mkdir -p "$WF_DIR"
 mkdir -p "$WF_DIR/lib"
@@ -331,7 +331,7 @@ Each phase script is extracted from `refresher.md` and executed as a standalone 
 
 ### Phase R5 exits with code 3 (review prompts and/or apply mode)
 
-- **Issue**: In a non-interactive run, review prompts (`Apply added files?`, `Apply updated files?`, `Delete removed files?`, `Delete these modified files?`, `Overwrite locally-modified files?`, `Append these .gitignore entries...`) and/or the apply decision were unanswered. R5 emits ONE manifest listing everything still missing — `GENTLE_AI_WF_REFRESH_NEEDS=prompt=...|apply_mode=` — and stops BEFORE applying anything. This is expected control flow.
+- **Issue**: In a non-interactive run, review prompts (`Apply added files?`, `Apply updated files?`, `Delete removed files?`, `Delete these modified files?`, `Overwrite locally-modified files?`, `Append these .gitignore entries...`, `Remove the SDD openspec/ directory from this project?`) and/or the apply decision were unanswered. R5 emits ONE manifest listing everything still missing (`GENTLE_AI_WF_REFRESH_NEEDS=prompt=...|apply_mode=`) and stops BEFORE applying anything. This is expected control flow.
 - **Solution**: Set `WF_REFRESH_ANSWERS='Apply added files?=yes|Apply updated files?=no'` using the exact prompt strings from the manifest, AND set `WF_REFRESH_APPLY_MODE`, then re-run with `WF_REFRESH_RESUME=1`. Already-answered prompts drop off the list automatically on the next pass.
 
 ### Apply gate: WF_REFRESH_APPLY_MODE
@@ -375,8 +375,8 @@ A missing value emits `GENTLE_AI_WF_REFRESH_NEEDS=apply_mode=` with exit 3 (same
 
 ### Phase R6 fails (apply)
 
-- **Issue**: Git operations fail
-- **Solution**: Check git status; may need to commit or stash changes first
+- **Issue**: Git operations fail (for example a pre-commit hook rejects the commit)
+- **Solution**: The apply rolls back the working tree, the index and the state, so nothing is left half-applied. Fix the cause, then run /wf-refresh again
 
 ---
 
@@ -425,6 +425,16 @@ Each file in staging is compared with the project using SHA256 hashes:
 - **Added**: File only in staging → proposed for addition
 - **Deleted**: File only in project and marked as wizard-managed, unchanged → proposed for deletion
 - **Deleted-modified**: File in old `managed_paths`, not in new staging, but project hash differs from recorded hash → flagged for explicit approval
+
+### Retired SDD files (schema 4)
+
+Installs from before the SDD removal carry retired files (`wf-tdd`, `wf-sdd-trigger`, `wf-orchestrator`, `sdd-lite`, `sdd/*` protocols, `sdd-new.md`). A refresh handles them as follows:
+- A retired file is deleted only when its hash matches the recorded hash. Edited or unrecorded copies go to the deleted-modified approval, and nothing is removed silently. A retired file with no HEAD entry (you created or staged it) is never offered for removal. The refresh keeps it and says so once.
+- A removal you decline is recorded in `.migrations.retired_pending` and offered again on the next refresh.
+- State moves to schema 4. `features.tdd_protocol` becomes `features.testing`, so test infrastructure stays. `phases.phase45` and `phases.phase46b` are dropped, and an in-flight pointer on either one moves to `phase46`.
+- `openspec/` is removed only after an explicit "yes" to `Remove the SDD openspec/ directory from this project?` (default No). It is removed only when git tracks it and it is clean. Tracked files are removed; ignored or untracked leftovers stay.
+- A stale SDD `.wf-status` is deleted once. The post-commit hook regenerates it when drift appears.
+- SDD text inside your `<!-- WF: DO NOT REGENERATE -->` blocks is reported with line numbers. Remove those lines by hand, because the refresh never rewrites your blocks.
 
 ### Wizard-managed files
 

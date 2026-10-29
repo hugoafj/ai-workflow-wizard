@@ -23,11 +23,11 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
    pointers). Framework rules are NEVER copied here — they live in
    `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/`.
 
-## Schema (schema_version 3)
+## Schema (schema_version 4)
 
 ```json
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "wizard_version": "<auto: VERSION file in workflow-wizard>",
   "phase_pointer": "phase0",
   "started_at": "ISO-8601",
@@ -42,9 +42,7 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
     "phase3":   { "status": "pending" },
     "phase4":   { "status": "pending" },
     "phase5":   { "status": "pending" },
-    "phase45":  { "status": "pending" },
     "phase46":  { "status": "pending" },
-    "phase46b": { "status": "pending" },
     "phase47-cicd": { "status": "pending" },
     "phase6":        { "status": "pending" },
     "phase6a-agents": { "status": "pending" },
@@ -86,8 +84,7 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
 
   "features": {
     "decision_ladder": null,
-    "tdd_protocol": null,
-    "routing_abc": null,
+    "testing": false,
     "ci": null,
     "cd": null,
     "release_please": null,
@@ -96,16 +93,9 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
 
   "agents": [],
 
-  "sdd": {
-    "backend": null,
-    "already_initialized": false,
-    "refresh_requested": null
-  },
-
   "testing": {
     "runner_detected": null,
     "layers": [],
-    "tdd_mode": null,
     "coverage_threshold": null,
     "visual_regression": false,
     "page_object_model": false
@@ -177,7 +167,8 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
   engineering). Feeds the AGENTS.md **Project Structure** section; when absent the Builder
   falls back to `"flat"`.
 - **`answers.ides`**: determines which satellites/commands/packed protocols are generated.
-- **`testing.tdd_mode`**: `standard` | `strict` → selects `templates/commands/wf-tdd/variants/{standard,strict}.md`.
+- **`features.testing`**: `true` when the user chose test infrastructure in phase 0c. Gates the
+  test-infra phase (`phase46`).
 - **`build_plan`**: populated by the Builder with the exact list of artifacts to write.
   - `generated_files[]`: array of `{ path, hash, managed }` for every file written to staging.
   - `managed_paths[]`: array of project-relative paths that the wizard owns (for deletion detection in `/wf-refresh`).

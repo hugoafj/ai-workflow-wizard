@@ -1,14 +1,14 @@
-## PHASE 4.6 — Testing stack setup — conditional
+## PHASE 4.6: Testing stack setup (conditional)
 
-> **Gate**: only runs if `features.tdd_protocol == true`.
+> **Gate**: only runs if `features.testing == true`. This phase covers the test layers, the wiring check, the test infrastructure and the optional testing extras (coverage threshold, visual regression, POM).
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
-FEATURES_TDD=$(jq -r '.features.tdd_protocol // false' .wizard-state.json)
-if [ "$FEATURES_TDD" != "true" ]; then
-  echo "PHASE 4.6 skipped — TDD Protocol not selected."
+FEATURES_TESTING=$(jq -r '.features.testing // false' .wizard-state.json)
+if [ "$FEATURES_TESTING" != "true" ]; then
+  echo "PHASE 4.6 skipped: testing not selected."
   NEXT=
   if [ "$(jq -r '.features.ci // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.cd // false' .wizard-state.json)" = "true" ] || [ "$(jq -r '.features.release_please // false' .wizard-state.json)" = "true" ]; then
     NEXT="phase47-cicd"
@@ -22,7 +22,7 @@ if [ "$FEATURES_TDD" != "true" ]; then
 fi
 ```
 
-The testing stack converts `sdd-apply` from "implement and hope it works" to "implement and the pipeline automatically verifies". Without this phase, `checks_before_done` only has `lint + build`. With this phase it adds `test`, `test:e2e`, or both depending on what the user activates.
+The testing stack lets the pipeline verify each change automatically. Without this phase, the checks before done only cover lint and build. With it, they add `test`, `test:e2e`, or both, depending on the layers you activate.
 
 This phase is optional but highly recommended. If the user prefers to configure it later, they can run `/wf-onboard` when they install a test runner.
 
@@ -56,13 +56,13 @@ crashing.
 ```
 No configured testing framework detected.
 
-Without tests, sdd-verify only runs lint + build. With tests, the SDD pipeline
+Without tests, the checks only run lint + build. With tests, the pipeline
 automatically verifies that changes don't break existing behavior.
 
 What testing layers would you like to configure now?
 
 ────────────────────────────────────────────────────────────
-1. Unit tests — Vitest + Testing Library
+1. Unit tests: Vitest + Testing Library
 
    WHAT IT DOES: tests functions, hooks, and utilities in isolation.
    INSTALLS: vitest, @testing-library/react, @testing-library/user-event,
@@ -71,306 +71,353 @@ What testing layers would you like to configure now?
    ADDS SCRIPTS: "test", "test:ui", "test:coverage"
    CONVENTION: Component.test.tsx next to the tested file.
 
-2. Integration tests — same stack as unit
+2. Integration tests: same stack as unit
 
    WHAT IT DOES: tests components with real dependencies in jsdom.
-   Doesn't require a separate install — uses the layer 1 runner.
+   Doesn't require a separate install: uses the layer 1 runner.
    CONVENTION: *.integration.test.tsx in src/__tests__/integration/
    Requires layer 1 to be activated.
 
-3. E2E tests — Playwright
+3. E2E tests: Playwright
 
    WHAT IT DOES: complete flows in a real browser (Chromium by default).
    INSTALLS: @playwright/test + browsers via npx playwright install
    GENERATES: playwright.config.ts, e2e/ folder with example spec
    ADDS SCRIPTS: "test:e2e", "test:e2e:ui", "test:e2e:report"
    ENABLES: Playwright MCP so the agent controls the browser during
-           sdd-apply and sdd-verify.
+           implementation and verification.
 
 ────────────────────────────────────────────────────────────
 
 What do I activate? [1 / 2 / 1,2 / 1,2,3 / 3 only / none for now]
 ```
 
-### ⏸ PAUSE — Waiting for user response...
+### ⏸ PAUSE: Waiting for user response...
 
-### TDD Mode (only if they activated layer 1, 2, or both)
+### Optional testing extras (always asked, never activated by default)
 
-If the user activated unit and/or integration tests, ask what TDD discipline mode they prefer. This is an exclusive choice — they don't combine, one replaces the other:
+Regardless of the layers chosen above, ask if the user wants to
+activate any of these extras. They are optional because they have a real cost
+(maintenance, execution tokens, or risk of over-engineering in a
+small project) that isn't justified in every case. The Decision
+Ladder of this same wizard exists precisely to avoid activating things the
+project doesn't need yet.
 
-### [USER MESSAGE]
 ```
-What TDD mode do you want for this project?
+Optional testing extras. None are activated unless you ask:
 
 ────────────────────────────────────────────────────────────
-1. Standard TDD Protocol (recommended)
+1. Configurable coverage targets
 
-   The agent proposes which test layers apply to each change (according
-   to a coverage matrix) and LETS YOU CHOOSE: apply the full
-   suggestion, apply only unit, or skip TDD for that change if
-   you decide it doesn't warrant it. Flexible, you have the final say
-   on each task.
+   Define a minimum code coverage percentage. If the project
+   drops below it, `npm run test -- --coverage` fails locally
+   (and in CI, when the Block 6 pipeline exists). Cost: nearly zero.
+   It's one config line in vitest.config.ts.
 
-   This protocol is custom content of this workflow — the exact
-   text that gets written to your AGENTS.md is documented in this
-   wizard and has been tested in real usage.
+2. Visual regression (Playwright snapshots)
 
-2. Strict TDD Mode (native gentle-ai mechanism)
+   Compares screenshots against a saved reference and fails
+   if something visual changed without approval. Real cost: each run takes
+   longer (renders and compares images), and references have to be
+   re-generated manually every time you intentionally change the design.
+   Ongoing maintenance, not just initial setup.
 
-   More disciplined mode: no option to skip TDD, requires real
-   evidence (RED → GREEN → REFACTOR table per task) instead
-   of the agent narrating a result without having verified it. The
-   `sdd-apply` skill of gentle-ai rejects the work if that evidence
-   is missing or incomplete.
+3. Page Object Model (POM) for E2E
 
-   IMPORTANT — unlike option 1, this is NOT content that
-   this wizard writes. The real source of truth is a field in
-   `openspec/config.yaml` that gentle-ai's own `sdd-apply`
-   queries directly (confirmed against the actual installed skill).
-   This wizard does not simulate or control the behavior itself —
-   it only writes the field that activates the native mechanism.
+   Organizes Playwright selectors into reusable classes instead
+   of repeating them in every spec. No execution cost, but it's a layer
+   of abstraction that's only worthwhile with several E2E specs. In a
+   project with 2-3 flows, it's over-engineering.
 ────────────────────────────────────────────────────────────
 
-Which do you prefer? [1 / 2]
+Which ones do I activate? [comma-separated numbers / none for now]
 ```
 
-### ⏸ PAUSE — Waiting for user response...
+### ⏸ PAUSE: Waiting for user response...
 
-**If they chose option 1 (Standard TDD Protocol)**: the Builder writes the standard protocol
-(source `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-tdd/variants/standard.md`) in the AGENTS.md.
+**If they activated extra 1 (coverage targets)**, ask for the threshold. It is stored in
+`state.testing.coverage_threshold` (persistence below); the builder injects the
+`coverage.thresholds` block into `vitest.config.ts` in Phase 6b (step B8, from
+`coverage-thresholds.tmpl.md` resolving `{{threshold}}`) and Phase 8 promotes it to the real file;
+do NOT edit `vitest.config.ts` here, the file doesn't exist yet in this phase:
 
-> **CRITICAL — reset Strict TDD if it was active (known bug)**: choosing "standard" is NOT
-> enough to just write the protocol in AGENTS.md. If the project **already had Strict TDD
-> activated before** (common: `openspec/config.yaml → testing.strict_tdd: true` and/or the
-> Engram observation `sdd/{project}/testing-capabilities` with `Strict TDD Mode: enabled`),
-> those sources **override AGENTS.md** — `sdd-apply` would still be enforced in strict even if
-> the AGENTS.md says standard. Therefore, when choosing standard you must **sync all three
-> sources to "no strict"**:
->
-> 1. Detect the previous state:
-> ```bash
-> grep -q "strict_tdd: *true" openspec/config.yaml 2>/dev/null && echo "config: strict" || echo "config: ok"
-> # Engram: check the project's testing-capabilities observation (Strict TDD Mode)
-> ```
-> 2. If `openspec/config.yaml` exists (openspec/hybrid backend), set `testing.strict_tdd: false`.
-> 3. Update the Engram observation `sdd/{project}/testing-capabilities` with
->    `**Strict TDD Mode**: disabled` (same `--type config`, same project auto-detected from the
->    remote). Don't leave the old observation saying `enabled`.
-> 4. Save in the state `state.testing.tdd_mode = "standard"`.
->
-> Only when all three sources agree on "standard" is the mode truly applied.
-> (Rule in the `wf-tdd` protocol.) If there was NO prior strict, there's nothing to reset.
+```
+What minimum coverage percentage do you want to require? (recommended: 70-80%
+for projects in active development, 100% only if you have critical
+utility libs that warrant it)
 
-**If they chose option 2 (Strict TDD Mode)**:
+[70 / 80 / 90 / other: specify]
+```
 
-> **Round 7 of this verification — back to direct writing, with
-> real empirical evidence**: Round 6 proposed delegating this writing to
-> `/sdd-init`, assuming that skill would ask the user about Strict
-> TDD or respect a marker the wizard had left beforehand. The
-> maintainer tested this on a real project: `/sdd-init` **never asks**
-> about Strict TDD interactively (confirmed by re-reading its own
-> Decision Gates table: it only *uses* a value if it already exists, or applies an
-> *automatic default* if it doesn't exist — there's no step in the skill that
-> asks the user for confirmation), and furthermore **doesn't rewrite anything if
-> `openspec/` already exists** — the Hard Rule of the skill explicitly says
-> that if the structure is already initialized, it reports what's there and asks
-> before touching it, instead of merging or updating a value. In
-> practice, this means changing `strict_tdd` in an already
-> initialized project by running `/sdd-init` again simply does nothing.
->
-> **Fixed**: for this phase (activating Strict TDD during `/wf-init`,
-> before any prior SDD initialization exists in this project),
-> this wizard does write directly — as `/wf-settings` already does
-> correctly, quality-tested by the maintainer. The real difference from
-> what this wizard did before Round 5 is that we now know the
-> exact format (confirmed against `references/init-details.md` of the
-> actual skill) and write to both applicable sources, synced
-> with each other — not an approximate simulation.
+**If they activated extra 2 (visual regression)**, save `testing.visual_regression: true` in
+state (persistence below). The builder injects the snapshot configuration into
+`playwright.config.ts` in Phase 6b (step B8, from `visual-snapshots.tmpl.md`) and Phase 8 promotes
+it to the real file; do NOT edit `playwright.config.ts` here, the file doesn't exist yet in this phase:
 
-Always write to Engram, with the exact format from the official template
-of `sdd-init` (confirmed in its `references/init-details.md`):
+```typescript
+// Injected by the builder (visual-snapshots.tmpl.md) inside defineConfig({ ... })
+expect: {
+  toHaveScreenshot: { maxDiffPixels: 100 },
+},
+```
+
+Inform the user that references are generated the first time they run
+`npx playwright test --update-snapshots`, and that they must review and commit
+those reference images manually.
+
+**If they activated extra 3 (POM)**: the Builder stages a minimal scaffold:
+`e2e/pages/HomePage.ts` (Phase 6b, from `pom-example.tmpl.md`), and the AGENTS.md Testing
+Approach section gains the page-object convention line automatically. It is deliberately a
+PATTERN, not real pages: real Page Objects emerge with features as they are built, replacing the
+example locators with actual `data-testid` values grepped from components. Nothing is edited
+by hand here.
+
+**If they activated layer 1 or 1+2 (Vitest)**:
+
+`vitest.config.ts`:
+```typescript
+import { defineConfig } from 'vitest/config'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    globals: true,
+    exclude: ['**/node_modules/**', '**/e2e/**'],
+  },
+})
+```
+
+> **Why the `exclude`**: without it, Vitest picks up Playwright specs in `e2e/` and fails with "Playwright Test did not expect test() to be called here". This happens in any project that activates unit + e2e together.
+
+`src/test/setup.ts`:
+```typescript
+import '@testing-library/jest-dom'
+```
+
+Scripts added to `package.json` in Phase 8, step 8.1e (same content as `test-scripts.tmpl.md`):
+```json
+"test": "vitest",
+"test:ui": "vitest --ui",
+"test:coverage": "vitest run --coverage"
+```
+
+**If they activated layer 3 (Playwright)**:
+
+`playwright.config.ts`:
+```typescript
+import { defineConfig, devices } from '@playwright/test'
+
+export default defineConfig({
+  testDir: './e2e',
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: 'html',
+  use: {
+    baseURL: 'http://localhost:5173',
+    trace: 'on-first-retry',
+  },
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+  ],
+  webServer: {
+    command: 'npm run dev',
+    url: 'http://localhost:5173',
+    reuseExistingServer: !process.env.CI,
+  },
+})
+```
+
+`e2e/example.spec.ts`:
+```typescript
+import { test, expect } from '@playwright/test'
+
+test('app loads correctly', async ({ page }) => {
+  await page.goto('/')
+  await expect(page).toHaveTitle(/.*/)
+})
+```
+
+Scripts added to `package.json` in Phase 8, step 8.1e (same content as `e2e-scripts.tmpl.md`):
+```json
+"test:e2e": "playwright test",
+"test:e2e:ui": "playwright test --ui",
+"test:e2e:report": "playwright show-report"
+```
+
+### Additional MCPs by stack
+
+Detect additional MCPs based on the project's actual stack:
 
 ```bash
-engram save "sdd/{project}/testing-capabilities" "## Testing Capabilities
-
-**Strict TDD Mode**: enabled
-**Detected**: $(date +%Y-%m-%d)
-
-### Test Runner
-- Command: <detected command, e.g. npm run test>
-- Framework: <detected framework, e.g. vitest>
-
-### Test Layers
-| Layer       | Available | Tool        |
-| ----------- | --------- | ----------- |
-| Unit        | <✅/❌>   | <tool or —> |
-| Integration | <✅/❌>   | <tool or —> |
-| E2E         | <✅/❌>   | <tool or —> |
-
-### Coverage
-- Available: <✅/❌>
-- Command: <command or —>
-
-### Quality Tools
-| Tool         | Available | Command        |
-| ------------ | --------- | -------------- |
-| Linter       | <✅/❌>   | <command or —> |
-| Type checker | <✅/❌>   | <command or —> |
-| Formatter    | <✅/❌>   | <command or —> |" \
-  --project "{project}" --type config
+# Detect dependencies that imply specific MCPs
+cat package.json | grep -E '"@supabase|"pg|"postgres|"stripe|"github|"octokit' 2>/dev/null
+# Detect .env.example files with API keys that reveal services
+cat .env.example 2>/dev/null || cat .env.local.example 2>/dev/null
 ```
 
-> Use `--type config`, not `--type convention` as earlier versions of this wizard said — confirmed against `init-details.md`, the correct type for this observation is `config`. The project name is auto-detected from the git remote (normalized to lowercase) from Engram v1.11.0 — use `git remote get-url origin 2>/dev/null` to confirm it.
+Based on what's detected, ask the user which additional MCPs to activate:
 
-Additionally, if the detected backend is `openspec` or `hybrid`, update
-`openspec/config.yaml` using `yq` to ensure atomic, safe YAML modification:
+```
+Detected the following dependencies that could benefit from MCPs:
+
+<list of detected MCPs based on package.json, one per line with description>
+
+Which ones would you like to configure? [comma-separated numbers / none]
+
+Note: Engram and Context7 are already active via gentle-ai. They don't need configuration.
+```
+
+For each selected additional MCP, register it in the MCPs table of AGENTS.md
+(generated in Phase 6) with its purpose and the required setup type.
+MCPs that require credentials are marked as "API key in `.env.local`". wf-onboard will guide the new developer through that step.
+
+**Testing state**: the testing configuration reaches the agent through the Testing Approach
+section of AGENTS.md (below). `visual_regression` and `page_object_model` stay in
+`.wizard-state.json` only; they surface in the generated `playwright.config.ts` and `e2e/pages/`.
+The wizard writes no other testing configuration file.
+
+**Update the Testing section of `AGENTS.md`**: find the `## Testing` (or `## Testing Approach`) section and replace it with:
+
+```markdown
+## Testing Approach
+
+<based on activated layers: include only active ones>
+- Unit: Vitest + Testing Library. `npm run test`. File: `Component.test.tsx` next to the component.
+- Integration: Vitest + Testing Library with real render. `npm run test`. File: `*.integration.test.tsx` in `src/__tests__/integration/`.
+- E2E: Playwright (Chromium). `npm run test:e2e`. Specs in `e2e/<feature-name>.spec.ts`.
+  One file per user flow, named by the flow, not by the component or hook.
+  Examples: `persistence.spec.ts`, `task-creation.spec.ts`, `categories.spec.ts`.
+
+<if layer 3 (e2e) activated>:
+### `data-testid` Convention (mandatory on interactive components)
+
+Every element that an E2E test interacts with (buttons, inputs, links,
+clickable elements) MUST have its own `data-testid` attribute, added
+by the agent when creating the component, not added later, a posteriori,
+only when a test needs it.
+
+Format: `data-testid="<context>-<element>"`, in kebab-case, specific
+without being redundant. Examples: `data-testid="task-item-delete-button"`,
+`data-testid="category-filter-select"`.
+
+Why: without this, E2E specs look for elements by visible text or
+Tailwind classes. Both change frequently during normal development and
+break tests unrelated to the actual change. `data-testid` is
+stable against style or copy refactors.
+
+Don't confuse with internal `data-*` attributes of third-party libraries
+(e.g. `data-radix-scroll-area-viewport` from Radix UI): those are internal
+library mechanisms, not the project's testing convention.
+
+Before declaring a task done, the agent MUST run and leave green:
+\`\`\`bash
+npm run lint
+npm run build
+npm run test        # if unit/integration
+npm run test -- --coverage  # if coverage targets activated; must meet the configured threshold
+npm run test:e2e    # if e2e
+\`\`\`
+```
+
+**Playwright MCP** (only if the user activated layer 3), registered in Phase 8, step 8.1e
+(from `playwright-mcp.settings.tmpl.md`), NOT here: `.claude/settings.json` and the IDE
+equivalents don't exist yet in this phase. The MCP is `@playwright/mcp` and lets the agent launch
+browsers during implementation and verification:
+
+```json
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp"]
+    }
+  }
+}
+```
+
+For other agents configured in this project, Phase 8.1e checks each one's MCP registration format
+(Cursor: `.cursor/mcp.json`, Windsurf: `.windsurf/mcp.json`). If the format isn't clear for any
+agent, it tells the user which files to create and with what content, and waits for confirmation
+before writing.
+
+> **Note**: `npx @playwright/mcp` doesn't require an API key. It launches Playwright directly. There are no credentials to protect. It IS reasonable to commit this MCP to the repo so all developers on the team have it.
+
+**Install Playwright browsers** (after `npm install`):
 
 ```bash
-# Ensure the Go mikefarah/yq binary is available.
-# pip3's kislyuk/yq wrapper does NOT support `yq eval ... -i`.
-# Fix #7: auto-fallback - if kislyuk detected, install mikefarah yq FIRST and prepend to PATH
-if command -v yq &>/dev/null && yq --version 2>/dev/null | grep -q "kislyuk"; then
-  echo "INFO: detected Python yq wrapper (kislyuk); installing Go yq (mikefarah) as priority." >&2
-  # Force reinstall of mikefarah yq to ensure it takes precedence
-  YQ_INSTALL_DIR="${HOME}/.local/bin"
-  mkdir -p "$YQ_INSTALL_DIR"
-  case "$(uname -s)-$(uname -m)" in
-    Linux-x86_64)     YQ_BINARY="yq_linux_amd64" ;;
-    Linux-aarch64|Linux-arm64) YQ_BINARY="yq_linux_arm64" ;;
-    Darwin-x86_64)    YQ_BINARY="yq_darwin_amd64" ;;
-    Darwin-arm64)     YQ_BINARY="yq_darwin_arm64" ;;
-    *)
-      echo "ERROR: unsupported platform for automatic yq install ($(uname -s)-$(uname -m))." >&2
-      echo "Install Go yq from https://github.com/mikefarah/yq and re-run this step." >&2
-      exit 1
-      ;;
-  esac
-  echo "Installing Go yq (${YQ_BINARY}) to ${YQ_INSTALL_DIR}..."
-  if command -v curl &>/dev/null; then
-    curl -fsSL "https://github.com/mikefarah/yq/releases/latest/download/${YQ_BINARY}" -o "$YQ_INSTALL_DIR/yq"
-  elif command -v wget &>/dev/null; then
-    wget -q "https://github.com/mikefarah/yq/releases/latest/download/${YQ_BINARY}" -O "$YQ_INSTALL_DIR/yq"
-  else
-    echo "ERROR: curl or wget is required to install yq." >&2
-    exit 1
-  fi
-  chmod +x "$YQ_INSTALL_DIR/yq"
-  export PATH="$YQ_INSTALL_DIR:$PATH"
-fi
-
-if ! command -v yq &>/dev/null || ! yq --version 2>/dev/null | grep -q "mikefarah"; then
-  # Not installed at all, or not mikefarah (already handled kislyuk case above)
-  if ! command -v yq &>/dev/null; then
-    echo "INFO: yq not found, installing Go yq (mikefarah)..." >&2
-  fi
-
-  YQ_INSTALL_DIR="${HOME}/.local/bin"
-  mkdir -p "$YQ_INSTALL_DIR"
-
-  case "$(uname -s)-$(uname -m)" in
-    Linux-x86_64)     YQ_BINARY="yq_linux_amd64" ;;
-    Linux-aarch64|Linux-arm64) YQ_BINARY="yq_linux_arm64" ;;
-    Darwin-x86_64)    YQ_BINARY="yq_darwin_amd64" ;;
-    Darwin-arm64)     YQ_BINARY="yq_darwin_arm64" ;;
-    *)
-      echo "ERROR: unsupported platform for automatic yq install ($(uname -s)-$(uname -m))." >&2
-      echo "Install Go yq from https://github.com/mikefarah/yq and re-run this step." >&2
-      exit 1
-      ;;
-  esac
-
-  echo "Installing Go yq (${YQ_BINARY}) to ${YQ_INSTALL_DIR}..."
-  if command -v curl &>/dev/null; then
-    curl -fsSL "https://github.com/mikefarah/yq/releases/latest/download/${YQ_BINARY}" -o "$YQ_INSTALL_DIR/yq"
-  elif command -v wget &>/dev/null; then
-    wget -q "https://github.com/mikefarah/yq/releases/latest/download/${YQ_BINARY}" -O "$YQ_INSTALL_DIR/yq"
-  else
-    echo "ERROR: curl or wget is required to install yq." >&2
-    exit 1
-  fi
-  chmod +x "$YQ_INSTALL_DIR/yq"
-  export PATH="$YQ_INSTALL_DIR:$PATH"
-
-  # Verify yq is actually available (use full path as fallback)
-  if ! command -v yq &>/dev/null; then
-    if [ -x "$YQ_INSTALL_DIR/yq" ]; then
-      YQ_CMD="$YQ_INSTALL_DIR/yq"
-    else
-      echo "ERROR: yq install to ${YQ_INSTALL_DIR} failed or the directory is not in PATH." >&2
-      exit 1
-    fi
-  else
-    YQ_CMD="yq"
-  fi
-fi
-
-# Update testing.strict_tdd safely — preserves all other keys
-$YQ_CMD eval '.testing.strict_tdd = true' -i openspec/config.yaml
+npx playwright install --with-deps chromium
 ```
 
-If the backend is pure `engram`, the Engram step above is already
-sufficient — there's no `openspec/config.yaml` to edit.
+This command downloads the browser. It only needs to be run once per machine. If the user is on CI, the CI workflow also needs this command.
 
-**Important**: Always use `yq eval ... -i` (in-place) to modify YAML, never echo/cat fragments. This ensures:
-- Existing keys under `testing:` are preserved
-- No formatting/indentation errors
-- Idempotent: running multiple times produces the same result
-- If `testing:` doesn't exist, it is created automatically
+### ✓ PHASE 4.6 COMPLETED
 
-Additionally, for Claude Code and Windsurf specifically, gentle-ai
-also exposes a sync flag that reflects this choice in their
-global context files (`~/.claude/CLAUDE.md` or
-`~/.codeium/windsurf/memories/global_rules.md`) — this is an
-informational signal for the orchestrator, not the source that `sdd-apply` queries:
-
-```bash
-gentle-ai sync --strict-tdd
 ```
+Testing stack configured (in memory; everything is written in Phase 8):
 
-> **Accuracy note that still applies**: `gentle-ai install --strict-tdd`
-> does NOT exist as a flag — confirmed with `flag provided but not defined:
-> -strict-tdd` against a real installation (v1.43.3). Nor does
-> `gentle-ai sdd-init` exist as a binary subcommand — confirmed against the
-> actual `--help`. `/sdd-init` is a session skill with orchestrator→sub-agent
-> delegation, correct for initializing `openspec/`
-> in Phase 4.5 of this wizard, but does not rewrite values in an
-> already-existing structure — that's why this specific phase (TDD mode
-> change) writes directly, instead of delegating.
+  Layers: <unit / integration / e2e, only the activated ones>
 
-Inform the user:
+  New files:
+    <if unit>  vitest.config.ts ✓  (with exclude: e2e/)
+    <if unit>  src/test/setup.ts ✓
+    <if e2e>   playwright.config.ts ✓
+    <if e2e>   e2e/example.spec.ts ✓
+    <if POM>   e2e/pages/HomePage.ts ✓ (minimal scaffold)
+
+  Files modified in Phase 8:
+    package.json  → test scripts added
+    AGENTS.md     → Testing section updated
+
+  Playwright MCP:
+    <if e2e>  .claude/settings.json (and IDE equivalents) ← Phase 8
+
+  Activated extras:
+    <if coverage>          - Minimum coverage: <threshold>%
+    <if visual regression> - Visual regression (snapshots) active
+    <if POM>                - Page Object Model active
+
+  Final checks_before_done:
+    - npm run lint
+    - npm run build
+    <if unit>      - npm run test
+    <if coverage>  - npm run test -- --coverage
+    <if e2e>       - npm run test:e2e
+```
 
 ### [USER MESSAGE]
+Testing stack configured. Reply **continue** to continue.
+
+### ⏸ PAUSE: Waiting for user to confirm "continue"...
+
+> **📝 PERSISTENCE** (contract `wf-init/lib/state.md`): use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `testing.layers` (activated layers), `testing.runner_detected`, `testing.coverage_threshold` (number or null, if the coverage extra was activated), `testing.visual_regression` (bool), `testing.page_object_model` (bool), `mcps` (project MCPs to configure). Mark `wf_phase_done phase46 <next>`.
+> Calculate the next phase based on features:
+```bash
+NEXT=
+if jq -e '.features.ci == true or .features.cd == true or .features.release_please == true' .wizard-state.json >/dev/null; then
+  NEXT="phase47-cicd"
+else
+  NEXT="phase5"
+fi
 ```
-Activated Strict TDD Mode.
-
-Saved strict_tdd: enabled in Engram, under sdd/{project}/testing-capabilities
-— confirmed that this is the first source sdd-apply queries.
-
-<if openspec or hybrid backend>
-Also wrote strict_tdd: true in openspec/config.yaml, synced
-with the Engram value.
-
-<if the active agent is Claude Code or Windsurf>
-Also synced your agent's global context block
-(gentle-ai sync --strict-tdd) — it's an additional signal for the
-orchestrator, not the actual behavior source.
-
-How to deactivate it later if you change your mind: use /wf-settings — it
-already writes correctly to both sources in sync.
-```
-
-> **📝 PERSISTENCE** (contract `wf-init/lib/state.md`): use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `testing.layers` (activated layers), `testing.tdd_mode` (`standard`|`strict`), `testing.runner_detected`. Mark `wf_phase_done phase46 phase46b`.
-> - `wf_state_set '.testing.layers' '<activated layers array>'` — e.g. `["unit","integration","e2e"]`
-> - `wf_state_set '.testing.tdd_mode' '"standard"'` or `'"strict"'`
-> - `wf_state_set '.testing.runner_detected' '"<runner>"'` — e.g. `"vitest"`, `"playwright"`
-> Tell the user: *"Testing and TDD mode configured. Reply **continue** to review optional testing extras (coverage, visual regression, POM) and generate configs."*
+> Tell the user: *"Testing stack configured. Reply **continue** to continue."*
 > Wait for the response. Only when they confirm, execute in bash:
+> - `wf_state_set '.testing.layers' '<activated layers array>'`, e.g. `["unit","integration","e2e"]`
+> - `wf_state_set '.testing.runner_detected' '"<runner>"'`, e.g. `"vitest"`, `"playwright"`
+> - `wf_state_set '.testing.coverage_threshold' '<number>'`, if coverage extra activated, else `null`
+> - `wf_state_set '.testing.visual_regression' 'true'` or `'false'`
+> - `wf_state_set '.testing.page_object_model' 'true'` or `'false'`
+> - `wf_state_set '.mcps' '<array of selected MCPs>'`
 
 ---
 
 ═══════════════════════════════════════════════════════
-⛔ PHASE 4.6 COMPLETE — Ready for Phase 4.6b
-⏸ PAUSE — Waiting for user to confirm "continue"
+⛔ PHASE 4.6 COMPLETE: Ready for Next Phase
+⏸ PAUSE: Waiting for user to confirm "continue"
 
 ### [WIZARD ACTION]
 When user confirms, run EXACTLY:
@@ -380,6 +427,14 @@ WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 
 # Validate state before phase transition (phase-aware validation)
-wf_phase_done phase46 phase46b
-cat "$WF_DIR/phase46b.md"
+# Note: coverage_threshold can be null if coverage extra not activated - the phase46 validator checks the field exists and is a number when set
+NEXT=
+if jq -e '.features.ci == true or .features.cd == true or .features.release_please == true' .wizard-state.json >/dev/null; then
+  NEXT="phase47-cicd"
+else
+  NEXT="phase5"
+fi
+wf_phase_done phase46 "$NEXT"
+echo "ℹ Next phase: $NEXT"
+cat "$WF_DIR/$NEXT.md"
 ```

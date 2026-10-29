@@ -1,7 +1,7 @@
 ## PHASE 0 — Prerequisite: gentle-ai
 
 > **IMPORTANT**: gentle-ai is the fundamental requirement of this workflow. Without it, the
-> SDD orchestrator, Engram (persistent memory), curated skills, and multi-IDE
+> gentle-ai's ODD orchestrator, Engram (persistent memory), curated skills, and multi-IDE
 > routing remain inactive. The wizard CANNOT complete correctly without gentle-ai.
 > This phase installs or verifies it automatically — never skip it.
 
@@ -18,13 +18,13 @@ which gentle-ai 2>/dev/null && gentle-ai --version 2>/dev/null
 gentle-ai is not installed on this machine.
 
 gentle-ai is a mandatory requirement of this workflow. Without it:
-- The SDD orchestrator does not work (no automatic phases).
+- The gentle-ai orchestrator (ODD workflow) does not run.
 - Engram (persistent memory between sessions) is not available.
 - Curated skills for React, TypeScript, Tailwind, etc. are not loaded.
 - Multi-IDE routing (Claude Code, Cursor, Windsurf, Kiro, etc.) is not configured.
 
 The workflow can run partially without gentle-ai, but it will be incomplete
-and some blocks (SDD, Block 3, Block 4) will not work as documented.
+and some blocks (Block 3, Block 4) will not work as documented.
 
 I am going to install it now. Shall I continue with the automatic installation? [yes / no / later]
 
@@ -43,7 +43,7 @@ If they respond "no", terminate the wizard with a clear message.
 If they respond "later", continue to Phase 1 but add a visible warning at the
 end of the generated AGENTS.md:
 ```
-<!-- WF-WARNING: gentle-ai not installed. SDD, Engram and skills unavailable.
+<!-- WF-WARNING: gentle-ai not installed. Engram and skills unavailable.
      Install with: brew install gentle-ai && gentle-ai install
      Then run /wf-refresh to complete the configuration. -->
 ```
@@ -266,8 +266,8 @@ If there is network access and a response:
 
 Compare local vs remote version. Decide if the update is critical using this heuristic:
 
-- **MAJOR update** (e.g. v1.x.x → v2.x.x): **mandatory for the wizard**. SDD phases and sub-agents may have breaking changes. Strongly recommend updating before continuing.
-- **MINOR update** (e.g. v1.2.x → v1.3.x): suggested. There may be improvements to the SDD orchestrator or skills. The wizard works with the current version.
+- **MAJOR update** (e.g. v1.x.x → v2.x.x): **mandatory for the wizard**. Wizard phases and sub-agents may have breaking changes. Strongly recommend updating before continuing.
+- **MINOR update** (e.g. v1.2.x → v1.3.x): suggested. There may be improvements to the orchestrator or skills. The wizard works with the current version.
 - **PATCH update** (e.g. v1.2.3 → v1.2.4): optional. Bug fixes. Does not block anything.
 
 Present the result to the user with a clear recommendation:
@@ -283,7 +283,7 @@ gentle-ai available: v<REMOTE>
   Update now? [yes / no, continue with current version]
 
 <If there is a minor version difference>:
-  RECOMMENDATION: Minor update available with improvements to the SDD orchestrator.
+  RECOMMENDATION: Minor update available with improvements to the orchestrator.
   It is not blocking, but updating is recommended.
   Update now? [yes / no, continue with current version]
 
@@ -330,10 +330,9 @@ curl -s --max-time 5 "https://api.github.com/repos/Gentleman-Programming/gentle-
 Terms hardcoded by this wizard that warrant monitoring (keep this list updated in each wizard version):
 
 ```
-gentle-orchestrator, sdd-orchestrator, gentle-ai doctor, gentle-ai sync,
+gentle-orchestrator, gentle-ai doctor, gentle-ai sync,
 gentle-ai install, gentle-ai upgrade, gentle-ai skill-registry, engram,
-sdd-init, sdd-propose, sdd-tasks, sdd-design, sdd-apply, sdd-verify,
-gentle-sdd, prefix, rename, adapter-specific
+prefix, rename, adapter-specific
 ```
 
 Search the release text, near those terms, for words indicating

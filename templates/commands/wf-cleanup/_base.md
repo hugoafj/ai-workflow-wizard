@@ -6,7 +6,7 @@
 > **When to use it**: when you want to uninstall the wizard from a project — you no longer
 > need the rules, protocols, or CI/CD that the wizard configured.
 >
-> **What it does NOT touch**: gentle-ai files (base AGENTS.md, MCPs, Engram, OpenSpec),
+> **What it does NOT touch**: gentle-ai files (base AGENTS.md, MCPs, Engram), `openspec/`,
 > project code, user configuration.
 
 ---
@@ -14,7 +14,7 @@
 ## Inviolable rules
 
 1. **DO NOT touch gentle-ai**: do not delete gentle-ai's `~/.claude/skills/`, do not modify
-   MCPs configured by gentle-ai, do not touch Engram or OpenSpec.
+   MCPs configured by gentle-ai, do not touch Engram. Never delete `openspec/`.
 2. **DO NOT touch project code**: do not delete files that were not created
    by the wizard.
 3. **DO NOT push**: the user decides when to publish.
@@ -100,10 +100,11 @@ for dir in .claude/skills .cursor/skills .gemini/skills .agents/skills .kiro/ski
   if [ -d "$dir" ]; then
     for skill in "$dir"/*/; do
       skill_name=$(basename "$skill")
-      # gentle-ai skills: sdd-apply, sdd-propose, sdd-tasks, sdd-spec, sdd-design, sdd-explore, sdd-verify, sdd-archive, sdd-init, sdd-onboard, gentle-orchestrator
-      # wizard skills (7 commands): wf-ladder, wf-tdd, wf-orchestrator, wf-sdd-trigger, wf-onboard, wf-worktree, wf-settings
+      # gentle-ai skills: gentle-orchestrator
+      # wizard skills (4 commands): wf-ladder, wf-onboard, wf-worktree, wf-settings
+      # retired wizard skills, removed so older installs get cleaned: wf-tdd, wf-orchestrator, wf-sdd-trigger
       case "$skill_name" in
-        sdd-apply|sdd-propose|sdd-tasks|sdd-spec|sdd-design|sdd-explore|sdd-verify|sdd-archive|sdd-init|sdd-onboard|gentle-orchestrator)
+        gentle-orchestrator)
           echo "  ⏭ $dir/$skill_name (gentle-ai — DO NOT delete)"
           ;;
         wf-ladder|wf-tdd|wf-orchestrator|wf-sdd-trigger|wf-onboard|wf-worktree|wf-settings)
@@ -147,7 +148,7 @@ for skills_dir in .windsurf/skills .devin/skills; do
         skill_name=$(basename "$(dirname "$skill")")
         # Exclude gentle-ai skills from deletion
         case "$skill_name" in
-          sdd-apply|sdd-propose|sdd-tasks|sdd-spec|sdd-design|sdd-explore|sdd-verify|sdd-archive|sdd-init|sdd-onboard|gentle-orchestrator)
+          gentle-orchestrator)
             echo "  ⏭ $skills_dir/$skill_name (gentle-ai — DO NOT delete)"
             ;;
           wf-ladder|wf-tdd|wf-orchestrator|wf-sdd-trigger|wf-onboard|wf-worktree|wf-settings)
@@ -234,7 +235,7 @@ echo "📁 Other artifacts:"
 [ -f ".release-please-manifest.json" ] && echo "  🗑 .release-please-manifest.json"
 [ -f ".git/hooks/post-commit" ] && echo "  🗑 .git/hooks/post-commit (git hook installed by the wizard)"
 [ -d ".wizard-staging" ] && echo "  🗑 .wizard-staging/ (leftover from an interrupted run)"
-[ -d "openspec" ] && echo "  ⏭ openspec/ (gentle-ai — DO NOT delete)"
+[ -d "openspec" ] && echo "  ⏭ openspec/ (never deleted by wf-cleanup; /wf-refresh offers removal with consent)"
 if [ -f ".gitignore" ] && grep -qE "^\.wf-status$|^\.wizard-state\.json$|^\.wizard-managed-files\.json$|^\.wizard-staging/$|^!\.agents/$|^!\.cursor/$|^!\.windsurf/$|^!\.devin/$|^!\.kiro/$|^!\.claude/$|^!\.codex/$|^!\.opencode/$|^!\.gemini/$|^!GEMINI\.md$|^!ANTIGRAVITY\.md$|^!\.github/copilot-instructions\.md$|^!\.github/prompts/$" .gitignore; then
   echo "  🗑 .gitignore (wizard entries — review which ones to revert)"
 fi
@@ -309,17 +310,17 @@ Delete these? [yes / no]
 ## Phase 1 · Delete the confirmed groups
 
 Delete each group confirmed in Phase 0, group by group, and report each one.
-Never delete gentle-ai artifacts (`sdd-*`, `gentle-orchestrator`, `openspec/`,
-`~/.<ide>/`).
+Never delete `openspec/` or gentle-ai artifacts (`gentle-orchestrator`, `~/.<ide>/`).
 
 ### Skills
 
 Remove each wizard skill directory detected in Phase 0 (only wizard ones — never
-`sdd-*` or `gentle-orchestrator`):
+`gentle-orchestrator`):
 
 ```bash
-# Example per detected wizard skill (replace with the actual list — all 7 wizard
-# commands ship skills 1:1, in native IDE paths AND the universal .agents/skills/)
+# Example per detected wizard skill (replace with the actual list). Current wizard
+# skills: wf-ladder, wf-onboard, wf-worktree, wf-settings. Retired names stay so older
+# installs get cleaned.
 rm -rf .claude/skills/wf-ladder .claude/skills/wf-tdd \
        .claude/skills/wf-orchestrator .claude/skills/wf-sdd-trigger \
        .claude/skills/wf-onboard .claude/skills/wf-worktree .claude/skills/wf-settings \
@@ -502,7 +503,7 @@ Here is the AGENTS.md with the wizard sections removed.
 
 Write, in your own words, what you want to KEEP (for example:
   "keep the Commands section", "keep the MCPs table",
-  "keep everything about SDD"). Examples of wizard sections:
+  "keep everything about testing"). Examples of wizard sections:
   - Commands
   - MCPs
   - wf-version footer
@@ -550,7 +551,7 @@ Deleted:
 
 Preserved (your choice):
 - AGENTS.md (clean, without wizard sections)
-- openspec/ (gentle-ai)
+- openspec/ (never deleted by wf-cleanup)
 - [user files / sections that were kept]
 
 Commit: <hash>
@@ -566,7 +567,7 @@ Next steps:
 ## Technical rules
 
 - **gentle-ai vs wizard detection**: gentle-ai skills have specific
-  names (sdd-apply, sdd-propose, etc.). Wizard skills are: workflow,
+  names (for example, gentle-orchestrator). Wizard skills are: workflow,
   commands, cicd, ides, testing, architecture, wf-refresh, wf-onboard,
   wf-settings, wf-worktree, wf-cleanup.
 - **Confirmation flow**: after the inventory, the user writes freely what to

@@ -1,10 +1,10 @@
 # /wf-settings — Optional workflow settings wizard
 
 > **When to use**: when you want to change something you chose during
-> `/wf-init` and are no longer happy with — enable or disable strict TDD
-> mode, add or remove a testing extra, enable or disable the Decision
-> Ladder, change the SDD persistence backend, toggle CI/CD, choose the
-> release strategy, or add/remove an IDE/CLI.
+> `/wf-init` and are no longer happy with: enable or disable the testing
+> infrastructure, add or remove a testing extra, enable or disable the
+> Decision Ladder, toggle CI/CD, choose the release strategy, or add/remove
+> an IDE/CLI.
 >
 > **Difference from `/wf-refresh`**: `wf-refresh` updates your AGENTS.md
 > when the *wizard template* changed (new version) or the *project*
@@ -52,12 +52,9 @@ cat .wizard-state.json 2>/dev/null
 
 # Or read individual fields:
 jq -r '.features.decision_ladder // false' .wizard-state.json 2>/dev/null
-jq -r '.features.tdd_protocol // false' .wizard-state.json 2>/dev/null
-jq -r '.features.routing_abc // false' .wizard-state.json 2>/dev/null
+jq -r '.features.testing // false' .wizard-state.json 2>/dev/null
 jq -r '.features.ci // false' .wizard-state.json 2>/dev/null
 jq -r '.features.release_please // false' .wizard-state.json 2>/dev/null
-jq -r '.sdd.backend // "unknown"' .wizard-state.json 2>/dev/null
-jq -r '.testing.tdd_mode // "standard"' .wizard-state.json 2>/dev/null
 jq -r '.testing.coverage_threshold // null' .wizard-state.json 2>/dev/null
 jq -r '.testing.visual_regression // false' .wizard-state.json 2>/dev/null
 jq -r '.testing.page_object_model // false' .wizard-state.json 2>/dev/null
@@ -94,29 +91,23 @@ they want to adjust.
 
 Example of how it should look:
 
-Workflow settings — current state:
+Workflow settings, current state:
 
-1. wf-ladder (Decision Ladder) — <ON/OFF>
-2. TDD — <ON/OFF>
-3. TDD Mode — <standard/strict>
-4. Coverage targets — <80%/OFF>
-5. Visual regression — <ON/OFF>
-6. Page Object Model — <ON/OFF>
-7. wf-sdd-trigger (SDD-forcing policy) — <ON/OFF>
-8. SDD persistence backend — <engram/openspec/hybrid>
-9. CI — <ON/OFF>
-10. AI Reviewer — <GGA (provider: X) / Copilot / Claude Code / Gemini / None>
-11. AI Review Suggestions — <ON/OFF> (Gemini: auto_improve / Claude: inline comments)
-12. Dedicated Security Review — <Claude/Gemini/OFF>
-13. E2E in CI — <ON/OFF>
-14. release-please standalone — <ON/OFF>
-15. CD (automatic deploy) — <ON/OFF>
-16. Release strategy — <tag v* / push a main>
-<if Windsurf is in active IDEs>
-17. Fix Windsurf gentle-ai — <Reapply workaround>
-</if>
-18. IDEs/CLIs — <comma-separated active list>
-19. branch-pr override (issue linkage optional) — <ON/OFF>
+1. wf-ladder (Decision Ladder): <ON/OFF>
+2. Testing infrastructure: <ON/OFF>
+3. Coverage targets: <80%/OFF>
+4. Visual regression: <ON/OFF>
+5. Page Object Model: <ON/OFF>
+6. CI: <ON/OFF>
+7. AI Reviewer: <GGA (provider: X) / Copilot / Claude Code / Gemini / None>
+8. AI Review Suggestions: <ON/OFF> (Gemini: auto_improve / Claude: inline comments)
+9. Dedicated Security Review: <Claude/Gemini/OFF>
+10. E2E in CI: <ON/OFF>
+11. release-please standalone: <ON/OFF>
+12. CD (automatic deploy): <ON/OFF>
+13. Release strategy: <tag v* / push a main>
+14. IDEs/CLIs: <comma-separated active list>
+15. branch-pr override (issue linkage optional): <ON/OFF>
 
 Which number do you want to adjust?
 
@@ -147,7 +138,7 @@ field in `.wizard-state.json` after each change.
 
 ---
 
-### Option 1 — wf-ladder
+### 1: wf-ladder
 
 ```
 wf-ladder (Decision Ladder): <ON / OFF>
@@ -161,9 +152,8 @@ Do you want to keep it as is or change it?
 **If they want to change (enable)**: inject the `wf-ladder` section into
 `AGENTS.md` (same content that `wf-init.md` documents in its Behavior
 Preferences phase, Question 4) and generate the `/wf-ladder` command for
-active IDEs if it does not already exist. Ensure `wf-orchestrator` is also
-present (it must be built whenever `wf-ladder`, `wf-sdd-trigger`, or `wf-tdd`
-is active). **Update the footer**'s `features:`
+active IDEs if it does not already exist. **Update the
+footer**'s `features:`
 line (single line, comma-separated — see `templates/AGENTS.router.md`) so its
 `ladder=` token becomes `ladder=yes`:
 
@@ -183,7 +173,6 @@ implementing. Do you confirm you want to remove it? [yes / no]
 **Wait for explicit confirmation before removing it.** If confirmed, remove the
 section from `AGENTS.md` (do not delete the `/wf-ladder` command
 file). **Update the footer**'s `ladder=` token to `no` (same `sed` pattern above with `no`).
-If no other `wf-` protocol remains active (`routing`, `tdd`), also remove `wf-orchestrator`.
 
 Confirm:
 ```
@@ -200,10 +189,10 @@ jq '.features.decision_ladder = <value>' .wizard-state.json > .wizard-state.json
 
 ---
 
-### 2 — TDD
+### 2: Testing infrastructure
 
 ```
-TDD: <ON / OFF>
+Testing infrastructure: <ON / OFF>
 
 Do you want to keep it as is or change it?
   [keep / change]
@@ -211,154 +200,41 @@ Do you want to keep it as is or change it?
 
 **If they choose keep**: move to the next option.
 
-**If they want to change (enable)**: inject the TDD Protocol section into
-`AGENTS.md`. Run the `sdd-init` skill (slash: `/sdd-init`, or `/gentle-sdd-init`
-in Claude Code) so it detects the test runner and configures
-Testing Capabilities. Ensure `wf-orchestrator` is also present (it must be
-built whenever `wf-ladder`, `wf-sdd-trigger`, or `wf-tdd` is active).
-**Update the footer** to `tdd=yes`.
+**If they want to change (enable)**: set up the test infrastructure the same way
+`wf-init.md` Phase 4.6 does (detect the test runner, then configure the unit,
+integration, and E2E layers the user chooses). Add the `## Testing Approach`
+section to `AGENTS.md`, using the verbatim content of
+`templates/protocols/testing/testing-approach.section.md`.
 
 After enabling, ask about options:
 
 ```
-TDD enabled. Do you want to configure these options?
-3. TDD Mode              <standard / strict>     [current: standard]
-4. Coverage targets      <percentage / OFF>      [current: OFF]
-5. Visual regression     <ON / OFF>              [current: OFF]
-6. Page Object Model     <ON / OFF>              [current: OFF]
+Testing enabled. Do you want to configure these options?
+3. Coverage targets      <percentage / OFF>      [current: OFF]
+4. Visual regression     <ON / OFF>              [current: OFF]
+5. Page Object Model     <ON / OFF>              [current: OFF]
 
-Which one do you configure? [3 / 4 / 5 / 6 / none]
+Which one do you configure? [3 / 4 / 5 / none]
 ```
 
-**If they want to change (disable)**: remove the TDD Protocol section from
-`AGENTS.md`. Ask if they want to keep or clean
-`openspec/testing-capabilities.yaml`. **Update the footer** to `tdd=no`.
-**Update `.wizard-state.json`**: `features.tdd_protocol = false`.
-If no other `wf-` protocol remains active (`ladder`, `routing`), also remove `wf-orchestrator`.
-
----
-
-### 3 — TDD Mode
-
-```
-Current mode: <standard / Strict>
-
-Which one do you want to switch to?
-  1. Standard TDD Protocol
-  2. Strict TDD Mode
-```
-
-**If switching to Strict TDD**: write directly to the real sources,
-with the exact format of the official `sdd-init` template (confirmed in
-`references/init-details.md` — do not delegate to the `sdd-init` skill
-(slash: `/sdd-init`, or `/gentle-sdd-init` in Claude Code) for this change:
-empirically confirmed that this skill does not rewrite anything if `openspec/`
-already exists, and never asks about Strict TDD interactively — it only uses
-an existing value or applies its own automatic default).
-
-Save to Engram, with the correct `--type` (`config`, not `convention`):
-
-```bash
-engram save "sdd/{project}/testing-capabilities" "## Testing Capabilities
-
-**Strict TDD Mode**: enabled
-**Detected**: $(date +%Y-%m-%d)
-
-### Test Runner
-- Command: <detected command>
-- Framework: <detected framework>
-
-### Test Layers
-| Layer       | Available | Tool        |
-| ----------- | --------- | ----------- |
-| Unit        | <✅/❌>   | <tool or —> |
-| Integration | <✅/❌>   | <tool or —> |
-| E2E         | <✅/❌>   | <tool or —> |
-
-### Coverage
-- Available: <✅/❌>
-- Command: <command or —>
-
-### Quality Tools
-| Tool         | Available | Command        |
-| ------------ | --------- | -------------- |
-| Linter       | <✅/❌>   | <command or —> |
-| Type checker | <✅/❌>   | <command or —> |
-| Formatter    | <✅/❌>   | <command or —> |" \
-  --project "{project-name}" --type config
-```
-
-Additionally, if the backend is `openspec` or `hybrid`, also write:
-
-```yaml
-testing:
-  strict_tdd: true
-```
-
-If the active agent is Claude Code or Windsurf, also run:
-
-```bash
-gentle-ai sync --strict-tdd
-```
-
-**If switching to Standard TDD Protocol** (coming from Strict): same
-mechanism, with `strict_tdd: false` / `**Strict TDD Mode**: disabled` in
-both sources as applicable per backend.
-
-1. If the agent is Claude Code or Windsurf and the global block is still
-   `enabled`, inform the user that there is no `--no-strict-tdd` command
-   — it must be edited manually:
-
-```
-There is no gentle-ai command to disable the global block
-(known bug in gentle-ai itself, not this wizard). If you use Claude
-Code or Windsurf, edit manually:
-  ~/.claude/CLAUDE.md (or ~/.codeium/windsurf/memories/global_rules.md)
-Look for the <!-- gentle-ai:strict-tdd-mode --> block and change
-"Strict TDD Mode: enabled" to "Strict TDD Mode: disabled".
-
-This is only the informational global block — what sdd-init just
-wrote to the real source (Engram and/or openspec/config.yaml, depending on your
-backend) is what actually determines that sdd-apply goes back to standard
-mode, regardless of what that block says.
-```
-
-2. Restore in `AGENTS.md`, under `### 🧪 TDD Protocol (standard)`, the
-   "Protocol per change" and "Implementation cycle" subsections — they
-   were omitted if the project originally chose Strict TDD.
-
-   **SINGLE SOURCE**: Do NOT copy an embedded block from this file. Read the
-   VERBATIM content from `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/commands/wf-tdd/variants/standard.md` (which is the
-   `standard` variant of the `wf-tdd` protocol) and insert it as-is. Do not summarize, do not
-   paraphrase: without the exact `🧪 TDD PROPOSAL` format and its numbered options, the
-   executing agent has no real pause point before writing tests or code.
-
-   Also regenerate the `wf-tdd` protocol packaging (native skills per active IDE
-   `.claude/skills/wf-tdd/`, `.kiro/skills/wf-tdd/`, `.codex/skills/wf-tdd/`, plus the
-   universal `.agents/skills/wf-tdd/` and flat `.agents/protocols/wf-tdd.md`) from the
-   single source (Builder B4), so they do not get out of sync.
-
-3. **Do not touch** "Playwright Dual-loop" or "wf-sdd-trigger Integration"
-   — those two subsections do not depend on the TDD mode
-   (they depend on whether the E2E layer is active) and must remain intact
-   regardless of which mode is switched to. If you notice they are missing from the current
-   `AGENTS.md`, it is a bug in the original `/wf-init` generation (not something
-   `/wf-settings` should fix as a side effect) — inform the user instead of
-   writing them yourself here.
+**If they want to change (disable)**: remove the `## Testing Approach` section
+from `AGENTS.md`. Do not delete test configs or specs; they stay in the project.
 
 Confirm:
 ```
-✓ TDD mode changed to: <new mode>
+✓ Testing infrastructure: <enabled / disabled>
+✓ .wizard-state.json: features.testing = <yes/no>
 ```
 
 **State update**:
 ```bash
-jq '.testing.tdd_mode = "<standard|strict>"' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+# Replace <value> with true or false
+jq '.features.testing = <value>' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
 ```
 
 ---
 
-### 4 — Coverage targets
+### 3: Coverage targets
 
 ```
 Coverage targets: <ON (threshold: N%) / OFF>
@@ -368,13 +244,12 @@ Do you want to keep or change?
 ```
 
 **If enabling**: ask for the threshold (same as in `wf-init.md` Phase 4.6) and
-add the `coverage.thresholds` block to `vitest.config.ts`. Save in
-`openspec/config.yaml` the field `rules.verify.coverage_threshold` (gentle-ai's canonical
-field, via Phase 8 step 8.1d — never stamped).
+add the `coverage.thresholds` block to `vitest.config.ts`. Write the threshold
+only to `vitest.config.ts` and to `.wizard-state.json` (`testing.coverage_threshold`,
+see the state update below).
 
 **If disabling**: remove the `coverage.thresholds` block from `vitest.config.ts`
-and the `rules.verify.coverage_threshold` field from `openspec/config.yaml` (leave it
-unset or `0`).
+and set `testing.coverage_threshold` to `null` in `.wizard-state.json`.
 
 Confirm:
 ```
@@ -392,7 +267,7 @@ jq '.testing.coverage_threshold = null' .wizard-state.json > .wizard-state.json.
 
 ---
 
-### 5 — Visual regression
+### 4: Visual regression
 
 ```
 Visual regression: <ON / OFF>
@@ -421,7 +296,7 @@ jq '.testing.visual_regression = <value>' .wizard-state.json > .wizard-state.jso
 
 ---
 
-### 6 — Page Object Model
+### 5: Page Object Model
 
 ```
 Page Object Model: <ON / OFF>
@@ -450,134 +325,7 @@ jq '.testing.page_object_model = <value>' .wizard-state.json > .wizard-state.jso
 
 ---
 
-### 7 — wf-sdd-trigger
-
-```
-wf-sdd-trigger (this project's own SDD-forcing policy): <ON / OFF>
-
-Do you want to keep or change?
-  [keep / change]
-```
-
-**If they choose keep**: move to the next option.
-
-**If they want to change (enable)**: set `state.routing_abc = true`, inject
-the `wf-sdd-trigger` + `wf-preflight` + PRECHECK section into `AGENTS.md`
-(from the `wf-init.md` template), and ensure `wf-orchestrator` is also present
-(it must be built whenever `wf-ladder` OR `wf-sdd-trigger` OR `wf-tdd` is active). Run
-`phase45.md` to initialize gentle-ai's SDD if it does not exist. **Update the
-footer**'s `routing=` token to `yes` (same `sed` pattern as Option 1, targeting
-`routing=` instead of `ladder=`).
-
-**If they want to change (disable)**: set `state.routing_abc = false`. Remove
-the `wf-sdd-trigger`, `wf-preflight`, and PRECHECK sections from `AGENTS.md`.
-**Important**: the PRECHECK lives inside `wf-sdd-trigger` — if it was only
-there because of this feature, it does not become orphaned. If `wf-ladder` or
-`wf-tdd` standalone is still active, keep `wf-orchestrator` and the remaining
-standalone protocol (standalone `wf-ladder` and standalone `wf-tdd` have no
-PRECHECK). If none remain active, remove `wf-orchestrator`.
-**Update the footer**'s `routing=` token to `no`.
-
-Confirm:
-```
-✓ wf-sdd-trigger: <enabled / disabled>
-✓ .wizard-state.json: features.routing_abc = <yes/no>
-✓ AGENTS.md footer updated
-```
-
-**State update**:
-```bash
-jq '.features.routing_abc = <value>' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
-```
-
----
-
-### 8 — SDD persistence backend
-
-```
-Current backend: <engram / openspec / hybrid>
-
-Supported migrations:
-  engram   → hybrid    (adds git versioning, keeps local memory)
-  openspec → hybrid    (adds cross-session memory, keeps versioning)
-  hybrid   → engram     (loses git versioning — not recommended)
-  hybrid   → openspec    (loses cross-session memory — not recommended)
-
-Do you want to keep or migrate?
-  [keep / migrate to <destination>]
-```
-
-**If they choose keep**: move to the next option.
-
-> **This is the most delicate migration** — unlike TDD/extras/
-> wf-ladder (which are just config), changing the SDD backend can
-> mean moving or duplicating real data (already written specs, Engram
-> memories).
-
-**If migrating to `hybrid`** (from engram or openspec): this is the recommended
-direction with the least risk — nothing is lost, only the other half is added.
-Follow the flow already documented in `wf-refresh.md` for this specific
-migration.
-
-**If migrating to `engram` or `openspec` from `hybrid`** (losing the other
-half): stop and explicitly confirm that the user understands what is
-lost, before touching anything:
-
-```
-⚠ Migrating from hybrid to <destination> means you will lose:
-  <if destination=engram>: the versioned spec history in openspec/ will
-    stop being updated — existing files are NOT deleted, but new specs
-    will no longer be versioned in git.
-  <if destination=openspec>: Engram's cross-session memory will stop being
-    consulted for this project — the context the team accumulated there
-    is not lost from Engram's binary, but sdd-apply will stop reading it.
-
-Do you confirm you want to continue anyway? [yes / no]
-```
-
-**Wait for explicit confirmation.** Only after confirming, apply a **targeted, agent-driven edit**
-to the existing `openspec/config.yaml` (never regenerate/overwrite it — see protocol `sdd`,
-"Wizard-Allowed Field Edits"): read the real file first, locate whichever field it actually uses to
-declare the backend (the exact key name can vary — e.g. `artifact_store`, `backend`, `schema` — do
-not assume; gentle-ai's own docs confirm the shape is not fully uniform), change only that leaf
-value to the new backend, and preserve `context.*`, `sdd.*`, `notes`, and every other key verbatim.
-
-> **About `strict_tdd` when migrating**: since Engram always saves
-> `sdd/{project}/testing-capabilities` regardless of the declared
-> backend, **that value is never lost during migration** — it was already in Engram
-> before the migration and remains there afterwards. The only thing that changes
-> depending on the new backend:
->
-> - **Migrating to `openspec` or `hybrid`** (from pure `engram`, where
->   `openspec/` NEVER EXISTED): unlike the TDD mode change in an
->   already existing structure (which is written directly), here it does make sense
->   to ask the user to run the `sdd-init` skill (slash: `/sdd-init`, or
->   `/gentle-sdd-init` in Claude Code) — because it is a new
->   `openspec/` initialization, not a re-write of something already initialized, and there
->   the real skill does its full work. The Hard Rule of "do not rewrite
->   if it already exists" does not apply to this case because `openspec/` genuinely
->   did not exist before.
-> - **Migrating to pure `engram`** (from `openspec` or `hybrid`): no
->   action on `strict_tdd` is needed — Engram already had it. The
->   existing `openspec/config.yaml` can stay as is (it is no longer consulted
->   for SDD, but leaving it does no harm).
-
-Confirm:
-```
-✓ SDD backend changed to: <new backend>
-✓ .wizard-state.json: sdd.backend = <new backend>
-✓ strict_tdd: <value> (was already in Engram; <if applicable> also written to
-  openspec/config.yaml for the new backend)
-```
-
-**State update**:
-```bash
-jq '.sdd.backend = "<new backend>"' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
-```
-
----
-
-### 9 — CI
+### 6: CI
 
 ```
 CI: <ON / OFF>
@@ -601,7 +349,7 @@ Enable full CI? This will add:
 [yes / no]
 ```
 
-If yes, update state and continue to the options 10-15 to configure AI reviewer,
+If yes, update state and continue to the options 7-12 to configure AI reviewer,
 security review, and E2E. When finished, run `/wf-refresh` to regenerate the
 CI/CD artifacts and `AGENTS.md`.
 
@@ -629,7 +377,7 @@ and adds Quality Guard + optional AI review and security review.
 Enable full CI? [yes / no]
 ```
 
-If yes, update state and continue to options 10-15, then run `/wf-refresh`.
+If yes, update state and continue to options 7-12, then run `/wf-refresh`.
 
 ```bash
 jq '.features.ci = true |
@@ -691,7 +439,7 @@ Confirm:
 
 ---
 
-### 10 — AI Reviewer
+### 7: AI Reviewer
 
 > Only available if CI = ON.
 > **Single source**: the complete option text and per-option generation logic live in
@@ -798,7 +546,7 @@ Confirm:
 
 ---
 
-### 11 — AI Review Suggestions
+### 8: AI Review Suggestions
 
 > Only available if CI = ON and AI reviewer is Gemini or Claude.
 
@@ -858,7 +606,7 @@ Confirm:
 
 ---
 
-### 12 — Dedicated Security Review
+### 9: Dedicated Security Review
 
 > Only available if CI = ON.
 > **Single source**: the question text and artifact names live in
@@ -920,7 +668,7 @@ Confirm:
 
 ---
 
-### 13 — E2E in CI
+### 10: E2E in CI
 
 > Only available if CI = ON and the project has E2E layer detected.
 
@@ -949,7 +697,7 @@ jq '.ci.e2e_in_ci = <value>' .wizard-state.json > .wizard-state.json.tmp && mv .
 
 ---
 
-### 14 — release-please standalone
+### 11: release-please standalone
 
 > Only visible if CI = OFF. If CI is active, release-please is already
 > included and this option does not apply.
@@ -989,7 +737,7 @@ jq '.features.release_please = <value> | .ci.release_please = <value> | .ci.conv
 
 ---
 
-### 15 — CD (automatic deploy)
+### 12: CD (automatic deploy)
 
 ```
 CD (automatic deploy): <ON / OFF>
@@ -1045,7 +793,7 @@ jq '.features.cd = <value> | .cd.enabled = <value>' .wizard-state.json > .wizard
 
 ---
 
-### 16 — Release strategy
+### 13: Release strategy
 
 > Always available. Affects the wizard's CD (if active) and documents
 > the decision for external CD (AWS CodePipeline, Vercel, Railway, etc.).
@@ -1119,64 +867,7 @@ jq '.cd.trigger = "<new_trigger>"' .wizard-state.json > .wizard-state.json.tmp &
 
 ---
 
-### 17 — Fix Windsurf gentle-ai (conditional, only if Windsurf is active)
-
-**Gate**: Only show this option if Windsurf or Devin is in `state.answers.ides`.
-
-```
-Fix Windsurf gentle-ai — Reapply the AGENTS.md "Legacy Path Bridge" rule
-in case it was overwritten by a manual "gentle-ai sync".
-
-Do you want to reapply the Windsurf fix now? [yes / no, skip]
-```
-
-**If they choose "no, skip"**: move to Phase 4.
-
-**If they choose "yes"**:
-
-1. **Merge AGENTS.md rule** — same as phase45 did:
-   - Read the rule from temp-files/AGENTS.md (Gentle AI — Legacy Path Bridge section).
-   - Check if it already exists in the project's AGENTS.md.
-   - If not present, insert it after the first line (after the title), ENVELOPED in
-     `<!-- WF: DO NOT REGENERATE -->` ... `<!-- /WF: DO NOT REGENERATE -->` (add a newline
-     before the closing marker — temp-files/AGENTS.md has no trailing newline), so future
-     refreshes preserve it.
-   - If already present, skip (do not duplicate).
-
-```bash
-WF_DIR="${WF_DIR:-/tmp/wf-settings-phases}"
-WF_RAW="${WF_RAW:-https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main}"
-
-mkdir -p "$WF_DIR/temp-files"
-
-# Download the AGENTS.md bridge rule and merge it if missing
-[ -f "$WF_DIR/temp-files/AGENTS.md" ] || curl -fsSL "$WF_RAW/temp-files/AGENTS.md" -o "$WF_DIR/temp-files/AGENTS.md" 2>/dev/null
-if [ -f "$WF_DIR/temp-files/AGENTS.md" ] && [ -f AGENTS.md ]; then
-  if ! grep -q "Gentle AI — Legacy Path Bridge" AGENTS.md; then
-    TITLE_LINE=$(grep -n '^# ' AGENTS.md | head -1 | cut -d: -f1)
-    if [ -n "$TITLE_LINE" ]; then
-      {
-        head -n "$TITLE_LINE" AGENTS.md
-        printf '%s\n' "<!-- WF: DO NOT REGENERATE -->"
-        cat "$WF_DIR/temp-files/AGENTS.md"
-        printf '\n%s\n' "<!-- /WF: DO NOT REGENERATE -->"
-        tail -n +$((TITLE_LINE + 1)) AGENTS.md
-      } > AGENTS.md.tmp
-      mv AGENTS.md.tmp AGENTS.md
-    fi
-  fi
-fi
-```
-
-Confirm:
-```
-✓ Windsurf gentle-ai fix reapplied
-✓ AGENTS.md rule: in place
-```
-
----
-
-### 18 — IDEs/CLIs
+### 14: IDEs/CLIs
 
 ```
 IDEs/CLIs: <comma-separated active list>
@@ -1225,15 +916,13 @@ Generate everything related for the chosen IDE, downloading from `$WF_RAW`:
    `cursor` → `.cursor/rules/project.mdc`, `windsurf` → `.windsurf/rules/project.md`,
    `kiro` → `.kiro/steering/project-context.md`, `gemini-cli` → `GEMINI.md`,
    `antigravity` → `ANTIGRAVITY.md`. Create parent directories as needed.
-2. **Commands** — every command in the catalog (full command catalog from Builder B7: 3-7 commands depending on active features) → the IDE's
+2. **Commands**: every command in the catalog (full command catalog from Builder B7: 3-4 commands depending on active features) → the IDE's
     command directory
     (`.claude/commands/`, `.cursor/commands/`, `.windsurf/workflows/`, `.kiro/steering/`,
     `.opencode/commands/`, `.github/prompts/` **with `.prompt.md` suffix**, `.codex/commands/`), applying the per-IDE
     frontmatter (protocol `ides`, routing-table.section.md).
 3. **Skills** — the packaged protocol skills → the IDE's native skills directory
     (`.claude/skills/`, `.cursor/skills/`, `.kiro/skills/`, `.codex/skills/`, `.windsurf/skills/`, `.devin/skills/`, `.gemini/skills/`, `.opencode/skills/`, `.agents/skills/`, `.github/skills/`).
-4. **Windsurf fix** — ONLY if the added IDE is Windsurf/Devin: apply the same logic as
-   Option 17 (AGENTS.md "Gentle AI — Legacy Path Bridge" rule).
 
 Confirm:
 ```
@@ -1241,7 +930,6 @@ Confirm:
 ✓ Satellite: <path>
 ✓ Commands: <N> generated in <dir>
 ✓ Skills: <N> generated in <dir>
-<if Windsurf/Devin> ✓ Windsurf fix applied
 ```
 
 **State update**:
@@ -1265,7 +953,6 @@ Removing <IDE> deletes:
   - <satellite path>
   - <N> commands in <command dir>
   - <N> skills in <skills dir>
-  <if Windsurf/Devin>: - AGENTS.md "Legacy Path Bridge" rule
 
 Confirm deletion? [yes / no]
 ```
@@ -1273,8 +960,6 @@ Confirm deletion? [yes / no]
 - Delete ONLY the files this wizard generated in the project (satellite, commands, skills).
   Never touch `~/.<ide>/` or gentle-ai's global config.
 - If some of the files are already gone, just remove what exists and update the state.
-- If the IDE is Windsurf/Devin, also remove the "Legacy Path Bridge" rule from AGENTS.md
-  (revert the Option 17 logic).
 
 Confirm:
 ```
@@ -1282,7 +967,6 @@ Confirm:
 ✓ <satellite path> deleted
 ✓ <N> commands deleted
 ✓ <N> skills deleted
-<if Windsurf/Devin> ✓ AGENTS.md rule removed
 ```
 
 **State update**:
@@ -1295,7 +979,7 @@ repeat the question. Do not guess.
 
 ---
 
-### 19 — branch-pr override (issue linkage optional)
+### 15: branch-pr override (issue linkage optional)
 
 ```
 branch-pr override: <ON/OFF>
@@ -1404,11 +1088,11 @@ Show the consolidated summary of ALL changes made in this session
 ```
 Session settings summary:
   ✓ wf-ladder: enabled
-  ✓ TDD Mode: standard → Strict TDD Mode
+  ✓ Coverage targets: 80%
 
 Modified files:
   AGENTS.md
-  openspec/config.yaml
+  vitest.config.ts
 
 Do I write these changes and make the commit? [yes / no, abort / let me edit X first]
 ```
@@ -1430,25 +1114,12 @@ git commit -m "chore: update workflow settings
 ## Implementation notes for the agent
 
 - **Always read the real state before showing the menu** (Phase 1) — do not
-  assume that `AGENTS.md` faithfully reflects what is in
-  `openspec/config.yaml`, they may have diverged if someone edited one without
-  the other.
+  assume that `AGENTS.md` faithfully reflects `.wizard-state.json` or the
+  coverage block in `vitest.config.ts`. They may have diverged if someone
+  edited one without the other.
 - **Each change is confirmed individually** before asking "anything
   else?" — do not silently process several changes and show everything together at the
   end, except in the Phase 5 summary, which is consolidated.
-- **Write `strict_tdd` directly with `engram save` (type `config`, not
-  `convention`) and by editing `openspec/config.yaml`** — empirically
-  confirmed that the `sdd-init` skill (slash: `/sdd-init`, or `/gentle-sdd-init`
-  in Claude Code) does NOT work for this change: it never asks
-  about Strict TDD interactively, and it does not rewrite anything if `openspec/`
-  already exists (it only reports and asks before touching, according to its own Hard
-Rule). Use it ONLY when `openspec/` does not yet exist (option
-8, migrating to `openspec`/`hybrid` from pure `engram`) — there it is
-  a real initialization, not a re-write, and the skill does its full work.
-- **SDD backend migration (option 8) is the only one that requires
-  a second explicit confirmation** when it implies loss of functionality
-  (`hybrid` → `engram`/`openspec`) — the other options do not have that
-  risk and do not need double confirmation.
 - **Never delete reference files (visual regression snapshots,
   specs with POM)** when disabling an extra without asking first — the
   config disablement does not imply the user wants to lose that
