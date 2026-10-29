@@ -2,6 +2,8 @@
 
 Sets up a complete AI development workflow in any repo: context layers, testing, CI/CD, and feature tracking with Organic Driven Development (ODD). One command installs everything; the wizard adapts to your stack and IDE automatically.
 
+> **Note:** SDD (spec-driven development, OpenSpec) was removed in favor of ODD, which gentle-ai v4 runs natively. ODD sizes its work by evidence instead of file counts, keeps one feature document per change in `odd/tasks/`, and runs test-first by default. Projects set up by an older version migrate on their next `/wf-refresh`.
+
 ## Install
 
 **One time in your terminal:**
