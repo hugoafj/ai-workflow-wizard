@@ -1,6 +1,6 @@
 # AI Workflow Wizard
 
-Sets up a complete AI development workflow in any repo — context layers, testing, CI/CD, and spec-driven development. One command installs everything; the wizard adapts to your stack and IDE automatically.
+Sets up a complete AI development workflow in any repo: context layers, testing, CI/CD, and feature tracking with Organic Driven Development (ODD). One command installs everything; the wizard adapts to your stack and IDE automatically.
 
 ## Install
 
@@ -22,9 +22,9 @@ In your IDE or CLI agent, run:
 /wf-init    # Or just say "run wf-init" to your agent
 ```
 
-> **IMPORTANT**: This wizard requires [gentle-ai](https://github.com/Gentleman-Programming/gentle-ai), the foundation ecosystem that powers SDD, Engram (persistent memory), skills, and multi-IDE routing. If gentle-ai is not installed, the wizard will guide you through installation automatically. **Before running `/wf-init`, take 5 minutes to read the [gentle-ai documentation](https://github.com/Gentleman-Programming/gentle-ai#readme)** — understanding how gentle-ai works is essential to getting the most out of this workflow. Skipping this step means missing critical features like the SDD orchestrator and persistent memory between sessions.
+> **IMPORTANT**: This wizard requires [gentle-ai](https://github.com/Gentleman-Programming/gentle-ai), the foundation ecosystem that powers ODD, Engram (persistent memory), skills, and multi-IDE routing. If gentle-ai is not installed, the wizard will guide you through installation automatically. **Before running `/wf-init`, take 5 minutes to read the [gentle-ai documentation](https://github.com/Gentleman-Programming/gentle-ai#readme)**. Understanding how gentle-ai works is essential to getting the most out of this workflow. Skipping this step means missing critical features like the ODD workflow and persistent memory between sessions.
 
-> **⚠️ WARNING — Use capable models**: The wizard is instruction-driven: agents must follow multi-step procedures exactly. **Fast or small models (Haiku-class or equivalent) are, by nature, prone to skipping instructions and steps** — they do not follow procedural prompts reliably. This is worse on **VS Code / GitHub Copilot**, where the harness hides context and the model cuts corners. Use a **Sonnet-class or better** model to run `/wf-init` (wizard initialization). **This warning applies to the wizard bootstrap only — for day-to-day development, SDD work, and anything else in the initialized repo, any model works fine.** See [Known Issues & Workarounds](#copilot--vs-code-use-capable-models) below.
+> **⚠️ WARNING: Use capable models**: The wizard is instruction-driven: agents must follow multi-step procedures exactly. **Fast or small models (Haiku-class or equivalent) are, by nature, prone to skipping instructions and steps**. They do not follow procedural prompts reliably. This is worse on **VS Code / GitHub Copilot**, where the harness hides context and the model cuts corners. Use a **Sonnet-class or better** model to run `/wf-init` (wizard initialization). **This warning applies to the wizard bootstrap only. For day-to-day development, feature work, and anything else in the initialized repo, any model works fine.** See [Known Issues & Workarounds](#copilot--vs-code-use-capable-models) below.
 
 The wizard discovers your stack, installs [gentle-ai](https://github.com/Gentleman-Programming/gentle-ai) (the foundation ecosystem), generates `AGENTS.md`, configures satellites per IDE, sets up git hooks, and prepares CI/CD templates.
 
@@ -54,17 +54,17 @@ The wizard's phases are procedural instructions: each one expects the agent to e
 
 - **The issue**: fast/small models do not follow multi-step instructions reliably; the problem compounds on Copilot / VS Code harnesses that hide context.
 - **The fix**: use a **Sonnet-class or better** model only to run `/wf-init` (wizard initialization). If a capable model is unavailable, expect to review every phase step manually — the wizard cannot compensate for a model that ignores its instructions.
-- **Scope**: this applies to the wizard bootstrap **only** — once the repo is initialized, day-to-day development, SDD work, and anything else work with any model, including fast/small ones.
+- **Scope**: this applies to the wizard bootstrap **only**, once the repo is initialized, day-to-day development, feature work, and anything else work with any model, including fast/small ones.
 - **What works**: OpenCode and Claude Code expose full context and respect tool/agent boundaries; Copilot's harness is the least reliable for instruction-driven workflows, regardless of model.
 
 ### Windsurf / Devin: Legacy Path Bridge
 
-If you use **Windsurf** or **Devin**, `wf-init` automatically applies a compatibility workaround during Phase 4.5 (SDD initialization):
+If you use **Windsurf** or **Devin**, the wizard adds a compatibility rule to `AGENTS.md`:
 
-- **The issue**: gentle-ai installs SDD skills into Windsurf's legacy paths (`~/.codeium/windsurf/skills/`), but doesn't scan them natively. Without a bridge rule in `AGENTS.md`, the agent can't find the skills.
-- **The fix**: The wizard injects a rule into `AGENTS.md` that tells your agent where to look.
-- **When it applies**: During `/wf-init` Phase 4.5, automatically, if Windsurf is detected as an active IDE.
-- **If it needs reapplying**: Run `/wf-settings` → option **"Fix Windsurf gentle-ai"** — useful after manually running `gentle-ai sync`, which may remove the rule.
+- **The issue**: gentle-ai installs its skills into Windsurf's legacy paths (`~/.codeium/windsurf/skills/`), but Windsurf doesn't scan them natively. Without a bridge rule in `AGENTS.md`, the agent can't find those skills.
+- **The fix**: the bridge rule tells your agent where to look.
+- **When it applies**: during `/wf-init`, automatically, if Windsurf is detected as an active IDE. The wizard re-applies it in Phase 8.
+- **If it needs reapplying**: run `/wf-refresh`. It reinserts the rule, which `gentle-ai sync` may remove.
 
 No user action needed; the wizard handles it.
 
@@ -86,16 +86,16 @@ After `/wf-init`, your repo has:
 - **IDE satellites** — auto-generated files in `.cursor/rules/`, `.windsurf/rules/`, `.kiro/steering/`, `CLAUDE.md`, etc. that point to `AGENTS.md` ([learn more](AI_DEV_WORKFLOW.md#54-project-specific-satellites-what-they-are-and-why-we-need-them))
 - **Post-commit hook** — detects when `AGENTS.md` drifts out of sync with the codebase
 - **CI/CD templates** — GitHub Actions with quality guard, AI review, and release-please ([learn more](AI_DEV_WORKFLOW.md#10-block-6--cicd-pipeline--gga))
-- **Project-specific slash commands** — `/wf-onboard`, `/wf-settings`, `/wf-worktree` (plus `/wf-ladder`, `/wf-tdd`, `/wf-orchestrator`, `/wf-sdd-trigger` when the corresponding features are enabled). Every command is also packaged as a skill (1:1), so it can be invoked by natural language too.
+- **Project-specific slash commands**: `/wf-onboard`, `/wf-settings`, `/wf-worktree` (plus `/wf-ladder` when the Decision Ladder is enabled). Every command is also packaged as a skill (1:1), so it can be invoked by natural language too.
 
 ## The Day-to-Day
 
 Once set up, here's what working with the AI Workflow looks like:
 
 1. **Request features in natural language** — no slash commands to learn. Just tell the agent what you want.
-2. **SDD kicks in automatically** — for non-trivial tasks, the agent runs Spec-Driven Development: proposal → specs → design → tasks → implementation. You approve at each gate. ([learn more](AI_DEV_WORKFLOW.md#6-block-2--specification-layer-sdd))
-3. **Test-first by default** — when TDD is enabled, the agent writes the test first, you approve it, then implements until it passes. Strict mode enforces this for every change. ([learn more](AI_DEV_WORKFLOW.md#9-block-5--tdd-pro--playwright-integrated))
-4. **Sub-agents work in parallel** — each SDD phase runs on the optimal model with fresh context. ([learn more](AI_DEV_WORKFLOW.md#82-sub-agents-and-delegation-native-to-gentle-ai))
+2. **ODD tracks substantial work**: for substantial, authorized changes the agent creates one feature document (`odd/tasks/<feature>.md`) with specs, tasks, and a log, and mirrors it to Engram. Small changes stay lightweight. ([learn more](AI_DEV_WORKFLOW.md#6-block-2--feature-tracking-odd))
+3. **Test-first by default**: when a relevant runnable test exists, the agent writes it first, watches it fail, then implements until it passes. ([learn more](AI_DEV_WORKFLOW.md#9-block-5--testing-test-first-and-playwright))
+4. **Sub-agents work in parallel**: when a task is large enough to delegate, each sub-agent runs with fresh context. ([learn more](AI_DEV_WORKFLOW.md#82-sub-agents-and-delegation-native-to-gentle-ai))
 5. **Human review before every commit** — the agent shows you the full diff and waits for approval.
 6. **AI code review on PRs** — GGA (Gentleman Guardian Angel) reviews diffs applying your project standards. Provider-agnostic: works with Claude, Gemini, Codex, Ollama. ([learn more](AI_DEV_WORKFLOW.md#10-block-6--cicd-pipeline--gga))
 7. **Security scanning** — automated security review on every PR as part of the CI pipeline.
@@ -110,17 +110,14 @@ Once set up, here's what working with the AI Workflow looks like:
 | `/wf-refresh` | Global | Re-runs the Builder (B1–B9) to regenerate all managed artifacts when the project evolves ([learn more](AI_DEV_WORKFLOW.md#55-context-auto-update)) |
 | `/wf-cleanup` | Global | Removes wizard artifacts from a project |
 | `/wf-onboard` | Project | Onboarding guide for new developers |
-| `/wf-settings` | Project | Toggle optional modules: TDD, testing extras, Decision Ladder ([learn more](AI_DEV_WORKFLOW.md#98-wf-settings--toggle-optional-modules-after-installation)) |
+| `/wf-settings` | Project | Toggle optional modules: testing, testing extras, Decision Ladder, CI/CD ([learn more](AI_DEV_WORKFLOW.md#96-wf-settings-toggle-optional-modules-after-installation)) |
 | `/wf-worktree` | Project | Git worktree management with automatic port assignment ([learn more](AI_DEV_WORKFLOW.md#84-worktrees--wf-worktree-built-in-this-block)) |
-| `/wf-ladder` | Project (LADDER) | Decision Ladder — avoids over-engineering before implementing ([learn more](AI_DEV_WORKFLOW.md#58-optional-behavior-improvements--wf-ladder)) |
-| `/wf-tdd` | Project (TDD + layers) | TDD Protocol — RED→GREEN→REFACTOR or TDD Proposal ([learn more](AI_DEV_WORKFLOW.md#9-block-5--tdd-pro--playwright-integrated)) |
-| `/wf-orchestrator` | Project (ROUTING‖LADDER‖TDD) | Single entry point to the project's wf- protocols |
-| `/wf-sdd-trigger` | Project (ROUTING) | Decides `wf-no-sdd`/`wf-force-sdd` before gentle-ai's SDD ([learn more](AI_DEV_WORKFLOW.md#6-block-2--specification-layer-sdd)) |
+| `/wf-ladder` | Project (optional) | Decision Ladder: avoids over-engineering before implementing ([learn more](AI_DEV_WORKFLOW.md#58-optional-behavior-improvements--wf-ladder)) |
 
 > Every command is also packaged as a SKILL.md (1:1): project ones by the Builder (native
 > per IDE + `.agents/skills/` universal + flat fallback), global ones by `install.sh`.
 
-> CI/CD re-configuration lives in `/wf-settings` (options 9–16: CI/CD and release strategy), sourced from the `cicd`
+> CI/CD re-configuration lives in `/wf-settings` (options 6–13: CI/CD and release strategy), sourced from the `cicd`
 > protocol (`templates/protocols/cicd/_base.md`).
 
 ## When to Use /wf-cleanup + /wf-init Instead of /wf-refresh
@@ -147,7 +144,7 @@ See [WF_REFRESH_TROUBLESHOOTING.md](WF_REFRESH_TROUBLESHOOTING.md) for detailed 
 
 Enable via `/wf-settings` after initial setup:
 
-- **TDD** — test-first development with strict or standard mode ([learn more](AI_DEV_WORKFLOW.md#9-block-5--tdd-pro--playwright-integrated))
+- **Testing**: unit, integration, and E2E layers, with test-first development by default ([learn more](AI_DEV_WORKFLOW.md#9-block-5--testing-test-first-and-playwright))
 - **wf-ladder (Decision Ladder)** — structured decision-making protocol for complex architectural choices ([learn more](AI_DEV_WORKFLOW.md#58-optional-behavior-improvements--wf-ladder))
 - **CI/CD extras** — GGA review, security scanning, AI summary jobs ([learn more](AI_DEV_WORKFLOW.md#10-block-6--cicd-pipeline--gga))
 
@@ -155,7 +152,7 @@ Enable via `/wf-settings` after initial setup:
 
 Two layers that complement each other:
 
-- **Foundation Layer** ([gentle-ai](https://github.com/Gentleman-Programming/gentle-ai)) — global ecosystem: Engram (persistent memory), SDD orchestrator, skills, MCPs, persona, permissions. Installed once, serves all projects.
+- **Foundation Layer** ([gentle-ai](https://github.com/Gentleman-Programming/gentle-ai)) is the global ecosystem: Engram (persistent memory), the ODD workflow, skills, MCPs, persona, permissions. Installed once, serves all projects.
 - **Custom Layer** (this wizard) — project-specific: `AGENTS.md`, satellites, hooks, CI/CD. Lives in your repo.
 
 They write to different locations and coexist without conflict. ([full architecture details](AI_DEV_WORKFLOW.md#2-the-architecture-two-layers))
