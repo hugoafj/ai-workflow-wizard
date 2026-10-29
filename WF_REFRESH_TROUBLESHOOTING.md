@@ -141,10 +141,24 @@ fi
 
 ---
 
+## Prompts About Retired Files and openspec/
+
+Installs from before the SDD removal can raise two prompts during `/wf-refresh`. Answer them in the refresh. You do not need `/wf-cleanup` for either.
+
+### "Delete these modified files?"
+
+Asked for retired wizard files (for example `wf-tdd`, `wf-sdd-trigger`, or `wf-orchestrator`) that you edited or that have no recorded hash. Unedited copies are removed without this prompt. Answer no to keep a file. A declined file is recorded in `.migrations.retired_pending`, and the next `/wf-refresh` asks again.
+
+### "Remove the SDD openspec/ directory from this project?"
+
+Asked when `openspec/` exists. The default is No. Answer yes only if you no longer use that directory. It is removed only when git tracks it and it is clean, and only its tracked files go. Untracked or changed files stay, and the refresh reports them.
+
+---
+
 ## What /wf-cleanup Does (Safe)
 
 **Removes:**
-- ✅ Wizard skills (but NOT gentle-ai skills like sdd-*)
+- ✅ Wizard skills (but NOT gentle-ai skills)
 - ✅ Wizard commands (/wf-refresh, /wf-settings, etc.)
 - ✅ Wizard satellites (CLAUDE.md, GEMINI.md)
 - ✅ Wizard CI/CD workflows (release-please, quality-guard, etc.)
@@ -154,7 +168,8 @@ fi
 
 **Preserves:**
 - ✅ Project code
-- ✅ gentle-ai files (MCPs, OpenSpec, Engram)
+- ✅ gentle-ai files (MCPs, Engram)
+- ✅ `openspec/` (only `/wf-refresh` offers to remove it, with your consent)
 - ✅ Your AGENTS.md custom sections
 - ✅ User configuration files
 - ✅ User-created skills

@@ -13,7 +13,7 @@
 >   (contract: `wf-init/lib/state.md`; read/write helpers in `wf-init/lib/state-helpers.sh`;
 >   refresh orchestrator in `wf-init/lib/refresher.md`). The process is resumable even if the
 >   conversation is lost between phases.
-> - **Permanent knowledge** (wf-ladder, wf-sdd-trigger, wf-tdd, SDD, CI/CD,
+> - **Permanent knowledge** (wf-ladder, CI/CD,
 >   Testing, IDEs, Commands, Architecture) → `templates/protocols/<module/>` as **single
 >   source of truth**, packaged as skills for each IDE (installed via `install.sh`).
 > - **Assembly** → Deterministic Builder (`wf-init/lib/builder-core.py` B1-B6 + `wf-init/lib/builder-heavy.py` B7-B9; `wf-init/lib/builder.md` is the specification reference) that assembles artifacts
@@ -56,21 +56,21 @@ Terms that appear constantly. No need to memorize them; come back to this sectio
 
 **Engram** — The agent's persistent memory. It is a local program (Go binary with SQLite) that the agent uses via MCP to save decisions, context, bugs, learnings between sessions. Without Engram, each session starts from zero.
 
-**gentle-ai** — Ecosystem configurator. It is a binary installed once on your machine that configures ALL your agents (Claude Code, Cursor, etc.) with Engram, skills, MCPs, SDD, persona, and permissions. It is the foundation of this workflow.
+**gentle-ai**: Ecosystem configurator. It is a binary installed once on your machine that configures ALL your agents (Claude Code, Cursor, etc.) with Engram, skills, MCPs, ODD, persona, and permissions. It is the foundation of this workflow.
 
-**SDD (Spec-Driven Development)** — Methodology where before writing code you write artifacts: `proposal.md` (what), `specs/` (criteria), `design.md` (how), `tasks.md` (all). The agent does not implement until you approve each artifact. gentle-ai automates this in 10 phases.
-
-**OpenSpec** — SDD framework that lives underneath gentle-ai. You do not invoke it directly; gentle-ai handles it for you. We only mention it because it is the internal machinery.
+**ODD (Organic Driven Development)**: The feature workflow that gentle-ai runs natively for every agent. Small, understood changes go straight to implementation. For substantial, authorized work the agent creates one feature document, `odd/tasks/<feature>.md`, with the specs, the tasks, and a log, and mirrors it to Engram. You do not invoke it: you describe what you want.
 
 **GGA (Gentleman Guardian Angel)** — AI code review tool from the gentle-ai ecosystem. Reviews diffs and PRs applying defined standards. Provider-agnostic (works with Claude, Gemini, Codex, Ollama).
 
-**TDD (Test-Driven Development)** — Methodology where you write the test BEFORE the code. In this workflow, the agent writes the test first, you approve it, then implements until the test passes.
+**RDD (Receipt-Driven Development)**: Independent review of a frozen change candidate, run by gentle-ai. It is on by default and opt-out: `gentle-ai review mode disable` turns it off. Medium and high risk candidates ask for consent first.
+
+**TDD (Test-Driven Development)**: Methodology where you write the test BEFORE the code. In this workflow, when a relevant runnable test exists, the agent writes it first, watches it fail, then implements until it passes. Test-first is the default, not an optional mode.
 
 **Conventional commits** — Commit message convention with prefixes (`feat:`, `fix:`, `chore:`, etc.) that enables automatic changelog generation and releases.
 
 **Worktree** — Isolated git folder that shares the same repo. Useful for having multiple agents working in parallel without stepping on each other, each in their own worktree.
 
-**Wizard `/wf-init`** — Global slash command for this workflow that initializes a project: installs and verifies gentle-ai automatically (Phase 0), discovers the project (Phases 1-4), runs `/sdd-init` with backend choice showing all three modes (Phase 4.5), generates `AGENTS.md` with "📋 wf-sdd-trigger" section (Phases 6a and 6b), configures post-commit hook that detects AGENTS.md and SDD drift. Installed with `install.sh` as a global slash command. Architecture: orchestrator (`templates/commands/wf-init/_base.md`) + phase files in `wf-init/` (read on-demand from disk).
+**Wizard `/wf-init`**: Global slash command for this workflow that initializes a project: installs and verifies gentle-ai automatically (Phase 0), discovers the project (Phases 1-4), asks which optional features to enable (Phase 0c), generates `AGENTS.md` with its Testing Approach section (Phases 6a and 6b), configures a post-commit hook that detects AGENTS.md drift. Installed with `install.sh` as a global slash command. Architecture: orchestrator (`templates/commands/wf-init/_base.md`) + phase files in `wf-init/` (read on-demand from disk).
 
 **Hook (git hook)** — Script that git executes automatically on certain events (commit, push). Runs only on your local machine, not on GitHub. We use it to detect drift in AGENTS.md.
 
@@ -106,30 +106,26 @@ Terms that appear constantly. No need to memorize them; come back to this sectio
    - 5.6 [Step-by-step tutorial · Test the wizard on a clean project](#56-step-by-step-tutorial--test-the-wizard-on-a-clean-project)
    - 5.7 [Ensuring multi-IDE fidelity · Strategy and specific fixes](#57-ensuring-multi-ide-fidelity--strategy-and-specific-fixes)
    - 5.8 [Optional behavior improvements · wf-ladder](#58-optional-behavior-improvements--wf-ladder)
-6. [Block 2 · Specification Layer (SDD)](#6-block-2--specification-layer-sdd)
-   - 6.1 [SDD Philosophy](#61-sdd-philosophy)
-   - 6.2 [How gentle-ai handles SDD for you](#62-how-gentle-ai-handles-sdd-for-you)
-   - 6.3 [How you invoke SDD without learning slash commands](#63-how-you-invoke-sdd-without-learning-slash-commands)
-   - 6.4 [Greenfield vs Legacy](#64-greenfield-vs-legacy)
-   - 6.5 [When SDD yes, when NO](#65-when-sdd-yes-when-no)
-   - 6.6 [SDD persistence backends](#66-sdd-persistence-backends)
-   - 6.7 [SDD integration with AGENTS.md](#67-sdd-integration-with-agentsmd)
-   - 6.8 [Judgment Day — Automatic dual-judge review](#68-judgment-day--automatic-dual-judge-review)
+6. [Block 2 · Feature Tracking (ODD)](#6-block-2--feature-tracking-odd)
+   - 6.1 [ODD philosophy](#61-odd-philosophy)
+   - 6.2 [How gentle-ai runs ODD for you](#62-how-gentle-ai-runs-odd-for-you)
+   - 6.3 [The feature document](#63-the-feature-document)
+   - 6.4 [Work units, delivery and the 400-line budget](#64-work-units-delivery-and-the-400-line-budget)
+   - 6.5 [Review and consent (RDD)](#65-review-and-consent-rdd)
+   - 6.6 [Judgment Day: dual-judge review](#66-judgment-day-dual-judge-review)
 7. [Block 3 · MCPs, Testing Stack and Commands](#7-block-3--mcps-testing-stack-and-commands)
 8. [Block 4 · Orchestration and worktrees](#8-block-4--orchestration-and-worktrees)
     - 8.1 [What gentle-ai automates vs. what the wizard provides](#81-what-gentle-ai-automates-vs-what-the-wizard-provides)
    - 8.2 [Sub-agents and delegation](#82-sub-agents-and-delegation-native-to-gentle-ai)
-   - 8.3 [Model routing per SDD phase](#83-model-routing-per-sdd-phase)
+   - 8.3 [Model choice](#83-model-choice)
    - 8.4 [Worktrees — `/wf-worktree`](#84-worktrees--wf-worktree-built-in-this-block)
-9. [Block 5 · TDD pro + Playwright integrated](#9-block-5--tdd-pro--playwright-integrated)
-    - 9.1 [Strict TDD Mode](#91-strict-tdd-mode--what-it-is-and-how-it-works)
-    - 9.2 [Architecture of three independent pieces](#92-architecture-of-three-independent-pieces)
-    - 9.3 [TDD Mode](#93-tdd-mode--how-it-is-asked-and-what-changes)
-    - 9.4 [Playwright dual-loop](#94-playwright-dual-loop--when-to-explore-before-versioning)
-    - 9.5 [data-testid convention](#95-data-testid-convention--mandatory-when-e2e-is-present)
-    - 9.6 [Optional extras](#96-optional-extras--coverage-targets-visual-regression-page-object-model)
-    - 9.7 [Strategy for legacy projects without tests](#97-strategy-for-legacy-projects-without-tests)
-    - 9.8 [/wf-settings — toggle optional modules](#98-wf-settings--toggle-optional-modules-after-installation)
+9. [Block 5 · Testing: test-first and Playwright](#9-block-5--testing-test-first-and-playwright)
+    - 9.1 [Test-first by default](#91-test-first-by-default)
+    - 9.2 [Playwright dual loop](#92-playwright-dual-loop-when-to-explore-before-versioning)
+    - 9.3 [data-testid convention](#93-data-testid-convention-mandatory-when-e2e-is-present)
+    - 9.4 [Optional extras](#94-optional-extras-coverage-targets-visual-regression-page-object-model)
+    - 9.5 [Strategy for legacy projects without tests](#95-strategy-for-legacy-projects-without-tests)
+    - 9.6 [/wf-settings: toggle optional modules after installation](#96-wf-settings-toggle-optional-modules-after-installation)
 10. [Block 6 · CI/CD pipeline + GGA](#10-block-6--cicd-pipeline--gga)
 11. [Block 7 · Bootstrap automation (slash commands)](#11-block-7--bootstrap-automation-slash-commands)
 12. [Appendices](#appendices)
@@ -160,13 +156,13 @@ Provides the base ecosystem that is **the same across all your projects**. Lives
 What it provides:
 
 - **Engram**: persistent memory via MCP, across sessions, with full-text search.
-- **SDD orchestrator**: 10 phases of Spec-Driven Development that the agent invokes automatically when the task warrants it. You don't have to learn slash commands.
+- **ODD (Organic Driven Development)**: the feature workflow the agent follows on every request. Substantial work gets a feature document, and you don't have to learn slash commands.
 - **Skills**: curated library (embedded foundation + community in `Gentleman-Skills`).
 - **Preconfigured MCPs**: Context7 (live framework docs), Engram.
 - **Automatic multi-IDE config**: configures Claude Code, OpenCode, Cursor, Windsurf, Codex CLI, Kiro, VS Code Copilot, Gemini CLI, Antigravity CLI, Pi, OpenClaw, Trae.
 - **Persona**: senior architect teaching-oriented (or neutral if you prefer).
 - **Permissions**: blocks destructive commands and sensitive paths (`.env`, `.ssh`, etc.) by default.
-- **Model routing per phase**: each SDD phase can run on a different model (Opus for design, Sonnet for implementation, Haiku for exploration).
+- **Model routing**: gentle-ai can assign models to agents. Section 8.3 lists the models this workflow approves.
 - **GGA (Gentleman Guardian Angel)**: AI code review (activated in Block 6).
 - **Auto-updates**: via Homebrew/Scoop.
 
@@ -175,12 +171,12 @@ What it provides:
 On top of gentle-ai, in each repo. This is what you maintain. What it provides:
 
 - **AGENTS.md**: project-specific context (stack, conventions, constraints, exact commands). gentle-ai's skills + persona still apply, but AGENTS.md tells the agent HOW THIS specific repo is.
-- **Wizard `/wf-init`**: slash command that installs gentle-ai if not present, runs `/sdd-init` to initialize SDD in the repo, verifies system state, and bootstraps the project (generates AGENTS.md, configures hooks, adjusts .gitignore).
+- **Wizard `/wf-init`**: slash command that installs gentle-ai if not present, verifies system state, and bootstraps the project (generates AGENTS.md, configures hooks, adjusts .gitignore).
 - **Post-commit hook**: detects structural drift and warns when AGENTS.md may need an update.
 - **Project-specific satellites**: files in `.cursor/rules/`, `.windsurf/rules/`, `.kiro/steering/`, `CLAUDE.md`, etc. that point to the repo's AGENTS.md. **gentle-ai does NOT generate these satellites**, because gentle-ai is global and knows nothing about your individual repo. All satellites are always from the custom workflow (section 5.4 explains them in detail).
 - **CI/CD pipeline**: GitHub Actions with quality guard + AI review (Claude Code Action or GGA).
 - **Conventional commits + release-please**: traceable releases and automatic changelog.
-- **`/wf-config`**: local setup command for devs who clone the repo (project-specific MCPs, etc.).
+- **`/wf-onboard`**: local setup command for devs who clone the repo (project-specific MCPs, etc.).
 
 ### 2.3 How they complement each other without clashing
 
@@ -188,7 +184,7 @@ gentle-ai writes to **global** folders (`~/.claude/`, etc.). Our custom satellit
 
 When you open an IDE in a project:
 
-1. The IDE first reads the global config (from gentle-ai) → persona, skills, MCPs, SDD agents.
+1. The IDE first reads the global config (from gentle-ai) → persona, skills, MCPs, permissions.
 2. Then reads the project config (your AGENTS.md + satellites) → repo-specific context.
 3. The agent combines both. The two layers complement each other.
 
@@ -200,24 +196,22 @@ When everything is set up, a typical feature looks like this:
 
 1. **New or existing repo** → you start in any state.
 2. **`/wf-init`** once per repo → installs gentle-ai if missing, generates AGENTS.md + satellites + hooks.
-3. **You open your AI IDE** → skills, MCPs, Engram, SDD orchestrator already active (courtesy of gentle-ai).
+3. **You open your AI IDE** → skills, MCPs, Engram, and ODD already active (courtesy of gentle-ai).
 4. **You request a feature in natural language**. You don't learn slash commands.
-5. **SDD orchestrator decides**: if the task warrants SDD, it starts the 10 phases automatically.
-6. **Sub-agents work per phase**, each with their own model and fresh context.
-7. **You approve at each gate** (after proposal, after specs, after design, before implementing).
+5. **ODD sets the depth**: small work proceeds directly; substantial work gets a feature document that tracks specs, tasks, and evidence.
+6. **Sub-agents work per task** when the work is large enough to delegate, each with fresh context.
+7. **You stay in control of delivery**: you give consent for medium and high risk reviews, and you decide what gets committed and pushed.
 8. **Human review gate** before commit: the agent shows you the full diff, waits for your approval.
 9. **Commit with conventional commits** + the post-commit hook detects if AGENTS.md may need an update.
 10. **PR + CI/CD pipeline**: Quality Guard (lint, types, tests, build) + AI review (GGA or Claude Code Action) + security scan.
 11. **Merge + release-please** prepares the automatic release PR with changelog.
 12. **Engram saves what was learned** for the next session.
 
-**To visualize**: see the two diagrams in Appendix E.
-
 ---
 
 ## 4. gentle-ai · The Foundation
 
-gentle-ai is the foundation of this workflow: it configures the complete AI agent ecosystem on your machine (persona, skills, SDD orchestrator, Engram, MCPs, permissions). **You don't need to install it manually before starting.** The `/wf-init` wizard detects it, installs it if missing, and configures it — all in its Phase 0.
+gentle-ai is the foundation of this workflow: it configures the complete AI agent ecosystem on your machine (persona, skills, ODD, Engram, MCPs, permissions). **You don't need to install it manually before starting.** The `/wf-init` wizard detects it, installs it if missing, and configures it (all in its Phase 0).
 
 This section exists as **reference**: what it is, what it installs, and advanced options you might need later.
 
@@ -230,8 +224,8 @@ It is a binary written in Go. It lives on your machine (`/opt/homebrew/bin/gentl
 What it installs on your machine (once, globally):
 
 - **Engram**: persistent memory via MCP. Local SQLite, full-text search, shared across all IDEs.
-- **SDD orchestrator + 10 sub-agents**: the agents that drive the Spec-Driven Development cycle. Live in `~/.claude/agents/`, `~/.cursor/agents/`, `~/.kiro/agents/`, etc.
-- **Foundation skills**: SDD, workflow, testing. Embedded in gentle-ai.
+- **ODD**: the feature workflow the agent follows natively, so there is nothing to install for it.
+- **Foundation skills**: workflow and testing, plus Judgment Day for dual review. Embedded in gentle-ai.
 - **Preconfigured MCPs**: Context7 (live framework docs), Engram.
 - **Persona**: senior architect teaching-oriented. Applies to all configured IDEs.
 - **Permissions**: blocks destructive commands and sensitive paths by default.
@@ -289,7 +283,7 @@ gentle-ai install --agent vscode-copilot --preset full-gentleman
 gentle-ai install --agent codex --preset full-gentleman
 ```
 
-> `--preset full-gentleman` activates everything: persona, skills, SDD, MCPs, permissions. It is the preset the wizard uses by default.
+> `--preset full-gentleman` activates everything: persona, skills, MCPs, permissions. It is the preset the wizard uses by default.
 
 ### 4.4 Extra stack skills (optional but recommended)
 
@@ -382,19 +376,18 @@ When you run `gentle-ai` without arguments (or `gentle-ai install`), the interac
 **Main screens and what they are for**:
 
 - **Install / Configure agents**: select which IDEs/CLIs to configure. Shows detected agents on your machine with checkmarks. You can check/uncheck without running additional commands.
-- **Configure Models**: assign different models to each SDD pipeline phase and to Judgment Day (jd-judge-a, jd-judge-b, jd-fix-agent). For example, Claude Opus for `sdd-design`, a cheap model for `sdd-explore`. Also configures Codex lanes (strong/mid/cheap).
-- **OpenCode SDD Profiles**: create and manage SDD profiles for OpenCode. After creating one, in OpenCode press `Tab` to switch between `gentle-orchestrator` (default) and your custom profiles.
+- **Configure Models**: assign models to the sub-agents gentle-ai installs, including Judgment Day (jd-judge-a, jd-judge-b, jd-fix-agent). Also configures Codex lanes (strong/mid/cheap).
 - **Backup & Rollback**: lists automatic configuration snapshots (gentle-ai backs up before each install/sync/upgrade). You can pin a backup with `p` to protect it from auto-pruning (by default it keeps the 5 most recent). Useful if an update broke something.
-- **Uninstall**: removes specific components from specific agents without deleting everything. Example: remove only `sdd` and `persona` from Cursor without affecting Claude Code.
+- **Uninstall**: removes specific components from specific agents without deleting everything. Example: remove only `persona` from Cursor without affecting Claude Code.
 - **Doctor**: equivalent to `gentle-ai doctor` in terminal, but with visual formatting.
 
 **Useful shortcuts that are not obvious**:
 
 - `p` in Backup & Rollback: pins the selected backup (not deleted by auto-pruning).
-- In Configure Models: you can assign models per-phase without needing the CLI — the TUI writes the same files as `gentle-ai sync --profile-phase`.
+- In Configure Models: you can assign models without needing the CLI.
 - Upgrade from the TUI: if an update is available, the TUI shows the prompt "Apply now? [Y/n]". When updating gentle-ai from the TUI, the app restarts automatically after you confirm the result.
 
-> **For dummies**: the TUI is useful for exploring what gentle-ai has installed and changing models per phase. For daily use, you don't need to open it — the workflow runs in the background. Open it when you want to adjust which model each SDD phase uses or review/restore a configuration backup.
+> **For dummies**: the TUI is useful for exploring what gentle-ai has installed and changing models per sub-agent. For daily use, you don't need to open it. The workflow runs in the background. Open it when you want to adjust which model a sub-agent uses or review/restore a configuration backup.
 
 ### 4.11 Engram TUI
 
@@ -429,10 +422,10 @@ The Engram TUI is a persistent memory browser. It shows:
 
 - To see what the agent remembers about a project before starting an important session.
 - To detect obsolete or contradictory memories (for example, an architecture decision that changed).
-- To verify that the agent correctly saved a decision after an SDD session.
+- To verify that the agent correctly saved a decision after a feature session.
 - To diagnose why the agent proposed something unexpected ("what did it remember about the project?").
 
-**What it does NOT show**: Engram TUI only shows explicit persistent memories (those the agent saved with `mem_save`). It does not show in-memory session context or the contents of `openspec/`. They are different layers.
+**What it does NOT show**: Engram TUI only shows explicit persistent memories (those the agent saved with `mem_save`). It does not show in-memory session context or the feature documents in `odd/tasks/`, which are plain files in your repo. They are different layers.
 
 **Note about `engram serve`**: most agents (Claude Code, Antigravity CLI, Gemini CLI, Codex, VS Code, Cursor, Windsurf) launch Engram as an automatic stdio subprocess — you never run `engram serve` manually for them. Only OpenCode and Pi need `engram serve` running in the background for their HTTP integration. If you see `engram:reachable [fail]` in `gentle-ai doctor` and you use Claude Code, ignore it — it is not blocking for that agent.
 
@@ -500,7 +493,7 @@ A section typically at the end of AGENTS.md with operational preferences from th
 
 The `AGENTS.md` is **per-repository, not per-developer**. Each project has its own AGENTS.md adapted to the stack it uses.
 
-**When the project uses routing, the decision ladder, or the TDD protocol**, the router starts with a **⛔ HARD STOP RULE** block right after the title: it orders the agent to read `wf-orchestrator` before classifying/planning/implementing any task (the single entry point and source of truth for the gate sequence Ladder → Preflight → Decision → TDD ritual). Read-only questions ("explain X", "what does Y do") are explicitly exempt. It exists because the router is a thin router — the protocols are loaded on demand, so without a visible top-level gate the agent can skip wf-orchestrator and lose the gate sequence.
+**When the Decision Ladder is enabled**, the router lists `wf-ladder` among its protocols, and the agent loads it before proposing an implementation. The protocols live in skills and in `.agents/protocols/`, so the router itself stays short.
 
 **What changes between stacks** (mental map):
 
@@ -512,7 +505,7 @@ The `AGENTS.md` is **per-repository, not per-developer**. Each project has its o
 | Backend Node/Express | Error handling, API contracts, auth, validation | Transactions, idempotency, rate limiting |
 | Python FastAPI / Django | Type hints, Pydantic schemas, async patterns | DB sessions, dependency injection |
 
-#### Concrete example: AGENTS.md for `crud-tasks-sdd-demo`
+#### Concrete example: AGENTS.md for `crud-tasks-demo`
 
 Stack: Vite 8 + React 19.2 + TS 6 + Tailwind 4 + ESLint 9 flat config. Size: ~82 lines. Covers the 6 mandatory sections + Behavior preferences + Trigger 3 of drift detection + version footer.
 
@@ -526,36 +519,32 @@ The wizard phases:
 
 - **Phase 0** — Self-contained prerequisite. Installs/verifies gentle-ai, runs `gentle-ai doctor`, confirms active agents for this project.
 - **Phase 0b** — System health check. Verifies `gentle-ai doctor` critical checks, warns on disk space and Engram reachability.
-- **Phase 0c** — Workflow feature selection. Lets the user toggle routing, TDD, CI/CD, release-please and other optional modules before discovery.
+- **Phase 0c**: Workflow feature selection. Lets the user toggle the Decision Ladder, testing, CI/CD, release-please, and the branch-PR override before discovery.
 - **Phase 1** — Discovery (lists files, manifests, previous satellites, commits; also saves npm scripts to `discovery.commands` and the root folder summary for the AGENTS.md Commands / Project Structure sections).
 - **Phase 2** — Migration of previous artifacts (if any with their own content).
 - **Phase 3** — Mode: greenfield vs legacy (auto-detect + confirmation).
 - **Phase 4** — Reverse engineering (legacy only).
-- **Phase 4.5** — SDD initialization (conditional, only if routing or TDD is enabled). With the context already discovered (committers, stack, greenfield vs legacy), the wizard explains the three backends (engram / openspec / hybrid), makes a grounded recommendation, and runs `/sdd-init` with the user's choice. The wizard always shows all three modes — the user decides. Verification checks the canonical config structure (`schema`, `context`, `rules`) and that `testing:*` is NOT required at this phase (it may live in Engram as `sdd/{project}/testing-capabilities` and is completed in `openspec/config.yaml` by Phase 8, step 8.1d); the backend value is read from `.wizard-state.json` (`sdd.backend`), not from a `persistence.mode` key in the config, which no gentle-ai convention uses (an improvised `/sdd-init` run once wrote invented keys like `phases.*.template`). For Windsurf/Devin, it also ensures the "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule is present in the project's `AGENTS.md`; on greenfield projects (where Phase 6a has not generated `AGENTS.md` yet) it creates the file directly so `/sdd-init` can load the legacy skill paths in the new session.
-- **Phase 4.6** — Testing stack setup (conditional, only if TDD is enabled). Detects or installs the selected testing layers (unit, integration, E2E) and registers the Playwright MCP when applicable. Layer detection checks wiring, not just dependencies: a Playwright dependency without `playwright.config.ts` counts as NOT configured and the wizard offers to generate the config.
-- **Phase 4.6b** — Testing extras and MCP registration (conditional, only if TDD is enabled). Optional coverage targets, visual regression, Page Object Model (Builder-Heavy stages a minimal `e2e/pages/HomePage.ts` scaffold plus an AGENTS.md convention line), and final MCP registration.
+- **Phase 4.6**: Testing stack setup (conditional, only if testing is enabled in Phase 0c). Detects or installs the selected testing layers (unit, integration, E2E), asks about the optional extras (coverage targets, visual regression, Page Object Model), and registers the Playwright MCP when applicable. Layer detection checks wiring, not just dependencies: a Playwright dependency without `playwright.config.ts` counts as NOT configured and the wizard offers to generate the config. The Page Object Model extra stages a minimal `e2e/pages/HomePage.ts` scaffold plus an AGENTS.md convention line.
 - **Phase 4.7** — CI/CD configuration (conditional, only if CI, CD, or release-please is enabled). Collects AI reviewer, security review, conventional commits, release-please, E2E in CI, and tag-based deploy preferences; writes no files here.
 - **Phase 5** — Minimum questions (4-5 depending on path).
-- **Phase 6a** — Deterministic assembly (Builder-Core): `AGENTS.md`, packaged protocols, and per-IDE satellites into `.wizard-staging/` on disk (does not promote to the project root yet). Runs the deterministic script `wf-init/lib/builder-core.py` (`python3 "$WF_DIR/lib/builder-core.py" --state .wizard-state.json --staging .wizard-staging --raw "$WF_RAW" --wf-dir "$WF_DIR"`); it hard-fails on unresolved placeholders instead of guessing. List state fields render as UTF-8 markdown bullets (`critical_constraints` → readable rule list, never escaped JSON); missing satellite templates hard-fail with the affected IDE listed instead of skipping silently. The E2E Testing Approach section embeds the `data-testid` convention from its template file.
+- **Phase 6a**: Deterministic assembly (Builder-Core): `AGENTS.md`, packaged protocols, and per-IDE satellites into `.wizard-staging/` on disk (does not promote to the project root yet). Runs the deterministic script `wf-init/lib/builder-core.py` (`python3 "$WF_DIR/lib/builder-core.py" --state .wizard-state.json --staging .wizard-staging --raw "$WF_RAW" --wf-dir "$WF_DIR"`); it hard-fails on unresolved placeholders instead of guessing. List state fields render as UTF-8 markdown bullets (`critical_constraints` → readable rule list, never escaped JSON); missing satellite templates hard-fail with the affected IDE listed instead of skipping silently. The Testing Approach section is built from the active test layers: it carries the coverage matrix, the Playwright guidance, and, when E2E is active, the `data-testid` convention.
 - **Phase 6b** — Deterministic assembly (Builder-Heavy): per-IDE commands, post-commit hook, testing configs, and CI/CD into `.wizard-staging/`. Runs the deterministic script `wf-init/lib/builder-heavy.py` with the same argument contract (B7-B9).
 - **Phase 7** — Human review gate (preview incl. the Phase-8 install side effects — husky/commitlint/vitest/playwright installs and package.json script additions — approval).
-- **Phase 8** — Write, handle `.gitignore`, install post-commit hook (detects AGENTS.md and SDD drift in the same hook), commit. When Windsurf is active, re-inserts the "Gentle AI — Legacy Path Bridge for Windsurf/Devin" rule into `AGENTS.md` after the staging copy (portable head/tail/cat, verified with a loud failure check) — the staging router does not carry the rule. Validates the `AGENTS.md` `wf-version` footer is a concrete semver (never `latest` or an unresolved placeholder) and fails loudly if it is not — a non-semver footer blocks every `/wf-init` and `/wf-refresh`. It also cross-checks the footer against the state's `wizard_version` and warns on mismatch (it does not abort, so a manually advanced footer does not break a refresh). When conventional commits is active it neutralizes Husky's factory `pre-commit` (`npm test`) with an inert hook unless GGA-local wrote one or a non-factory user hook exists (watch-mode scripts would hang every commit); the dummy-test creation globs the whole tree instead of one hardcoded path; the 8.1d `openspec/config.yaml` edit deletes scalar nodes at canonical paths before writing sub-keys (a yq write over a scalar is a silent no-op) and asserts every written field reads back before declaring OK.
+- **Phase 8**: Write, handle `.gitignore`, install post-commit hook (detects AGENTS.md drift), commit. When Windsurf is active, re-inserts the Gentle AI legacy path bridge rule for Windsurf/Devin after the staging copy (portable head/tail/cat, verified with a loud failure check). The staging router does not carry the rule. Validates the `AGENTS.md` `wf-version` footer is a concrete semver (never `latest` or an unresolved placeholder) and fails loudly if it is not. A non-semver footer blocks every `/wf-init` and `/wf-refresh`. It also cross-checks the footer against the state's `wizard_version` and warns on mismatch (it does not abort, so a manually advanced footer does not break a refresh). When conventional commits is active it neutralizes Husky's factory `pre-commit` (`npm test`) with an inert hook unless GGA-local wrote one or a non-factory user hook exists (watch-mode scripts would hang every commit); the dummy-test creation globs the whole tree instead of one hardcoded path.
 
 **How it is invoked**: with `install.sh` it is installed as a global slash command on all detected IDEs. You invoke it with `/wf-init` from any repo. The agent detects and reads the phase files from the repo as it progresses.
 
 ### 5.4 Project-specific satellites: what they are and why we need them
 
-**Important clarification**: gentle-ai does NOT generate project-specific satellites. gentle-ai is **global**: it only knows about your machine (persona, skills, MCPs, SDD sub-agents). It has no way to know your individual repo or how to "point" to your project's specific `AGENTS.md`. **All project satellites are generated by the `/wf-init` wizard**.
+**Important clarification**: gentle-ai does NOT generate project-specific satellites. gentle-ai is **global**: it only knows about your machine (persona, skills, MCPs, permissions). It has no way to know your individual repo or how to "point" to your project's specific `AGENTS.md`. **All project satellites are generated by the `/wf-init` wizard**.
 
 #### What gentle-ai installs globally (NOT project satellites)
 
 These files live in `~/`, are common to all your projects, and do NOT know your repo:
 
-- `~/.claude/` — persona, SDD sub-agents, skills, MCP wiring.
-- `~/.cursor/agents/sdd-*.md` — 10 sub-agents for Cursor.
-- `~/.windsurf/` — persona, MCP, skills (Plan Mode).
-- `~/.kiro/steering/gentle-ai.md` — global steering.
-- `~/.kiro/agents/sdd-*.md` — 10 Kiro sub-agents.
+- `~/.claude/`: persona, skills, MCP wiring.
+- `~/.windsurf/`: persona, MCP, skills (Plan Mode).
+- `~/.kiro/steering/gentle-ai.md`: global steering.
 - `~/.config/opencode/`, `~/.codex/`, `~/.gemini/`, etc.
 
 #### What your `/wf-init` wizard generates (these ARE project satellites)
@@ -577,7 +566,7 @@ These live in the repo. Each one connects its specific IDE to THIS project's `AG
 
 When you open an IDE in a project, the agent loads both:
 
-1. **gentle-ai global config** → persona, skills, MCPs, SDD agents.
+1. **gentle-ai global config** → persona, skills, MCPs, permissions.
 2. **Project-specific config (satellites)** → repo context.
 
 Example with Kiro:
@@ -607,8 +596,8 @@ native support, delete this file. Feature request: github.com/anthropics/claude-
 
 Copilot does read `AGENTS.md` natively in 2026, but its **skill discovery is progressive**:
 only the `name+description` of a skill stays resident, and the SKILL.md body only loads when
-the model decides it is relevant. That makes chained wizard protocols (ladder → sdd-trigger →
-tdd) unreliable when they live only in skills/AGENTS.md. The wizard therefore generates a
+the model decides it is relevant. That makes chained wizard protocols (the ladder and the testing
+rules) unreliable when they live only in skills/AGENTS.md. The wizard therefore generates a
 self-contained instructions file that inlines the mandatory gate checklist, the active
 protocols' requirements, and the project facts — with zero dependence on AGENTS.md or on skill
 discovery. It is rendered by the shared `render_resolved` pipeline (same `<if>` conditionals
@@ -621,12 +610,11 @@ from AGENTS.md.
 ## ⛔ MANDATORY WORKFLOW GATE (before ANY edit, write, or generation)
 - Features table (only ACTIVE features) + GATE CONFIRMATION CHECKLIST, output VERBATIM
 - Hard rule: one turn = one action
-- Active protocol sections (only those the user enabled): 🪜 wf-ladder, 🔍 wf-sdd-trigger
-  with Route Contract, 🧪 wf-tdd (standard/strict per state)
+- Active protocol sections (only those the user enabled): 🪜 wf-ladder
 - Project facts (same placeholders as AGENTS.md): Commands, Code Style, Layout, Testing
   Approach, Project MCPs, Critical constraints, Validate before done
 - Deep-dive references to .github/skills/* and registered / commands
-<!-- wf-version: ... features: ladder=..., tdd=..., routing=... -->
+<!-- wf-version: ... features: ladder=..., ci=..., cd=..., release=... -->
 ```
 
 **`.cursor/rules/project.mdc`** (OPTIONAL in 2026):
@@ -652,7 +640,7 @@ Apply the conventions defined in `AGENTS.md` in all your responses.
 @file ../AGENTS.md
 
 <!-- Windsurf/Devin compatibility: Devin reads AGENTS.md natively, so no separate .devin/rules/ is needed.
-     Project-level SDD skills are written to both .windsurf/skills/ and .devin/skills/ for dual IDE support. -->
+     Project-level skills are written to both .windsurf/skills/ and .devin/skills/ for dual IDE support. -->
 ```
 
 **`.kiro/steering/project-context.md`**:
@@ -739,9 +727,9 @@ Solves two different problems:
 - **Phase R1** (Discover): Re-discovers the project (stack, node engine, commands from `package.json`, etc.) and detects drift — writes accepted drift to the STAGING state, not root. **Commands are ALWAYS re-detected from `package.json` on every refresh** (never gated on empty state); the fresh list is merged with descriptions from the current AGENTS.md Commands section (the parser strips backticks and allows `:` inside script names, so both the documented rich format `` - `npm run dev` — Start development server `` and canonical npm scripts like `test:e2e` merge correctly) and written as backticked bulleted list (`- \`npm run <name>\` — <description>`) to `discovery.commands`, logging the honest merged/total description count instead of an unconditional success message. A **regeneration-first merge** replaces the old conditional backfill: structure is regenerated from the live filesystem tree (depth 2, excluding `node_modules`, `.git`, `dist`, `build`, `coverage`, `playwright-report`, `test-results` and `.wizard-*` — both the directories themselves and their children) while preserving the original section's entry order and inline comments (tree-drawing glyphs like `├──`/`│` are normalized before matching so comments survive from tree-formatted sections; surviving entries keep their comments, genuinely new directories are appended, removed ones dropped). A **downgrade guard** never trades a richer section for a poorer one: fenced/tree-formatted originals are preserved verbatim (the deterministic regeneration is dirs-only at depth 2), and when regeneration would drop every inline comment the original had, the original section wins with a warning. MCPs are re-detected from known config files (`.mcp.json`, `.cursor/mcp.json`, `.windsurf/mcp.json`, `.github/copilot-instructions.md`) and merged with purpose/setup from the old AGENTS.md 3-column table. Code Style is composed from structured `discovery.conventions.{naming,components,imports,tests,css,state}` fields as bullets when any is present, falling back to preserving the AGENTS.md section verbatim when all are absent. The old "backfill only when empty" guard is replaced — richer regenerated content supersedes stale preserved text. In non-tty runs the `Use updated project info?` prompt is **fail-fast**: when unanswered, R1 stops IMMEDIATELY (before any staging work), emits `GENTLE_AI_WF_REFRESH_NEEDS=prompt=Use updated project info?`, writes `.wizard-resume-phase`, and exits 3 — continuing on a default answer would build staging from stale info and an answer collected later would have no consumer.
 - **Phase R2** (Migrate): Migrate state schema; run unconditional legacy normalization (testing.layers dict→array, flat `discovery.stack_key`→nested); ask about new optional features. Feature prompts (`Enable <FEATURE>?`) share R1's fail-fast semantics: unanswered non-tty prompts stop R2, emit the manifest, write `.wizard-resume-phase`, and exit 3
 - **Phase R3**: Re-run Builder (B1-B9) to generate all artifacts into `.wizard-staging/` via the deterministic scripts `lib/builder-core.py` + `lib/builder-heavy.py` (first snapshots the pre-Builder managed files for deletion detection)
-- **Phase R4**: Before diffing, a **placeholder gate** fails the phase loudly if any wizard-owned template namespace (`{{answers.*}}`, `{{discovery.*}}`, `{{features.*}}`, `{{version}}`, `{{sdd.backend}}`, `{{PROTOCOL_BODY:*}}`, etc.) appears unresolved in staging — arbitrary `{{ }}` text quoted in project docs is NOT flagged. Narrow exemption: `{{sdd.backend}}` appearing as a sed search pattern (the runtime literal wf-settings uses to re-resolve the SDD backend when the user switches backends post-build — builder-core.py ships it verbatim on purpose) does NOT fail the gate; occurrences outside that sed-command context still do. The exemption regex uses `grep -E` with escaped braces because BSD grep (macOS) gives undefined behavior for unescaped `{{` in BRE. Then compares the R3 baseline snapshot with staging using SHA256 hashes; classify files as add/update/delete/unchanged (the staged `wizard-state.json` copy is never part of the plan). After classification, R4 computes a **behavioral diff over curated config keys** (`auto_improve`, `tdd_mode`, `e2e_in_ci`, `release_ai_summary`, `release_ai_provider`) between the project copy and staging for every updated file, persisting flips into the plan's `behavioral_changes` array so Phase R5 can surface them FIRST instead of hiding a semantic toggle among hash-classified mechanical updates
+- **Phase R4**: Before diffing, a **placeholder gate** fails the phase loudly if any wizard-owned template namespace (`{{answers.*}}`, `{{discovery.*}}`, `{{features.*}}`, `{{version}}`, `{{PROTOCOL_BODY:*}}`, etc.) appears unresolved in staging. Arbitrary `{{ }}` text quoted in project docs is NOT flagged. Then compares the R3 baseline snapshot with staging using SHA256 hashes; classify files as add/update/delete/unchanged (the staged `wizard-state.json` copy is never part of the plan). After classification, R4 computes a **behavioral diff over curated config keys** (`auto_improve`, `e2e_in_ci`, `release_ai_summary`, `release_ai_provider`) between the project copy and staging for every updated file, persisting flips into the plan's `behavioral_changes` array so Phase R5 can surface them FIRST instead of hiding a semantic toggle among hash-classified mechanical updates
 - **Phase R5**: Show grouped diff and collect user approvals; unanswered review prompts batch into ONE combined manifest (plus `apply_mode`) with a `.wizard-resume-phase=R5` marker; offers apply+commit, apply without commit, or cancel (cancel cleans the staging directory). Behavioral changes print first, then previews per `WF_REFRESH_PREVIEW`
-- **Phase R6**: Apply approved changes only; on approval update the STAGING state's `build_plan` (promoted to root by the final copy), write `.wizard-managed-files.json`, and commit via an explicit pathspec (the user's other staged work is never unstaged); in apply-only mode files are copied to the working tree but never staged or committed; a fully declined refresh writes nothing
+- **Phase R6**: Apply approved changes only; on approval commit via an explicit pathspec (the user's other staged work is never unstaged), then update the STAGING state's `build_plan` (promoted to root by the final copy) and write `.wizard-managed-files.json`; a failed commit rolls the working tree, the index and the state back; in apply-only mode files are copied to the working tree but never staged or committed; a fully declined refresh writes nothing
 
 **Trigger 3 · Rule in AGENTS.md**. The most effective. A line in "Behavior Preferences":
 
@@ -791,10 +779,10 @@ The `features` field is new and critical. It tracks which optional features of t
 - **Phase R0 · Pre-flight state checks**: Validates `.wizard-state.json` exists and contains minimal required structure; detects active IDEs; copies the state to staging.
 - **Phase R1 · Project content drift**: Re-discovers the project (stack, node engine, commands from `package.json`, etc.) and detects changes; accepted drift is written to the STAGING state (a root-only write would be clobbered by R6's final promotion). A conditional **backfill** then preserves richer documentation from the current `AGENTS.md` into flat staging discovery fields: `discovery.commands`, `discovery.conventions.code_style`, `discovery.conventions.structure`, and `mcps` (the last parsed from the `## Project MCPs` markdown table into `[{name, active}]`). Each field is backfilled only when the staging value is empty AND the current section differs from the builder's generic fallback (`npm run build`, `camelCase`, `flat`, `None configured`), so an already-rich state is never overwritten and newly-added wizard sections still flow in from the fresh router.
 - **Phase R2 · State/schema migration**: Migrates `.wizard-state.json` to current schema; runs an unconditional, idempotent legacy normalization (`testing.layers` dict → array, flat `discovery.stack_key` → nested `discovery.stack.stack_key`); **normalizes corrupted `discovery.node_engine`/`discovery.npm_major` values (`"None"` or `""`) to `null` so the builder's coalesced defaults ("22"/"10") apply correctly**; asks about new optional features.
-- **Phase R3 · Builder re-run**: Re-runs B1-B9 to generate all artifacts into `.wizard-staging/` by executing the deterministic scripts directly — `python3 "$WF_DIR/lib/builder-core.py"` (B1-B6) then `python3 "$WF_DIR/lib/builder-heavy.py"` (B7-B9), both with `--state .wizard-staging/wizard-state.json --staging .wizard-staging --raw "$WF_RAW" --wf-dir "$WF_DIR"` (the `--raw` base and `--wf-dir` come from `wf-refresh/_base.md`). No sub-agent delegation. It **never follows the `/wf-init` phase 7/8 tail** (no `wf_phase_done phase6 phase7`, no `cat phase7.md`) — after Builder-Heavy validation it returns to Phase R4. Staging validation checks the generated artifacts (e.g. `AGENTS.md`) and requires the staged state copy (`.wizard-staging/wizard-state.json`, written by R0) to exist. The builders fetch over IPv4-first DNS (preferring `AF_INET` so `urllib` does not hang on IPv6-first resolution) and print a `>>> fetching <url>` progress line per download plus per-attempt failure lines on retry. **Step 0 runs first**: it snapshots the pre-Builder `managed_paths`/`generated_files` into `.wizard-refresh-baseline.json` because the Builder overwrites `build_plan` with the new staging set. The baseline snapshot, both builder invocations, and the validation block are fenced bash blocks that `_extract_phase` concatenates in order — with a post-extraction coverage check (count of ```bash fences vs extracted blocks) that fails loudly instead of silently truncating multi-block phases. After `preserve_custom_agents` and `reinsert_legacy_bridge`, R3 runs a **dynamic `EXPECTED[]` validation** built from the state features (active ladder/tdd/routing skills+protocols, the always-included commands per active IDE, quality-guard when CI, release-please+commitlint when release, vitest/playwright when testing layers) — a missing artifact fails the phase loudly.
-- **Phase R4 · Hash-based diff**: Compares the R3 baseline snapshot (not the live `build_plan`, which the Builder already overwrote) against staging; classifies files as add/update/delete/unchanged, with `deleted_modified` flagged when the user edited a file since the last refresh. **Updated entries now carry `local_modified: true` when the working-tree file differs from HEAD (fallback: recorded `generated_files` hash), so locally-modified files are tracked separately.** An explicit `DEPRECATED_PATHS` list is extended with **per-IDE skill dirs for 6 deprecated commands** (`wf-cicd`, `wf-cleanup`, `wf-refresh`, `wf-init`, `wf-sdd-config`, `wf-sdd-lite`) across **8 IDE skill roots** (`.claude/skills`, `.cursor/skills`, `.opencode/skills`, `.windsurf/skills`, `.codex/skills`, `.kiro/skills`, `.github/skills`, `.devin/skills` when Windsurf active). These are deleted even when absent from the baseline, because they are installed globally by `install.sh` and never belong in a project. Deletion paths are deduplicated (`unique_by(.path)`). The `## Project MCPs` table now renders **3-column (`| MCP | Purpose | Required setup |`)** when purpose/setup are known (from re-detection + merge), falling back to 2-column (`| MCP | Active |`)** otherwise.
+- **Phase R3 · Builder re-run**: Re-runs B1-B9 to generate all artifacts into `.wizard-staging/` by executing the deterministic scripts directly: `python3 "$WF_DIR/lib/builder-core.py"` (B1-B6) then `python3 "$WF_DIR/lib/builder-heavy.py"` (B7-B9), both with `--state .wizard-staging/wizard-state.json --staging .wizard-staging --raw "$WF_RAW" --wf-dir "$WF_DIR"` (the `--raw` base and `--wf-dir` come from `wf-refresh/_base.md`). No sub-agent delegation. It **never follows the `/wf-init` phase 7/8 tail** (no `wf_phase_done phase6 phase7`, no `cat phase7.md`). After Builder-Heavy validation it returns to Phase R4. Staging validation checks the generated artifacts (e.g. `AGENTS.md`) and requires the staged state copy (`.wizard-staging/wizard-state.json`, written by R0) to exist. The builders fetch over IPv4-first DNS (preferring `AF_INET` so `urllib` does not hang on IPv6-first resolution) and print a `>>> fetching <url>` progress line per download plus per-attempt failure lines on retry. **Step 0 runs first**: it snapshots the pre-Builder `managed_paths`/`generated_files` into `.wizard-refresh-baseline.json` because the Builder overwrites `build_plan` with the new staging set. The baseline snapshot, both builder invocations, and the validation block are fenced bash blocks that `_extract_phase` concatenates in order, with a post-extraction coverage check (count of ```bash fences vs extracted blocks) that fails loudly instead of silently truncating multi-block phases. After `preserve_custom_agents` and `reinsert_legacy_bridge`, R3 runs a **dynamic `EXPECTED[]` validation** built from the state features (the active ladder skill and protocol, the always-included commands per active IDE, quality-guard when CI, release-please+commitlint when release, vitest/playwright when testing layers). A missing artifact fails the phase loudly.
+- **Phase R4 · Hash-based diff**: Compares the R3 baseline snapshot (not the live `build_plan`, which the Builder already overwrote) against staging; classifies files as add/update/delete/unchanged, with `deleted_modified` flagged when the user edited a file since the last refresh. **Updated entries now carry `local_modified: true` when the working-tree file differs from HEAD (fallback: recorded `generated_files` hash), so locally-modified files are tracked separately.** An explicit `DEPRECATED_PATHS` list is extended with **per-IDE skill dirs for the deprecated commands** (`wf-cicd`, `wf-cleanup`, `wf-refresh`, `wf-init`, and the retired wizard commands) across **8 IDE skill roots** (`.claude/skills`, `.cursor/skills`, `.opencode/skills`, `.windsurf/skills`, `.codex/skills`, `.kiro/skills`, `.github/skills`, `.devin/skills` when Windsurf active). These are deleted even when absent from the baseline, because they are installed globally by `install.sh` and never belong in a project. Deletion paths are deduplicated (`unique_by(.path)`). The `## Project MCPs` table now renders **3-column (`| MCP | Purpose | Required setup |`)** when purpose/setup are known (from re-detection + merge), falling back to 2-column (`| MCP | Active |`)** otherwise.
 - **Phase R5 · Review gate**: Prints **behavioral changes FIRST** (curated keys like `ci.auto_improve` whose value flips between the project copy and staging — a semantic toggle must not hide among N mechanical updates), then shows a real content preview (added → staged content; updated → `diff -u` against staging; deleted/deleted_modified → current content), bounded by `MAX_PREVIEW_LINES` (default 120) per file, then collects user approvals. The full review is ALWAYS written to `$WF_STATE_DIR/refresh-review.md` (outside `.wizard-staging`, so R6's cleanup trap cannot delete it) with its path printed; inline verbosity follows `WF_REFRESH_PREVIEW=full|summary|none` — default `full` keeps the historical complete dump, `summary` prints counts + behavioral changes only, `none` only the pointer. Then collects user approvals. **Dedicated warning block lists `updated` files with `local_modified: true` and asks a separate approval: `Overwrite locally-modified files?` (stored as `build_plan.approval.overwrite_local`).** The final gate offers three choices: apply+commit (default), apply without commit, or cancel. **In non-tty/agent contexts, if any prompt lacks an answer, R5 emits a structured manifest `GENTLE_AI_WF_REFRESH_NEEDS="prompt=<p1>|prompt=<p2>|...|apply_mode=..."` and exits with code 3 (not 2), leaving staging/plan intact. Review prompts accumulate during the review and are emitted as that single manifest right before approvals are stored; each prompt satisfied from `WF_REFRESH_ANSWERS`/`WF_REFRESH_DEFAULT_ANSWER`/cancel semantics is removed from `$WF_STATE_DIR/.wizard-pending-prompts` immediately, so resumed runs never re-ask already-answered questions. The restart-semantics `Update global commands?` prompt never reaches this manifest — R-1 resolves it (or cuts the run) before any refresh work.** `WF_REFRESH_RESUME=1` re-enters via the `$WF_STATE_DIR/.wizard-resume-phase` marker: pre-R5 stops (R1/R2 fail-fast prompts) resume at exactly the marked phase — earlier phases skip themselves, the marked phase consumes `WF_REFRESH_ANSWERS` and re-runs fully — and the pipeline flows through R5 normally; runs stopped at R5 write a marker of `R5`, so on resume R-1..R4 skip via that same marker and R5 consumes it before re-running the review (the legacy no-marker path still validates staging/plan exist and re-enters R5 with the preserved state).** In non-tty contexts the choice comes from `WF_REFRESH_APPLY_MODE=commit|apply-only|cancel`; anything else aborts instead of guessing — the missing-value case emits `GENTLE_AI_WF_REFRESH_NEEDS=apply_mode=` with exit 3, the same contract as every other gate.
-- **Phase R6 · Apply and close**: Applies approved changes, updates the STAGING state's `build_plan` (the final `cp` promotes the complete staging state to root), writes `.wizard-managed-files.json`, and commits. Bookkeeping only runs when at least one category is approved; a declined refresh writes nothing. In **apply-only mode**, approved `deleted`/`deleted_modified` files are removed with plain `rm -f` (unstaged), **not** `git rm`, and the closing message accurately states: "changes left in the working tree (unstaged). Review with: git status && git diff". Locally-modified `updated` files are only overwritten when `overwrite_local` approval is true. The commit uses an explicit pathspec so it contains only approved paths and never unstages unrelated user work. The staged `wizard-state.json` copy is excluded from the diff plan.
+- **Phase R6 · Apply and close**: Applies approved changes, commits them, and only then updates the STAGING state's `build_plan` and writes `.wizard-managed-files.json` (the final `cp` promotes the complete staging state to root). A failed commit rolls the working tree, the index and the state back. The Project Structure is regenerated on the final tree, so an approved refresh is not offered again on the next run. Bookkeeping only runs when at least one category is approved; a declined refresh writes nothing. In **apply-only mode**, approved `deleted`/`deleted_modified` files are removed with plain `rm -f` (unstaged), **not** `git rm`, and the closing message accurately states: "changes left in the working tree (unstaged). Review with: git status && git diff". Locally-modified `updated` files are only overwritten when `overwrite_local` approval is true. The commit uses an explicit pathspec so it contains only approved paths and never unstages unrelated user work. The staged `wizard-state.json` copy is excluded from the diff plan.
 
 **New optional features** are handled in Phase R2:
 
@@ -802,7 +790,7 @@ When running `/wf-refresh`, Phase R2 does the following:
 
 1. Reads `.wizard-state.json` features (e.g., `features.decision_ladder`).
 2. After `migrate_state`, checks the protocol features that can be enabled without
-   the full phase47-cicd questionnaire: `decision_ladder`, `tdd_protocol`, `routing_abc`.
+   the full phase47-cicd questionnaire: `decision_ladder`.
 3. **For each feature not in the local state**: asks you. In non-interactive/agent
    contexts set `WF_REFRESH_ANSWERS="<prompt>=yes|..."` per-question (exact prompt
    match) or the global `WF_REFRESH_DEFAULT_ANSWER=yes|no` so the migration can
@@ -816,13 +804,23 @@ When running `/wf-refresh`, Phase R2 does the following:
 ```
 New optional feature available: decision_ladder
 Enable decision_ladder? [y/n]
-
-New optional feature available: routing_abc
-Enable routing_abc? [y/n]
 ```
 
 5. For each user response, updates `features.*` in `.wizard-state.json`.
 6. Features marked as disabled are recorded explicitly and not asked again in future refreshes.
+
+#### Projects set up by an older wizard
+
+Projects initialized before the SDD removal carry files and state that the current wizard no longer uses. The next `/wf-refresh` migrates them:
+
+- **Retired wizard files** (`wf-tdd`, `wf-sdd-trigger`, `wf-orchestrator`, `sdd-lite`, the `sdd/*` protocols, `sdd-new.md`) are removed when they still match the hash recorded at install. A file you edited, or one with no recorded hash, is listed for approval, and it stays if you answer no.
+- **Declined removals** are recorded in `.migrations.retired_pending` and asked again on the next run.
+- **Retired files that are not in git's HEAD** (files you created or staged yourself) are never offered for deletion. `/wf-refresh` prints one notice for each, then records them in `.migrations.kept_not_in_head` and stays quiet about them on later runs.
+- **State** moves to schema 4. `features.tdd_protocol` maps to `features.testing`, so your test infrastructure stays. The `sdd`, `routing_abc`, and `tdd_mode` keys and the `phase45` and `phase46b` phase keys are dropped. An in-flight pointer on `phase45` or `phase46b` resumes at `phase46`. The migration is stamped once in `migrations.sdd_removed`.
+- **`openspec/`** is removed only after an explicit "yes" to "Remove the SDD openspec/ directory from this project?" (default No). It is removed only when git tracks it and it is clean, and only its tracked files go.
+- **`.wf-status`** is deleted only when it carries the old SDD drift text. The post-commit hook writes a new one when drift appears.
+
+SDD text inside your `<!-- WF: DO NOT REGENERATE -->` blocks is reported with line numbers. The refresh never rewrites those blocks, so you remove those lines by hand.
 
 #### When refresh is NOT enough and you need to re-run the wizard
 
@@ -840,7 +838,7 @@ These cases are rare (1-2 times per year max) and are announced in the wizard ch
 
 #### Step 1 · Open the project from its root
 
-This is the only thing that matters before running the wizard: **open the IDE exactly from the repo root folder**, not from a parent folder. If you open from the parent, the agent won't find `AGENTS.md` or `openspec/` because its working directory is not the repo's.
+This is the only thing that matters before running the wizard: **open the IDE exactly from the repo root folder**, not from a parent folder. If you open from the parent, the agent won't find `AGENTS.md` because its working directory is not the repo's.
 
 ```bash
 # Correct
@@ -902,11 +900,7 @@ What you will see, in order:
 
 **Phase 4 — Reverse engineering**. Legacy only. Reports detected conventions. Confirm or correct.
 
-**Phase 4.5 — SDD initialization** (conditional, only if routing or TDD is enabled). Selects the SDD backend and applies the Windsurf/Devin compatibility workaround.
-
-**Phase 4.6 — Testing stack setup** (conditional, only if TDD is enabled). Detects or installs the selected testing layers.
-
-**Phase 4.6b — Testing extras** (conditional, only if TDD is enabled). Optional coverage targets, visual regression, Page Object Model (Builder-Heavy stages a minimal `e2e/pages/HomePage.ts` scaffold), and final MCP registration.
+**Phase 4.6: Testing stack setup** (conditional, only if testing is enabled). Detects or installs the selected testing layers, and asks about the optional extras (coverage targets, visual regression, Page Object Model).
 
 **Phase 4.7 — CI/CD configuration** (conditional, only if CI, CD, or release-please is enabled). Collects AI reviewer, security review, conventional commits, release-please, and tag-based deploy preferences; writes no files here.
 
@@ -1006,7 +1000,7 @@ With Block 1 working end-to-end:
 
 - **Work a few days normally** with the agent on your project. Observe which AGENTS.md rules are well respected, which need adjustment, what's missing to document.
 - **If the agent detects drift** (`[AGENTS.md drift detected: ...]` at the end of some response), run `/wf-refresh` to apply the complete Decision Ladder, or adjust manually.
-- **When you're ready**, advance to Block 2 (SDD) to start using the spec flow before implementing non-trivial features.
+- **When you're ready**, advance to Block 2 (ODD) to see how a substantial feature gets its feature document.
 
 
 ### 5.7 Ensuring multi-IDE fidelity · Strategy and specific fixes
@@ -1103,7 +1097,7 @@ This file persists across IDE sessions until you act on it.
 
 ### 5.8 Optional behavior improvements · wf-ladder
 
-This section documents an optional but highly recommended improvement: integrating the **Decision Ladder** pattern into the project's AGENTS.md, or as a global gentle-ai skill.
+This section documents an optional improvement: the **Decision Ladder**, a short checklist that stops over-engineering before the agent writes code. It ships as the optional `wf-ladder` protocol.
 
 #### The problem it solves
 
@@ -1121,68 +1115,17 @@ Before writing any code, the agent must follow this priority ladder. Only descen
 6. **Can it be done in a single line?** If yes, do it in one line.
 7. Only if none of the above apply: write the minimum necessary code that works.
 
-#### Where to integrate it
+#### How it is enabled
 
-Two options, not mutually exclusive:
+Phase 0c asks whether to enable the Decision Ladder. When it is enabled, the router lists `wf-ladder` among its protocols, and the agent loads it before proposing an implementation. The `/wf-ladder` command (section 7.5) forces it on demand. The output lists each rung with its answer and ends with the rung that was used.
 
-**Option A · In the project's AGENTS.md** (recommended to start). Add the decision ladder as a subsection of "Behavior preferences":
-
-```markdown
-## Behavior preferences
-
-[...rest of behavior preferences...]
-
-### Decision Ladder (before writing any code)
-
-Before proposing any implementation, go through this ladder in order and
-**declare out loud each rung and its answer**. Do not apply the ladder in
-silence — the analysis output must be visible so the user can
-audit it. Stop at the first rung where the answer is "yes" and use it.
-
-**When it applies:**
-
-The Ladder applies **always before Preflight**, in all paths. This is
-intentional: the Ladder can simplify a task before classifying it — if
-it detects that "it already exists in the code" (rung 2), the task can go from `wf-force-sdd`
-to `wf-no-sdd`. `wf-preflight` uses the Ladder result as input for classification.
-
-Universal order: 🪜 **Ladder → 🔍 Preflight → flow by path**.
-
-In Paths B and C, the Ladder applies **a second time** inside `sdd-apply`,
-before implementing each individual task — the SDD pipeline already approved the what and
-the how, and the Ladder confirms that each implementation follows the minimum path.
-
-Mandatory output format:
-
-```
-🪜 DECISION LADDER
-  1. Does this need to exist? → <answer and brief reason>
-  2. Does it already exist in the code? → <answer and brief reason>
-  ...
-  ✓ Rung N — <what is used or done and why>
-```
-
-1. Does this really need to exist? If not, skip it.
-2. Does it already exist in this codebase? If yes, reuse instead of rewriting.
-3. Does the language's standard library already do it? If yes, use the standard library.
-4. Is it a native platform feature? If yes, use the native approach (e.g.: native `<input type="date">` instead of installing a heavy lib).
-5. Is there already a dependency installed in the project that serves? If yes, use it.
-6. Can it be done in a single line? If yes, do it in one line.
-7. Only if none of the above apply: write the minimum necessary code that works.
-
-Only the rungs evaluated up to the ✓ are declared.
-Under `wf-force-sdd`, the Ladder applies once per task — not to the full pipeline.
-```
-
-**Option B · As a project-specific command** (generated in Block 3, section 7.5). The `/wf-ladder` command allows the user to force it explicitly and see the agent's reasoning rung by rung. The ladder rules stay in `AGENTS.md`; the command is the shortcut to invoke it consciously.
-
-Recommendation: use Option A (AGENTS.md) as the base — the agent always follows it. The Block 3 command adds the ability to force and audit it explicitly.
+The ladder declares each rung and then stops for your confirmation before any code is written. That pause is the ladder's only interruption, and it exists because you chose to enable the ladder. To disable it, run `/wf-settings` and choose option 1.
 
 #### Related frameworks (future reference, don't integrate now)
 
 If in the future you evaluate replacing the gentle-ai foundation with another, the serious candidates are:
 
-- **Superpowers** (`github.com/obra/superpowers`) — 93k-150k stars. Agentic skills framework with SDD methodology, brainstorming, automatic worktrees, subagent-driven dev, strict TDD, code review. Works with Claude Code, Cursor, Codex, Gemini CLI, Copilot CLI, OpenCode, Pi, Antigravity, Kimi Code, Factory Droid. Created by obra (Jesse Vincent, ex-Anthropic). Technical difference with gentle-ai is small; community/maturity difference favors Superpowers. **Reason not to migrate now**: gentle-ai is already installed and validated in your setup, and Engram (persistent memory) is a real differentiator of gentle-ai that Superpowers has no equivalent for. The day you decide to migrate, the only thing that changes is section 4 of the master document (the foundation); the rest of the workflow stays the same because the foundation is replaceable by design.
+- **Superpowers** (`github.com/obra/superpowers`): 93k-150k stars. Agentic skills framework with a spec-first methodology, brainstorming, automatic worktrees, subagent-driven dev, strict TDD, code review. Works with Claude Code, Cursor, Codex, Gemini CLI, Copilot CLI, OpenCode, Pi, Antigravity, Kimi Code, Factory Droid. Created by obra (Jesse Vincent, ex-Anthropic). Technical difference with gentle-ai is small; community/maturity difference favors Superpowers. **Reason not to migrate now**: gentle-ai is already installed and validated in your setup, and Engram (persistent memory) is a real differentiator of gentle-ai that Superpowers has no equivalent for. The day you decide to migrate, the only thing that changes is section 4 of the master document (the foundation); the rest of the workflow stays the same because the foundation is replaceable by design.
 
 - **Decision Ladder** — Anti-over-engineering prioritization pattern (origin: Ponytail project, `github.com/DietrichGebert/ponytail`). Integrated as a practice in this workflow (see section 5.8).
 
@@ -1190,516 +1133,102 @@ If in the future you evaluate replacing the gentle-ai foundation with another, t
 
 ---
 
-## 6. Block 2 · Specification Layer (SDD)
+## 6. Block 2 · Feature Tracking (ODD)
 
-### 6.1 SDD Philosophy
+### 6.1 ODD philosophy
 
-#### The problem SDD solves
+#### The problem it solves
 
-Working with AI without structure produces a predictable pattern: vague prompt → code that seems to work → you ask for adjustments → model "fixes" things → you lose context between sessions → after 3-5 iterations the code diverges. The industry called it **vibe coding**: trusting that a good prompt and the smartest model are enough. They are not.
+Working with AI without structure produces a predictable pattern: vague prompt → code that seems to work → you ask for adjustments → the model "fixes" things → you lose context between sessions → after 3-5 iterations the code diverges. The industry calls it **vibe coding**: trusting that a good prompt and the smartest model are enough. They are not.
 
-**SDD (Spec-Driven Development)** is the structural correction: before the agent touches code, there are markdown artifacts that describe **what to build** and **how to build it**. Those artifacts are versioned, approved, and are the contract against which the agent implements.
+**ODD (Organic Driven Development)** keeps the explore, implement, and check loop, and adds one thing: substantial work leaves a durable record. Small, understood work stays lightweight. Substantial work gets one feature document that states what to build, what is done, and what the evidence was, so a session can end and the next one can resume without rebuilding the plan.
 
-#### The mental shift
+#### The principle
 
-The hardest part of adopting SDD is not technical, it's psychological. The instinct is: "let me start writing and figure it out as I go". SDD inverts that: "let me solve it first, then write". With AI this is the right approach because AI implements fast — the slow phase is understanding what is wanted. If you understand what you want before asking for implementation, the AI goes to the goal at maximum speed. If not, the AI goes fast in the wrong direction.
-
-The sentence that captures the principle: _"Vibe coding optimizes for the first iteration. SDD optimizes for the tenth — the one you have six months later when you've already forgotten what you built."_
+Explore first, then write. The agent reads the code and the requirements before it changes anything, and it asks you only about real product decisions. AI implements fast, so the slow phase is understanding what you want. If the target is clear before implementation starts, the agent reaches it quickly. If not, it moves fast in the wrong direction.
 
 #### Two layers of context
 
 - **AGENTS.md** = persistent **project** context. How to work in this repo.
-- **Specs (SDD)** = context per **change**. What to build in this specific feature.
+- **Feature document** = context per **change**. What to build in this feature and what has been verified so far.
 
 The agent reads both. The two separate layers keep the context window clean.
 
-### 6.2 How gentle-ai handles SDD for you
+### 6.2 How gentle-ai runs ODD for you
 
-gentle-ai comes with an **SDD orchestrator** that drives the entire Spec-Driven Development flow. Underneath it uses OpenSpec, but you **don't interact with OpenSpec directly** — the orchestrator makes all the calls and decisions. Your interface is **natural language** with the agent.
+gentle-ai runs ODD natively in every agent it configures, so you install and invoke nothing. The agent follows the same protocol on every request:
 
-#### The 10 orchestrator phases
+1. **Authorize.** Questions, reviews, and proposals stay read-only until you ask for a change.
+2. **Explore.** The agent reads the relevant code and requirements first, in proportion to the request.
+3. **Resolve uncertainty.** It asks one focused question only for a real product decision.
+4. **Classify.** Small work is understood, contained, and can be resumed from the request plus `git diff`. Substantial work fails that test. File and test counts never decide it.
+5. **Track.** Substantial work gets its feature document and Engram mirror before the first source write, and the agent tells you which document it created (section 6.3).
+6. **Implement task by task.** Each task follows the test-first policy (section 9.1). A task is checked only after its outcome is observed, and it closes with a Conventional Commit on the feature branch.
+7. **Close.** The agent reports the verified outcome, every failed or pending check, and the next step.
 
-The orchestrator defines a 10-phase cycle for a change (feature, refactor, non-trivial fix). Each phase is a **specialized sub-agent** with its own fresh context, assigned model, and specific permissions:
+ODD adds no CLI, no state engine, and no mandatory planning phase. It is shared agent guidance. Your interface is natural language.
 
-1. **`sdd-onboard`** — Only the first time in a project. Reads existing code, identifies patterns, generates initial context for gentle-ai (saves it in Engram).
-2. **`sdd-explore`** — Research when the problem is not clear. Reads related code, searches Engram for previous decisions, proposes alternatives. Ends with a concrete understanding of the problem.
-3. **`sdd-propose`** — Generates `proposal.md`: what will change, why, user-visible impact, rollback strategy. Waits for your approval.
-4. **`sdd-spec`** — Generates `specs/` with requirements in Given/When/Then format (BDD style). These are the **acceptance criteria** that will feed into Block 5 tests. Waits for your approval.
-5. **`sdd-design`** — Generates `design.md`: technical approach, decisions, trade-offs, new APIs. If there's a significant architectural decision, proposes adding it as an ADR (Architectural Decision Record). Waits for your approval.
-6. **`sdd-tasks`** — Generates `tasks.md`: implementation checklist with executable TODOs. Each with a clear "done" criterion.
-7. **`sdd-apply`** — Implementation. Takes each task, writes tests first (if the project has a TDD framework), implements until green. Marks tasks completed as it progresses.
-8. **`sdd-verify`** — Final validation. Runs the AGENTS.md programmatic checks (lint, typecheck, tests, build). Validates acceptance criteria against implementation.
-9. **`sdd-archive`** — When all tasks are complete and verify passes, moves the change to `openspec/changes/archive/` and merges the deltas to the source of truth in `openspec/specs/`.
-10. **`sdd-finalize`** — Generates summary, saves decisions in Engram for future sessions, prepares commit/PR context.
+### 6.3 The feature document
 
-#### Execution modes by agent
+For substantial, authorized work, the agent creates one feature document, `odd/tasks/<feature-name>.md`, after exploration and before the first source write. The file has a short header (objective, scope, applicable checks) and three sections, read in this order:
 
-gentle-ai adapts how phases run depending on the IDE:
+- **`## Specs`**: numbered `S#` requirements. They quote your exact strings, error messages, and examples verbatim, and they carry the acceptance criteria and checks.
+- **`## Tasks`**: one line per task, with a stable ID (`T1`, `T2`), the linked specs, the route, and the commit that holds it.
+- **`## Log`**: last. `L1` is your original request, verbatim. Corrections, evidence, and rationale are appended as the work goes on.
 
-- **Claude Code and Cursor**: each phase is delegated to a **native sub-agent** of the IDE, with fresh context window. Benefit: no context contamination between phases, different model per phase if you configured model routing.
-- **OpenCode**: uses the native task subagent system (post v0.13).
-- **Pi**: global agents in `~/.pi/agents/sdd-*.md`.
-- **Windsurf Cascade**: gentle-ai's own installed content classifies it as solo-agent — *"there are no sub-agents. Every SDD phase runs inline in the same conversation"*. Native Plan Mode is used to save/persist artifacts across sessions.
-- **Devin (fork of Windsurf, shares its file paths)**: gentle-ai has **no dedicated adapter for Devin** — it isn't in gentle-ai's capability manifest at all, so gentle-ai's "Windsurf" content (including the "no sub-agents" claim above) gets applied to Devin by accident, not by design. In practice Devin does support real subagent delegation (a working `run_subagent`-style tool). Don't trust the IDE-name label alone — check whether a real subagent tool is actually available in the current session before assuming either capability.
-- **Kiro**: 10 native files in `~/.kiro/agents/sdd-*.md`, auto-delegate by YAML description.
-- **Others**: SDD runs **inline** in the same session. The orchestrator is the executor. Engram provides persistence between phases.
+```markdown
+# filter-by-status
 
-#### Where artifacts live
+Objective: filter the task list by status, with the filter kept in the URL.
 
-Independent of the agent:
+## Specs
+S1. The list accepts `status=open` or `status=done`. Any other value shows an error.
+S2. Reloading the page keeps the active filter.
 
-```
-openspec/
-├── specs/                          ← source of truth (current state)
-│   └── (active product specs)
-├── changes/                        ← proposed modifications
-│   └── <change-id>/
-│       ├── proposal.md
-│       ├── specs/                  ← delta specs (ADDED/MODIFIED/REMOVED)
-│       ├── design.md
-│       └── tasks.md
-└── changes/archive/                # completed changes
-    └── YYYY-MM-DD-<change-id>/
-        └── (frozen artifacts as historical reference)
+## Tasks
+- [x] T1 (S1) inline, commit a1b2c3d
+- [ ] T2 (S2) delegated, pending
+
+## Log
+L1. Original request, verbatim: "add a status filter to the task list..."
 ```
 
-When a change is archived, the **deltas** (what the change added/modified) are merged into `openspec/specs/` which grows organically. **You never rewrite the full spec**; you only describe the delta of the current change.
+A requirement change rewrites only the affected spec and reopens only its task. Checkboxes record observed outcomes. They grant no approval and no review receipt.
 
-#### Engram in each phase
+The same content is mirrored to Engram under the project-scoped topic `odd/<feature-name>/tasks`, together with the file locator. When the agent resumes, it reads the Engram context, the feature-scoped search result, and the full observation, then the file itself, and reconciles them before it continues. Both writes are read back, because they are not atomic. If Engram is unavailable, the agent keeps local progress and reports the mirror as pending.
 
-Each sub-agent can:
+The feature document is plain markdown in git, so any IDE can read it, and Engram is shared across the IDEs on your machine. A new IDE does not inherit the previous conversation, so tell it which feature to continue, for example: `Continue odd/tasks/filter-by-status.md from T2.`
 
-- **Search** Engram for relevant past decisions (`mem_search`).
-- **Save** what was learned when finishing the phase (`mem_save`).
+### 6.4 Work units, delivery and the 400-line budget
 
-This means when you start a new change six months later, the sub-agents find what your team decided in past changes without you having to remember. It's the difference between vibe coding (single-turn memory) and professional SDD (persistent project memory).
+- **Work units.** Each task closes with at least one commit on the feature branch. When you are on the default branch, the agent creates the branch first. Commits use Conventional Commits, and tests and docs go in the same commit as the behavior they cover.
+- **Budget.** About 400 authored changed lines (additions plus deletions) per slice is a planning heuristic, not a hard cap or an automatic stop. The agent keeps the smallest coherent behavior with its tests and docs. It does not remove blank lines or minify to fit the number, and it does not split artificially.
+- **Delivery strategy.** The feature document records one strategy. `ask-on-risk` (the default) asks once which chain strategy to use when the forecast passes about 400 lines. `auto-chain` slices automatically once a chain strategy is chosen. `single-pr` and `exception-ok` keep one PR. Chained PRs follow the `chained-pr` skill, and the feature document records which commits each PR holds.
+- **Delivery is yours.** Push, pull request creation, and merge are your decisions under ordinary repository policy.
 
-#### Cross-IDE portability: can I start in one IDE and continue in another?
+### 6.5 Review and consent (RDD)
 
-Yes, with an important distinction between **what is directly portable** and **what requires the new IDE to reorient**.
+Receipt-Driven Development (RDD) is gentle-ai's independent review of a frozen change candidate. It is on by default. `gentle-ai review mode status` reads the switch without changing it, `gentle-ai review mode disable` turns it off, and `gentle-ai review mode enable` turns it back on. An explicit OFF choice stays off until you change it.
 
-**What IS portable without friction**: the artifacts in `openspec/changes/<change-id>/` (`proposal.md`, `specs/`, `design.md`, `tasks.md`) are **plain markdown versioned in git**. They have nothing specific to Claude Code, Cursor, or any IDE. If you generated `proposal.md` in Claude Code, approved it, and then open the same repo in Windsurf, Windsurf can read that `proposal.md` exactly the same. The change state (which phase, what's approved) lives in the repo filesystem, not in the IDE session that generated it.
+When RDD is on, each candidate is assessed for risk first:
 
-**What DOES require reorientation**: the *orchestration mechanism* varies by IDE (see "Execution Modes" table above). If you were in Claude Code using native sub-agents and switch to Windsurf (which runs everything inline, without sub-agents), the new IDE doesn't "resume the session" from the previous one — **it reads the existing artifacts from scratch** and continues the flow from there. It's like a colleague taking over your work: they don't inherit your session, but they do read your document.
+- **Passive risk**: no reviewer and no prompt. The agent runs the structural checks and moves on.
+- **Medium or high risk**: the agent asks for consent for that candidate. If you grant it, gentle-ai runs the review plan, with at most one bounded correction. If you decline, the change continues under ordinary repository policy. A decline applies to that candidate only. It does not turn RDD off.
+- **Failed assessment**: the agent never assumes low risk.
 
-**How to resume an SDD change in another IDE**: when opening the new IDE, explicitly tell it to continue an existing change:
+Review results are informational. They never authorize a commit, a push, a PR, or a release. Turning RDD off is a user decision: the agent does not switch it off on its own.
 
-```
-There's an SDD change in progress in openspec/changes/filter-by-status/. The proposal.md
-and specs/ are already approved. Continue from design.md.
-```
+### 6.6 Judgment Day: dual-judge review
 
-The agent reads the existing artifacts, confirms their content with you (for safety, it doesn't assume what was approved in another session is still valid without your confirmation), and continues with the corresponding phase.
+gentle-ai includes the `judgment-day` skill, which runs a dual review: two judges review the same change in parallel, with no communication between them. Each reports issues such as bugs, vulnerabilities, contradictions with the feature's specs, and convention violations. The orchestrator then sorts the findings:
 
-**What is NOT portable**: Engram context (persistent memory) IS shared between IDEs because Engram is a single local service on your machine (not per-IDE) — any agent with the Engram MCP connected sees the same memories, regardless of which IDE you saved them in. The only real exception is if you configured gentle-ai with `--scope=workspace` instead of global; in that case each repo has its own config and you need to verify the new IDE is also configured for that project.
+- **Confirmed** (both judges found it): fix it.
+- **Suspect A or Suspect B** (only one judge found it): triage it.
+- **Contradiction** (the judges disagree): you decide.
 
-**Quick summary**:
+A fix agent applies the confirmed fixes, and both judges run again. Judges only detect: they never commit, push, or change code during review. Warnings that need an unlikely setup are reported as theoretical and do not block.
 
-| Element | Portable cross-IDE |
-|---|---|
-| `openspec/changes/*/proposal.md`, `specs/`, `design.md`, `tasks.md` | Yes — plain markdown in the repo |
-| Approval state of each phase | Yes, but the new agent must confirm with you when resuming |
-| Engram (persistent memory) | Yes — shared local service, unless different scope=workspace per project |
-| Orchestration mechanism (sub-agents vs inline vs Plan Mode) | No — each IDE uses its own mode, but all read the same artifacts |
-| Active session / conversational context of previous IDE | No — the new IDE does not inherit the conversation, only the files |
-
-### 6.3 How you invoke SDD without learning slash commands
-
-The goal of gentle-ai's orchestrator is that you don't need to know which phase you're in or which sub-agent to run. You speak in natural language and the system decides. Here's the actual mechanics.
-
-#### Two independent axes operate in parallel
-
-gentle-ai has its own **global Delegation Stop Rules** (4+ file rule to understand a flow, 2+ non-trivial file rule to modify, etc.). These always apply — they belong to the orchestrator and are not overridden.
-
-What this workflow adds on top is **`wf-sdd-trigger`**, a binary decision (`wf-no-sdd` / `wf-force-sdd`) that the agent applies to each local change before touching the workspace. It's a different axis: gentle-ai's own native routing decides Direct inline vs Delegated direct and owns all delegation mechanics; `wf-sdd-trigger` decides only WHEN this project's own rules require explicitly requesting gentle-ai's SDD. They don't conflict; they are complementary axes, and `wf-sdd-trigger` never re-specifies HOW gentle-ai then routes or delegates.
-
-#### wf-sdd-trigger: the two outcomes
-
-The AGENTS.md generated by the wizard includes a "📋 wf-sdd-trigger" section that defines the complete decision tree in detail. It decides ONE thing: does this change meet this project's own rules for explicitly requesting gentle-ai's SDD? It never decides HOW gentle-ai then routes or delegates — that remains gentle-ai's own native authority, already installed for the active adapter(s). Summary:
-
-- **🟢 `wf-no-sdd`**: trivial/straightforward changes where there is an obvious implementation — typo, dependency patch, color change, mechanical refactor, simple bug fix, or small feature that is direct (behavior obvious from requirements). No design decisions needed. Direct implementation; gentle-ai's own native routing (Direct inline / Delegated direct) decides the rest.
-- **🔴 `wf-force-sdd`**: any change NOT matching the above criteria (default fallback). Requires explicit SDD request: proposal → specs → design → tasks → implementation. The agent explicitly requests gentle-ai's full SDD pipeline.
-
-#### The mandatory wf-preflight
-
-Before writing code, planning, or requesting SDD, the agent issues a **single definitive diagnosis** called `wf-preflight` with: determined outcome (`wf-no-sdd`/`wf-force-sdd`) and impact analysis. The agent asks the user for confirmation of the proposed route (they may override if they prefer the other path). This closes the gap where the agent might "forget" to declare its outcome — the declaration is auditable, and if it later contradicts itself (says `wf-no-sdd` but modifies public contracts), you catch it on the spot.
-
-#### User confirmation after wf-preflight
-
-After `wf-preflight`, the agent asks the user for explicit confirmation:
-
-- If `wf-preflight` proposed `wf-no-sdd`: "Do you want to proceed without SDD, or prefer to use SDD?" 
-- If `wf-preflight` proposed `wf-force-sdd`: "Do you want to proceed with SDD, or prefer to implement directly?"
-
-The user always has the chance to override. Only after confirmation does the agent proceed (invoke `sdd-new` if SDD confirmed, or implement directly if no-SDD confirmed).
-
-#### How to correct the flow manually
-
-If the agent determined `wf-no-sdd` and you prefer SDD:
-
-```
-Before implementing, I want the full SDD flow: exploration, proposal, specs, design, tasks. Do not implement until I approve each artifact.
-```
-
-If the agent determined `wf-force-sdd` and you confirm it's trivial:
-
-```
-This task is simpler than what you classified in the wf-preflight. Reclassify as wf-no-sdd and implement directly. The AGENTS.md constraints still apply.
-```
-
-> The exact text of the "📋 wf-sdd-trigger" section lives in each project's AGENTS.md (the wizard injects it in Phases 6a/6b, and `/wf-refresh` re-runs the Builder in Phase R3 to keep it synced). This section 6.3 is only the conceptual summary.
-
-#### The human gate in each phase
-
-After each artifact (proposal, specs, design, tasks), the orchestrator **stops and waits**. It does not continue until you say something. The responses that make it advance:
-
-- **Approval**: "Approved", "LGTM", "continue", "ok, continue with specs".
-- **Approval with comments**: "Approved, but before specs: add a constraint that the filter must work without JS too." → The agent incorporates the feedback and regenerates if needed before advancing.
-- **Rejection**: "Rejected. The design approach assumes react-router but we don't have it. Propose an alternative with native URL API." → The agent goes back to the previous phase.
-
-> **For dummies**: the gate is not a rhetorical question. If the agent asks "does the proposal look good to you?" and you keep not responding, it doesn't advance. If you say "yes" without reading, the contract is yours. Read the artifact. The value of SDD is in those approvals.
-
-#### Visual flow of a typical SDD session
-
-```
-You: "Add task filter by status with URL persistence"
-                    │
-                    ▼
-         [Orchestrator evaluates]
-         Does it warrant SDD? → Yes
-                    │
-                    ▼
-         sdd-explore: reads code, searches Engram
-                    │
-                    ▼
-         sdd-propose → generates proposal.md
-                    │
-                    ▼
-         ┌─── GATE: waits for approval ─────────────────────┐
-         │  You review proposal.md. Approve or reject.      │
-         └──────────────────────────────────────────────────┘
-                    │ (approved)
-                    ▼
-         sdd-spec → generates specs/ (Given/When/Then)
-                    │
-                    ▼
-         ┌─── GATE: waits for approval ─────────────────────┐
-         └──────────────────────────────────────────────────┘
-                    │ (approved)
-                    ▼
-         sdd-design → generates design.md
-                    │
-                    ▼
-         ┌─── GATE: waits for approval ─────────────────────┐
-         └──────────────────────────────────────────────────┘
-                    │ (approved)
-                    ▼
-         sdd-tasks → generates tasks.md
-                    │
-                    ▼
-         ┌─── GATE: waits for approval ─────────────────────┐
-         └──────────────────────────────────────────────────┘
-                    │ (approved)
-                    ▼
-         sdd-apply → implements (TDD if configured)
-                    │
-                    ▼
-         sdd-verify → lint, types, tests, build
-                    │
-                    ▼
-         ┌─── GATE: human diff review ──────────────────────┐
-         │  You review the full diff before committing.      │
-         └──────────────────────────────────────────────────┘
-                     │ (approved)
-                    ▼
-         sdd-archive + sdd-finalize → commit, Engram
-```
-
-#### What to do when the agent "skips" a gate
-
-This can happen with more impatient models (or if your initial prompt already sounded like approval). If you notice the agent went from proposal to specs without asking for approval:
-
-```
-Stop. Show me the full proposal.md again. Do not continue until I explicitly approve it.
-```
-
-The magic phrase is always **"stop"** or **"don't continue"**. Well-configured agents respect this.
-
-### 6.4 Greenfield vs Legacy
-
-The orchestrator has two start modes (`sdd-explore` phase works differently in each). The `/wf-init` wizard already did the diagnosis when you configured the repo (Phase 3 of the wizard), and left that context in AGENTS.md. The orchestrator reads it and adjusts.
-
-#### Greenfield (new project, empty or minimal codebase)
-
-`sdd-explore` in greenfield is short: no existing code to read, no Engram project memories. It does three things:
-
-1. Reads `AGENTS.md` to understand the stack and conventions.
-2. Searches Engram for past decisions from similar projects (rare in greenfield).
-3. Proposes the file structure it will create before doing so.
-
-The `proposal.md` in greenfield is more detailed in the "what is created from scratch" section because there is no reference code the agent can assume.
-
-**Typical greenfield pattern**: the first SDD change (the project's main feature) starts with `sdd-onboard` → `sdd-propose` → specs → design → tasks → apply. Subsequent changes skip `sdd-onboard` because Engram already has the initial context.
-
-#### Legacy (existing project with working code)
-
-`sdd-explore` in legacy is where the orchestrator earns its real value. Before proposing anything:
-
-1. Reads files directly related to the feature.
-2. Searches Engram: are there past decisions about this module? was something similar attempted before?
-3. Identifies implicit constraints: naming conventions, component patterns, existing hooks that could be reused (Decision Ladder applied to real code).
-4. Detects relevant technical debt: if the module to be touched has known problems, it mentions them in `sdd-explore` before the proposal ignores them.
-
-Only after that context does it write the `proposal.md`. The proposal in legacy always includes a "Relevant Existing Code" section with the files/functions it found, so you can validate the agent understood the context before designing.
-
-#### The delta concept
-
-In SDD, **you never rewrite the full product spec**. Each change is a delta: it describes only what changes from the current state.
-
-Structure of a delta in `openspec/changes/<change-id>/`:
-
-```
-specs/
-  filter-by-status.md        ← change spec (ADDED)
-  task-list.md               ← existing spec modification (MODIFIED)
-                             ← (existing spec that didn't change, not included)
-```
-
-The file in `specs/` that is `MODIFIED` describes only the delta: "Add `filter: TaskFilter` prop to `TaskList` component". It doesn't rewrite the entire `TaskList` spec. When the change is archived, that delta is merged into `openspec/specs/task-list.md` which grows incrementally.
-
-Advantage of the delta approach: **the history is readable**. You can see in `openspec/changes/archive/` exactly what was changed in each feature, on what date, with what justification. It's the design changelog, not just the code changelog.
-
-#### Summary table
-
-| Aspect | Greenfield | Legacy |
-|---|---|---|
-| `sdd-explore` | Short. Reads AGENTS.md + global Engram. | Long. Reads real code + project Engram. |
-| First change | Starts with `sdd-onboard` too. | Starts with `sdd-explore` (onboard already ran). |
-| `proposal.md` | Details "what is created from scratch". | Includes "relevant existing code". |
-| Main risk | Over-engineering without real reference code. | Breaking something existing the agent didn't see. |
-| Risk mitigation | design.md approval is critical. | proposal.md approval is critical (verify the agent understood existing code). |
-
-### 6.5 When SDD yes, when NO
-
-The "📋 wf-sdd-trigger" section in each AGENTS.md (see 6.3) is the source of truth for classifying any change. This section 6.5 is the reference heuristic for understanding when to expect each outcome and why.
-
-#### The trivial-vs-complex rule (quick calibration)
-
-Changes that are straightforward, deterministic, or obviously implementable → `wf-no-sdd`. Everything else (requires thought, has trade-offs, or involves design decisions) → `wf-force-sdd`.
-
-Examples:
-- **`wf-no-sdd`**: typo, patch, color change, mechanical refactor, simple bug fix (solution is clear), small feature (behavior is obvious).
-- **`wf-force-sdd`**: anything NOT fitting above — functional decisions unresolved, new abstractions, architecture changes, public contracts, data model changes, or any choice with multiple valid approaches.
-
-#### Reference table (when to expect each outcome)
-
-| Type of change | Expected outcome | Why |
-|---|---|---|---|
-| Typo, label, copy fix | wf-no-sdd | Deterministic, solution obvious |
-| Dependency bump (patch/minor) | wf-no-sdd | No design decision |
-| Color, size, spacing change | wf-no-sdd | Obvious implementation |
-| Mechanical name refactor (many or few files) | wf-no-sdd | Mechanical even if touches many files |
-| Simple bug fix (cause clear, solution direct) | wf-no-sdd | One obvious path, no trade-offs |
-| Documentation, comments, READMEs | wf-no-sdd | No production code decision |
-| Small new feature (max 3 files, direct, behavior obvious) | wf-no-sdd | Straightforward & simple |
-| Extend existing flow with unspecified UX decision | wf-force-sdd | Multiple valid approaches exist |
-| New validation with business rule | wf-force-sdd | Needs validation with user |
-| Bug with two reasonable architectures | wf-force-sdd | Design decision required |
-| Feature with new global state or shared hook | wf-force-sdd | Modifies contracts / adds abstractions |
-| Feature with new API or endpoint | wf-force-sdd | Public contract change |
-| Feature with new user-visible routing | wf-force-sdd | Modifies system navigation model |
-| Significant refactor (complete module) | wf-force-sdd | Touches architecture |
-| Dependency migration (major) | wf-force-sdd | Breaking changes, real trade-offs |
-| Data model / schema change | wf-force-sdd | Fundamental contract |
-| Replace main library | wf-force-sdd | Architecture |
-| Convert synchronous APIs to async | wf-force-sdd | Deep tradeoffs |
-
-#### When the wf-preflight seems wrong
-
-`wf-preflight` is auditable by design. If it declared `wf-force-sdd` but the agent starts creating files that contradict that classification, or if it declared `wf-no-sdd` and started creating new files that contradict that classification, you have immediate evidence to request reclassification:
-
-```
-The wf-preflight declared wf-no-sdd but you are creating a new file (TaskFilter.tsx) that is a reusable abstraction. Reclassify.
-```
-
-The agent should not defend itself — it should re-emit a corrected `wf-preflight` and proceed according to the new outcome.
-
-### 6.6 SDD persistence backends
-
-When you run `/sdd-init` in a repo, gentle-ai asks which persistence backend to use. The choice is not trivial — it affects what is versioned in git, whether the team can share SDD context, and whether you will be able to evolve canonical specs. The official gentle-ai documentation is explicit about this.
-
-#### The three backends
-
-**engram** (persistent memory without versioned files). All decisions, specs, and SDD context live in the developer's local Engram. No canonical `openspec/specs/` is generated in the repo. The advantage is automatic cross-session persistent memory, without file noise in the repo. The main disadvantage, quoting the official documentation: "Engram-only mode is different by design: Engram is working memory and does not maintain a canonical spec merge layer." Without that layer, you cannot evolve versionable specs or share context with other developers via git.
-
-**openspec** (versioned files in the repo). All SDD context lives in files: `openspec/config.yaml`, `openspec/specs/`, `openspec/changes/`. It is committed to the repo and shared with the team. The advantage is that specs are first-class artifacts with git history. The disadvantage is that you lose the cross-session persistent memory that Engram provides — each session starts by reading files, not remembering context from past sessions.
-
-**hybrid** (both). Combines the best of both: versioned files in `openspec/` + persistent memory in Engram. The official documentation recommends it: "Use openspec or both (hybrid file + memory persistence) when you need canonical spec evolution". The cost is that there are two sources of truth that need to be kept consistent, but gentle-ai does this automatically via `sdd-sync` (merges file-backed deltas into the canonical spec) and `sdd-archive` (moves the archived change to history).
-
-#### Which to choose based on your context
-
-| Context | Recommended backend | Why |
-|---|---|---|
-| Solo project indefinitely, no plan to share | engram | Simple, no file noise |
-| Solo project but could grow to a team | hybrid | Frictionless migration when devs join |
-| Established team, professional use | hybrid | Official recommendation |
-| Company with audit or compliance requirements | openspec or hybrid | Specs must be versionable artifacts |
-| Learning project, throwaway | engram | No overhead |
-
-**Default wizard recommendation**: hybrid, unless the user explicitly states they will work solo indefinitely.
-
-#### Migration between backends
-
-If you started with engram and now developers are joining, you can migrate to hybrid by re-running `/sdd-init`. But there is an important limitation: **decisions already saved in Engram are not retroactively transferred to the repo when you migrate**. Only new post-migration decisions will live in `openspec/`.
-
-This means if you started engram-only and accumulated 6 months of context, migrating to hybrid leaves that historical context only in your local Engram — new developers joining will not have access to it without you manually extracting it. That's why the wizard recommends hybrid from the start, even if you start alone.
-
-The reverse direction (hybrid → engram) is valid but rare — you lose the versioned specs layer, which is almost never desirable.
-
-#### How the wizard handles the choice
-
-#### The canonical `openspec/config.yaml` shape (gentle-ai source of truth)
-
-The shape `/sdd-init` produces follows gentle-ai's own convention (`_shared/openspec-convention.md`,
-`docs/openspec-config.md`, and the `openspec/config.yaml` in the gentle-ai repo). The wizard
-maps its activated testing configuration onto THESE fields — never onto invented ones:
-
-```yaml
-schema: spec-driven
-
-context: |
-  Tech stack: ...
-  Architecture: ...
-  Testing: ...
-  Style: ...
-
-strict_tdd: true
-
-rules:
-  proposal:
-    - Include rollback plan for risky changes
-  specs:
-    - Use Given/When/Then for scenarios
-    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
-  design:
-    - Include sequence diagrams for complex flows
-    - Document architecture decisions with rationale
-  tasks:
-    - Group by phase, use hierarchical numbering
-    - Keep tasks completable in one session
-  apply:
-    guidelines:
-      - Follow existing code patterns
-    tdd: false           # Set to true to enable RED-GREEN-REFACTOR
-    test_command: "npm test"       # ← sdd-apply strict-tdd override
-  verify:
-    test_command: "npm run test:coverage" # ← sdd-verify runs this; coverage script so {test_command} --coverage (Step 5d) produces a real report
-    build_command: "npm run build" # ← sdd-verify runs this
-    coverage_threshold: 80         # ← sdd-verify enforces this
-  archive:
-    - Warn before merging destructive deltas
-
-testing:
-  strict_tdd: true
-  detected: "YYYY-MM-DD"
-  runner:
-    command: "npm test"            # ← sdd-apply detects the runner here
-    framework: "Vitest + Playwright"
-  layers:
-    unit:        {available: true, tool: "vitest"}
-    integration: {available: true, tool: "vitest"}
-    e2e:         {available: true, tool: "playwright"}
-  coverage:
-    available: true
-    command: "npm run test:coverage"
-  quality:
-    linter:       {available: true, command: "eslint ."}
-    type_checker: {available: true, command: "tsc -b"}
-    formatter:    {available: null, command: null}
-```
-
-**What to do with this information**:
-
-- `strict_tdd: true` (top-level) tells `sdd-apply` to load strict-tdd mode; `rules.apply.test_command`
-  is the override it reads for the test command. Phase 4.6 of the wizard owns `strict_tdd`.
-- `testing` is the capability cache that `sdd-apply`/`sdd-verify` read so they don't re-detect the
-  runner every time: `runner.{command,framework}` and `layers.<layer>.{available,tool}`.
-- `rules.verify.coverage_threshold` is what `sdd-verify` enforces — the wizard writes it there in
-  Phase 8, step 8.1d when the coverage extra is activated. This is the ONLY field gentle-ai
-  reads for the threshold; keys like `extras.coverage_threshold` are dead data no consumer reads.
-- `context:` (multiline) is the most valuable for SDD sub-agents: stack, architecture, testing,
-  style. `/sdd-init` writes it; the wizard leaves it alone.
-- `rules.*` hold phase-specific project conventions; `/sdd-init` writes them, the wizard only
-  touches `rules.apply.test_command` and `rules.verify.{test_command,build_command,coverage_threshold}`.
-- The wizard does NOT invent top-level keys (`configured`, `planned`, `extras`, `conventions`,
-  `checks_before_done`) — no gentle-ai consumer reads them, and the exact shape is a documented
-  convention, not a locked schema (`docs/openspec-config.md` of gentle-ai).
-
-**When to re-run `/sdd-init`**: when the test runner changes (e.g. you install Vitest and the `testing.runner` capability cache in `openspec/config.yaml` is stale), when the architectural pattern changes, or when the stack changes. The post-commit hook notifies when `package.json` changes (which is when most of those changes occur).
-
-### 6.7 SDD integration with AGENTS.md
-
-gentle-ai's SDD sub-agents read the project's `AGENTS.md` in every phase — it's not an optional integration, it's part of the pipeline. This means the conventions, Critical Constraints, and Behavior Preferences you defined in `AGENTS.md` are respected during `sdd-propose`, `sdd-spec`, `sdd-design`, `sdd-tasks`, and `sdd-apply`.
-
-The "📋 wf-sdd-trigger" section that the wizard injects into `AGENTS.md` is especially relevant here because gentle-ai's SDD phases use it to classify sub-tasks within a large change. Example: if in the `sdd-tasks` phase a task is generated that technically falls under `wf-no-sdd` (mechanical change), it can be executed directly without declaring a formal `wf-preflight` — but if it generates a task that falls under `wf-force-sdd`, the agent requests SDD before touching code.
-
-The native `sdd-apply` skill resolves TDD mode by reading `openspec/config.yaml → strict_tdd`. With `strict_tdd: true` it loads `strict-tdd.md` and requires RED→GREEN evidence per task (headless, no interaction). With `strict_tdd: false` it falls into native standard mode. Since `sdd-apply` is a headless sub-agent (`user-invocable: false`) — it executes and returns, cannot ask the user anything — the `🧪 TDD PROPOSAL` happens **before** delegation: the orchestrator issues the proposal (task coverage, in batch), waits for the user's choice, and **only then** delegates to `sdd-apply` with the decision baked into the prompt.
-
-If you detect that sub-agents ignore `AGENTS.md` in some phase, there are two possible causes: (1) `AGENTS.md` is too far from the repo root where the sub-agent started — verify the location; (2) the sub-agent started from a parent folder — same diagnosis documented in 5.7. The solution in both cases is the same as for direct IDEs.
-
-### 6.8 Judgment Day — Automatic dual-judge review
-
-gentle-ai includes a skill called `judgment-day` (visible in `internal/assets/skills/judgment-day/` of the repo) that implements a dual code review pattern with two independent agents in parallel. This skill activates automatically at SDD pipeline gates and requires no manual invocation.
-
-#### How it works
-
-The orchestrator launches two "judges" in parallel — `judge-a` and `judge-b` — each with its own session, no communication between them. Both review the same change looking for issues (bugs, vulnerabilities, contradictions with specs, convention violations). When both complete, the orchestrator synthesizes a verdict classifying each issue into four categories:
-
-- **Confirmed** (both judges detected it) → high confidence, immediate fix.
-- **Suspect A** (only judge A detected it) → requires triage.
-- **Suspect B** (only judge B detected it) → requires triage.
-- **Contradiction** (judges disagree on the same point) → flag for manual decision.
-
-Confirmed issues go to a `fix-agent` (a third delegation, not one of the judges) that applies fixes. After fix, both judges re-launch in Round 2. The cycle continues until APPROVED or until the user decides to escalate.
-
-#### When it activates
-
-Judgment Day has a specific trigger: **dual adversarial review when there is real risk or high uncertainty** about whether the implementation is correct. It is not an automatic verifier for every `sdd-verify` phase — it applies when context warrants it.
-
-**Activates automatically when**:
-
-- Before commits/pushes with substantial changes per trigger-rules v1.33+.
-- In OpenCode with profiles v1.34+, it is profile-scoped by default.
-- When there is high uncertainty about the implementation (ambiguity in spec, complex code without strict type coverage, changes to shared contracts).
-
-**Does NOT activate in `sdd-verify` when** the SDD pipeline already provided sufficient guarantees:
-
-- The change followed a detailed spec (spec + design phases defined exactly what to produce).
-- TypeScript strict already validated all contracts — if something was broken, `tsc -b` would have caught it in `checks_before_done`.
-- No ambiguity in the implementation.
-
-In those cases, `sdd-verify` runs the commands from `rules.verify` in `openspec/config.yaml` (`npm run lint` + `npm run build`) and that is sufficient. Judgment Day is not redundant — it simply doesn't apply when mechanical checks already guarantee correctness.
-
-**Manually** — when you do want to force it:
-
-- With `/judgment-day` in agents with slash commands enabled.
-- When you want adversarial review of a PR before merging.
-- When the agent implemented something without a prior spec and you want a structured second opinion.
-
-#### Critical rules you should know
-
-Directly from the skill:
-
-- The judges never execute git commit / git push / code during review — they only detect.
-- After a fix, the orchestrator MUST re-launch both judges before allowing commit/push.
-- A single judge finishing does NOT allow skipping rounds of the other — each judgment day is independent.
-- Warnings are classified as "real" (bug reproducible with normal use) vs "theoretical" (requires contrived scenario). Theoretical warnings are reported as INFO but do not block.
-
-#### Interaction with the workflow flow
-
-When applicable, Judgment Day runs after implementation but before human review. The order is: implementation → `checks_before_done` → Judgment Day (if applicable) → human review → commit. Human review cannot be skipped just because Judgment Day passed — they are complementary layers.
-
-When not applicable (SDD pipeline with detailed spec + TypeScript strict), the order is simply: implementation → `checks_before_done` → human review → commit.
+Invoke it manually with `/judgment-day` when you want a second opinion: before merging a risky PR, after a change to a shared contract, or when the agent implemented something without a spec. The order is implementation, then the Programmatic Checks in AGENTS.md, then Judgment Day if you invoke it, then your human review, then the commit. Human review still happens when Judgment Day passes.
 
 ---
 
@@ -1745,9 +1274,9 @@ This section is read by `/wf-onboard` to guide each new developer through the ex
 
 ### 7.4 Testing stack — automatic configuration
 
-The wizard's goal is that the agent automatically runs tests as part of the SDD pipeline, without the user having to remember commands. For that, the wizard needs to configure the complete stack and update `openspec/config.yaml`.
+The wizard's goal is that the agent runs tests as part of every change, without the user having to remember commands. For that, the wizard configures the complete stack.
 
-**When it is configured**: in Phase 4.5 (or Phase 4.6 dedicated to the testing stack) of the wizard, when the user confirms they want testing. It can also be configured later when the post-commit hook detects changes in `package.json` relevant to testing.
+**When it is configured**: in Phase 0c (feature selection) and Phase 4.6 (testing stack), when the user confirms they want testing. It can also be configured later with `/wf-settings`.
 
 **What the wizard installs and configures** (with user confirmation for each layer):
 
@@ -1775,35 +1304,29 @@ After the selection, the wizard:
 1. Installs dependencies (`npm install --save-dev vitest @testing-library/react @playwright/test`, according to selection).
 2. Generates config files (`vitest.config.ts`, `playwright.config.ts`).
 3. Adds scripts to `package.json` (`test`, `test:ui`, `test:e2e`, `test:coverage`) — Phase 8, step 8.1e, from `test-scripts.tmpl.md` / `e2e-scripts.tmpl.md`.
-4. Updates `openspec/config.yaml` using gentle-ai's canonical schema — the fields its SDD skills actually read: `testing.runner.{command,framework}`, `testing.layers.<layer>.{available,tool}`, `testing.coverage.{available,command}`, and `rules.verify.coverage_threshold` (coverage extra), plus `rules.apply.test_command` and `rules.verify.{test_command,build_command}`. This is the targeted leaf-field edit executed in Phase 8, step 8.1d (Wizard-Allowed Field Edits) — `yq` preferred (auto-installed with the Phase 4.6 guard); if `yq` is unavailable after the install attempt, the wizard falls back to agent `edit`-tool edits of the same allowed leaf fields, never skipping the step or delegating it to the user. The wizard never regenerates or stamps the file; `/sdd-init` owns it. It does NOT invent keys like `testing.configured`, `extras.*`, `conventions`, or `checks_before_done` — no gentle-ai consumer reads them.
-5. Injects the extra fragments into the generated configs (Phase 6b, step B8a, promoted in Phase 8): `coverage-thresholds.tmpl.md` into `vitest.config.ts` when `state.testing.coverage_threshold` is a number, and `visual-snapshots.tmpl.md` into `playwright.config.ts` when `state.testing.visual_regression` is true.
-6. Updates `AGENTS.md` "Testing" section with the real commands.
-7. If the user activated Playwright: configures the Playwright MCP in the agent's folder — Phase 8, step 8.1e, from `playwright-mcp.settings.tmpl.md`.
-8. Everything with human review gate before writing any files.
+4. Injects the extra fragments into the generated configs (Phase 6b, step B8a, promoted in Phase 8): `coverage-thresholds.tmpl.md` into `vitest.config.ts` when `state.testing.coverage_threshold` is a number, and `visual-snapshots.tmpl.md` into `playwright.config.ts` when `state.testing.visual_regression` is true.
+5. Updates `AGENTS.md` "Testing" section with the real commands.
+6. If the user activated Playwright: configures the Playwright MCP in the agent's folder (Phase 8, step 8.1e, from `playwright-mcp.settings.tmpl.md`).
+7. Everything with human review gate before writing any files.
 
-This makes `checks_before_done` in the SDD pipeline go from just `lint + build` to `lint + build + test` (or `lint + build + test + e2e` depending on layers). The agent runs it all automatically before archiving a change.
+This makes the Programmatic Checks in AGENTS.md go from `lint + build` to `lint + build + test` (or `lint + build + test + e2e` depending on layers). The agent runs them before it declares a change done.
 
-**TDD Protocol** (automatic when testing is configured — no opt-in, no question asked): in addition to running tests in `checks_before_done`, the agent **automatically writes them** before implementing each change. It evaluates which layers apply based on the type of change using the coverage matrix (unit for pure logic, integration for components, e2e for complete user flows), and issues a `🧪 TDD PROPOSAL` with its suggestion.
+**Test-first** (section 9.1): when testing is configured, the agent writes the relevant test before it implements each change, watches it fail, and then implements until it passes. It picks the layer from the coverage matrix in AGENTS.md (unit for pure logic, integration for components, e2e for complete user flows). There is no proposal menu to answer.
 
-The proposal menu is dynamic: if the suggestion already covers unit + integration + e2e, it only shows Apply / Skip. If partial, it shows Apply / TDD Full / Skip. The agent follows the red-green-refactor cycle per task and when generating E2E specs always shows the exact command with `--headed` to see them run in the browser.
+E2E naming conventions: one file per user flow named by the flow, not by the component (`persistence.spec.ts`, `task-creation.spec.ts`). The convention lives in the `AGENTS.md` "Testing Approach" section (written in Phase 4.6).
 
-E2E naming conventions: one file per user flow named by the flow, not by the component (`persistence.spec.ts`, `task-creation.spec.ts`). The convention lives in the `AGENTS.md` "Testing Approach" section (written in Phase 4.6b) — gentle-ai has no field for it in `openspec/config.yaml`.
-
-Complete output order before implementing: 🪜 Ladder → 🔍 Preflight → 🧪 TDD Proposal → implementation.
+When the Decision Ladder is enabled, the order is: 🪜 WF-LADDER rungs, your confirmation, then test-first implementation.
 
 ### 7.5 Project-specific commands
 
 Commands the wizard generates in Phases 6a/6b and writes in Phase 8. They are project-specific markdown files — live in the repo, not globally. They are used as slash commands in the IDE (correct format per IDE).
 
-**`/wf-ladder`** — forces explicit wf-ladder with visible `🪜` output per rung (only if `LADDER == true`).
-**`/wf-tdd`** — invokes the TDD ritual explicitly (only if `TDD == true` AND testing layers exist).
-**`/wf-orchestrator`** — single entry point for the wizard's own gate sequence (only if `ROUTING == true` OR `LADDER == true` OR `TDD == true`).
-**`/wf-sdd-trigger`** — forces the SDD classification tree (only if `ROUTING == true`).
+**`/wf-ladder`**: forces explicit wf-ladder with visible `🪜` output per rung (only if the Decision Ladder is enabled).
 **`/wf-onboard`** — stub that points to `wf-onboard.md` for new developer onboarding.
-**`/wf-settings`** — toggle optional modules: TDD, testing extras, Decision Ladder, SDD backend, CI/CD, release strategy, and active IDEs/CLIs.
+**`/wf-settings`**: toggle optional modules: testing, testing extras, Decision Ladder, CI/CD, release strategy, and active IDEs/CLIs.
 **`/wf-worktree`** — git worktree management with automatic port assignment.
 
-**Global vs project-specific commands**: `wf-init`, `wf-refresh`, and `wf-cleanup` are installed globally with `install.sh`. `wf-onboard`, `wf-settings`, and `wf-worktree` are generated per project in Phases 6a/6b. `wf-ladder`, `wf-tdd`, `wf-orchestrator`, and `wf-sdd-trigger` are project-specific too, each conditional on its feature flag(s). `/wf-cicd` was archived; CI/CD and release-strategy re-configuration happen through `/wf-settings` (options 9–16), whose single source is the `cicd` protocol. Options 17–18 (Windsurf fix and IDE/CLI list) are handled by other protocols.
+**Global vs project-specific commands**: `wf-init`, `wf-refresh`, and `wf-cleanup` are installed globally with `install.sh`. `wf-onboard`, `wf-settings`, and `wf-worktree` are generated per project in Phases 6a/6b. `wf-ladder` is project-specific too, conditional on the Decision Ladder. `/wf-cicd` was archived; CI/CD and release-strategy re-configuration happen through `/wf-settings` (options 6–13), whose single source is the `cicd` protocol.
 
 **Skills 1:1** — every command in this section is also packaged as a SKILL.md, so it can be invoked as a slash command AND by natural language. Project commands are emitted by Builder B4 in the IDE's native skill path (`.claude/skills/`, `.cursor/skills/`, `.kiro/skills/`, `.codex/skills/`, `.gemini/skills/`, `.windsurf/skills/`, `.devin/skills/`) plus the universal `.agents/skills/<cmd>/SKILL.md` and the flat `.agents/protocols/<cmd>.md`. Global commands get the same 1:1 from `install.sh` (each detected IDE's skill path + `~/.agents/skills/`).
 
@@ -1824,25 +1347,25 @@ The wizard detects active IDEs: on new projects it uses the Phase 5 list; on upg
 
 ### 7.6 How to test that wf-ladder works
 
-Three concrete tests. The Ladder must always appear **before `wf-preflight`** — that is the correct and validated order: 🪜 wf-ladder → 🔍 wf-preflight → flow.
+Three concrete tests. The ladder shows its rungs in the output and stops for your confirmation before any code is written.
 
-**Test 1 — wf-no-sdd, Ladder should propose reusing existing:**
+**Test 1, reuse at rung 2:**
 
 ```
 I need to show the number of completed tasks in the app header.
 ```
 
-Expected: `🪜 WF-LADDER` appears before `🔍 WF-PREFLIGHT`. Stops at rung 2 because `useTasks` already exposes `tasks.filter(t => t.completed).length`. Success signal: `✓ Rung 2 — use tasks.filter(t => t.completed).length from useTasks`. No new hooks or state.
+Expected: `🪜 WF-LADDER` stops at rung 2 because `useTasks` already exposes `tasks.filter(t => t.completed).length`. Success signal: the change reuses that expression from `useTasks`, with no new hooks or state.
 
-**Test 2 — wf-no-sdd, Ladder should reach rung 7:**
+**Test 2, reach rung 7:**
 
 ```
 I need to validate that a task title doesn't have special characters like <, >, &.
 ```
 
-Expected: `🪜` evaluates rungs 1-6 and none apply. `✓ Rung 7 — minimum validation function`. If it proposes installing a validation library, it did not apply rung 5 correctly.
+Expected: rungs 1 to 6 do not apply, and the ladder stops at rung 7 with a minimum validation function. If it proposes installing a validation library, it did not apply rung 5 correctly.
 
-**Test 3 — wf-force-sdd, Ladder in two moments (validated in production):**
+**Test 3, a substantial feature:**
 
 ```
 Add a priority system to tasks (high, medium, low) with visual badge and ability to sort by priority.
@@ -1850,10 +1373,9 @@ Add a priority system to tasks (high, medium, low) with visual badge and ability
 
 Success signals:
 
-- `🪜 WF-LADDER` appears first, before `🔍 WF-PREFLIGHT`. The Ladder informs `wf-preflight` — detecting rung 7 with 5+ coordinated files directly feeds full `wf-force-sdd` classification.
-- One `🔍 WF-PREFLIGHT` per task/change is the norm. The user can override the proposed route if desired.
-- SDD pipeline runs with gates at each phase, once explicitly requested from gentle-ai.
-- Inside `sdd-apply` (gentle-ai's own phase), the Ladder appears again per task confirming minimum implementation.
+- The ladder runs first, and its rungs do not end at reuse, because the change touches several coordinated files.
+- Because the change is substantial, the agent creates a feature document in `odd/tasks/` with its specs and tasks, and mirrors it to Engram.
+- Each task follows the test-first policy, and the agent observes its checks before it starts the next task.
 
 ### 7.7 `/wf-onboard` — new developer cloning the repo
 
@@ -1863,7 +1385,7 @@ Success signals:
 
 - **Phase 0**: reads the repo's AGENTS.md, especially the `## Project MCPs` section — source of truth for which MCPs each developer needs to configure.
 - **Phase 1**: verifies and installs gentle-ai if missing. Detects which agents the team uses (by reading the repo's satellites) and compares them with the agents configured on the developer's machine. Configures missing ones.
-- **Phase 2**: verifies SDD and Engram. Reads the backend from `openspec/config.yaml` and warns if the project uses engram-only (decision history is not shared).
+- **Phase 2**: verifies Engram, the persistent memory that mirrors each feature document. The feature documents in `odd/tasks/` are the shared record in the repo.
 - **Phase 3**: verifies and guides configuration of each project MCP. Automatic ones (Engram, Context7): no action. Playwright: verifies browsers. GitHub: `gh auth login` if missing. API key MCPs (Supabase, Stripe, Postgres): guides creation of local `.env.local`.
 - **Phase 4**: final verification with status summary and project commands.
 - **Phase 5**: suggests adding a mention to `/wf-onboard` in the README if it doesn't exist.
@@ -1882,27 +1404,27 @@ Success signals:
 |---|---|---|
 | Delegation to sub-agents | Yes, native | Via Agent tool in Claude Code, native system in OpenCode, inline (without spawning a separate process) in others |
 | Rules for when to delegate | Yes, native | "Delegation Stop Rules" — see 8.2 |
-| Model routing per SDD phase | Only in OpenCode | Via "SDD Profiles". In all other agents, SDD runs in single-mode with one model |
+| Model routing per sub-agent | Depends on the agent | Configured in gentle-ai (`Configure Models` in the TUI, section 4.10). The wizard does not change models |
 | Worktrees | No | gentle-ai does not create, list, or clean worktrees. It only has a reactive rule: if it detects a worktree/git accident, it requires a fresh audit before continuing |
 
 ### 8.2 Sub-agents and delegation (native to gentle-ai)
 
-When the orchestrator agent (the one in your main session) delegates work to a sub-agent — for example, an `sdd-explore` to investigate code before proposing a change — that sub-agent is not a dumb script. It is a full agent with its own session, its own tools, and its own context.
+When the orchestrator agent (the one in your main session) delegates work to a sub-agent (for example, an exploration sub-agent that reads code before a change is planned), that sub-agent is not a dumb script. It is a full agent with its own session, its own tools, and its own context.
 
 **How this runs depending on which agent you use**:
 
 | Agent | How it delegates |
 |---|---|---|
 | Claude Code | Via the Agent tool (Task tool) — the orchestrator launches focused sub-agents and injects already resolved project rules |
-| OpenCode | Native sub-agent system — each phase is a dedicated agent with its own model, tools and permissions defined in `opencode.json` |
-| Cursor | Native sub-agents, 10 SDD agents in `~/.cursor/agents/` |
-| Kiro | Native sub-agents in `~/.kiro/agents/` with orchestration via steering |
-| Windsurf Cascade | No sub-agents (solo-agent, per gentle-ai's own installed content) — inline for every phase |
+| OpenCode | Native sub-agent system: each sub-agent is a dedicated agent with its own model, tools and permissions defined in `opencode.json` |
+| Cursor | Native sub-agents |
+| Kiro | Native sub-agents with orchestration via steering |
+| Windsurf Cascade | No sub-agents (solo-agent, per gentle-ai's own installed content), so work runs inline |
 | Devin (fork of Windsurf) | gentle-ai has no dedicated adapter for Devin, so it inherits Windsurf's "no sub-agents" content by accident. In practice Devin does support real subagent delegation (`run_subagent()`-style tool) — check your actual session toolset rather than trusting the inherited label |
-| Codex | Native sub-agents in `~/.codex/agents/` with phase routing |
-| Copilot | SDD runs inline in a single session — without spawning separate processes |
-| Gemini CLI | SDD runs inline in a single session — without spawning separate processes |
-| Antigravity CLI | SDD runs inline in a single session (known bug: gentle-ai doesn't install SDD skills in the correct path, see Known Issues) |
+| Codex | Native sub-agents in `~/.codex/agents/` |
+| Copilot | Runs inline in a single session, without spawning separate processes |
+| Gemini CLI | Runs inline in a single session, without spawning separate processes |
+| Antigravity CLI | Runs inline in a single session |
 
 You don't need to configure any of this — the `gentle-ai install` wizard sets it up when you choose your preset. What IS worth understanding are the rules that tell the orchestrator *when* to delegate instead of doing everything in the same session.
 
@@ -1919,54 +1441,13 @@ You don't need to configure any of this — the `gentle-ai install` wizard sets 
 
 **For you as a developer, this means**: if you see your agent suddenly "opens" a sub-task instead of continuing everything in the same conversation, this is working — it's not a bug or a weird model decision. It's the mechanism that prevents a long session from accumulating complexity without control.
 
-### 8.3 Model routing per SDD phase
+### 8.3 Model choice
 
-SDD (Block 2) has phases: explore, propose, spec, design, implement, verify. Each phase has a different nature — exploring code doesn't need the most expensive model, but designing architecture does benefit from a more capable one. gentle-ai supports assigning different models per phase, but **only in OpenCode**.
+gentle-ai can assign models to agents and sub-agents (section 4.10 shows where). This workflow does not set models per phase, because ODD has no phases. Use one model per session, and switch it in your IDE or CLI when a session needs a different one.
 
-#### 8.3.1 OpenCode SDD Profiles (real automatic routing)
+> **Note for Improving**: the organization-approved models are Claude Sonnet and Claude Haiku. Opus, Fable, and Mythos are not approved for use in this stack. Use Haiku for read-only exploration and Sonnet for everything else. If a project needs more capacity, request an exception from Global IT Services; do not change the model on your own.
 
-This is the only thing gentle-ai truly automates. If your team uses OpenCode:
-
-```bash
-# Create a "cheap" profile for experimentation: economical model in general,
-# but a more capable model specifically for the design phase
-gentle-ai sync --profile cheap:openrouter/qwen/qwen3-30b-a3b:free
-gentle-ai sync --profile-phase cheap:sdd-design:anthropic/claude-sonnet-5
-```
-
-You can also create via TUI: `gentle-ai` → "OpenCode SDD Profiles" → Create.
-
-**How it works once created**:
-- The base SDD conductor is `gentle-orchestrator` (correct name since the migration from `sdd-orchestrator`, applied automatically if you come from an old version).
-- Each named profile generates `sdd-orchestrator-{name}` plus sub-agents with the corresponding suffix, each pointing to the model you chose.
-- In OpenCode, press **Tab** to switch between `gentle-orchestrator` (default) and your custom profiles.
-- You can have multiple profiles at once (e.g., "cheap" for exploring, "premium" for production) and switch freely.
-
-Full official guide: `github.com/Gentleman-Programming/gentle-ai/blob/main/docs/opencode-profiles.md`.
-
-#### 8.3.2 Manual recommendation per phase (for all other agents)
-
-For Claude Code, Cursor, Windsurf, Kiro, Copilot, Gemini CLI, Antigravity CLI, Codex, and any other agent supported by the wizard: SDD runs in single-mode, one model handles all phases automatically. If you want to vary the model per phase, you do it **manually**, changing the model in your IDE/CLI before invoking each phase. Here is the guide on what to choose:
-
-| SDD Phase | What it requires | Recommended model | Why |
-|---|---|---|---|---|
-| Explore | Read and understand existing code, without generating much new output | Fast/economical model (e.g., Haiku) | It's reading and synthesis work, not deep reasoning. Saves cost without perceptible quality loss |
-| Propose | Draft the "what" of the change, scope decisions | Intermediate model (e.g., Sonnet) | Needs good judgment but not maximum reasoning — it's a proposal, not final architecture |
-| Spec | Detailed acceptance criteria | Intermediate model (e.g., Sonnet) | Precision and thoroughness matter more than creativity |
-| Design | Architecture, technical decisions on how to solve it | Most capable model available (e.g., Opus, if your organization has it approved) | This is the phase where a design error is most expensive to fix later. Worth the strongest model here |
-| Implement | Write code following the already approved design | Intermediate model (e.g., Sonnet) | Design already solved the hard decisions; implementing is disciplined execution, not exploration |
-| Verify | Review that code meets the spec, run tests | Intermediate model (e.g., Sonnet) | Rigorous review, doesn't require top capability if the spec is already clear |
-
-> **Note for Improving**: the organization-approved models are Claude Sonnet and Claude Haiku — Opus, Fable, and Mythos are not approved for use in this stack. Applying the table above within that limit: use Haiku for Explore, and Sonnet for everything else (Propose, Spec, Design, Implement, Verify). If any project needs additional capacity for Design, the correct path is to request an exception from Global IT Services, not to change the model on your own.
-
-**How to apply this in practice** (no automation, it's manual):
-1. Before running `sdd-propose`, `sdd-explore`, etc., change the active model in your IDE/CLI to the one recommended for that phase.
-2. Run the phase.
-3. Switch back before the next phase if applicable.
-
-This is real friction compared to OpenCode, but it's the current reality of gentle-ai outside that agent. If your team adopts OpenCode in the future, 8.3.1 applies directly.
-
-> **Codex CLI**: treats skills as passive reference context — it can ignore Decision Ladder gates, Preflight, TDD Proposal even after reading them. Workaround: add the protocol instructions at the end of the prompt (`--prompt "..."` or paste in UI) instead of relying on it reading from `AGENTS.md` or `.agents/`. The wizard documents this but doesn't automate it because the limitation is on the client side, not the config.
+> **Codex CLI**: treats skills as passive reference context, so it can skip the Decision Ladder gate even after reading it. Workaround: add the protocol instructions at the end of the prompt (`--prompt "..."` or paste in UI) instead of relying on it reading from `AGENTS.md` or `.agents/`. The wizard documents this but doesn't automate it because the limitation is on the client side, not the config.
 
 ### 8.4 Worktrees — `/wf-worktree` (built in this block)
 
@@ -2147,69 +1628,33 @@ The complete `wf-worktree.md` file is already built as a standalone file (same f
 
 ---
 
-## 9. Block 5 · TDD pro + Playwright integrated
+## 9. Block 5 · Testing: test-first and Playwright
 
-### 9.1 Strict TDD Mode — what it is and how it works
+### 9.1 Test-first by default
 
-Strict TDD Mode is a working mode (managed by gentle-ai) where the agent CANNOT skip TDD — no skip option, with mandatory raw output evidence. Unlike the standard TDD Protocol (where the agent proposes and you decide whether to apply, apply partial, or skip), Strict TDD has no "escape".
+The agent writes the test first whenever a relevant runnable test exists. The policy has four parts:
 
-The actual Strict TDD behavior is resolved by this precedence (confirmed against the gentle-ai source SKILL.md):
-1. Engram: `mem_search("sdd/{project}/testing-capabilities")`
-2. `openspec/config.yaml → strict_tdd`
-3. Fallback: project file detection
+1. **Observe RED.** Write a test for the requested behavior, and watch it fail for the expected reason before you implement.
+2. **Implement to GREEN.** Write the least code that makes the test pass.
+3. **Refactor** while the tests stay green.
+4. **Explain the exceptions.** When no meaningful runnable test exists (passive documentation, no runner yet), the agent says so and runs the applicable functional checks instead. It never invents a runner or RED evidence.
 
-`wf-init` writes `strict_tdd` directly to Engram ALWAYS, and additionally to `openspec/config.yaml` if the backend includes it. In Claude Code or Windsurf it also runs `gentle-ai sync --strict-tdd` as a complementary signal for the orchestrator. There is no `--no-strict-tdd` — the field is reverted by simply changing `true` to `false`, which is what `/wf-settings` automates.
+The coverage matrix in AGENTS.md maps each change type to the layers that apply:
 
-### 9.2 Architecture of three independent pieces
+| Change type | Unit | Integration | E2E |
+|---|---|---|---|
+| Logic in a hook or `lib/` | Yes | No | No |
+| Component with its own state | Yes | Optional | No |
+| Multi-component flow | No | Yes | No |
+| Complete user feature | No | Yes | Yes |
+| Bug fix with possible regression | Based on origin | No | No |
+| Pure UI or styles | No | No | No |
 
-The final design separates three decisions that are orthogonal to each other — activating one does not affect the others:
+The matrix is a guideline. If logic could break silently and the table does not cover it, add tests anyway.
 
-```
-┌─────────────────────────────┐   ┌──────────────────────────────┐   ┌─────────────────────────┐
-│ 1. TDD Mode                  │   │ 2. Playwright Dual-loop       │   │ 3. Optional Extras       │
-│    (exclusive choice)        │   │    (independent of mode)     │   │    (each separate)       │
-│                               │   │                                │   │                          │
-│  • Standard TDD Protocol      │   │  Applies equally with         │   │  • Coverage targets      │
-│    (own content, already      │   │  standard TDD or Strict —     │   │  • Visual regression     │
-│    tested)                    │   │  answers a different          │   │  • Page Object Model     │
-│  • Strict TDD Mode            │   │  question: "how do I build    │   │                          │
-│    (real field in openspec/    │   │  the E2E spec?", not "can    │   │  None activate without   │
-│    config.yaml, confirmed     │   │  I skip the test?"            │   │  being asked             │
-│    against source skill)      │   │                                │   │                          │
-└─────────────────────────────┘   └──────────────────────────────┘   └─────────────────────────┘
-```
+You choose testing in Phase 0c. Phase 4.6 then asks which layers to set up (unit, integration, E2E), installs them, and registers the Playwright MCP when E2E is chosen. Test-first is not a mode you select: it applies whenever the project has a runnable test for the change.
 
-### 9.3 TDD Mode — how it is asked and what changes
-
-In Phase 4.6 of `/wf-init`, immediately after choosing testing layers (unit/integration/e2e), the wizard asks:
-
-```
-What TDD mode do you want for this project?
-
-1. Standard TDD Protocol (recommended)
-   Own content of this workflow, already tested in real use. The agent
-   proposes which layers apply and LETS YOU CHOOSE: apply, apply partial,
-   or skip TDD if you decide it's not warranted.
-
-2. Strict TDD Mode (managed by gentle-ai, not by this wizard)
-   No skip option, with mandatory raw output evidence. This
-   wizard does NOT write the content — runs `gentle-ai install --strict-tdd`
-   and gentle-ai writes its own section in your AGENTS.md/CLAUDE.md. The
-   exact content of that section is neither controlled nor verified by this
-   workflow line by line.
-
-Which do you prefer? [1 / 2]
-```
-
-**If option 1 is chosen**: `wf-init` writes the TDD Protocol documented in the file itself — 100% our content, unchanged from what was already tested.
-
-**If option 2 is chosen**: `wf-init` writes no TDD Protocol text. Runs `gentle-ai install --strict-tdd` and informs the user to review the section gentle-ai added to their `AGENTS.md`/`CLAUDE.md` as the real source of truth, instead of assuming it matches this workflow's documentation.
-
-The response is saved in `openspec/config.yaml` (`testing.strict_tdd: true/false`) only as an informational record of which mode was activated — that field does not control behavior, because in the Strict TDD case the real behavior lives in what gentle-ai wrote, not in this config file.
-
-Neither mode forces tests where the coverage matrix already says they don't apply (for example, "UI/pure styles") — but that guarantee is verifiable in standard mode (it's our text) and not verified by this workflow in Strict TDD (depends on how gentle-ai implemented it in its current version).
-
-### 9.4 Playwright dual-loop — when to explore before versioning
+### 9.2 Playwright dual loop: when to explore before versioning
 
 The pattern consists of two different loops for the same tool:
 
@@ -2221,56 +1666,57 @@ The pattern consists of two different loops for the same tool:
 - **Explore first if**: the flow has multiple visual states, transitions or animations; it's the first time that interaction is tested; or the user explicitly asks for it.
 - **Go direct to spec if**: it's a simple known CRUD (create → appears in list, edit → updates) without complex visual states, or a similar template spec already exists.
 
-This criterion lives as its own subsection within the TDD Protocol in `AGENTS.md` (see `/wf-init`, "Playwright Dual-loop" section), applying equally regardless of whether the project uses Standard TDD Protocol or Strict TDD Mode.
+This criterion lives in the Testing Approach section of `AGENTS.md` (the "Playwright dual loop" subsection). Whenever E2E specs were generated, the agent also shows the headed command for the exact spec before it declares the task done, so you can watch it run in the browser:
 
-### 9.5 `data-testid` convention — mandatory when E2E is present
+```bash
+npm run test:e2e -- --headed --workers=1 --project=chromium e2e/<exact-name>.spec.ts
+```
+
+### 9.3 `data-testid` convention, mandatory when E2E is present
 
 When the project activates the E2E layer in Phase 4.6, `/wf-init` adds to the Testing Approach section of `AGENTS.md` the requirement that every interactive element (buttons, inputs, links) receives its own `data-testid` **at component creation time**, not later when a test needs it. Format: `data-testid="<context>-<element>"` in kebab-case. The practical reason: without this, E2E specs depend on visible text or Tailwind classes, both fragile against copy or style changes that have nothing to do with the behavior the test is trying to verify.
 
-### 9.6 Optional extras — coverage targets, visual regression, Page Object Model
+### 9.4 Optional extras: coverage targets, visual regression, Page Object Model
 
-All three are always asked in Phase 4.6, after TDD mode, and **none activate without the user explicitly requesting it** — each has a real cost that isn't justified in every project:
+All three are asked in Phase 4.6, after the layers, and **none activate without the user explicitly requesting it**. Each has a real cost that isn't justified in every project:
 
 | Extra | What it does | Real cost | When it's worth it |
 |---|---|---|---|---|
 | Coverage targets | Minimum coverage threshold; fails `npm run test -- --coverage` if not met | Nearly zero — one config line in `vitest.config.ts` | Almost always — cheap and provides an objective quality signal |
 | Visual regression (snapshots) | Compares screenshots against a saved reference | Real and ongoing — each run is slower, and references need manual re-generation when design intentionally changes | Projects with stable UI where an accidental visual change would be costly |
-| Page Object Model | Organizes Playwright selectors into reusable classes. Activating it stages a minimal `e2e/pages/HomePage.ts` scaffold plus an AGENTS.md convention line; real page objects emerge with features via sdd-apply | None at runtime, but it's an abstraction layer | Projects with multiple E2E specs — for 2-3 flows it's over-engineering, same logic the workflow's Decision Ladder already applies |
+| Page Object Model | Organizes Playwright selectors into reusable classes. Activating it stages a minimal `e2e/pages/HomePage.ts` scaffold plus an AGENTS.md convention line; real page objects emerge as features add specs | None at runtime, but it's an abstraction layer | Projects with multiple E2E specs; for 2-3 flows it's over-engineering, same logic the workflow's Decision Ladder already applies |
 
 Integration with CI/CD (so the coverage threshold also blocks the pipeline, not just the local run) is pending until Block 6 exists — today the gate can only apply locally.
 
-### 9.7 Strategy for legacy projects without tests
+### 9.5 Strategy for legacy projects without tests
 
 Unchanged from the original criteria: no mass retrofitting of tests onto legacy code without coverage. Testing entry is organic — new feature comes with its new tests, bug fix comes with a regression test that first reproduces the bug and then confirms the fix, and the suite grows with the team's real work instead of a dedicated "let's cover all the legacy this sprint" effort.
 
-### 9.8 `/wf-settings` — toggle optional modules after installation
+### 9.6 `/wf-settings`: toggle optional modules after installation
 
-Once `/wf-init` has run, several decisions the developer made (TDD mode, testing extras, Decision Ladder, SDD backend, CI/CD, release strategy, active IDEs/CLIs) are fixed in the project — but they are not immutable, and it shouldn't require editing files by hand or re-running full `wf-init` to change them. `/wf-settings` (new standalone file, same format as `wf-onboard.md` and `wf-worktree.md`) closes that gap.
+Once `/wf-init` has run, several decisions the developer made (testing, testing extras, Decision Ladder, CI/CD, release strategy, active IDEs/CLIs) are fixed in the project, but they are not immutable, and it shouldn't require editing files by hand or re-running full `wf-init` to change them. `/wf-settings` (new standalone file, same format as `wf-onboard.md` and `wf-worktree.md`) closes that gap.
 
-**The modules it manages** (options 1–18 in `/wf-settings`):
+**The modules it manages** (options 1–15 in `/wf-settings`):
 
 | Module | What it toggles | Risk when changing |
 |---|---|---|
-| Decision Ladder (1) | `wf-ladder` enabled or not in `AGENTS.md` | Real — it's an anti-over-engineering safeguard, removing it requires additional explicit confirmation |
-| TDD (2) | Enable or disable the TDD protocol | Medium — removes or adds `wf-tdd` skill and satellite |
-| TDD Mode (3) | Standard ↔ Strict TDD Mode | None — both coexist in `openspec/config.yaml`, changing is instant |
-| Testing extras (4–6) | Coverage targets / Visual regression / Page Object Model, each independent | Low — only config, although deactivating visual regression or POM doesn't automatically rewrite existing specs |
-| SDD forcing policy (7) | `wf-sdd-trigger` active or not | Medium — turns the SDD gating mechanism on/off |
-| SDD persistence backend (8) | engram ↔ openspec ↔ hybrid | Variable — migrating *to* hybrid is safe (only adds), migrating *from* hybrid implies real functionality loss and requires double confirmation |
-| CI (9) | Enable or disable the CI quality guard | Real — adds/removes `.github/workflows/quality-guard.yml` and related files |
-| AI Reviewer (10) | GGA / Copilot / Claude Code / Gemini / None | Medium — rewrites the AI review workflow |
-| AI Review Suggestions (11) | Enable or disable auto-improve / inline suggestions | Low — config change only |
-| Dedicated Security Review (12) | Claude / Gemini / OFF | Low — config change only |
-| E2E in CI (13) | Include E2E tests in the quality guard | Low–Medium — may slow CI; no effect on local tests |
-| release-please standalone (14) | Publish releases automatically from conventional commits | Medium — `release-please-config.json` now uses `release-type` resolved from `state.discovery.stack` (`node` for Node projects, `simple` default; resolved via `discovery.stack.primary`, falling back to `discovery.stack_key` when absent — e.g. legacy states migrated by R2) |
-| CD (15) | Automatic deploy to VPS | Real — writes `deploy.yml` and requires server secrets |
-| Release strategy (16) | Tag-based (`v*`) or push-to-main deploy trigger | Medium — changes how CD fires |
-| Windsurf gentle-ai fix (17) | Reapply the legacy-path bridge rule | Low — safe re-sync of IDE-specific files |
-| IDEs/CLIs (18) | Add/remove an active IDE — generates (satellite + commands + skills) or deletes everything related, downloading templates from the wizard's raw source | Real — creates or removes project files; requires explicit confirmation |
+| Decision Ladder (1) | `wf-ladder` enabled or not | Real: it's an anti-over-engineering safeguard, removing it requires additional explicit confirmation |
+| Testing infrastructure (2) | Enable or disable the testing layers (unit, integration, E2E) | Medium: adds or removes the test runner setup |
+| Testing extras (3–5) | Coverage targets / Visual regression / Page Object Model, each independent | Low: only config, although deactivating visual regression or POM doesn't automatically rewrite existing specs |
+| CI (6) | Enable or disable the CI quality guard | Real: adds/removes `.github/workflows/quality-guard.yml` and related files |
+| AI Reviewer (7) | GGA / Copilot / Claude Code / Gemini / None | Medium: rewrites the AI review workflow |
+| AI Review Suggestions (8) | Enable or disable auto-improve / inline suggestions | Low: config change only |
+| Dedicated Security Review (9) | Claude / Gemini / OFF | Low: config change only |
+| E2E in CI (10) | Include E2E tests in the quality guard | Low–Medium: may slow CI; no effect on local tests |
+| release-please standalone (11) | Publish releases automatically from conventional commits | Medium: `release-please-config.json` now uses `release-type` resolved from `state.discovery.stack` (`node` for Node projects, `simple` default; resolved via `discovery.stack.primary`, falling back to `discovery.stack_key` when absent, e.g. legacy states migrated by R2) |
+| CD (12) | Automatic deploy to VPS | Real: writes `deploy.yml` and requires server secrets |
+| Release strategy (13) | Tag-based (`v*`) or push-to-main deploy trigger | Medium: changes how CD fires |
+| IDEs/CLIs (14) | Add/remove an active IDE: generates (satellite + commands + skills) or deletes everything related, downloading templates from the wizard's raw source | Real: creates or removes project files; requires explicit confirmation |
+| Branch PR override (15) | Project-local override for the branch-pr skill | Low: switches the override on or off |
 
-**Note**: Option numbering in `/wf-settings` is 1–18; options 1 and 2 map to `wf-ladder` and TDD, respectively. Option 17 is a Windsurf-only repair switch.
+**Note**: Option numbering in `/wf-settings` runs from 1 to 15. Option 1 maps to `wf-ladder`, option 2 to the testing infrastructure, and option 14 manages IDEs and CLIs.
 
-**Interaction pattern**: the command always shows the real state first (reading `openspec/config.yaml` and `AGENTS.md` directly, never assuming what the developer remembers choosing), lets you choose one or several changes, applies and confirms each individually, and asks "anything else?" before closing with a consolidated commit — without `git push`, like the rest of this workflow.
+**Interaction pattern**: the command always shows the real state first (reading `.wizard-state.json` and `AGENTS.md` directly, never assuming what the developer remembers choosing), lets you choose one or several changes, applies and confirms each individually, and asks "anything else?" before closing with a consolidated commit, without `git push`, like the rest of this workflow.
 
 **Why it's project-specific and not global**: just like `/wf-worktree`, its behavior depends entirely on the real state of the active repo (which backend, which extras are on) — it doesn't make sense as a global command installed once for all projects.
 
@@ -2361,8 +1807,7 @@ curl -fsSL https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/ins
 | **Global** | `/wf-init`, `/wf-refresh` | `install.sh` → per-IDE global paths |
 | **Project-specific** | `/wf-onboard`, `/wf-settings`, `/wf-worktree` | `/wf-init` Phases 6a/6b → repo |
 | **Global** | `/wf-cleanup` | `install.sh` → per-IDE global paths |
-| **Project-specific** | `/wf-ladder` (LADDER), `/wf-tdd` (TDD && LAYERS) | `/wf-init` Phases 6a/6b → repo |
-| **Project-specific** | `/wf-orchestrator` (ROUTING‖LADDER‖TDD), `/wf-sdd-trigger` (ROUTING) | `/wf-init` Phases 6a/6b → repo |
+| **Project-specific** | `/wf-ladder` (optional, Decision Ladder) | `/wf-init` Phases 6a/6b → repo |
 
 Global paths written by `install.sh` per command:
 
@@ -2431,13 +1876,11 @@ Global paths written by `install.sh` per command:
 | `~/.gentle-ai/state.json` | Installation state, agents, versions |
 | `~/.engram/engram.db` | SQLite database with memories |
 | `~/.engram/engram` | Engram binary |
-| `~/.claude/` | Persona, SDD sub-agents, skills, MCP wiring |
-| `~/.cursor/agents/sdd-*.md` | 10 sub-agents for Cursor |
+| `~/.claude/` | Persona, skills, MCP wiring |
 | `~/.windsurf/` | Persona, MCP, skills (Plan Mode integration) |
 | `~/.kiro/steering/gentle-ai.md` | Kiro global steering |
-| `~/.kiro/agents/sdd-*.md` | 10 sub-agents for Kiro |
-| `~/.config/opencode/` | Plugins, SDD profiles, MCP |
-| `~/.codex/` | Per-phase model+effort configs |
+| `~/.config/opencode/` | Plugins, MCP |
+| `~/.codex/` | Model and effort configs |
 | `~/.gemini/` | Global GEMINI.md, MCP, skills |
 | `~/.pi/` | Pi agent harness (gentle-pi) |
 
@@ -2457,33 +1900,14 @@ Global paths written by `install.sh` per command:
 
 This workflow is built on top of `gentle-ai` (`github.com/Gentleman-Programming/gentle-ai`) as a mandatory foundation. It is an open source project with good traction (4.2k+ stars, 500+ forks, 190+ releases at the time of writing), but it is still maintained by a small/individual team, not by an organization with long-term support guarantees. It's worth understanding the risk and plan if something changes.
 
-**What already happened and what could happen again**: the base SDD conductor was renamed from `sdd-orchestrator` to `gentle-orchestrator` between versions (with automatic migration on `sync`). It is a real example of how an internal naming change can affect any part of this workflow that hardcodes command names, sub-agents, or gentle-ai paths — and this workflow does so in several places (`/wf-init`, `/wf-refresh`, section 8.3 of this document).
+**What already happened and what could happen again**: gentle-ai v4.0.0 retired the spec-driven workflow in favor of ODD, and with it the agents and skills that earlier releases installed. It is a real example of how a change inside gentle-ai can affect any part of this workflow that hardcodes command names, sub-agents, or gentle-ai paths, and this workflow does so in several places (`/wf-init`, `/wf-refresh`, `/wf-settings`).
 
 **Current mitigation (no new tool required)**:
 - **Periodic manual monitoring**: check `github.com/Gentleman-Programming/gentle-ai/releases` before recommending the wizard in a new project, or when the wizard fails unexpectedly. No cron or constant monitoring needed — the natural cadence is "I check when I'm going to use it or when something breaks".
 - **Semi-automatic detection in the wizard**: Step 0.3.1 analyzes the text of gentle-ai release notes looking for risk signals near terms this workflow hardcodes, informs the developer on the spot, and leaves a draft ready to report it as an issue in this workflow's repo (see Block 4, section 8 and `/wf-init` Step 0.3.1 for full detail). This does not replace manual monitoring — it complements it by detecting in situ what a real developer encounters in production.
 
-**What happens if gentle-ai stops being maintained or breaks compatibility severely**: Engram and OpenSpec (the actual backends behind persistent memory and SDD) are separate projects from gentle-ai — gentle-ai orchestrates them but does not replace them. An abandonment of gentle-ai would mainly affect the multi-IDE configuration layer and native sub-agents, not necessarily the memory or SDD themselves, which could continue to be used more manually. There is no detailed migration plan yet because it hasn't been necessary — it will be documented if the situation arises.
+**What happens if gentle-ai stops being maintained or breaks compatibility severely**: Engram is a separate project from gentle-ai. gentle-ai orchestrates it but does not replace it. An abandonment of gentle-ai would mainly affect the multi-IDE configuration layer and native sub-agents, not Engram, which could continue to be used directly. There is no detailed migration plan yet because it hasn't been necessary; it will be documented if the situation arises.
 
----
-
-## Known Issues
-
-### Antigravity IDE — gentle-ai does not install SDD skills in the correct path
-
-gentle-ai writes SDD skills to `~/.gemini/antigravity-cli/skills/` (correct path for the **CLI**), but **IDE 2.0** expects global skills at `~/.gemini/config/skills/`. As a result, the agent reads the SDD orchestrator from `GEMINI.md` and tries to run phases, but without actual skill files, it simulates phases inline without persisting artifacts to Engram/openspec.
-
-**Bug reference**: [gentle-ai issue #746](https://github.com/Gentleman-Programming/gentle-ai/issues/746) — "Feat: Add support for Antigravity 2.0 target directory"
-
-**Manual workaround** (until gentle-ai fixes it):
-
-```bash
-cp -r ~/.gemini/antigravity-cli/skills ~/.gemini/config/skills
-```
-
-This copies the 22 SDD skills (`sdd-apply`, `sdd-propose`, etc.) to the path the IDE recognizes. It does not affect the CLI installation.
-
-**Valid for**: gentle-ai v1.43.3 and earlier. When issue #746 is resolved, this workaround will no longer be necessary.
 
 ---
 
