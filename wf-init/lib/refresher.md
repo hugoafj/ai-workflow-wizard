@@ -401,8 +401,9 @@ _apply_jq_filter() {
 # Migrate state from CURRENT_VERSION to TARGET_VERSION.
 # Schema migration ensures required fields exist. Feature defaults are NOT set
 # here: Phase R2 asks the user about protocol features missing from .features
-# (decision_ladder, tdd_protocol, routing_abc) using _ask_yesno_safe. Features
-# already present in state are never re-asked.
+# (decision_ladder) using _ask_yesno_safe. Features already present in state are
+# never re-asked. The schema 4 SDD cleanup is not here: it runs unconditionally
+# in Phase R2, because this function skips equal versions.
 migrate_state() {
   local CURRENT="$1"
   local TARGET="$2"
@@ -414,10 +415,10 @@ migrate_state() {
 
   echo "  Upgrading state from $CURRENT to $TARGET..."
   
-  # Ensure schema v3 required fields exist (idempotent: //= creates only if missing).
+  # Ensure schema v4 required fields exist (idempotent: //= creates only if missing).
   # Do NOT set default values for features here — Phase R2 asks instead.
   _apply_jq_filter '
-    .schema_version = 3 |
+    .schema_version = 4 |
     .wizard_version = "'"$TARGET"'" |
     .build_plan //= {} |
     .build_plan.managed_paths //= [] |
@@ -622,6 +623,149 @@ reinsert_legacy_bridge() {
       echo "  ⚠ Legacy path bridge MISSING from $TARGET after insert." >&2
     fi
   done
+}
+
+# FU3c: Regenerate Project Structure from live tree and merge comments from AGENTS.md.
+# Shared by R1 (pre-removal tree) and R6 (after approved removals, so one run leaves the
+# structure that the next refresh regenerates). Writes discovery.conventions.structure
+# into the staging state named by the root WF_STATE.
+wf_regenerate_structure() {
+  local LIVE_STRUCTURE line MERGED_STRUCTURE _si _sp _sc _lp _known
+  local STAGING_DIR STAGING_STATE_BF OLD_ANNOTATED NEW_ANNOTATED RAW_STRUCTURE_SECTION
+  local -a STRUCT_PATHS STRUCT_COMMENTS
+# Deterministic find: depth 2. Exclude build/output/dependency directories BOTH
+# themselves and their children ("-not -path X" alone misses the directory when
+# the pattern requires a trailing slash component).
+LIVE_STRUCTURE=$(find . -mindepth 1 -maxdepth 2 -type d \
+  -not -path "./node_modules" -not -path "./node_modules/*" \
+  -not -path "./.git" -not -path "./.git/*" \
+  -not -path "./dist" -not -path "./dist/*" \
+  -not -path "./build" -not -path "./build/*" \
+  -not -path "./coverage" -not -path "./coverage/*" \
+  -not -path "./playwright-report" -not -path "./playwright-report/*" \
+  -not -path "./test-results" -not -path "./test-results/*" \
+  -not -path "./.wizard-*" \
+  2>/dev/null | sed 's|^\./||' | sort)
+
+if [[ -n "$LIVE_STRUCTURE" ]]; then
+  # Parse old AGENTS.md Project Structure for comments (path -> comment).
+  # Parallel indexed arrays instead of `declare -A` (bash 3.2 compatible).
+  # Paths are stored WITHOUT trailing slash so they match the live tree's
+  # `find` output exactly ("src/" in prose vs "src" from find never matched,
+  # which silently dropped every merged comment); the trailing slash is
+  # re-added on emission to keep the documented "dir/ — comment" shape.
+  STRUCT_PATHS=()
+  STRUCT_COMMENTS=()
+  if [[ -f AGENTS.md ]]; then
+    # Extract lines like "src/ — single source of truth" or "templates/  # single source of truth"
+    while IFS= read -r line; do
+      # Normalize tree-drawing glyphs FIRST ("├── src/" -> "src/"): box-drawing
+      # chars are not [[:space:]], so without this the path class never reached
+      # them and every comment in a tree-formatted section was silently dropped.
+      line="${line//[│├└─]/}"
+      line="${line#"${line%%[![:space:]]*}"}"   # ltrim
+      # Match patterns: "path/ — comment" or "path/  # comment" or "path/ -- comment".
+      # The separator class is [—#-] (dash LAST): "[—-#]" would form the range
+      # em-dash..'#', which is empty, so em-dash comments never matched.
+      if [[ "$line" =~ ^[-*]?[[:space:]]*([^[:space:]:#—-]+/)[[:space:]]*[—#-][[:space:]]*(.+)$ ]]; then
+        STRUCT_PATHS+=("${BASH_REMATCH[1]%/}")
+        STRUCT_COMMENTS+=("${BASH_REMATCH[2]}")
+      elif [[ "$line" =~ ^[-*]?[[:space:]]*([^[:space:]:#—-]+/)[[:space:]]*$ ]]; then
+        STRUCT_PATHS+=("${BASH_REMATCH[1]%/}")
+        STRUCT_COMMENTS+=("")
+      fi
+    done < <(_wf_section "Project Structure")
+  fi
+  
+  _struct_in_live() {
+    # Membership test against the live tree list (exact line match).
+    printf '%s\n' "$LIVE_STRUCTURE" | grep -Fxq "$1"
+  }
+  
+  # Merge pass 1: surviving original entries first, in original order, with
+  # their comments; drop paths that no longer exist on disk.
+  MERGED_STRUCTURE=""
+  for _si in "${!STRUCT_PATHS[@]}"; do
+    _sp="${STRUCT_PATHS[_si]}"
+    if _struct_in_live "$_sp"; then
+      _sc="${STRUCT_COMMENTS[_si]}"
+      if [[ -n "$_sc" ]]; then
+        MERGED_STRUCTURE+="$_sp/ — $_sc"$'\n'
+      else
+        MERGED_STRUCTURE+="$_sp/"$'\n'
+      fi
+    fi
+  done
+  
+  # Merge pass 2: newly detected directories (no original entry), sorted order.
+  while IFS= read -r _lp; do
+    [[ -z "$_lp" ]] && continue
+    _known=0
+    for _si in "${!STRUCT_PATHS[@]}"; do
+      if [[ "${STRUCT_PATHS[_si]}" = "$_lp" ]]; then
+        _known=1
+        break
+      fi
+    done
+    if [[ "$_known" = "0" ]]; then
+      MERGED_STRUCTURE+="$_lp/"$'\n'
+    fi
+  done <<< "$LIVE_STRUCTURE"
+  
+  MERGED_STRUCTURE="${MERGED_STRUCTURE%$'\n'}"
+  
+  if [[ -n "$MERGED_STRUCTURE" ]]; then
+    STAGING_DIR=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' "$WF_STATE")
+    STAGING_STATE_BF="$STAGING_DIR/wizard-state.json"
+    # Downgrade guard: never trade a MORE informative section for a LESS
+    # informative one. A fenced/tree-formatted original (written by /wf-init
+    # discovery: hierarchy, files, comments) outranks the deterministic flat
+    # regeneration (dirs only, depth 2): keep it verbatim. Same guard when
+    # regeneration would drop every inline comment the original had.
+    OLD_ANNOTATED=0
+    for _sc in "${STRUCT_COMMENTS[@]}"; do
+      if [[ -n "$_sc" ]]; then OLD_ANNOTATED=$((OLD_ANNOTATED+1)); fi
+    done
+    NEW_ANNOTATED=$(printf '%s' "$MERGED_STRUCTURE" | grep -c ' — ' || true)
+    RAW_STRUCTURE_SECTION=""
+    if [[ -f AGENTS.md ]]; then
+      RAW_STRUCTURE_SECTION=$(_wf_section "Project Structure")
+    fi
+    case "$RAW_STRUCTURE_SECTION" in
+      *'```'*|*'│'*|*'├'*|*'└'*)
+        WF_STATE="$STAGING_STATE_BF" _apply_jq_filter --arg st "$RAW_STRUCTURE_SECTION" '.discovery.conventions.structure = $st'
+        echo "✓ Kept rich Project Structure section verbatim (tree/fenced format outranks flat regeneration)"
+        ;;
+      *)
+        if [[ "$OLD_ANNOTATED" -gt 0 && "$NEW_ANNOTATED" -eq 0 ]]; then
+          WF_STATE="$STAGING_STATE_BF" _apply_jq_filter --arg st "$RAW_STRUCTURE_SECTION" '.discovery.conventions.structure = $st'
+          echo "⚠ Regenerated structure lost all $OLD_ANNOTATED inline comments; kept original section verbatim"
+        else
+          WF_STATE="$STAGING_STATE_BF" _apply_jq_filter --arg st "$MERGED_STRUCTURE" '.discovery.conventions.structure = $st'
+          echo "✓ Regenerated structure from live tree ($NEW_ANNOTATED inline comments preserved)"
+        fi
+        ;;
+    esac
+  fi
+fi
+  return 0
+}
+
+# Replace the body of the "## Project Structure" section in an AGENTS.md file with
+# discovery.conventions.structure from the given state. The body ends at the next
+# "## " heading or at a WF: DO NOT REGENERATE block, so custom blocks stay in place.
+# The value goes through ENVIRON: awk -v would expand backslash escapes.
+wf_render_structure_section() {
+  local file="$1" state="$2" value
+  value=$(jq -r '.discovery.conventions.structure // ""' "$state")
+  WF_STRUCT_VALUE="$value" awk '
+    state == 0 && $0 == "## Project Structure" {
+      print; print ""; print ENVIRON["WF_STRUCT_VALUE"]; print ""; state = 1; next
+    }
+    state == 1 && ($0 ~ /^## / || $0 ~ /^<!-- WF: DO NOT REGENERATE -->/) { state = 2 }
+    state == 1 { next }
+    { print }
+  ' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
 }
 
 LIBEOF
@@ -834,14 +978,13 @@ if command -v gentle-ai >/dev/null 2>&1; then
     echo "⚠ 'gentle-ai doctor' reported issues — review the Gentle AI runtime before relying on its gates"
   fi
 fi
-if [[ -d openspec ]] && [[ ! -d openspec/changes ]]; then
-  echo "⚠ openspec/ exists but openspec/changes/ is missing — SDD pre-check may fail later"
+if [[ -d openspec ]]; then
+  echo "ℹ openspec/ is present. It is SDD-era data; R5 asks before removing it, and only when git tracks it and it is clean."
 fi
 
 SCHEMA_VERSION=$(jq -r '.schema_version // 0' "$WF_STATE")
-if [[ "$SCHEMA_VERSION" -lt 3 ]]; then
-  echo "✗ State schema is too old (v$SCHEMA_VERSION < v3)"
-  echo "  Phase R2 will migrate the schema. Continuing."
+if [[ "$SCHEMA_VERSION" -lt 4 ]]; then
+  echo "ℹ State schema is v$SCHEMA_VERSION (current: v4). Phase R2 migrates it, including the SDD removal."
 fi
 
 echo "✓ State validation passed (schema v$SCHEMA_VERSION)"
@@ -1010,122 +1153,9 @@ if [[ -f package.json ]] && command -v jq >/dev/null 2>&1; then
   fi
 fi
 
-# FU3c: Regenerate Project Structure from live tree and merge comments from AGENTS.md
-# Deterministic find: depth 2. Exclude build/output/dependency directories BOTH
-# themselves and their children ("-not -path X" alone misses the directory when
-# the pattern requires a trailing slash component).
-LIVE_STRUCTURE=$(find . -mindepth 1 -maxdepth 2 -type d \
-  -not -path "./node_modules" -not -path "./node_modules/*" \
-  -not -path "./.git" -not -path "./.git/*" \
-  -not -path "./dist" -not -path "./dist/*" \
-  -not -path "./build" -not -path "./build/*" \
-  -not -path "./coverage" -not -path "./coverage/*" \
-  -not -path "./playwright-report" -not -path "./playwright-report/*" \
-  -not -path "./test-results" -not -path "./test-results/*" \
-  -not -path "./.wizard-*" \
-  2>/dev/null | sed 's|^\./||' | sort)
-
-if [[ -n "$LIVE_STRUCTURE" ]]; then
-  # Parse old AGENTS.md Project Structure for comments (path -> comment).
-  # Parallel indexed arrays instead of `declare -A` (bash 3.2 compatible).
-  # Paths are stored WITHOUT trailing slash so they match the live tree's
-  # `find` output exactly ("src/" in prose vs "src" from find never matched,
-  # which silently dropped every merged comment); the trailing slash is
-  # re-added on emission to keep the documented "dir/ — comment" shape.
-  STRUCT_PATHS=()
-  STRUCT_COMMENTS=()
-  if [[ -f AGENTS.md ]]; then
-    # Extract lines like "src/ — single source of truth" or "templates/  # single source of truth"
-    while IFS= read -r line; do
-      # Normalize tree-drawing glyphs FIRST ("├── src/" -> "src/"): box-drawing
-      # chars are not [[:space:]], so without this the path class never reached
-      # them and every comment in a tree-formatted section was silently dropped.
-      line="${line//[│├└─]/}"
-      line="${line#"${line%%[![:space:]]*}"}"   # ltrim
-      # Match patterns: "path/ — comment" or "path/  # comment" or "path/ -- comment".
-      # The separator class is [—#-] (dash LAST): "[—-#]" would form the range
-      # em-dash..'#', which is empty, so em-dash comments never matched.
-      if [[ "$line" =~ ^[-*]?[[:space:]]*([^[:space:]:#—-]+/)[[:space:]]*[—#-][[:space:]]*(.+)$ ]]; then
-        STRUCT_PATHS+=("${BASH_REMATCH[1]%/}")
-        STRUCT_COMMENTS+=("${BASH_REMATCH[2]}")
-      elif [[ "$line" =~ ^[-*]?[[:space:]]*([^[:space:]:#—-]+/)[[:space:]]*$ ]]; then
-        STRUCT_PATHS+=("${BASH_REMATCH[1]%/}")
-        STRUCT_COMMENTS+=("")
-      fi
-    done < <(_wf_section "Project Structure")
-  fi
-  
-  _struct_in_live() {
-    # Membership test against the live tree list (exact line match).
-    printf '%s\n' "$LIVE_STRUCTURE" | grep -Fxq "$1"
-  }
-  
-  # Merge pass 1: surviving original entries first, in original order, with
-  # their comments; drop paths that no longer exist on disk.
-  MERGED_STRUCTURE=""
-  for _si in "${!STRUCT_PATHS[@]}"; do
-    _sp="${STRUCT_PATHS[_si]}"
-    if _struct_in_live "$_sp"; then
-      _sc="${STRUCT_COMMENTS[_si]}"
-      if [[ -n "$_sc" ]]; then
-        MERGED_STRUCTURE+="$_sp/ — $_sc"$'\n'
-      else
-        MERGED_STRUCTURE+="$_sp/"$'\n'
-      fi
-    fi
-  done
-  
-  # Merge pass 2: newly detected directories (no original entry), sorted order.
-  while IFS= read -r _lp; do
-    [[ -z "$_lp" ]] && continue
-    _known=0
-    for _si in "${!STRUCT_PATHS[@]}"; do
-      if [[ "${STRUCT_PATHS[_si]}" = "$_lp" ]]; then
-        _known=1
-        break
-      fi
-    done
-    if [[ "$_known" = "0" ]]; then
-      MERGED_STRUCTURE+="$_lp/"$'\n'
-    fi
-  done <<< "$LIVE_STRUCTURE"
-  
-  MERGED_STRUCTURE="${MERGED_STRUCTURE%$'\n'}"
-  
-  if [[ -n "$MERGED_STRUCTURE" ]]; then
-    STAGING_DIR=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' "$WF_STATE")
-    STAGING_STATE_BF="$STAGING_DIR/wizard-state.json"
-    # Downgrade guard: never trade a MORE informative section for a LESS
-    # informative one. A fenced/tree-formatted original (written by /wf-init
-    # discovery: hierarchy, files, comments) outranks the deterministic flat
-    # regeneration (dirs only, depth 2) — keep it verbatim. Same guard when
-    # regeneration would drop every inline comment the original had.
-    OLD_ANNOTATED=0
-    for _sc in "${STRUCT_COMMENTS[@]}"; do
-      if [[ -n "$_sc" ]]; then OLD_ANNOTATED=$((OLD_ANNOTATED+1)); fi
-    done
-    NEW_ANNOTATED=$(printf '%s' "$MERGED_STRUCTURE" | grep -c ' — ' || true)
-    RAW_STRUCTURE_SECTION=""
-    if [[ -f AGENTS.md ]]; then
-      RAW_STRUCTURE_SECTION=$(_wf_section "Project Structure")
-    fi
-    case "$RAW_STRUCTURE_SECTION" in
-      *'```'*|*'│'*|*'├'*|*'└'*)
-        WF_STATE="$STAGING_STATE_BF" _apply_jq_filter --arg st "$RAW_STRUCTURE_SECTION" '.discovery.conventions.structure = $st'
-        echo "✓ Kept rich Project Structure section verbatim (tree/fenced format outranks flat regeneration)"
-        ;;
-      *)
-        if [[ "$OLD_ANNOTATED" -gt 0 && "$NEW_ANNOTATED" -eq 0 ]]; then
-          WF_STATE="$STAGING_STATE_BF" _apply_jq_filter --arg st "$RAW_STRUCTURE_SECTION" '.discovery.conventions.structure = $st'
-          echo "⚠ Regenerated structure lost all $OLD_ANNOTATED inline comments — kept original section verbatim"
-        else
-          WF_STATE="$STAGING_STATE_BF" _apply_jq_filter --arg st "$MERGED_STRUCTURE" '.discovery.conventions.structure = $st'
-          echo "✓ Regenerated structure from live tree ($NEW_ANNOTATED inline comments preserved)"
-        fi
-        ;;
-    esac
-  fi
-fi
+# FU3c: Regenerate Project Structure from live tree and merge comments from AGENTS.md.
+# The merge lives in refresh-lib.sh (wf_regenerate_structure) so R6 can run it again.
+wf_regenerate_structure
 
 # FU3d: Re-detect MCPs from config files and merge purpose/setup from AGENTS.md
 # Known MCP config locations
@@ -1388,12 +1418,36 @@ WF_STATE="$STAGING_STATE" _apply_jq_filter '
   else . end
 '
 
+# Schema 4 (SDD removal). Runs on every refresh, not only when the wizard version
+# changes: migrate_state skips equal versions, and a schema 3 state can already
+# carry the current version. Idempotent: a schema 4 state passes through unchanged.
+#  - features.testing takes over from features.tdd_protocol, so TDD projects keep
+#    their test infrastructure. An existing features.testing is never overwritten.
+#  - SDD-only keys are dropped. phases.phase45 and phases.phase46b no longer exist;
+#    an in-flight phase_pointer on either one moves to phase46, which now holds
+#    their extras.
+#  - migrations.sdd_removed records the cleanup (stamped once).
+# The Engram notice prints here, before the filter below drops the sdd key. R6 runs
+# after the promotion, when the key is already gone, so it cannot print the notice.
+if jq -e 'has("sdd")' "$STAGING_STATE" >/dev/null 2>&1; then
+  echo "ℹ Engram keys named sdd/<project>/* (for example sdd/<project>/testing-capabilities) are not file state. /wf-refresh cannot delete them; remove them with the Engram tools if you no longer want them."
+fi
+WF_STATE="$STAGING_STATE" _apply_jq_filter '
+  .features //= {} |
+  .features.testing = (if (.features | has("testing")) then .features.testing else (.features.tdd_protocol // false) end) |
+  del(.sdd, .testing.tdd_mode, .features.tdd_protocol, .features.routing_abc, .phases.phase45, .phases.phase46b) |
+  (if .phase_pointer == "phase45" or .phase_pointer == "phase46b" then .phase_pointer = "phase46" else . end) |
+  .migrations //= {} |
+  .migrations.sdd_removed //= true |
+  .schema_version = (if (.schema_version // 0) < 4 then 4 else .schema_version end)
+'
+
 # Ask about new optional protocol features that are not present in the local
 # state yet (features added by newer wizard versions). ci/cd/release_please are
 # NOT asked here: they require the full phase47-cicd questionnaire and are
 # configured via /wf-settings or /wf-init. Disabled features are recorded
 # explicitly so they are never re-asked.
-for FEATURE in decision_ladder tdd_protocol routing_abc; do
+for FEATURE in decision_ladder; do
   if ! jq -e ".features.$FEATURE != null" "$STAGING_STATE" >/dev/null 2>&1; then
     echo "New optional feature available: $FEATURE"
     # Fail-fast: an unanswered feature prompt stops R2 immediately so the
@@ -1509,13 +1563,10 @@ reinsert_legacy_bridge "$STAGING"
 # staging. A missing file means Builder-Core or Builder-Heavy did not run fully.
 EXPECTED=()
 IDES=$(jq -r '.answers.ides[]?' "$STAGING_STATE")
-LADDER=$(jq -r '.features.decision_ladder' "$STAGING_STATE"); TDD=$(jq -r '.features.tdd_protocol' "$STAGING_STATE")
-ROUTING=$(jq -r '.features.routing_abc' "$STAGING_STATE"); CI=$(jq -r '.features.ci' "$STAGING_STATE")
+LADDER=$(jq -r '.features.decision_ladder' "$STAGING_STATE"); CI=$(jq -r '.features.ci' "$STAGING_STATE")
 CD=$(jq -r '.features.cd' "$STAGING_STATE"); RELEASE=$(jq -r '.features.release_please' "$STAGING_STATE")
 LAYERS=$(jq -r '.testing.layers[]?' "$STAGING_STATE")
 [ "$LADDER" = "true" ] && EXPECTED+=(.agents/skills/wf-ladder/SKILL.md .agents/protocols/wf-ladder.md)
-[ "$TDD" = "true" ] && [ -n "$LAYERS" ] && EXPECTED+=(.agents/skills/wf-tdd/SKILL.md .agents/protocols/wf-tdd.md)
-[ "$ROUTING" = "true" ] && EXPECTED+=(.agents/skills/wf-sdd-trigger/SKILL.md .agents/protocols/wf-sdd-trigger.md)
 # always-included commands are always present
 EXPECTED+=(.agents/skills/wf-worktree/SKILL.md .agents/skills/wf-settings/SKILL.md .agents/skills/wf-onboard/SKILL.md)
 for IDE in $IDES; do
@@ -1530,16 +1581,16 @@ for IDE in $IDES; do
       EXPECTED+=(.github/prompts/wf-worktree.prompt.md .github/prompts/wf-settings.prompt.md .github/prompts/wf-onboard.prompt.md)
       # Conditional commands based on active features (match builder-heavy.py active_command_names)
       [ "$LADDER" = "true" ] && EXPECTED+=(.github/prompts/wf-ladder.prompt.md)
-      [ "$TDD" = "true" ] && [ -n "$LAYERS" ] && EXPECTED+=(.github/prompts/wf-tdd.prompt.md)
-      { [ "$ROUTING" = "true" ] || [ "$LADDER" = "true" ] || [ "$TDD" = "true" ]; } && EXPECTED+=(.github/prompts/wf-orchestrator.prompt.md)
-      [ "$ROUTING" = "true" ] && EXPECTED+=(.github/prompts/wf-sdd-trigger.prompt.md)
       ;;
     codex)       EXPECTED+=(.codex/commands/wf-worktree.md .codex/commands/wf-settings.md .codex/commands/wf-onboard.md) ;;
   esac
 done
 [ "$CI" = "true" ] && EXPECTED+=(.github/workflows/quality-guard.yml)
 [ "$RELEASE" = "true" ] && EXPECTED+=(.github/workflows/release-please.yml release-please-config.json .release-please-manifest.json .commitlintrc.json)
-[ -n "$LAYERS" ] && EXPECTED+=(vitest.config.ts playwright.config.ts)
+# Unit and integration layers render vitest.config.ts; the e2e layer renders playwright.config.ts.
+# Exact line match: a layer name must equal a whole line of LAYERS.
+if printf '%s\n' "$LAYERS" | grep -qxE 'unit|integration'; then EXPECTED+=(vitest.config.ts); fi
+if printf '%s\n' "$LAYERS" | grep -qxE 'e2e'; then EXPECTED+=(playwright.config.ts); fi
 for f in "${EXPECTED[@]}"; do
   [ -f "$STAGING/$f" ] || { echo "✗ FAIL: missing $STAGING/$f — Builder-Core/Heavy did not run or failed"; exit 1; }
 done
@@ -1575,21 +1626,6 @@ PLAN="refresh-plan.json"
 # wizard placeholder and must not fail the refresh.
 echo "ℹ Scanning staging for unresolved placeholders..."
 PLACEHOLDER_HITS=$(grep -RInE '\{\{(answers|discovery|features|testing|mcps|protocols|conventions|stack)\.|\{\{(wizard_version|version)\}\}|\{\{PROTOCOL_BODY:' "$STAGING" 2>/dev/null || true)
-# {{sdd.backend}} is scanned SEPARATELY with a narrow exemption: it doubles as
-# a RUNTIME literal — the sed SEARCH PATTERN wf-settings uses to re-resolve the
-# SDD backend when the user switches backends post-build — and builder-core.py
-# ships it verbatim on purpose (see its NOTE in write_skills). Only occurrences
-# OUTSIDE that sed-command context are unresolved-placeholder leaks. The
-# exemption regex MUST use grep -E with escaped braces: BSD grep (macOS) gives
-# undefined behavior for unescaped `{{` in BRE, so a fix validated only against
-# GNU grep can pass CI and silently match nothing on macOS.
-SDD_BACKEND_HITS=$(grep -RInE '\{\{sdd\.backend\}\}' "$STAGING" 2>/dev/null \
-  | grep -vE 'sed[[:space:]].*s.[[:space:]]*\{\{sdd\.backend\}\}' || true)
-if [[ -n "$PLACEHOLDER_HITS" && -n "$SDD_BACKEND_HITS" ]]; then
-  PLACEHOLDER_HITS="${PLACEHOLDER_HITS}"$'\n'"${SDD_BACKEND_HITS}"
-elif [[ -z "$PLACEHOLDER_HITS" && -n "$SDD_BACKEND_HITS" ]]; then
-  PLACEHOLDER_HITS="$SDD_BACKEND_HITS"
-fi
 if [[ -n "$PLACEHOLDER_HITS" ]]; then
   echo "✗ Unresolved wizard placeholders found in $STAGING:" >&2
   echo "$PLACEHOLDER_HITS" >&2
@@ -1683,46 +1719,103 @@ while IFS= read -r -d '' old_path; do
     fi
   fi
 done < <(jq -j '.managed_paths[]? + "\u0000"' "$OLD_MANAGED" 2>/dev/null || true)
-rm -f "$OLD_MANAGED"
-
-# Explicit deprecated-path cleanup (Fix 3): these global-only command artifacts
-# (installed by install.sh, never part of a project) must be removed even when
-# they are NOT in the managed_paths baseline.
-# FU4: Extended with per-IDE skill dirs for 6 deprecated commands (wf-cicd, wf-cleanup,
-# wf-refresh, wf-init, wf-sdd-config, wf-sdd-lite) across 8 IDE skill roots.
-DEPRECATED_COMMANDS=(wf-cicd wf-cleanup wf-refresh wf-init wf-sdd-config wf-sdd-lite)
-IDE_SKILL_ROOTS=(.claude/skills .cursor/skills .opencode/skills .windsurf/skills .codex/skills .kiro/skills .github/skills)
-# .devin/skills only when windsurf is active (per reinsert_legacy_bridge)
-IDES=$(jq -r '.answers.ides[]?' "$WF_STATE" 2>/dev/null)
-if echo "$IDES" | grep -q "windsurf"; then
-  IDE_SKILL_ROOTS+=(.devin/skills)
-fi
+# Explicit deprecated-path cleanup: retired wizard artifacts that may sit outside
+# the managed_paths baseline (installs that predate the manifest, or manifests that
+# never recorded them). They follow the same hash gate as the managed-path scan
+# above: a recorded hash that still matches is `deleted`; any other file is
+# `deleted_modified`, which needs explicit approval in R5. Retired files are never
+# deleted silently. OLD_MANAGED is removed after this section, which still reads it.
+#
+# Retired commands: the SDD/TDD orchestration commands (wf-tdd, wf-sdd-trigger,
+# wf-orchestrator) and the legacy sdd-lite family, plus the older global commands.
+DEPRECATED_COMMANDS=(wf-cicd wf-cleanup wf-refresh wf-init wf-sdd-config wf-sdd-lite sdd-lite wf-tdd wf-sdd-trigger wf-orchestrator)
+# Retired skill directories: files beside SKILL.md (reference/, variants/) go too.
+RETIRED_SKILL_DIRS=(wf-tdd wf-sdd-trigger wf-orchestrator sdd-lite wf-sdd-lite wf-sdd-config)
+# Skill roots. .devin/skills, .gemini/skills and .agents/skills are checked
+# unconditionally: these checks only find files that exist, and an earlier IDE
+# selection can leave a retired file behind.
+IDE_SKILL_ROOTS=(.claude/skills .cursor/skills .opencode/skills .windsurf/skills .codex/skills .kiro/skills .github/skills .gemini/skills .agents/skills .devin/skills)
 
 DEPRECATED_PATHS=(
-  # Existing command artifacts (workflows/commands/prompts/protocols)
-  .windsurf/workflows/wf-cicd.md .windsurf/workflows/wf-cleanup.md .windsurf/workflows/wf-refresh.md .windsurf/workflows/wf-init.md
-  .claude/commands/wf-cicd.md .claude/commands/wf-cleanup.md .claude/commands/wf-refresh.md .claude/commands/wf-init.md
-  .cursor/commands/wf-cicd.md .cursor/commands/wf-cleanup.md .cursor/commands/wf-refresh.md .cursor/commands/wf-init.md
-  .opencode/commands/wf-cicd.md .opencode/commands/wf-cleanup.md .opencode/commands/wf-refresh.md .opencode/commands/wf-init.md
-  .codex/commands/wf-cicd.md .codex/commands/wf-cleanup.md .codex/commands/wf-refresh.md .codex/commands/wf-init.md
-  .kiro/steering/wf-cicd.md .kiro/steering/wf-cleanup.md .kiro/steering/wf-refresh.md .kiro/steering/wf-init.md
-  .github/prompts/wf-cicd.prompt.md .github/prompts/wf-cleanup.prompt.md .github/prompts/wf-refresh.prompt.md .github/prompts/wf-init.prompt.md
-  .agents/protocols/wf-cicd.md .agents/skills/wf-cicd/SKILL.md .agents/skills/wf-cleanup/SKILL.md .agents/skills/wf-refresh/SKILL.md .agents/skills/wf-init/SKILL.md
-  .agents/skills/wf-sdd-config/SKILL.md .agents/protocols/wf-sdd-config.md
-  # FU4: Per-IDE skill dirs for 6 deprecated commands
+  # Retired SDD artifact with a fixed location.
+  .windsurf/workflows/sdd-new.md
 )
-# Add per-IDE skill paths for all 6 deprecated commands
+# Command files per IDE for every deprecated command: claude/opencode/cursor/codex
+# commands, windsurf workflows, kiro steering, copilot prompts, and .agents protocols.
+for cmd in "${DEPRECATED_COMMANDS[@]}"; do
+  DEPRECATED_PATHS+=(
+    ".claude/commands/$cmd.md" ".opencode/commands/$cmd.md" ".cursor/commands/$cmd.md" ".codex/commands/$cmd.md"
+    ".windsurf/workflows/$cmd.md" ".kiro/steering/$cmd.md" ".github/prompts/$cmd.prompt.md" ".agents/protocols/$cmd.md"
+  )
+done
+# Per-IDE protocol files of the retired SDD and TDD protocols, plus the retired
+# orchestration protocols that older .agents installs wrote.
+for root in .claude/protocols .opencode/protocols .cursor/protocols .codex/protocols .windsurf/protocols \
+            .gemini/protocols .kiro/protocols .github/protocols .agents/protocols; do
+  for name in sdd tdd wf-tdd wf-sdd-trigger wf-orchestrator; do
+    DEPRECATED_PATHS+=("$root/$name.md")
+  done
+done
+# SKILL.md of every deprecated command in every skill root.
 for cmd in "${DEPRECATED_COMMANDS[@]}"; do
   for root in "${IDE_SKILL_ROOTS[@]}"; do
     DEPRECATED_PATHS+=("$root/$cmd/SKILL.md")
   done
 done
+# Files beside SKILL.md inside the retired skill directories (reference/, variants/).
+for cmd in "${RETIRED_SKILL_DIRS[@]}"; do
+  for root in "${IDE_SKILL_ROOTS[@]}"; do
+    [ -d "$root/$cmd" ] || continue
+    while IFS= read -r -d '' extra; do
+      DEPRECATED_PATHS+=("$extra")
+    done < <(find "$root/$cmd" -type f -not -name SKILL.md -print0)
+  done
+done
+
+# Retired paths the user declined in an earlier refresh. R6 records them in
+# .migrations.retired_pending, because declined paths leave the managed set and
+# the managed-path scan above can no longer see them. Offer them again here.
+while IFS= read -r PENDING_PATH; do
+  [[ -n "$PENDING_PATH" ]] && DEPRECATED_PATHS+=("$PENDING_PATH")
+done < <(jq -r '.migrations.retired_pending[]?' "$WF_STATE" 2>/dev/null || true)
+
+# Retired paths with no HEAD entry were created or staged by the user, so they are never
+# removal candidates. The run that first finds one prints a kept notice and lists it in the
+# plan (kept_not_in_head). The R6 state promotion records it in .migrations.kept_not_in_head,
+# and later runs skip it silently.
+KEPT_NOT_HEAD_KNOWN=$(jq -r '.migrations.kept_not_in_head[]?' "$WF_STATE" 2>/dev/null || true)
+KEPT_NOT_HEAD_NEW=""
 
 for dp in "${DEPRECATED_PATHS[@]}"; do
-  if [ -f "$dp" ] && [ ! -f "$STAGING/$dp" ]; then
-    DELETED=$(jq --arg path "$dp" --arg reason "deprecated command" '. += [{"path": $path, "reason": $reason}]' <<< "$DELETED")
+  case "$dp" in .git|.git/*) continue ;; esac
+  if [ ! -f "$dp" ] || [ -f "$STAGING/$dp" ]; then
+    continue
+  fi
+  # Already classified by the managed-path scan (or listed twice): skip.
+  if jq -e --arg p "$dp" 'any(.[]; .path == $p)' <<< "$DELETED" >/dev/null \
+     || jq -e --arg p "$dp" 'any(.[]; .path == $p)' <<< "$DELETED_MODIFIED" >/dev/null; then
+    continue
+  fi
+  # No HEAD entry: the user created or staged this file. It is skipped on both branches below,
+  # so it is neither deleted nor offered again. The notice prints once per path.
+  if ! git cat-file -e "HEAD:$dp" 2>/dev/null; then
+    if ! grep -qxF "$dp" <<< "$KEPT_NOT_HEAD_NEW" && ! grep -qxF "$dp" <<< "$KEPT_NOT_HEAD_KNOWN"; then
+      echo "⚠ Kept $dp: it is not in HEAD (created or staged by you). Remove it by hand if you want it gone."
+    fi
+    KEPT_NOT_HEAD_NEW+="$dp"$'\n'
+    continue
+  fi
+  PROJECT_HASH=$(wf_sha256 "$dp")
+  OLD_HASH=$(jq -r --arg path "$dp" '.generated_files[]? | select(.path == $path) | .hash' "$OLD_MANAGED" 2>/dev/null | head -n 1 || true)
+  if [[ -n "$OLD_HASH" && "$PROJECT_HASH" == "$OLD_HASH" ]]; then
+    DELETED=$(jq --arg path "$dp" --arg hash "$PROJECT_HASH" '. += [{"path": $path, "hash": $hash, "reason": "deprecated command"}]' <<< "$DELETED")
+  elif [[ -n "$OLD_HASH" ]]; then
+    DELETED_MODIFIED=$(jq --arg path "$dp" --arg old_hash "$OLD_HASH" --arg project_hash "$PROJECT_HASH" '. += [{"path": $path, "old_hash": $old_hash, "project_hash": $project_hash, "reason": "deprecated (user modified)"}]' <<< "$DELETED_MODIFIED")
+  else
+    DELETED_MODIFIED=$(jq --arg path "$dp" --arg project_hash "$PROJECT_HASH" '. += [{"path": $path, "old_hash": "", "project_hash": $project_hash, "reason": "deprecated (no recorded hash, user may have modified)"}]' <<< "$DELETED_MODIFIED")
   fi
 done
+rm -f "$OLD_MANAGED"
 
 # Deduplicate deletion paths (a path may appear both in the managed_paths
 # baseline and in DEPRECATED_PATHS; unique_by keeps the counts honest).
@@ -1730,13 +1823,15 @@ DELETED=$(jq 'unique_by(.path)' <<< "$DELETED")
 DELETED_MODIFIED=$(jq 'unique_by(.path)' <<< "$DELETED_MODIFIED")
 
 # Write plan
+KEPT_NOT_HEAD_JSON=$(printf '%s' "$KEPT_NOT_HEAD_NEW" | jq -R -s -c 'split("\n") | map(select(length > 0)) | unique')
 jq -n \
   --argjson added "$ADDED" \
   --argjson updated "$UPDATED" \
   --argjson deleted "$DELETED" \
   --argjson deleted_modified "$DELETED_MODIFIED" \
   --argjson unchanged "$UNCHANGED" \
-  '{added: $added, updated: $updated, deleted: $deleted, deleted_modified: $deleted_modified, unchanged: $unchanged}' > "$PLAN"
+  --argjson kept_not_in_head "$KEPT_NOT_HEAD_JSON" \
+  '{added: $added, updated: $updated, deleted: $deleted, deleted_modified: $deleted_modified, unchanged: $unchanged, kept_not_in_head: $kept_not_in_head}' > "$PLAN"
 
 ADDED_COUNT=$(jq '.added | length' "$PLAN")
 UPDATED_COUNT=$(jq '.updated | length' "$PLAN")
@@ -1759,7 +1854,7 @@ fi
 # hash, so a semantic flip like ci.auto_improve false→true hides among N
 # mechanical updates. Compare the project copy vs staging line-wise per key
 # and persist every flip into the plan so R5 can surface them FIRST.
-CURATED_KEYS=(auto_improve tdd_mode e2e_in_ci release_ai_summary release_ai_provider)
+CURATED_KEYS=(auto_improve e2e_in_ci release_ai_summary release_ai_provider)
 BEHAVIORAL="[]"
 while IFS= read -r ufile; do
   [[ -n "$ufile" && -f "$ufile" && -f "$STAGING/$ufile" ]] || continue
@@ -1777,6 +1872,22 @@ mv "${PLAN}.tmp" "$PLAN"
 BEHAVIORAL_COUNT=$(jq '.behavioral_changes | length' "$PLAN")
 if [[ "$BEHAVIORAL_COUNT" -gt 0 ]]; then
   echo "⚠ Behavioral changes detected: $BEHAVIORAL_COUNT — Phase R5 lists them FIRST."
+fi
+
+# SDD text inside user-owned DO NOT REGENERATE blocks of the project AGENTS.md.
+# preserve_custom_agents re-injects those blocks verbatim, so this report is
+# informational only: /wf-refresh never rewrites user-owned blocks silently.
+if [[ -f AGENTS.md ]]; then
+  SDD_BLOCK_HITS=$(awk '
+    /<!-- WF: DO NOT REGENERATE -->/ { inblock = 1 }
+    inblock && tolower($0) ~ /(sdd|openspec|wf-tdd|wf-sdd-trigger|wf-orchestrator)/ { printf "  AGENTS.md:%d: %s\n", NR, $0 }
+    /<!-- \/WF: DO NOT REGENERATE -->/ { inblock = 0 }
+  ' AGENTS.md)
+  if [[ -n "$SDD_BLOCK_HITS" ]]; then
+    echo "ℹ AGENTS.md has SDD text inside DO NOT REGENERATE blocks (your content, not rewritten by /wf-refresh):"
+    printf '%s\n' "$SDD_BLOCK_HITS"
+    echo "  Remove those lines by hand. The rest of the refresh is unaffected."
+  fi
 fi
 
 # The plan now holds the classified diff; the pre-Builder baseline is no longer
@@ -1918,7 +2029,7 @@ esac
 REVIEW_FILE="${WF_STATE_DIR}/refresh-review.md"
 
 # --- 1. Behavioral changes over curated keys (project copy vs staging) ------
-CURATED_KEYS=(auto_improve tdd_mode e2e_in_ci release_ai_summary release_ai_provider)
+CURATED_KEYS=(auto_improve e2e_in_ci release_ai_summary release_ai_provider)
 BEHAVIORAL_CHANGES=()
 while IFS= read -r file; do
   [[ -n "$file" && -f "$file" && -f "$STAGING/$file" ]] || continue
@@ -2065,6 +2176,21 @@ else
   APPROVE_OVERWRITE_LOCAL="false"
 fi
 
+# Consumer openspec/ (SDD-era directory; /sdd-init created it, the wizard never
+# did). Removal needs its own explicit "yes": default No, and No for non-interactive
+# runs. It is offered only when git tracks the directory and it is clean. R6
+# re-checks both before deleting anything.
+APPROVE_OPENSPEC="false"
+if [[ -d openspec ]]; then
+  if [[ -n "$(git ls-files -- openspec)" && -z "$(git status --porcelain -- openspec)" ]]; then
+    _r5_ask "Remove the SDD openspec/ directory from this project?" APPROVE_OPENSPEC
+  else
+    echo ""
+    echo "⚠ openspec/ is untracked or has uncommitted changes, so /wf-refresh will not remove it."
+    echo "  Commit or stash it, then re-run /wf-refresh, or remove it by hand."
+  fi
+fi
+
 # The refresh appends wizard-managed entries to .gitignore in R6. Mutating it
 # behind the review gate contradicts AGENTS.md ("show me the full diff and wait
 # for my approval"), so preview the exact lines that would be appended and
@@ -2127,7 +2253,8 @@ jq --argjson added "$APPROVE_ADDED" \
    --argjson gitignore "$APPROVE_GITIGNORE" \
    --argjson gi_candidates "$GI_HAD_CANDIDATES" \
    --argjson overwrite_local "$APPROVE_OVERWRITE_LOCAL" \
-   '.build_plan.approval = {added: $added, updated: $updated, deleted: $deleted, deleted_modified: $deleted_modified, gitignore: $gitignore, overwrite_local: $overwrite_local, gitignore_candidates: $gi_candidates} | .updated_at = (now | todate)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
+   --argjson remove_openspec "$APPROVE_OPENSPEC" \
+   '.build_plan.approval = {added: $added, updated: $updated, deleted: $deleted, deleted_modified: $deleted_modified, gitignore: $gitignore, overwrite_local: $overwrite_local, gitignore_candidates: $gi_candidates, remove_openspec: $remove_openspec} | .updated_at = (now | todate)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
 mv "$STAGING_STATE.tmp" "$STAGING_STATE"
 
 # Explicit confirmation gate before R6: apply+commit, apply without commit, or cancel.
@@ -2139,6 +2266,7 @@ echo "  Deleted: $APPROVE_DELETED"
 echo "  Deleted-modified: $APPROVE_DELETED_MODIFIED"
 echo "  Gitignore: $APPROVE_GITIGNORE"
 echo "  Overwrite local: $APPROVE_OVERWRITE_LOCAL"
+echo "  Remove SDD openspec/: $APPROVE_OPENSPEC"
 echo ""
 echo "How should the approved changes be applied?"
 if [[ ! -t 0 ]]; then
@@ -2207,11 +2335,67 @@ STAGING=".wizard-staging"
 STAGING_STATE="$STAGING/wizard-state.json"
 PLAN="refresh-plan.json"
 
+# Rollback snapshot. A failed apply, for example a pre-commit hook that rejects the commit,
+# must leave the working tree, the index and the state as they were. The snapshot is taken
+# before the first write and disarmed once the commit (or the apply-only step) is complete.
+ROLLBACK_DIR=""
+ROLLBACK_ARMED="false"
+wf_r6_snapshot() {
+  local p index_file
+  ROLLBACK_DIR=$(mktemp -d)
+  mkdir -p "$ROLLBACK_DIR/files"
+  : > "$ROLLBACK_DIR/absent"
+  index_file=$(git rev-parse --git-path index)
+  if [[ -f "$index_file" ]]; then
+    cp -p "$index_file" "$ROLLBACK_DIR/index"
+  fi
+  {
+    jq -j '(.added[]?, .updated[]?, .deleted[]?, .deleted_modified[]?) | .path + "\u0000"' "$PLAN"
+    printf '%s\0' ".gitignore" "AGENTS.md" ".wf-status"
+    if [[ "$APPROVE_OPENSPEC" == "true" ]] && [[ -d openspec ]]; then
+      git ls-files -z -- openspec
+    fi
+  } | sort -zu > "$ROLLBACK_DIR/paths"
+  while IFS= read -r -d '' p; do
+    if [[ -e "$p" || -L "$p" ]]; then
+      mkdir -p "$ROLLBACK_DIR/files/$(dirname "$p")"
+      cp -Rp "$p" "$ROLLBACK_DIR/files/$p"
+    else
+      printf '%s\0' "$p" >> "$ROLLBACK_DIR/absent"
+    fi
+  done < "$ROLLBACK_DIR/paths"
+  ROLLBACK_ARMED="true"
+}
+
+wf_r6_rollback() {
+  local p rel
+  echo "✗ Apply failed: restoring the working tree, the index and the state." >&2
+  while IFS= read -r -d '' p; do
+    rm -f -- "$p"
+  done < "$ROLLBACK_DIR/absent"
+  while IFS= read -r -d '' rel; do
+    rel="${rel#./}"
+    mkdir -p "$(dirname "$rel")"
+    cp -Rp "$ROLLBACK_DIR/files/$rel" "$rel"
+  done < <(cd "$ROLLBACK_DIR/files" && find . -type f -print0)
+  if [[ -f "$ROLLBACK_DIR/index" ]]; then
+    cp -p "$ROLLBACK_DIR/index" "$(git rev-parse --git-path index)"
+  fi
+  echo "ℹ Restored. Fix the cause and run /wf-refresh again."
+}
+
 # Ensure staging, plan, and the R3 baseline are removed even if R6 fails.
 cleanup_r6() {
+  local rc=$?
+  if [[ $rc -ne 0 ]] && [[ "$ROLLBACK_ARMED" == "true" ]]; then
+    wf_r6_rollback
+  fi
   rm -rf "$STAGING"
   rm -f "$PLAN"
   rm -f .wizard-refresh-baseline.json
+  if [[ -n "${OPENSPEC_LIST:-}" ]]; then rm -f "$OPENSPEC_LIST"; fi
+  if [[ -n "${DELETED_COMMIT_LIST:-}" ]]; then rm -f "$DELETED_COMMIT_LIST"; fi
+  if [[ -n "${ROLLBACK_DIR:-}" ]]; then rm -rf "$ROLLBACK_DIR"; fi
 }
 trap cleanup_r6 EXIT
 
@@ -2228,8 +2412,27 @@ APPROVE_GITIGNORE=$(jq -r '.build_plan.approval.gitignore // false' "$STAGING_ST
 GI_HAD_CANDIDATES=$(jq -r '.build_plan.approval.gitignore_candidates // false' "$STAGING_STATE")
 # FU7: Overwrite locally-modified files approval
 APPROVE_OVERWRITE_LOCAL=$(jq -r '.build_plan.approval.overwrite_local // false' "$STAGING_STATE")
+# SDD openspec/ removal (R5 consent, default No).
+APPROVE_OPENSPEC=$(jq -r '.build_plan.approval.remove_openspec // false' "$STAGING_STATE")
+OPENSPEC_REMOVED="false"
+OPENSPEC_LIST=$(mktemp)
+# Paths removed from HEAD by this run. Only these enter the commit pathspec.
+DELETED_COMMIT_LIST=$(mktemp)
+# Removals actually made, per category. A kept file is not a removal. Set by _r6_remove_list.
+REMOVED_COUNT=0
+DELETED_REMOVED_COUNT=0
+DELETED_MODIFIED_REMOVED_COUNT=0
+# Paths kept in R6 because they have no HEAD entry (newline-separated), recorded with the promotion.
+KEPT_NOT_HEAD_R6=""
+# Set when the Project Structure regeneration rewrites the root AGENTS.md.
+STRUCT_AGENTS_WRITTEN="false"
+# Set when the stale SDD .wf-status cleanup removes the file.
+WF_STATUS_REMOVED="false"
 # Apply-only mode: copy approved files to the working tree but do NOT stage or commit.
 APPLY_ONLY=$(jq -r '.build_plan.apply_only // false' "$STAGING_STATE")
+
+# Snapshot before the first write to the project tree (see wf_r6_snapshot above).
+wf_r6_snapshot
 
 # Preserve custom AGENTS.md sections BEFORE any copy: the project AGENTS.md still
 # holds the user's custom markers here, and the staged AGENTS.md is the freshly
@@ -2243,6 +2446,92 @@ if [[ "$APPROVE_UPDATED" == "true" ]] || [[ "$APPROVE_ADDED" == "true" ]]; then
   # so the approved copy carries it, the manifest hashes it, and a declined refresh
   # writes nothing. Idempotent: skipped when the rule is already present.
   reinsert_legacy_bridge "$STAGING"
+fi
+
+# Removals run before the copies: the Project Structure regenerated below must
+# see the tree that the removals leave behind.
+#
+# Remove one approved path. A path tracked at HEAD goes through git rm, so the
+# deletion is staged and commits with the rest. An untracked or staged-new path
+# has no HEAD entry: it is dropped from the index and the disk and kept out of
+# DELETED_COMMIT_LIST, because the commit pathspec would abort with "did not match
+# any file(s) known to git".
+_r6_remove_list() {
+  local list="$1" file
+  while IFS= read -r -d '' file; do
+    if ! git cat-file -e "HEAD:$file" 2>/dev/null; then
+      # Not in HEAD: the user created or staged this file. Keep it on disk and in the
+      # index, and say so. Removing it would destroy work the wizard never tracked.
+      echo "⚠ Kept $file: it is not in HEAD (created or staged by you). Remove it by hand if you want it gone." >&2
+      KEPT_NOT_HEAD_R6+="$file"$'\n'
+    elif [[ "$APPLY_ONLY" == "true" ]]; then
+      # FU6: Apply-only mode uses plain rm (unstaged)
+      rm -f -- "$file"
+      REMOVED_COUNT=$((REMOVED_COUNT + 1))
+    else
+      # git rm does nothing for a path the user already removed from the index, and the
+      # commit pathspec then fails on a file that is still on disk. Remove it explicitly.
+      git rm -q -f --ignore-unmatch -- "$file"
+      rm -f -- "$file"
+      printf '%s\0' "$file" >> "$DELETED_COMMIT_LIST"
+      REMOVED_COUNT=$((REMOVED_COUNT + 1))
+    fi
+  done < "$list"
+}
+
+if [[ "$APPROVE_DELETED" == "true" ]]; then
+  echo "ℹ Deleting removed files..."
+  DELETED_LIST=$(mktemp)
+  jq -j '.deleted[]?.path | select(. != ".git" and (startswith(".git/") | not)) + "\u0000"' "$PLAN" > "$DELETED_LIST"
+  REMOVED_COUNT=0
+  _r6_remove_list "$DELETED_LIST"
+  DELETED_REMOVED_COUNT=$REMOVED_COUNT
+  rm -f "$DELETED_LIST"
+  echo "✓ Files deleted"
+fi
+
+if [[ "$APPROVE_DELETED_MODIFIED" == "true" ]]; then
+  echo "ℹ Deleting modified-removed files..."
+  DELETED_MODIFIED_LIST=$(mktemp)
+  jq -j '.deleted_modified[]?.path | select(. != ".git" and (startswith(".git/") | not)) + "\u0000"' "$PLAN" > "$DELETED_MODIFIED_LIST"
+  REMOVED_COUNT=0
+  _r6_remove_list "$DELETED_MODIFIED_LIST"
+  DELETED_MODIFIED_REMOVED_COUNT=$REMOVED_COUNT
+  rm -f "$DELETED_MODIFIED_LIST"
+  echo "✓ Modified-removed files deleted"
+fi
+
+# openspec/ removal. Only the tracked files go (git rm -r, or plain rm in apply-only
+# mode), and only when the directory is still tracked and clean at apply time.
+# Ignored or untracked leftovers stay, and the summary says so.
+if [[ "$APPROVE_OPENSPEC" == "true" ]]; then
+  if [[ -d openspec ]] && [[ -n "$(git ls-files -- openspec)" ]] && [[ -z "$(git status --porcelain -- openspec)" ]]; then
+    git ls-files -z -- openspec > "$OPENSPEC_LIST"
+    if [[ "$APPLY_ONLY" == "true" ]]; then
+      while IFS= read -r -d '' file; do
+        rm -f "$file"
+      done < "$OPENSPEC_LIST"
+      find openspec -depth -type d -empty -delete 2>/dev/null || true
+    else
+      git rm -r -q -- openspec
+    fi
+    OPENSPEC_REMOVED="true"
+    echo "✓ SDD openspec/ removed (tracked files only)"
+    if [[ -d openspec ]]; then
+      echo "ℹ openspec/ still exists: it holds ignored or untracked files. Remove it by hand if unwanted."
+    fi
+  else
+    echo "⚠ openspec/ changed since the review (untracked, dirty, or no longer tracked). Not removed."
+  fi
+fi
+
+# .wf-status is a gitignored runtime notice that the post-commit hook writes. A copy
+# written by a pre-v4 wizard holds a stale SDD drift section. The hook regenerates the
+# file when drift appears, so this deletes the stale copy once.
+if [[ -f .wf-status ]] && grep -qE 'SDD drift|/sdd-init' .wf-status; then
+  rm -f .wf-status
+  WF_STATUS_REMOVED="true"
+  echo "✓ Removed stale SDD .wf-status (the post-commit hook regenerates it)"
 fi
 
 if [[ "$APPROVE_ADDED" == "true" ]]; then
@@ -2272,47 +2561,45 @@ if [[ "$APPROVE_UPDATED" == "true" ]]; then
   echo "✓ Files updated"
 fi
 
-if [[ "$APPROVE_DELETED" == "true" ]]; then
-  echo "ℹ Deleting removed files..."
-  DELETED_LIST=$(mktemp)
-  jq -j '.deleted[]?.path + "\u0000"' "$PLAN" > "$DELETED_LIST"
-  if [ -s "$DELETED_LIST" ]; then
-    if [[ "$APPLY_ONLY" == "true" ]]; then
-      # FU6: Apply-only mode uses plain rm (unstaged)
-      while IFS= read -r -d '' file; do
-        rm -f "$file"
-      done < "$DELETED_LIST"
-    else
-      # Commit mode uses git rm (staged)
-      git rm -f --ignore-unmatch --pathspec-from-file="$DELETED_LIST" --pathspec-file-nul
+# Project Structure follows the live tree. Approved additions and removals change the
+# depth-2 directories, so it is regenerated on the final tree, after the copies and the
+# removals above. The staged AGENTS.md is re-rendered, and the root copy follows when it
+# matched staging before this step. One run then leaves the structure that the next
+# refresh regenerates, so a second run is a no-op.
+if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ "$APPROVE_DELETED" == "true" ]] || [[ "$APPROVE_DELETED_MODIFIED" == "true" ]] || [[ "$OPENSPEC_REMOVED" == "true" ]]; then
+  if [[ -f "$STAGING_STATE" ]]; then
+    STRUCT_BEFORE=$(jq -r '.discovery.conventions.structure // ""' "$STAGING_STATE")
+    STRUCT_SYNCED="false"
+    if [[ -f AGENTS.md ]] && [[ -f "$STAGING/AGENTS.md" ]] && cmp -s AGENTS.md "$STAGING/AGENTS.md"; then
+      STRUCT_SYNCED="true"
+    fi
+    wf_regenerate_structure
+    STRUCT_AFTER=$(jq -r '.discovery.conventions.structure // ""' "$STAGING_STATE")
+    if [[ "$STRUCT_AFTER" != "$STRUCT_BEFORE" ]] && [[ -f "$STAGING/AGENTS.md" ]]; then
+      wf_render_structure_section "$STAGING/AGENTS.md" "$STAGING_STATE"
+      echo "✓ Project Structure regenerated from the final tree"
+      if [[ "$STRUCT_SYNCED" == "true" ]]; then
+        # AGENTS.md matched staging before the removals, so the only difference left is the
+        # regenerated section, and the root copy follows it. An updates approval does not gate
+        # this: the section changed because the approved removals changed the tree. The file is
+        # planned as an update (so the manifest hashes it) and committed in this same run.
+        if ! jq -e '.updated[]? | select(.path == "AGENTS.md")' "$PLAN" >/dev/null 2>&1; then
+          OLD_AGENTS_HASH=$(wf_sha256 AGENTS.md)
+          NEW_AGENTS_HASH=$(wf_sha256 "$STAGING/AGENTS.md")
+          jq --arg old_hash "$OLD_AGENTS_HASH" --arg new_hash "$NEW_AGENTS_HASH" \
+             '.updated += [{"path": "AGENTS.md", "old_hash": $old_hash, "new_hash": $new_hash, "local_modified": false}]' "$PLAN" > "$PLAN.tmp"
+          mv "$PLAN.tmp" "$PLAN"
+        fi
+        cp "$STAGING/AGENTS.md" AGENTS.md
+        STRUCT_AGENTS_WRITTEN="true"
+      fi
     fi
   fi
-  rm -f "$DELETED_LIST"
-  echo "✓ Files deleted"
-fi
-
-if [[ "$APPROVE_DELETED_MODIFIED" == "true" ]]; then
-  echo "ℹ Deleting modified-removed files..."
-  DELETED_MODIFIED_LIST=$(mktemp)
-  jq -j '.deleted_modified[]?.path + "\u0000"' "$PLAN" > "$DELETED_MODIFIED_LIST"
-  if [ -s "$DELETED_MODIFIED_LIST" ]; then
-    if [[ "$APPLY_ONLY" == "true" ]]; then
-      # FU6: Apply-only mode uses plain rm (unstaged)
-      while IFS= read -r -d '' file; do
-        rm -f "$file"
-      done < "$DELETED_MODIFIED_LIST"
-    else
-      # Commit mode uses git rm (staged)
-      git rm -f --ignore-unmatch --pathspec-from-file="$DELETED_MODIFIED_LIST" --pathspec-file-nul
-    fi
-  fi
-  rm -f "$DELETED_MODIFIED_LIST"
-  echo "✓ Modified-removed files deleted"
 fi
 
 # Git operations (only if any category was approved). In apply-only mode we still
 # compute the manifest and update state, but we do NOT stage or commit.
-if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ "$APPROVE_DELETED" == "true" ]] || [[ "$APPROVE_DELETED_MODIFIED" == "true" ]] || [[ "$APPROVE_GITIGNORE" == "true" ]]; then
+if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ "$APPROVE_DELETED" == "true" ]] || [[ "$APPROVE_DELETED_MODIFIED" == "true" ]] || [[ "$APPROVE_GITIGNORE" == "true" ]] || [[ "$OPENSPEC_REMOVED" == "true" ]]; then
   echo "ℹ $(if [[ "$APPLY_ONLY" == "true" ]]; then echo "Applying changes to the working tree (no commit)"; else echo "Committing changes..."; fi)"
 
   # Recompute generated_files and managed_paths from the approved plan, reading
@@ -2326,21 +2613,15 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
     MANAGED_PATHS=$(jq --arg path "$file" '. += [$path]' <<< "$MANAGED_PATHS")
   done < <(jq -j '.added[]?, .updated[]?, .unchanged[]? | .path + "\u0000"' "$PLAN")
 
-  # Write .wizard-managed-files.json with the complete set of managed files
+  # TARGET_VERSION and generated_at are read here; the manifest is written after the commit.
   TARGET_VERSION=$(wf_fetch_version)
   generated_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-  jq -n \
-    --arg version "$TARGET_VERSION" \
-    --arg generated_at "$generated_at" \
-    --argjson files "$GENERATED_FILES" \
-    '{wizard_version: $version, generated_at: $generated_at, files: $files}' > ".wizard-managed-files.json"
 
-  # Update state build_plan. Write to the STAGING state so the final
-  # `cp "$STAGING_STATE" "$WF_STATE"` promotes the complete, recomputed plan
-  # (writing to root here would be silently overwritten by that cp).
-  jq --argjson files "$GENERATED_FILES" --argjson paths "$MANAGED_PATHS" \
-     '.build_plan.generated_files = $files | .build_plan.managed_paths = $paths | .updated_at = (now | todate)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
-  mv "$STAGING_STATE.tmp" "$STAGING_STATE"
+  # Declined removals leave the managed set. They are recorded in
+  # .migrations.retired_pending together with the state promotion below.
+  DECLINED_JSON=$(jq -c --argjson del_ok "$APPROVE_DELETED" --argjson dm_ok "$APPROVE_DELETED_MODIFIED" '
+    [ (if $del_ok then empty else .deleted[]?.path end),
+      (if $dm_ok then empty else .deleted_modified[]?.path end) ] | unique' "$PLAN")
 
   # Add to .gitignore (ensure a trailing newline first and use an exact line match).
   _gi_add() {
@@ -2404,117 +2685,158 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
     fi
   fi
 
+  # Counts for the commit message and the summary. Counted once, after the plan
+  # is final, so both read the same values. Removal counts are the removals actually made:
+  # a kept file is not counted. openspec removals count as approved files.
+  ADDED_COUNT=0; UPDATED_COUNT=0; DELETED_COUNT=0; DELETED_MODIFIED_COUNT=0; OPENSPEC_COUNT=0
+  # The regenerated AGENTS.md is in UPDATED_COUNT only when updates were approved.
+  STRUCT_AGENTS_EXTRA=0
+  [[ "$STRUCT_AGENTS_WRITTEN" == "true" && "$APPROVE_UPDATED" != "true" ]] && STRUCT_AGENTS_EXTRA=1
+  [[ "$APPROVE_ADDED" == "true" ]] && ADDED_COUNT=$(jq '.added | length' "$PLAN")
+  [[ "$APPROVE_UPDATED" == "true" ]] && UPDATED_COUNT=$(jq '.updated | length' "$PLAN")
+  [[ "$APPROVE_DELETED" == "true" ]] && DELETED_COUNT=$DELETED_REMOVED_COUNT
+  [[ "$APPROVE_DELETED_MODIFIED" == "true" ]] && DELETED_MODIFIED_COUNT=$DELETED_MODIFIED_REMOVED_COUNT
+  [[ "$OPENSPEC_REMOVED" == "true" ]] && OPENSPEC_COUNT=$(tr -cd '\0' < "$OPENSPEC_LIST" | wc -c | tr -d '[:space:]')
+
   # Stage and commit only when not in apply-only mode (apply-only leaves the
   # changes unstaged in the working tree for the user to review and commit).
   if [[ "$APPLY_ONLY" != "true" ]]; then
-  # Stage only the paths the user explicitly approved (null-delimited to handle
-  # spaces and avoid `git add -A` dragging in unrelated user changes). Do NOT
-  # reset the whole index: `git reset --mixed HEAD` would unstage unrelated work
-  # the user may have staged. The commit below uses an explicit pathspec, so it
-  # contains ONLY the approved paths.
-  GIT_ADD_LIST=$(mktemp)
-  if [[ "$APPROVE_ADDED" == "true" ]]; then
-    jq -j '.added[]?.path | select(. != ".git" and (startswith(".git/") | not)) + "\u0000"' "$PLAN" >> "$GIT_ADD_LIST"
-  fi
-  if [[ "$APPROVE_UPDATED" == "true" ]]; then
-    jq -j '.updated[]?.path | select(. != ".git" and (startswith(".git/") | not)) + "\u0000"' "$PLAN" >> "$GIT_ADD_LIST"
-  fi
-  if [ "$GITIGNORE_MODIFIED" = true ]; then
-    printf '.gitignore\0' >> "$GIT_ADD_LIST"
-  fi
-  if [ -s "$GIT_ADD_LIST" ]; then
-    # Force-add: every path here was explicitly approved by the user, and some
-    # (e.g. generated dotfiles) may be gitignored. Without -f, `git add` exits 1
-    # under set -e and the trap aborts the refresh mid-flight, leaving copied
-    # files in the working tree without a commit.
-    git add -f --pathspec-from-file="$GIT_ADD_LIST" --pathspec-file-nul
-  fi
-  rm -f "$GIT_ADD_LIST"
+    # Stage only the paths the user explicitly approved (null-delimited to handle
+    # spaces and avoid `git add -A` dragging in unrelated user changes). Do NOT
+    # reset the whole index: `git reset --mixed HEAD` would unstage unrelated work
+    # the user may have staged. The commit below uses an explicit pathspec, so it
+    # contains ONLY the approved paths. Removals are already staged by git rm above.
+    GIT_ADD_LIST=$(mktemp)
+    if [[ "$APPROVE_ADDED" == "true" ]]; then
+      jq -j '.added[]?.path | select(. != ".git" and (startswith(".git/") | not)) + "\u0000"' "$PLAN" >> "$GIT_ADD_LIST"
+    fi
+    if [[ "$APPROVE_UPDATED" == "true" ]]; then
+      jq -j '.updated[]?.path | select(. != ".git" and (startswith(".git/") | not)) + "\u0000"' "$PLAN" >> "$GIT_ADD_LIST"
+    fi
+    if [ "$GITIGNORE_MODIFIED" = true ]; then
+      printf '.gitignore\0' >> "$GIT_ADD_LIST"
+    fi
+    # The regenerated Project Structure is in AGENTS.md, so it is staged in this run.
+    if [[ "$STRUCT_AGENTS_WRITTEN" == "true" ]]; then
+      printf 'AGENTS.md\0' >> "$GIT_ADD_LIST"
+    fi
+    if [ -s "$GIT_ADD_LIST" ]; then
+      # Force-add: every path here was explicitly approved by the user, and some
+      # (e.g. generated dotfiles) may be gitignored. Without -f, `git add` exits 1
+      # under set -e and the trap aborts the refresh mid-flight, leaving copied
+      # files in the working tree without a commit.
+      git add -f --pathspec-from-file="$GIT_ADD_LIST" --pathspec-file-nul
+    fi
+    rm -f "$GIT_ADD_LIST"
 
-  # Commit exactly the approved paths (working-tree content). Other pre-staged
-  # user files stay in the index and are NOT included in this commit.
-  COMMIT_PATHS=$(mktemp)
-  if [[ "$APPROVE_ADDED" == "true" ]]; then
-    jq -j '.added[]?.path | select(. != ".git" and (startswith(".git/") | not)) + "\u0000"' "$PLAN" >> "$COMMIT_PATHS"
-  fi
-  if [[ "$APPROVE_UPDATED" == "true" ]]; then
-    jq -j '.updated[]?.path | select(. != ".git" and (startswith(".git/") | not)) + "\u0000"' "$PLAN" >> "$COMMIT_PATHS"
-  fi
-  if [[ "$APPROVE_DELETED" == "true" ]]; then
-    jq -j '.deleted[]?.path | select(. != ".git" and (startswith(".git/") | not)) + "\u0000"' "$PLAN" >> "$COMMIT_PATHS"
-  fi
-  if [[ "$APPROVE_DELETED_MODIFIED" == "true" ]]; then
-    jq -j '.deleted_modified[]?.path | select(. != ".git" and (startswith(".git/") | not)) + "\u0000"' "$PLAN" >> "$COMMIT_PATHS"
-  fi
-  if [ "$GITIGNORE_MODIFIED" = true ]; then
-    printf '.gitignore\0' >> "$COMMIT_PATHS"
-  fi
+    # Commit exactly the approved paths (working-tree content). Other pre-staged
+    # user files stay in the index and are NOT included in this commit. Removed paths
+    # enter only through DELETED_COMMIT_LIST (tracked at HEAD). .gitignore can be
+    # listed twice (plan and gitignore edit), so the pathspec is de-duplicated.
+    COMMIT_PATHS=$(mktemp)
+    if [[ "$APPROVE_ADDED" == "true" ]]; then
+      jq -j '.added[]?.path | select(. != ".git" and (startswith(".git/") | not)) + "\u0000"' "$PLAN" >> "$COMMIT_PATHS"
+    fi
+    if [[ "$APPROVE_UPDATED" == "true" ]]; then
+      jq -j '.updated[]?.path | select(. != ".git" and (startswith(".git/") | not)) + "\u0000"' "$PLAN" >> "$COMMIT_PATHS"
+    fi
+    cat "$DELETED_COMMIT_LIST" >> "$COMMIT_PATHS"
+    if [ "$GITIGNORE_MODIFIED" = true ]; then
+      printf '.gitignore\0' >> "$COMMIT_PATHS"
+    fi
+    if [[ "$STRUCT_AGENTS_WRITTEN" == "true" ]]; then
+      printf 'AGENTS.md\0' >> "$COMMIT_PATHS"
+    fi
+    if [[ "$OPENSPEC_REMOVED" == "true" ]]; then
+      cat "$OPENSPEC_LIST" >> "$COMMIT_PATHS"
+    fi
+    sort -zu -o "$COMMIT_PATHS" "$COMMIT_PATHS"
 
-  if [ -s "$COMMIT_PATHS" ]; then
-    # Commit message via temp file to avoid nested heredoc parsing issues (zsh/bash)
-    COMMIT_MSG_FILE=$(mktemp)
-    # Count only approved categories for accurate commit message
-    ADDED_COUNT=0; UPDATED_COUNT=0; DELETED_COUNT=0; DELETED_MODIFIED_COUNT=0
-    [[ "$APPROVE_ADDED" == "true" ]] && ADDED_COUNT=$(jq '.added | length' "$PLAN")
-    [[ "$APPROVE_UPDATED" == "true" ]] && UPDATED_COUNT=$(jq '.updated | length' "$PLAN")
-    [[ "$APPROVE_DELETED" == "true" ]] && DELETED_COUNT=$(jq '.deleted | length' "$PLAN")
-    [[ "$APPROVE_DELETED_MODIFIED" == "true" ]] && DELETED_MODIFIED_COUNT=$(jq '.deleted_modified | length' "$PLAN")
-    cat > "$COMMIT_MSG_FILE" <<MSG_EOF
+    if [ -s "$COMMIT_PATHS" ]; then
+      # Commit message via temp file to avoid nested heredoc parsing issues (zsh/bash)
+      COMMIT_MSG_FILE=$(mktemp)
+      OPENSPEC_MSG=""
+      if [[ "$OPENSPEC_REMOVED" == "true" ]]; then
+        OPENSPEC_MSG=$'\n- Removed SDD openspec/ directory (tracked files)'
+      fi
+      cat > "$COMMIT_MSG_FILE" <<MSG_EOF
 chore: refresh workflow to v$TARGET_VERSION
 
 - Updated AGENTS.md with new project info
 - Added $ADDED_COUNT new files
 - Updated $UPDATED_COUNT files
 - Removed $DELETED_COUNT deprecated files
-- Removed $DELETED_MODIFIED_COUNT modified-deprecated files
+- Removed $DELETED_MODIFIED_COUNT modified-deprecated files${OPENSPEC_MSG}
 
 Generated with /wf-refresh
 MSG_EOF
-    COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
-    rm -f "$COMMIT_MSG_FILE"
+      COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+      rm -f "$COMMIT_MSG_FILE"
 
-    # git diff does NOT support --pathspec-from-file (usage error 129); read the
-    # approved paths into positional arguments so the guard is portable.
-    COMMIT_PATH_ARGS=()
-    while IFS= read -r -d '' p; do
-      COMMIT_PATH_ARGS+=("$p")
-    done < "$COMMIT_PATHS"
+      # git diff does NOT support --pathspec-from-file (usage error 129); read the
+      # approved paths into positional arguments so the guard is portable.
+      COMMIT_PATH_ARGS=()
+      while IFS= read -r -d '' p; do
+        COMMIT_PATH_ARGS+=("$p")
+      done < "$COMMIT_PATHS"
 
-    # FU7: Support WF_REFRESH_SKIP_TESTS to skip husky pre-commit hooks (e.g., npm test)
-    # Useful for CI/automation where tests run separately. Default: run hooks.
-    SKIP_TESTS="${WF_REFRESH_SKIP_TESTS:-false}"
-    COMMIT_FLAGS=""
-    if [[ "$SKIP_TESTS" = "true" ]]; then
-      COMMIT_FLAGS="--no-verify"
-      echo "ℹ Skipping pre-commit hooks (WF_REFRESH_SKIP_TESTS=true)"
-    fi
+      # FU7: Support WF_REFRESH_SKIP_TESTS to skip husky pre-commit hooks (e.g., npm test)
+      # Useful for CI/automation where tests run separately. Default: run hooks.
+      SKIP_TESTS="${WF_REFRESH_SKIP_TESTS:-false}"
+      COMMIT_FLAGS=""
+      if [[ "$SKIP_TESTS" = "true" ]]; then
+        COMMIT_FLAGS="--no-verify"
+        echo "ℹ Skipping pre-commit hooks (WF_REFRESH_SKIP_TESTS=true)"
+      fi
 
-    if git diff --cached --quiet -- "${COMMIT_PATH_ARGS[@]}"; then
-      echo "ℹ Approved paths have no staged changes; skipping commit"
+      if git diff --cached --quiet -- "${COMMIT_PATH_ARGS[@]}"; then
+        echo "ℹ Approved paths have no staged changes; skipping commit"
+      else
+        git commit $COMMIT_FLAGS -m "$COMMIT_MSG" --pathspec-from-file="$COMMIT_PATHS" --pathspec-file-nul
+      fi
     else
-      git commit $COMMIT_FLAGS -m "$COMMIT_MSG" --pathspec-from-file="$COMMIT_PATHS" --pathspec-file-nul
+      echo "ℹ No approved paths to commit"
     fi
-  else
-    echo "ℹ No approved paths to commit"
-  fi
   else
     echo "ℹ Apply-only mode: changes left in the working tree (unstaged)."
     echo "  Review with: git status && git diff"
   fi
-else
-  echo "ℹ No changes approved; skipping commit (no files were written)"
-fi
 
-# Promote staging state to root (single source of truth for next refresh).
+  # The commit (or the apply-only step) is complete: the rollback no longer applies.
+  ROLLBACK_ARMED="false"
+
+  # Manifest and state are written only after the commit succeeded (or in apply-only
+  # mode). A failed commit exits above: the rollback restores the working tree, the
+  # index and the state, so a retry runs the same plan from the same starting point.
+  jq -n \
+    --arg version "$TARGET_VERSION" \
+    --arg generated_at "$generated_at" \
+    --argjson files "$GENERATED_FILES" \
+    '{wizard_version: $version, generated_at: $generated_at, files: $files}' > ".wizard-managed-files.json"
+
+  # Kept-not-in-HEAD record: the paths the plan found plus the ones kept just now. Later runs
+  # read it and stay silent about them (see the retired-path scan in R4).
+  KEPT_JSON=$({ jq -r '.kept_not_in_head[]?' "$PLAN" 2>/dev/null || true; printf '%s' "$KEPT_NOT_HEAD_R6"; } | jq -R -s -c 'split("\n") | map(select(length > 0)) | unique')
+  # Update state build_plan in the STAGING state, then promote it below.
+  jq --argjson files "$GENERATED_FILES" --argjson paths "$MANAGED_PATHS" --argjson declined "$DECLINED_JSON" --argjson kept "$KEPT_JSON" \
+     '.build_plan.generated_files = $files | .build_plan.managed_paths = $paths | .migrations //= {} | .migrations.retired_pending = $declined | .migrations.kept_not_in_head = $kept | .updated_at = (now | todate)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
+  mv "$STAGING_STATE.tmp" "$STAGING_STATE"
+
+  # Promote staging state to root (single source of truth for next refresh).
   # apply_only is a per-run decision: drop it so the promoted state stays clean.
-  if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ "$APPROVE_DELETED" == "true" ]] || [[ "$APPROVE_DELETED_MODIFIED" == "true" ]] || [[ "$APPROVE_GITIGNORE" == "true" ]]; then
-    if [[ "$APPLY_ONLY" == "true" ]]; then
-      jq 'del(.build_plan.apply_only)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
-      mv "$STAGING_STATE.tmp" "$STAGING_STATE"
-    fi
-    cp "$STAGING_STATE" "$WF_STATE"
-    echo "✓ State promoted from staging to root"
+  if [[ "$APPLY_ONLY" == "true" ]]; then
+    jq 'del(.build_plan.apply_only)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
+    mv "$STAGING_STATE.tmp" "$STAGING_STATE"
   fi
+  cp "$STAGING_STATE" "$WF_STATE"
+  echo "✓ State promoted from staging to root"
+else
+  if [[ "$WF_STATUS_REMOVED" == "true" ]]; then
+    echo "ℹ No changes approved. The stale SDD .wf-status was removed even though nothing else changed; nothing was committed."
+  else
+    echo "ℹ No changes approved; skipping commit (no files were written)"
+  fi
+fi
 
   # Explicit feedback summary: what was approved vs committed vs skipped
   echo ""
@@ -2526,19 +2848,24 @@ fi
   [[ "$APPROVE_DELETED_MODIFIED" == "true" ]] && echo "  ✓ Deleted-modified: $DELETED_MODIFIED_COUNT files"
   [[ "$APPROVE_GITIGNORE" == "true" ]] && echo "  ✓ Gitignore entries"
   [[ "$APPROVE_OVERWRITE_LOCAL" == "true" ]] && echo "  ✓ Overwrite locally-modified"
-  [[ "$APPROVE_ADDED" != "true" && "$APPROVE_UPDATED" != "true" && "$APPROVE_DELETED" != "true" && "$APPROVE_DELETED_MODIFIED" != "true" && "$APPROVE_GITIGNORE" != "true" ]] && echo "  (none)"
+  [[ "$OPENSPEC_REMOVED" == "true" ]] && echo "  ✓ SDD openspec/ removed"
+  [[ "$APPROVE_ADDED" != "true" && "$APPROVE_UPDATED" != "true" && "$APPROVE_DELETED" != "true" && "$APPROVE_DELETED_MODIFIED" != "true" && "$APPROVE_GITIGNORE" != "true" && "$OPENSPEC_REMOVED" != "true" ]] && echo "  (none)"
+  DECLINED_COUNT=$(jq 'length' <<< "${DECLINED_JSON:-[]}")
+  if [[ "$DECLINED_COUNT" -gt 0 ]]; then
+    echo "ℹ $DECLINED_COUNT declined removal(s) recorded in .migrations.retired_pending; the next /wf-refresh asks again."
+  fi
 
   if [[ "$APPLY_ONLY" != "true" ]]; then
     # Count actually committed files from COMMIT_PATHS
     COMMITTED_COUNT=0
-    [[ -s "$COMMIT_PATHS" ]] && COMMITTED_COUNT=$(tr -cd '\0' < "$COMMIT_PATHS" | wc -c)
+    [[ -s "$COMMIT_PATHS" ]] && COMMITTED_COUNT=$(tr -cd '\0' < "$COMMIT_PATHS" | wc -c | tr -d '[:space:]')
     echo "Committed to git: $COMMITTED_COUNT files"
 
     # Cross-validation warning: approved vs committed
-    TOTAL_APPROVED=$((ADDED_COUNT + UPDATED_COUNT + DELETED_COUNT + DELETED_MODIFIED_COUNT))
+    TOTAL_APPROVED=$((ADDED_COUNT + UPDATED_COUNT + DELETED_COUNT + DELETED_MODIFIED_COUNT + OPENSPEC_COUNT + STRUCT_AGENTS_EXTRA))
     if [[ $TOTAL_APPROVED -gt 0 && $COMMITTED_COUNT -ne $TOTAL_APPROVED ]]; then
       echo "⚠ WARNING: $TOTAL_APPROVED files approved but $COMMITTED_COUNT committed (difference: $((TOTAL_APPROVED - COMMITTED_COUNT)))"
-      echo "  This can happen if files were already up-to-date, or .gitignore filtered some paths."
+      echo "  This can happen if files were already up-to-date, .gitignore filtered some paths, or untracked files were removed without a commit."
     fi
   else
     echo "Apply-only mode: changes left unstaged in working tree"
