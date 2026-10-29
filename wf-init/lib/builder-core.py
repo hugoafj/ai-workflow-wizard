@@ -334,7 +334,7 @@ def unresolved_placeholders(text):
 # ---------------------------------------------------------------------------
 
 # SPLIT protocols live under templates/commands/; pure protocols under templates/protocols/.
-SPLIT_PROTOCOLS = {"wf-ladder", "wf-orchestrator"}
+SPLIT_PROTOCOLS = {"wf-ladder"}
 # Maintenance commands also live under templates/commands/ and ship skills.
 MAINTENANCE_COMMANDS = ["wf-onboard", "wf-worktree", "wf-settings"]
 # Everything resolved from templates/commands/ (SPLIT + maintenance).
@@ -997,12 +997,39 @@ def testing_approach_section(state, raw=None):
                     lines += ["", dt.strip()]
             except RuntimeError:
                 pass
+    if has_unit or has_e2e:
+        matrix, e2e_guidance = _testing_guidance_parts(raw)
+        if matrix:
+            lines += ["", matrix]
+        if has_e2e and e2e_guidance:
+            lines += ["", e2e_guidance]
     if not has_unit and not has_e2e:
         lines += [
             "No automated test layers are active. Follow `testing.checks_before_done` "
             "for the manual done-gate instead.",
         ]
     return "\n".join(lines).strip()
+
+
+TESTING_GUIDANCE_SPLIT = "### Playwright dual loop"
+
+
+def _testing_guidance_parts(raw):
+    """Split templates/protocols/testing/testing-approach.section.md in two.
+
+    Returns (coverage matrix, E2E guidance). The split point is the Playwright
+    dual-loop heading. Returns ("", "") when there is no template base to read.
+    """
+    if not raw:
+        return "", ""
+    try:
+        text = fetch_with_retries(
+            base_url(raw, "templates/protocols/testing/testing-approach.section.md"))
+    except RuntimeError:
+        return "", ""
+    text = strip_internal_comment(text)
+    head, sep, tail = text.partition(TESTING_GUIDANCE_SPLIT)
+    return head.strip(), (sep + tail).strip()
 
 
 def _collapse_blank_lines_outside_fences(text):
@@ -1193,7 +1220,6 @@ def active_protocols(state):
     ladder = bool_feature(state, "decision_ladder")
     if ladder:
         out.append("wf-ladder")
-        out.append("wf-orchestrator")
     return out
 
 

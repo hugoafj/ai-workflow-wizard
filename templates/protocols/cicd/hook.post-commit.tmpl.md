@@ -1,22 +1,13 @@
 ```bash
 #!/bin/bash
 # Workflow drift detector — AI Workflow Wizard
-# Detects three categories of drift on each commit and only notifies.
+# Detects two categories of drift on each commit and only notifies.
 
 # Files that trigger /wf-refresh (general project context for AI)
 REFRESH_FILES="package.json composer.json pyproject.toml Cargo.toml \
   tsconfig.json vite.config.ts vite.config.js \
   next.config.ts next.config.js \
   tailwind.config.ts tailwind.config.js"
-
-# Files that trigger an sdd-init refresh (project capabilities tracked by SDD)
-SDD_FILES="package.json \
-  vitest.config.ts vitest.config.js \
-  jest.config.ts jest.config.js \
-  playwright.config.ts playwright.config.js"
-# openspec/config.yaml is excluded: it is the output of the sdd-init skill.
-# Including it causes a loop: sdd-init writes the file → commit → hook notifies
-# re-run sdd-init → guaranteed loop.
 
 # Config/IDE files that trigger /wf-refresh (AGENTS.md, IDE settings, satellites, commands)
 CONFIG_FILES="AGENTS.md \
@@ -27,7 +18,6 @@ CONFIG_FILES="AGENTS.md \
   .agents/protocols .agents/skills"
 
 CHANGED_REFRESH=""
-CHANGED_SDD=""
 
 # Use git diff-tree to list files in the just-created commit.
 # This works for the first commit and after subsequent commits, unlike
@@ -45,7 +35,6 @@ fi
 # IDE commands/satellites/skills, vitest/playwright configs, hooks. Warning
 # about them seconds after applying would self-trigger the very flow that
 # produced the commit (field report B2), so refresh commits never raise drift.
-# openspec/config.yaml is excluded for the same loop reason (see note above).
 if [[ "$IS_WIZARD_REFRESH" = "true" ]]; then
   exit 0
 fi
@@ -53,12 +42,6 @@ fi
 for f in $REFRESH_FILES; do
   if echo "$CHANGED" | grep -qxF "$f"; then
     CHANGED_REFRESH="$CHANGED_REFRESH $f"
-  fi
-done
-
-for f in $SDD_FILES; do
-  if echo "$CHANGED" | grep -qxF "$f"; then
-    CHANGED_SDD="$CHANGED_SDD $f"
   fi
 done
 
@@ -78,7 +61,7 @@ for pattern in $CONFIG_FILES; do
 done
 
 # Exit cleanly if no drift
-if [ -z "$CHANGED_REFRESH" ] && [ -z "$CHANGED_SDD" ] && [ -z "$CHANGED_CONFIG" ]; then
+if [ -z "$CHANGED_REFRESH" ] && [ -z "$CHANGED_CONFIG" ]; then
   exit 0
 fi
 
@@ -90,11 +73,6 @@ printf '└───────────────────────
 if [ -n "$CHANGED_REFRESH" ]; then
   printf '  AGENTS.md drift:%s\n' "$CHANGED_REFRESH" >&2
   printf '  → Run /wf-refresh in your IDE/CLI\n' >&2
-fi
-
-if [ -n "$CHANGED_SDD" ]; then
-  printf '  SDD drift:%s\n' "$CHANGED_SDD" >&2
-  printf '  → Run the sdd-init skill (slash: /sdd-init, or /gentle-sdd-init in Claude Code)\n' >&2
 fi
 
 if [ -n "$CHANGED_CONFIG" ]; then
@@ -127,20 +105,6 @@ COMMIT_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date)
     echo ""
   fi
 
-  if [ -n "$CHANGED_SDD" ]; then
-    echo "## SDD drift"
-    echo ""
-    echo "The following files changed and may affect SDD project capabilities"
-    echo "(test frameworks, build config, dependencies, SDD config):"
-    echo ""
-    for f in $CHANGED_SDD; do echo "- \`$f\`"; done
-    echo ""
-    echo "**Action**: run the \`sdd-init\` skill to refresh SDD context"
-    echo "(slash: \`/sdd-init\`, or \`/gentle-sdd-init\` in Claude Code),"
-    echo "or \`rm .wf-status\` if these changes don't affect SDD."
-    echo ""
-  fi
-
   if [ -n "$CHANGED_CONFIG" ]; then
     echo "## Config/IDE files changed"
     echo ""
@@ -162,7 +126,6 @@ COMMIT_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date)
 if command -v osascript > /dev/null 2>&1; then
   NOTIF_TEXT=""
   [ -n "$CHANGED_REFRESH" ] && NOTIF_TEXT="Run /wf-refresh"
-  [ -n "$CHANGED_SDD" ] && NOTIF_TEXT="${NOTIF_TEXT:+$NOTIF_TEXT · }sdd-init (Claude Code: /gentle-sdd-init)"
   [ -n "$CHANGED_CONFIG" ] && NOTIF_TEXT="${NOTIF_TEXT:+$NOTIF_TEXT · }Config/IDE drift"
   osascript -e "display notification \"$NOTIF_TEXT\" with title \"⚠ Workflow drift detected\"" 2>/dev/null || true
 fi

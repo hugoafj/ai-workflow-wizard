@@ -1,7 +1,7 @@
 # /wf-onboard — Onboarding wizard for new developers
 
 > **Note**: onboarding reads the live repo source of truth (AGENTS.md router,
-> `openspec/config.yaml`, satellites). The project's protocols live packaged as
+> satellites). The project's protocols live packaged as
 > skills in the IDE's native path (`.claude/skills/<n>/`, `.kiro/skills/<n>/`,
 > `.codex/skills/<n>/`, `.windsurf/skills/<n>/`, `.devin/skills/<n>/`), with the
 > universal `.agents/skills/<n>/` and flat `.agents/protocols/<n>.md` fallbacks
@@ -23,7 +23,7 @@ You are an onboarding wizard. Your goal is for this developer to be able to work
 with the AI Workflow Wizard project on their local machine, without touching anything in the repo.
 
 **Inviolable rules**:
-1. Do NOT modify any repo files (AGENTS.md, satellites, openspec/, etc.).
+1. Do NOT modify any repo files (AGENTS.md, satellites, etc.).
 2. Do NOT `git add` or `git commit`.
 3. All configuration goes to the developer's local machine, not the repo.
 4. If a step requires manual developer action (login, API key), stop and guide them.
@@ -42,7 +42,6 @@ Extract:
 - The project stack (for relevant recommendations).
 - The `## Project MCPs` section — this is the source of truth for which MCPs
   the developer needs to configure.
-- The SDD backend (`openspec/config.yaml` if it exists).
 
 If `AGENTS.md` does not exist, this repo does not have the workflow configured:
 
@@ -102,48 +101,16 @@ Critical checks that must be green: `tool:gentle-ai`, `tool:engram`, `state:json
 
 ---
 
-## PHASE 2 — SDD and Engram
+## PHASE 2 · Engram
 
-```bash
-ls openspec/config.yaml 2>/dev/null && cat openspec/config.yaml | grep -E "artifact_store|backend" | head -3
-```
+Engram activates automatically in any work session with the agent. The agent uses it via
+MCP tools (`mem_save`, `mem_search`, etc.) without the developer having to run any manual
+command. For stdio-only agents (Claude Code, Cursor, Windsurf, Gemini CLI, Antigravity CLI,
+Codex, VS Code) even a separate server process is not needed. Engram runs embedded as a
+single binary with SQLite. Only agents with an HTTP plugin (OpenCode, Pi) need `engram serve`
+running in the background, and those plugins auto-start it when possible.
 
-**If `openspec/` exists**:
-
-Read the project's backend. If it is `hybrid` or `openspec`:
-
-```
-This project uses the "<backend>" backend for SDD.
-openspec/ is already in the repo — you have access to the historical specs context.
-
-Do you want to initialize Engram for this project on your machine?
-(Recommended if the backend is hybrid — it gives you cross-session memory)
-[yes / no]
-```
-
-If yes: inform the developer that Engram activates automatically in any
-work session with the agent — it is not exclusive to SDD. The agent uses it via
-MCP tools (`mem_save`, `mem_search`, etc.) without the developer having
-to run any manual command. For stdio-only agents (Claude Code, Cursor,
-Windsurf, Gemini CLI, Antigravity CLI, Codex, VS Code) even a separate
-server process is not needed — Engram runs embedded as a single binary with SQLite.
-Only agents with an HTTP plugin (OpenCode, Pi) need `engram serve` running
-in the background, and those plugins auto-start it when possible.
-
-**If the backend is `engram` only**:
-
-```
-⚠ This project uses Engram-only as the SDD backend.
-The team's SDD context lives in each developer's local Engram memory,
-not in repo files. You will not have access to the team's previous decision
-history in your local Engram.
-
-If this is a problem, talk to the team about migrating to "hybrid".
-```
-
-**If `openspec/` does not exist**: inform that SDD is not initialized. It is not blocking
-for work, but the agent will not be able to start SDD phases until someone runs the
-`sdd-init` skill (slash: `/sdd-init`, or `/gentle-sdd-init` in Claude Code).
+No additional action is required here once `gentle-ai doctor` passed in Phase 1.
 
 ---
 
@@ -160,8 +127,8 @@ No additional action required.
 
 ### Playwright MCP
 
-Only relevant if the project has E2E tests (detected in `openspec/config.yaml`
-with `layers.e2e: true` or in `package.json` with `@playwright/test`).
+Only relevant if the project has E2E tests (detected in `package.json` with
+`@playwright/test`).
 
 ```bash
 npx playwright --version 2>/dev/null

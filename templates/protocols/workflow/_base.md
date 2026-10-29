@@ -43,8 +43,8 @@
 
 ## Phase routing (canonical order, do not alter)
 
-`phase0 → phase0b → phase1 → phase2 → phase3 → (legacy: phase4) → phase45 → phase46 →
-phase46b → phase47 (CI/CD) → phase5 → phase6a → phase6b (Builder) → phase7 → phase8`.
+`phase0 → phase0b → phase1 → phase2 → phase3 → (legacy: phase4) → phase46 (testing, conditional) →
+phase47 (CI/CD, conditional) → phase5 → phase6a → phase6b (Builder) → phase7 → phase8`.
 
 - CI/CD (Block 6) is part of the /wf-init flow: questions in phase47, generation in phase6b.
   It is not optional. Re-configuration happens through `/wf-settings` (options 9–16: CI/CD and release strategy),

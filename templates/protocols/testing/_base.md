@@ -1,18 +1,17 @@
 # Protocol: Testing (stack, layers, configs)
 
 <!--
-  SINGLE SOURCE of the permanent testing rules and templates. Consumed by phase46,
-  phase46b (configs + extras), the Builder (Testing Approach in AGENTS.md), wf-settings
-  (extras). Source in inventory.md: phase46 1-5, phase46b (all), phase6a 53-55,
+  SINGLE SOURCE of the permanent testing rules and templates. Consumed by phase46
+  (configs + extras), the Builder (Testing Approach in AGENTS.md), wf-settings
+  (extras). Source in inventory.md: phase46 (all), phase6a 53-55,
   AI_DEV_WORKFLOW 7.4 / 9.x. The concrete artifacts are the *.tmpl.md and *.section.md
   files in this directory (VERBATIM from the source).
 -->
 
 ## What the testing stack adds
 
-Without testing, `checks_before_done` = `lint + build`. With testing, the SDD pipeline
-automatically verifies that changes do not break behavior (adds `test`,
-`test:e2e`).
+Without testing, `checks_before_done` = `lint + build`. With testing, the done-gate
+also verifies that changes do not break behavior (adds `test`, `test:e2e`).
 
 ## The three layers (user selection → state.testing.layers)
 
@@ -24,8 +23,9 @@ automatically verifies that changes do not break behavior (adds `test`,
 3. **E2E** — Playwright (Chromium by default). Generates `playwright.config.ts`, `e2e/`.
    Scripts: `test:e2e`, `test:e2e:ui`, `test:e2e:report`. Activates the Playwright MCP.
 
-> The exact layer menu and TDD mode (standard/strict) are asked in phase46 and
-> stored in `state.testing`. The TDD Protocol itself lives in the `wf-tdd` protocol.
+> The exact layer menu is asked in phase46 and stored in `state.testing`. The
+> coverage-by-change-type matrix, the Playwright dual loop and the headed-run output
+> rule are in `testing-approach.section.md`.
 
 ## Optional extras (state.testing: coverage_threshold, visual_regression, page_object_model)
 

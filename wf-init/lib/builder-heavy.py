@@ -68,7 +68,6 @@ def active_command_names(state):
     ladder = builder_core.bool_feature(state, "decision_ladder")
     if ladder:
         names.append("wf-ladder")
-        names.append("wf-orchestrator")
     return names
 
 
@@ -208,15 +207,17 @@ def write_testing_configs(raw, state, staging):
         cfg = builder_core.fetch_with_retries(
             builder_core.base_url(raw, "templates/protocols/testing/vitest.config.tmpl.md"))
         cfg = builder_core.extract_block(cfg, "typescript")
-        # Inject coverage fragment inside the test: { } block.
-        frag = builder_core.fetch_with_retries(
-            builder_core.base_url(raw, "templates/protocols/testing/coverage-thresholds.tmpl.md"))
-        frag = builder_core.strip_prose_header(frag)
+        # Inject coverage fragment inside the test: { } block. Skipped when the
+        # threshold is null, otherwise the config would render "lines: None".
         threshold = builder_core.get_state_value(state, "testing.coverage_threshold", "80")
-        frag = frag.replace("{{threshold}}", str(threshold))
-        # Indent the fragment to sit inside the test: { } block (F11).
-        frag = textwrap.indent(frag, "    ")
-        cfg = cfg.replace("test: {\n", "test: {\n" + frag + "\n")
+        if threshold is not None:
+            frag = builder_core.fetch_with_retries(
+                builder_core.base_url(raw, "templates/protocols/testing/coverage-thresholds.tmpl.md"))
+            frag = builder_core.strip_prose_header(frag)
+            frag = frag.replace("{{threshold}}", str(threshold))
+            # Indent the fragment to sit inside the test: { } block (F11).
+            frag = textwrap.indent(frag, "    ")
+            cfg = cfg.replace("test: {\n", "test: {\n" + frag + "\n")
         target = os.path.join(staging, "vitest.config.ts")
         with open(target, "w", encoding="utf-8") as fh:
             fh.write(cfg + "\n")

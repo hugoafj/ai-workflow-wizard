@@ -1,4 +1,4 @@
-**Register Playwright MCP** (only if the user activated layer 3) — adds the MCP to the active agent's configuration. The Playwright MCP is `@playwright/mcp` and allows the agent to launch browsers during sdd-apply and sdd-verify.
+**Register Playwright MCP** (only if the user activated layer 3). It adds the MCP to the active agent's configuration. The Playwright MCP is `@playwright/mcp` and allows the agent to launch browsers during implementation and verification.
 
 ---
 

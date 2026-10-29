@@ -65,10 +65,9 @@ check file by file — not just whether the directory exists:
 ```bash
 # List of commands expected by this wizard version (update every
 # version that adds new commands)
-# Conditional by feature: wf-ladder (LADDER), wf-tdd (TDD && LAYERS),
-# wf-orchestrator (ROUTING || LADDER || TDD), wf-sdd-trigger (ROUTING);
+# Conditional by feature: wf-ladder (LADDER);
 # wf-onboard, wf-worktree, wf-settings are always emitted.
-EXPECTED_COMMANDS="wf-ladder wf-tdd wf-orchestrator wf-sdd-trigger wf-onboard wf-worktree wf-settings"
+EXPECTED_COMMANDS="wf-ladder wf-onboard wf-worktree wf-settings"
 
 # Example verification for Claude Code — repeat the pattern for each
 # active IDE, adjusting directory and extension based on its format:
@@ -94,14 +93,14 @@ Apply the same pattern to each active IDE, adjusting path and extension:
 
 If the `EXPECTED_COMMANDS` of this wizard version differs from the one the previous
 detected version had (for example, an upgrade that added `wf-onboard` and
-`wf-tdd` as new commands), tell the user:
+`wf-settings` as new commands), tell the user:
 
 ### [USER MESSAGE]
 ```
 Command verification — <IDE>:
   ✓ wf-ladder.md
   ✗ wf-onboard.md   ← missing (new in this wizard version)
-  ✗ wf-tdd.md       ← missing (new in this wizard version)
+  ✗ wf-settings.md  ← missing (new in this wizard version)
 
 Although the directory already existed, 2 commands from the current version are missing.
 I will add them in Phase 8 without touching the existing ones that have their own content.

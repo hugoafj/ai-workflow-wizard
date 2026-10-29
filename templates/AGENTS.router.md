@@ -2,8 +2,7 @@
   This is the AGENTS.md template that the Builder (wf-init/lib/builder.md) writes to
   the target project. It is a THIN ROUTER (constraint 7): only global policies,
   project-specific content and routing to packaged protocols. It NEVER contains
-  the full protocols (wf-orchestrator, wf-ladder, wf-sdd-trigger, wf-tdd, wf-onboard,
-  wf-worktree, wf-settings) — those live as skills in your IDE's native skill path and
+  the full protocols (wf-ladder, wf-onboard, wf-worktree, wf-settings): those live as skills in your IDE's native skill path and
   in .agents/protocols/<n>.md, and the router points to them.
 
   The {{PLACEHOLDERS}} are filled deterministically from .wizard-state.json.
@@ -12,16 +11,6 @@
 -->
 
 # AGENTS.md — {{answers.project_name}} — {{answers.stack_versions}}
-
-<if state.features.routing_abc or state.features.decision_ladder or state.features.tdd_protocol>
-> **⛔ HARD STOP RULE — always follow wf-orchestrator skill first.**
->
-> always follow wf-orchestrator.md skill first. Before classifying, planning, or implementing
-> any task, READ `wf-orchestrator` (the project's packaged skill — see Protocol routing below).
-> It is the single entry point and source of truth for this project's workflow: it decides the
-> gate sequence (Ladder → Preflight → Decision → TDD ritual). If you skipped it, STOP and read
-> it before doing anything else.
-</if>
 
 ## Commands
 
@@ -68,7 +57,6 @@
 
 ---
 
-<if state.features.routing_abc or state.features.decision_ladder or state.features.tdd_protocol>
 ## 🧭 Protocol routing (load on demand)
 
 This project uses packaged protocols that are loaded **only when applicable**, to avoid
@@ -88,52 +76,35 @@ bloating the context. They are NOT written in full here — they live in dedicat
 | Gemini CLI | `~/.gemini/skills/` | `.gemini/skills/`, `.agents/skills/` (native + universal fallback) |
 | Antigravity | `~/.gemini/config/skills/` (canonical), `~/.gemini/antigravity-cli/builtin/skills/`, `~/.gemini/antigravity/skills/`, `~/.gemini/antigravity-ide/skills/` | `.agents/skills/` |
 
-> The wizard's own 7 `wf-*` skills are emitted by the Builder in the project path above
+> The wizard's own `wf-*` skills are emitted by the Builder in the project path above
 > (native auto-discovery) **plus** `.agents/skills/<n>/SKILL.md` (universal fallback) and the
 > flat `.agents/protocols/<n>.md`. Global `wf-*` commands get the same 1:1 from `install.sh`.
 
 ### Available protocols
 
 > **Namespace note**: everything prefixed `wf-` below is owned by THIS wizard, never by
-> gentle-ai. Anything named `sdd-*` (no `wf-` prefix) is gentle-ai's own — its routing and
-> delegation mechanics are gentle-ai's exclusive authority, already installed/synced for your
-> IDE. This wizard's own protocols never re-specify HOW gentle-ai delegates or routes.
+> gentle-ai. Anything without the `wf-` prefix is gentle-ai's own: its routing and
+> delegation mechanics (native ODD) are gentle-ai's exclusive authority, already installed/synced
+> for your IDE. This wizard's own protocols never re-specify HOW gentle-ai delegates or routes.
 
 | When | Protocol to read |
-<if state.features.routing_abc or state.features.decision_ladder or state.features.tdd_protocol>
-| Before classifying or implementing any task | `wf-orchestrator` — single entry point to this project's own wf- protocols<if state.features.decision_ladder> (loads `wf-ladder`)</if><if state.features.routing_abc> (loads `wf-sdd-trigger`)</if><if state.features.tdd_protocol> (loads `wf-tdd`)</if> |
-</if>
-<if state.features.tdd_protocol>
-| Before writing tests or code for a feature | `wf-tdd` — TDD Protocol (wizard-owned) |
+| --- | --- |
+<if state.features.decision_ladder>
+| Before proposing any implementation (optional) | `wf-ladder`: Decision Ladder, checks for over-engineering and existing reuse before writing code |
 </if>
 | When onboarding a new developer | `wf-onboard` — local environment setup (always available) |
 | When managing git worktrees | `wf-worktree` — parallel work isolation (always available) |
-| When toggling optional modules | `wf-settings` — TDD, testing, ladder, SDD backend (always available) |
-<if state.sdd.backend != null>
-| When gentle-ai's SDD was explicitly requested (via `wf-sdd-trigger`'s `wf-force-sdd` outcome) | SDD skills live in your IDE's path (see table above) — **gentle-ai's own**, not this wizard's. **READ them before relying on them** — do not invent the flow, and do not describe how they delegate; that is gentle-ai's own native content for this adapter. Available skills: `sdd-propose`, `sdd-spec`, `sdd-design`, `sdd-tasks`, `sdd-apply`, `sdd-verify`, `sdd-archive`, `sdd-explore`, `sdd-init`, `sdd-onboard` |
-| When migrating SDD backend or touching `openspec/config.yaml`'s known fields | `sdd` — wizard-owned rules (persistence backends, Wizard-Allowed Field Edits) — flat file `.agents/protocols/sdd.md` |
-</if>
+| When toggling optional modules | `wf-settings`: toggles optional workflow modules (always available) |
 | When generating/auditing AGENTS.md | `architecture` — AI context architecture |
 
 > **⚠️ MANDATORY RULE**: Before implementing any change, look for the
-> corresponding skill in your IDE's path and READ it. Do NOT invent SDD flows
+> corresponding skill in your IDE's path and READ it. Do NOT invent flows
 > or assume you know how it works — the skills contain the exact
 > procedure.
 
-<if state.features.routing_abc>
-> **Universal order**: 🪜 `wf-ladder` (if active) → 🔍 `wf-preflight` (user confirms) → (by outcome) 🧪 `wf-tdd` → implementation.
->
-> **No combined PRECHECK**: after the user confirms the `wf-preflight`, proceed directly to the chosen route. Summary of the outcome (details in the `wf-sdd-trigger` protocol):
-> - **`wf-no-sdd`**: implement directly (or with 🧪 `wf-tdd` if active). No SDD request needed.
-> - **`wf-force-sdd`**: declare the explicit SDD request to gentle-ai via `sdd-new <feature or fix>` (or `/sdd-new` if your adapter only supports native slash syntax — except in Claude Code, where gentle-ai's adapter renames SDD slash commands with a `gentle-sdd-` prefix, so use `/gentle-sdd-new` there). How gentle-ai delegates/executes is entirely its own decision per adapter — never re-specified by this wizard.
-<if state.features.tdd_protocol>
-> - **`wf-tdd`**: never production code without the mode's TDD ritual (🧪 TDD PROPOSAL in standard / RED→GREEN evidence in strict). On `wf-no-sdd` it goes before implementing. **When `wf-force-sdd` was requested, the `🧪 TDD PROPOSAL` (standard mode) is issued by you (the orchestrator) BEFORE making the `sdd-apply` request — since `sdd-apply` is headless and cannot ask — and only then is the request made with the *baked* decision + a reference to `wf-tdd` (see row above).**
-</if>
-</if>
-</if>
-<if not state.features.routing_abc and not state.features.decision_ladder and not state.features.tdd_protocol>
+<if not state.features.decision_ladder>
 <!-- WF: DO NOT REGENERATE -->
-<!-- No agent protocols: the project does not use wf-ladder, wf-sdd-trigger, or wf-tdd. -->
+<!-- The project does not use the optional wf-ladder protocol. -->
 <!-- /WF: DO NOT REGENERATE -->
 </if>
 
@@ -153,4 +124,4 @@ over the globally installed one.
      file, as-is, with real values (read by /wf-settings and /wf-refresh by reading
      the full line `features:.*`; if missing, both commands treat all features
      as unknown). -->
-<!-- wf-version: {{wizard_version}} | source: github.com/hugoafj/ai-workflow-wizard | stack: {{discovery.stack.stack_key}} | features: ladder={{features.decision_ladder_yesno}}, tdd={{features.tdd_protocol_yesno}}, routing={{features.routing_abc_yesno}}, ci={{features.ci_yesno}}, cd={{features.cd_yesno}}, release={{features.release_please_yesno}}, branch_pr={{features.branch_pr_override_yesno}} -->
+<!-- wf-version: {{wizard_version}} | source: github.com/hugoafj/ai-workflow-wizard | stack: {{discovery.stack.stack_key}} | features: ladder={{features.decision_ladder_yesno}}, ci={{features.ci_yesno}}, cd={{features.cd_yesno}}, release={{features.release_please_yesno}}, branch_pr={{features.branch_pr_override_yesno}} -->
