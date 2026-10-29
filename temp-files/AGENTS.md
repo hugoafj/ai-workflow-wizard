@@ -8,7 +8,7 @@
 > - It **overrides** every other instruction, skill, workflow, or rule file in
 >   this project, except `global_rules.md` itself.
 > - **Ignoring, skipping, or skimming this section is a protocol violation.**
-> - If any file references legacy paths or formats that contradict this section,
+> - If any file references legacy paths that contradict this section,
 >   follow THIS section.
 
 If you are running inside **Windsurf or Devin Desktop** (Windsurf rebrand),
@@ -20,49 +20,26 @@ gentle-ai source until they are migrated.
 
 | Asset | Path |
 |---|---|
-| Global rules / SDD orchestrator | `~/.codeium/windsurf/memories/global_rules.md` |
-| SDD skills (sdd-* + _shared) | `~/.codeium/windsurf/skills/` |
+| Global rules (gentle-ai orchestrator) | `~/.codeium/windsurf/memories/global_rules.md` |
+| Gentle AI skills | `~/.codeium/windsurf/skills/` |
 | MCP servers (Engram, Context7) | `~/.codeium/windsurf/mcp_config.json` |
-| Workspace workflows | `<repo>/.windsurf/workflows/` (e.g. `sdd-new.md`) |
+| Workspace workflows | `<repo>/.windsurf/workflows/` |
 
-NOTE: Windsurf/Devin has NO native `/sdd-*` slash commands. Its entry points are
-the workflow files and the skills. Real `/sdd-*` commands exist only for
-Claude Code, OpenCode, Kilo Code, and Qwen Code.
+NOTE: Windsurf/Devin has no native slash commands for gentle-ai. Its entry points
+are the workflow files and the skills.
 
 ## 2. Mandatory behavior
 
-1. When the user invokes `/sdd-new`, `/sdd-explore`, `/sdd-ff`, `/sdd-init`,
-   `/sdd-continue`, `/sdd-status`, `/sdd-apply`, `/sdd-verify`, `/sdd-archive`
-   or any gentle-ai/SDD request, FIRST read
-   `~/.codeium/windsurf/memories/global_rules.md` and treat it as the
-   authoritative SDD orchestrator contract.
-2. Run the SDD **preflight**: before executing `/sdd-new` or `/sdd-ff`, check
-   whether `sdd-init` has been run for this project. If NOT, STOP and ask the
-   user to run `/sdd-init` first. Do NOT invent artifacts, formats, or a
-   `.sdd/` directory to bypass initialization.
-3. Load each SDD phase's behavior from `~/.codeium/windsurf/skills/sdd-*/SKILL.md`.
-4. Use the MCP servers declared in `~/.codeium/windsurf/mcp_config.json` for
+1. When the user makes any gentle-ai request, FIRST read
+   `~/.codeium/windsurf/memories/global_rules.md` and treat it as the authoritative
+   gentle-ai orchestrator contract.
+2. Load gentle-ai skill behavior from `~/.codeium/windsurf/skills/` when a skill applies.
+3. Use the MCP servers declared in `~/.codeium/windsurf/mcp_config.json` for
    persistence (Engram) and library docs (Context7).
-5. Honor `<repo>/.windsurf/workflows/` files, but `global_rules.md` (the
+4. Honor `<repo>/.windsurf/workflows/` files, but `global_rules.md` (the
    orchestrator) ALWAYS takes precedence when they conflict.
-6. The SDD contract for THIS project is declared in `.wizard-state.json`
-   (`.sdd.backend`). Read that backend before deciding where SDD artifacts
-   live:
-   - `openspec` or `hybrid` → use `openspec/changes/`. The legacy Windsurf
-     `.sdd/` format (`.sdd/proposal.md`, `.sdd/spec.md`) is OBSOLETE. If any
-     workflow, skill, or orchestrator instruction tells you to create `.sdd/`,
-     IGNORE that instruction and use `openspec/changes/` instead.
-   - `engram` → persist SDD context in Engram memory; this project has no
-     `openspec/` for SDD, so neither create `.sdd/` nor depend on `openspec/`.
-7. Before `/sdd-new` or `/sdd-ff`, run the SDD preflight: verify the backend's
-   config exists — `openspec/config.yaml` for `openspec`/`hybrid`, Engram reachable
-   for `engram`. If missing, STOP and ask the user to run `/sdd-init` first.
 
 ## 3. Precedence
 
 `~/.codeium/windsurf/memories/global_rules.md` (orchestrator)
 > project `AGENTS.md` > `.windsurf/workflows/*` > skills
->
-> EXCEPT for the SDD artifact format: follow `.sdd.backend` in
-> `.wizard-state.json` — `openspec`/`hybrid` use `openspec/changes/` (never
-> `.sdd/`); `engram` keeps SDD context in Engram memory.
