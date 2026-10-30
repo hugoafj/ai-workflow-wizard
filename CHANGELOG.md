@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.10.0-beta.1...v0.10.1-beta.1) (2026-10-30)
+
+
+### Bug Fixes
+
+* **refresh:** regenerate an existing drift hook that still carries SDD text ([#189](https://github.com/hugoafj/ai-workflow-wizard/issues/189)) ([ef58a3f](https://github.com/hugoafj/ai-workflow-wizard/commit/ef58a3f3ad0a6ef8d5b2385b3ca1dbc9a9fe0cb9))
+
 ## [0.10.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.9.1-beta.1...v0.10.0-beta.1) (2026-10-29)
 
 
