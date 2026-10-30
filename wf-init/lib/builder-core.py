@@ -1425,25 +1425,26 @@ def main(argv=None):
     flat_created = write_flat_protocols(raw, state, staging)
     skills_created = write_skills(raw, state, staging)
 
-    # B4.5: project-local branch-pr override (permissive issue linkage).
-    if bool_feature(state, "branch_pr_override"):
-        branch_pr_url = base_url(raw, "templates/skills/branch-pr/SKILL.md")
-        try:
-            branch_pr_text = fetch_with_retries(branch_pr_url)
-            branch_pr_targets = [os.path.join(staging, ".agents", "skills", "branch-pr")]
-            for ide in active_ides(state):
-                ide_skill_path = SKILL_PATHS.get(ide)
-                if ide_skill_path:
-                    branch_pr_targets.append(os.path.join(staging, ide_skill_path, "branch-pr"))
-            if "windsurf" in active_ides(state):
-                branch_pr_targets.append(os.path.join(staging, DEVIN_SKILLS, "branch-pr"))
-            for tgt in dict.fromkeys(branch_pr_targets):
-                os.makedirs(tgt, exist_ok=True)
-                with open(os.path.join(tgt, "SKILL.md"), "w", encoding="utf-8") as fh:
-                    fh.write(branch_pr_text.rstrip() + "\n")
-                skills_created.append(os.path.relpath(os.path.join(tgt, "SKILL.md"), staging))
-        except RuntimeError:
-            pass  # template not found — skip silently
+    # B4.5: wf-conventional-pr skill (always installed; distinct name, does not override gentle-ai's branch-pr).
+    # A failed fetch is fatal: the skill is installed for every project, so the build must not succeed without it.
+    wf_pr_url = base_url(raw, "templates/skills/wf-conventional-pr/SKILL.md")
+    try:
+        wf_pr_text = fetch_with_retries(wf_pr_url)
+        wf_pr_targets = [os.path.join(staging, ".agents", "skills", "wf-conventional-pr")]
+        for ide in active_ides(state):
+            ide_skill_path = SKILL_PATHS.get(ide)
+            if ide_skill_path:
+                wf_pr_targets.append(os.path.join(staging, ide_skill_path, "wf-conventional-pr"))
+        if "windsurf" in active_ides(state):
+            wf_pr_targets.append(os.path.join(staging, DEVIN_SKILLS, "wf-conventional-pr"))
+        for tgt in dict.fromkeys(wf_pr_targets):
+            os.makedirs(tgt, exist_ok=True)
+            with open(os.path.join(tgt, "SKILL.md"), "w", encoding="utf-8") as fh:
+                fh.write(wf_pr_text.rstrip() + "\n")
+            skills_created.append(os.path.relpath(os.path.join(tgt, "SKILL.md"), staging))
+    except RuntimeError as exc:
+        print("ERROR: cannot fetch wf-conventional-pr template from %s: %s" % (wf_pr_url, exc), file=sys.stderr)
+        raise RuntimeError("build stopped: wf-conventional-pr skill template unavailable (%s)" % wf_pr_url) from exc
 
     # B5: AGENTS.md (router).
     router_text = render_router(raw, state)

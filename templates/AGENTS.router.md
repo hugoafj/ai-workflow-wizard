@@ -108,20 +108,16 @@ bloating the context. They are NOT written in full here — they live in dedicat
 <!-- /WF: DO NOT REGENERATE -->
 </if>
 
-<if state.features.branch_pr_override>
-### Project-local skill overrides
+### Project-local skills
 
-This project overrides the global `branch-pr` skill with a permissive version
-where issue linkage is optional. The project-local version takes precedence
-over the globally installed one.
+Use `wf-conventional-pr` for pull requests in this project. It is distinct from gentle-ai's global `branch-pr` skill, so both coexist.
 
 | Skill | Universal path | IDE-specific paths |
 |---|---|---|
-| `branch-pr` | `.agents/skills/branch-pr/SKILL.md` | `.claude/skills/`, `.opencode/skills/`, `.cursor/skills/`, `.devin/skills/`, `.codex/skills/`, `.kiro/skills/`, `.gemini/skills/` (when those IDEs are active) |
-</if>
+| `wf-conventional-pr` | `.agents/skills/wf-conventional-pr/SKILL.md` | `.claude/skills/`, `.opencode/skills/`, `.cursor/skills/`, `.devin/skills/`, `.codex/skills/`, `.kiro/skills/`, `.gemini/skills/` (when those IDEs are active) |
 
 <!-- The following HTML comment is mandatory and must remain as the LAST LINE of the
      file, as-is, with real values (read by /wf-settings and /wf-refresh by reading
      the full line `features:.*`; if missing, both commands treat all features
      as unknown). -->
-<!-- wf-version: {{wizard_version}} | source: github.com/hugoafj/ai-workflow-wizard | stack: {{discovery.stack.stack_key}} | features: ladder={{features.decision_ladder_yesno}}, ci={{features.ci_yesno}}, cd={{features.cd_yesno}}, release={{features.release_please_yesno}}, branch_pr={{features.branch_pr_override_yesno}} -->
+<!-- wf-version: {{wizard_version}} | source: github.com/hugoafj/ai-workflow-wizard | stack: {{discovery.stack.stack_key}} | features: ladder={{features.decision_ladder_yesno}}, ci={{features.ci_yesno}}, cd={{features.cd_yesno}}, release={{features.release_please_yesno}} -->

@@ -175,18 +175,19 @@ From the SAME `build_protocol_body(name)`:
    inlined into the skill body, only linked from its `## References` section, so it costs no
    tokens until the model explicitly reads it. No shipped protocol uses it today.
 
-### Step B4.5 — Project-local `branch-pr` override (optional)
+### Step B4.5: `wf-conventional-pr` skill (always)
 
-If `features.branch_pr_override == true`, fetch
-`templates/skills/branch-pr/SKILL.md` and write it to:
-- `STAGING/.agents/skills/branch-pr/SKILL.md` — universal fallback (always)
-- `STAGING/<ide-native-skills-path>/branch-pr/SKILL.md` for every active IDE
-  (same `SKILL_PATHS` table as B4; Windsurf also gets `.devin/skills/branch-pr/`)
+Always fetch `templates/skills/wf-conventional-pr/SKILL.md` and write it to:
+- `STAGING/.agents/skills/wf-conventional-pr/SKILL.md`: universal fallback (always)
+- `STAGING/<ide-native-skills-path>/wf-conventional-pr/SKILL.md` for every active IDE
+  (same `SKILL_PATHS` table as B4; Windsurf also gets `.devin/skills/wf-conventional-pr/`)
 
-This permissive version overrides gentle-ai's global `branch-pr` skill via the
-skill-registry dedup rule (same `name: branch-pr`, project-local wins). It makes
-issue linkage optional while keeping exactly-one `type:*` label and conventional
-commits. If the template fetch fails, the block is skipped silently.
+This skill is installed for every project, not only when conventional commits are enabled.
+It does not override gentle-ai's global `branch-pr` skill: the name `wf-conventional-pr` is
+distinct, so both skills coexist. The skill covers Conventional Commits, release-please
+conventions, exactly-one `type:*` label, and optional issue linkage. If the template fetch
+fails, the build stops with an error naming the URL and the reason; no project is produced
+without the skill.
 
 ### Step B5 — Assemble AGENTS.md (thin router)
 
