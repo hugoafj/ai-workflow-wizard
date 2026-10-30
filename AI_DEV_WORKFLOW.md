@@ -519,7 +519,7 @@ The wizard phases:
 
 - **Phase 0** — Self-contained prerequisite. Installs/verifies gentle-ai, runs `gentle-ai doctor`, confirms active agents for this project.
 - **Phase 0b** — System health check. Verifies `gentle-ai doctor` critical checks, warns on disk space and Engram reachability.
-- **Phase 0c**: Workflow feature selection. Lets the user toggle the Decision Ladder, testing, CI/CD, release-please, and the branch-PR override before discovery.
+- **Phase 0c**: Workflow feature selection. Lets the user toggle the Decision Ladder, testing, CI/CD, and release-please before discovery. The `wf-conventional-pr` PR skill is always installed, so it is not a question here.
 - **Phase 1** — Discovery (lists files, manifests, previous satellites, commits; also saves npm scripts to `discovery.commands` and the root folder summary for the AGENTS.md Commands / Project Structure sections).
 - **Phase 2** — Migration of previous artifacts (if any with their own content).
 - **Phase 3** — Mode: greenfield vs legacy (auto-detect + confirmation).
@@ -1712,9 +1712,8 @@ Once `/wf-init` has run, several decisions the developer made (testing, testing 
 | CD (12) | Automatic deploy to VPS | Real: writes `deploy.yml` and requires server secrets |
 | Release strategy (13) | Tag-based (`v*`) or push-to-main deploy trigger | Medium: changes how CD fires |
 | IDEs/CLIs (14) | Add/remove an active IDE: generates (satellite + commands + skills) or deletes everything related, downloading templates from the wizard's raw source | Real: creates or removes project files; requires explicit confirmation |
-| Branch PR override (15) | Project-local override for the branch-pr skill | Low: switches the override on or off |
 
-**Note**: Option numbering in `/wf-settings` runs from 1 to 15. Option 1 maps to `wf-ladder`, option 2 to the testing infrastructure, and option 14 manages IDEs and CLIs.
+**Note**: Option numbering in `/wf-settings` runs from 1 to 14. Option 1 maps to `wf-ladder`, option 2 to the testing infrastructure, and option 14 manages IDEs and CLIs. The `wf-conventional-pr` PR skill is always installed for every project and has no settings option.
 
 **Interaction pattern**: the command always shows the real state first (reading `.wizard-state.json` and `AGENTS.md` directly, never assuming what the developer remembers choosing), lets you choose one or several changes, applies and confirms each individually, and asks "anything else?" before closing with a consolidated commit, without `git push`, like the rest of this workflow.
 

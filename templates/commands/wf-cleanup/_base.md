@@ -101,13 +101,14 @@ for dir in .claude/skills .cursor/skills .gemini/skills .agents/skills .kiro/ski
     for skill in "$dir"/*/; do
       skill_name=$(basename "$skill")
       # gentle-ai skills: gentle-orchestrator
-      # wizard skills (4 commands): wf-ladder, wf-onboard, wf-worktree, wf-settings
-      # retired wizard skills, removed so older installs get cleaned: wf-tdd, wf-orchestrator, wf-sdd-trigger
+      # wizard skills: wf-ladder, wf-onboard, wf-worktree, wf-settings, wf-conventional-pr
+      # retired wizard skills, removed so older installs get cleaned: wf-tdd, wf-orchestrator, wf-sdd-trigger,
+      # branch-pr (older wizard versions installed it project-locally; gentle-ai's global branch-pr is in $HOME, never touched here)
       case "$skill_name" in
         gentle-orchestrator)
           echo "  ⏭ $dir/$skill_name (gentle-ai — DO NOT delete)"
           ;;
-        wf-ladder|wf-tdd|wf-orchestrator|wf-sdd-trigger|wf-onboard|wf-worktree|wf-settings)
+        wf-ladder|wf-tdd|wf-orchestrator|wf-sdd-trigger|branch-pr|wf-onboard|wf-worktree|wf-settings|wf-conventional-pr)
           echo "  🗑 $dir/$skill_name (wizard)"
           ;;
         *)
@@ -151,7 +152,7 @@ for skills_dir in .windsurf/skills .devin/skills; do
           gentle-orchestrator)
             echo "  ⏭ $skills_dir/$skill_name (gentle-ai — DO NOT delete)"
             ;;
-          wf-ladder|wf-tdd|wf-orchestrator|wf-sdd-trigger|wf-onboard|wf-worktree|wf-settings)
+          wf-ladder|wf-tdd|wf-orchestrator|wf-sdd-trigger|branch-pr|wf-onboard|wf-worktree|wf-settings|wf-conventional-pr)
             echo "  🗑 $skills_dir/$skill_name (wizard)"
             ;;
           *)
@@ -319,38 +320,39 @@ Remove each wizard skill directory detected in Phase 0 (only wizard ones — nev
 
 ```bash
 # Example per detected wizard skill (replace with the actual list). Current wizard
-# skills: wf-ladder, wf-onboard, wf-worktree, wf-settings. Retired names stay so older
-# installs get cleaned.
-rm -rf .claude/skills/wf-ladder .claude/skills/wf-tdd \
-       .claude/skills/wf-orchestrator .claude/skills/wf-sdd-trigger \
-       .claude/skills/wf-onboard .claude/skills/wf-worktree .claude/skills/wf-settings \
-       .cursor/skills/wf-ladder .cursor/skills/wf-tdd \
-       .cursor/skills/wf-orchestrator .cursor/skills/wf-sdd-trigger \
-       .cursor/skills/wf-onboard .cursor/skills/wf-worktree .cursor/skills/wf-settings \
-       .gemini/skills/wf-ladder .gemini/skills/wf-tdd \
-       .gemini/skills/wf-orchestrator .gemini/skills/wf-sdd-trigger \
-       .gemini/skills/wf-onboard .gemini/skills/wf-worktree .gemini/skills/wf-settings \
-       .kiro/skills/wf-ladder .kiro/skills/wf-tdd \
-       .kiro/skills/wf-orchestrator .kiro/skills/wf-sdd-trigger \
-       .kiro/skills/wf-onboard .kiro/skills/wf-worktree .kiro/skills/wf-settings \
-       .codex/skills/wf-ladder .codex/skills/wf-tdd \
-       .codex/skills/wf-orchestrator .codex/skills/wf-sdd-trigger \
-       .codex/skills/wf-onboard .codex/skills/wf-worktree .codex/skills/wf-settings \
-       .opencode/skills/wf-ladder .opencode/skills/wf-tdd \
-       .opencode/skills/wf-orchestrator .opencode/skills/wf-sdd-trigger \
-       .opencode/skills/wf-onboard .opencode/skills/wf-worktree .opencode/skills/wf-settings \
-       .windsurf/skills/wf-ladder .windsurf/skills/wf-tdd \
-       .windsurf/skills/wf-orchestrator .windsurf/skills/wf-sdd-trigger \
-       .windsurf/skills/wf-onboard .windsurf/skills/wf-worktree .windsurf/skills/wf-settings \
-       .devin/skills/wf-ladder .devin/skills/wf-tdd \
-       .devin/skills/wf-orchestrator .devin/skills/wf-sdd-trigger \
-       .devin/skills/wf-onboard .devin/skills/wf-worktree .devin/skills/wf-settings \
-       .agents/skills/wf-ladder .agents/skills/wf-tdd \
-       .agents/skills/wf-orchestrator .agents/skills/wf-sdd-trigger \
-       .agents/skills/wf-onboard .agents/skills/wf-worktree .agents/skills/wf-settings \
-       .github/skills/wf-ladder .github/skills/wf-tdd \
-       .github/skills/wf-orchestrator .github/skills/wf-sdd-trigger \
-       .github/skills/wf-onboard .github/skills/wf-worktree .github/skills/wf-settings
+# skills: wf-ladder, wf-onboard, wf-worktree, wf-settings, wf-conventional-pr. Retired
+# names stay so older installs get cleaned: wf-tdd, wf-orchestrator, wf-sdd-trigger,
+# branch-pr. All paths are project-relative; home-level gentle-ai skills are never listed.
+rm -rf .claude/skills/wf-ladder .claude/skills/wf-tdd .claude/skills/wf-orchestrator \
+       .claude/skills/wf-sdd-trigger .claude/skills/branch-pr .claude/skills/wf-onboard \
+       .claude/skills/wf-worktree .claude/skills/wf-settings .claude/skills/wf-conventional-pr \
+       .cursor/skills/wf-ladder .cursor/skills/wf-tdd .cursor/skills/wf-orchestrator \
+       .cursor/skills/wf-sdd-trigger .cursor/skills/branch-pr .cursor/skills/wf-onboard \
+       .cursor/skills/wf-worktree .cursor/skills/wf-settings .cursor/skills/wf-conventional-pr \
+       .gemini/skills/wf-ladder .gemini/skills/wf-tdd .gemini/skills/wf-orchestrator \
+       .gemini/skills/wf-sdd-trigger .gemini/skills/branch-pr .gemini/skills/wf-onboard \
+       .gemini/skills/wf-worktree .gemini/skills/wf-settings .gemini/skills/wf-conventional-pr \
+       .kiro/skills/wf-ladder .kiro/skills/wf-tdd .kiro/skills/wf-orchestrator \
+       .kiro/skills/wf-sdd-trigger .kiro/skills/branch-pr .kiro/skills/wf-onboard \
+       .kiro/skills/wf-worktree .kiro/skills/wf-settings .kiro/skills/wf-conventional-pr \
+       .codex/skills/wf-ladder .codex/skills/wf-tdd .codex/skills/wf-orchestrator \
+       .codex/skills/wf-sdd-trigger .codex/skills/branch-pr .codex/skills/wf-onboard \
+       .codex/skills/wf-worktree .codex/skills/wf-settings .codex/skills/wf-conventional-pr \
+       .opencode/skills/wf-ladder .opencode/skills/wf-tdd .opencode/skills/wf-orchestrator \
+       .opencode/skills/wf-sdd-trigger .opencode/skills/branch-pr .opencode/skills/wf-onboard \
+       .opencode/skills/wf-worktree .opencode/skills/wf-settings .opencode/skills/wf-conventional-pr \
+       .windsurf/skills/wf-ladder .windsurf/skills/wf-tdd .windsurf/skills/wf-orchestrator \
+       .windsurf/skills/wf-sdd-trigger .windsurf/skills/branch-pr .windsurf/skills/wf-onboard \
+       .windsurf/skills/wf-worktree .windsurf/skills/wf-settings .windsurf/skills/wf-conventional-pr \
+       .devin/skills/wf-ladder .devin/skills/wf-tdd .devin/skills/wf-orchestrator \
+       .devin/skills/wf-sdd-trigger .devin/skills/branch-pr .devin/skills/wf-onboard \
+       .devin/skills/wf-worktree .devin/skills/wf-settings .devin/skills/wf-conventional-pr \
+       .agents/skills/wf-ladder .agents/skills/wf-tdd .agents/skills/wf-orchestrator \
+       .agents/skills/wf-sdd-trigger .agents/skills/branch-pr .agents/skills/wf-onboard \
+       .agents/skills/wf-worktree .agents/skills/wf-settings .agents/skills/wf-conventional-pr \
+       .github/skills/wf-ladder .github/skills/wf-tdd .github/skills/wf-orchestrator \
+       .github/skills/wf-sdd-trigger .github/skills/branch-pr .github/skills/wf-onboard \
+       .github/skills/wf-worktree .github/skills/wf-settings .github/skills/wf-conventional-pr
 ```
 
 ### Commands
@@ -569,7 +571,7 @@ Next steps:
 - **gentle-ai vs wizard detection**: gentle-ai skills have specific
   names (for example, gentle-orchestrator). Wizard skills are: workflow,
   commands, cicd, ides, testing, architecture, wf-refresh, wf-onboard,
-  wf-settings, wf-worktree, wf-cleanup.
+  wf-settings, wf-worktree, wf-cleanup, wf-conventional-pr.
 - **Confirmation flow**: after the inventory, the user writes freely what to
   keep (in their own words, files or groups). Everything wizard-owned they did
   not mention is deleted, after a per-group confirmation.
