@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.11.0-beta.1...v0.11.1-beta.1) (2026-10-30)
+
+
+### Bug Fixes
+
+* **wf-init:** tolerate malformed state types in builders and wf_state_set ([#193](https://github.com/hugoafj/ai-workflow-wizard/issues/193)) ([2f5c8af](https://github.com/hugoafj/ai-workflow-wizard/commit/2f5c8afe0ff75f506d454984547fb5bbeadadba2))
+
 ## [0.11.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.10.1-beta.1...v0.11.0-beta.1) (2026-10-30)
 
 
