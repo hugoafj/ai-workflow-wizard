@@ -174,8 +174,28 @@ wf_state_get() { jq -r "$1 // empty" "$WF_STATE" 2>/dev/null; }
 # Returns 0 on success, 1 on failure. Verifies the write by reading back the path.
 wf_state_set() {
   local filter="$1" value="$2" tmp verify
+
+  # discovery.conventions is consumed as an object (builder-core calls .get on it).
+  # Normalize non-object values at write time (free text becomes {"code_style": ...}).
+  if [ "$filter" = ".discovery.conventions" ] && \
+     ! printf '%s' "$value" | jq -e 'type == "object"' >/dev/null 2>&1; then
+    echo "WARNING: wf_state_set - discovery.conventions should be an object; wrapping value as code_style." >&2
+    value="$(jq -nc --arg s "$value" '{code_style: $s}')"
+  fi
+
+  # build_plan.generated_files / managed_paths are iterated as lists by the builders.
+  # Reject anything else (e.g. a file count) instead of corrupting the state.
+  case "$filter" in
+    .build_plan.generated_files|.build_plan.managed_paths)
+      if ! printf '%s' "$value" | jq -e 'type == "array"' >/dev/null 2>&1; then
+        echo "ERROR: wf_state_set - $filter must be a JSON array of paths; refusing to write." >&2
+        return 1
+      fi
+      ;;
+  esac
+
   tmp="$(mktemp)"
-  
+
   # Use jq --arg to safely pass the value, preventing injection and escaping issues.
   # Use try-catch because fromjson? treats 'false' as empty (jq quirk where false is falsy).
   # try: parse as JSON, catch: if invalid JSON, use literal string (or null if $val=="null").
