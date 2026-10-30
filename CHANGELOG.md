@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.10.1-beta.1...v0.11.0-beta.1) (2026-10-30)
+
+
+### Features
+
+* **wf-init:** add wf-conventional-pr skill and retire the branch-pr override ([#191](https://github.com/hugoafj/ai-workflow-wizard/issues/191)) ([44d7e4f](https://github.com/hugoafj/ai-workflow-wizard/commit/44d7e4f240570329eb9d6783bb2374d35d23834b))
+
 ## [0.10.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.10.0-beta.1...v0.10.1-beta.1) (2026-10-30)
 
 
