@@ -652,6 +652,12 @@ def infer_placeholder(state, key):
         # Fall back to preserving AGENTS.md section verbatim (from R1 backfill)
         # when ALL structured fields are absent, then to naming, then camelCase.
         conventions = get_state_value(state, "discovery.conventions", {}) or {}
+        if isinstance(conventions, str):
+            # Tolerate a free-text value written by hand instead of the structured object.
+            print("WARNING: discovery.conventions is a string, expected an object — using it as code_style.", file=sys.stderr)
+            return conventions.strip() or "camelCase"
+        if not isinstance(conventions, dict):
+            return "camelCase"
         fields = [
             ("Naming", "naming"),
             ("Components", "components"),
@@ -1394,9 +1400,17 @@ def record_build_plan(state, staging, core_created, skills_created, wf_dir, phas
         # instead of plain path strings; normalize before set-union.
         return entry.get("path") if isinstance(entry, dict) else entry
 
-    existing = [_path_of(e) for e in build.get("generated_files", [])]
+    def _list_of(key):
+        # A hand-written state may hold a count or string here; ignore it instead of crashing.
+        value = build.get(key, [])
+        if isinstance(value, list):
+            return value
+        print(f"WARNING: build_plan.{key} is {type(value).__name__}, expected a list — ignoring it.", file=sys.stderr)
+        return []
+
+    existing = [_path_of(e) for e in _list_of("generated_files")]
     build["generated_files"] = sorted(set(p for p in existing if p) | set(core_created) | set(skills_created))
-    existing_m = [_path_of(e) for e in build.get("managed_paths", [])]
+    existing_m = [_path_of(e) for e in _list_of("managed_paths")]
     build["managed_paths"] = sorted(set(p for p in existing_m if p) | set(core_created) | set(skills_created))
     build["phase_now"] = phase_now
     build["stack_key"] = stack_key(state)

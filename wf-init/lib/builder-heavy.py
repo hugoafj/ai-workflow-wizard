@@ -573,9 +573,17 @@ def register_build_plan(state, staging, created_files):
         # instead of plain path strings; normalize before set-union.
         return entry.get("path") if isinstance(entry, dict) else entry
 
-    existing = [_path_of(e) for e in build.get("generated_files", [])]
+    def _list_of(key):
+        # A hand-written state may hold a count or string here; ignore it instead of crashing.
+        value = build.get(key, [])
+        if isinstance(value, list):
+            return value
+        print(f"WARNING: build_plan.{key} is {type(value).__name__}, expected a list — ignoring it.", file=sys.stderr)
+        return []
+
+    existing = [_path_of(e) for e in _list_of("generated_files")]
     build["generated_files"] = sorted(set(p for p in existing if p) | set(created_files))
-    existing_m = [_path_of(e) for e in build.get("managed_paths", [])]
+    existing_m = [_path_of(e) for e in _list_of("managed_paths")]
     build["managed_paths"] = sorted(set(p for p in existing_m if p) | set(created_files))
 
     # SHA256 scan of the staged tree.
