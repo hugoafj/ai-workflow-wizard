@@ -1442,6 +1442,20 @@ WF_STATE="$STAGING_STATE" _apply_jq_filter '
   .schema_version = (if (.schema_version // 0) < 4 then 4 else .schema_version end)
 '
 
+# A drift hook written by an older wizard can stay in the project while features.hook is
+# unset: the builder writes the hook only when features.hook is true, so the old hook (with
+# its SDD text) would never be regenerated. An existing wizard hook is wanted, so it is kept
+# in the plan and updated like any other managed file.
+if [[ "$(jq -r '.features.hook // false' "$STAGING_STATE")" != "true" ]]; then
+  for WF_HOOK_PATH in .husky/post-commit .git/hooks/post-commit; do
+    if [[ -f "$WF_HOOK_PATH" ]] && grep -q 'Workflow drift detected' "$WF_HOOK_PATH"; then
+      WF_STATE="$STAGING_STATE" jq '.features.hook = true | .updated_at = (now | todate)' "$STAGING_STATE" > "$STAGING_STATE.tmp" && mv "$STAGING_STATE.tmp" "$STAGING_STATE"
+      echo "ℹ Existing drift hook found ($WF_HOOK_PATH): it will be regenerated without the SDD text."
+      break
+    fi
+  done
+fi
+
 # Ask about new optional protocol features that are not present in the local
 # state yet (features added by newer wizard versions). ci/cd/release_please are
 # NOT asked here: they require the full phase47-cicd questionnaire and are
