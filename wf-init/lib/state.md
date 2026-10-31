@@ -8,7 +8,9 @@
 ## Location
 
 `.wizard-state.json` at the **root of the target project** (not in the wizard repo).
-It is local to the run and goes in `.gitignore` (same as `.wf-status`).
+It is **versioned** (committed in `/wf-init` Phase 8, together with `.wizard-managed-files.json`)
+so a teammate who clones the repo reuses it with `/wf-onboard`, `/wf-refresh` and `/wf-cleanup`
+instead of re-running `/wf-init`. Only `.wizard-state.json.tmp` and `.wizard-staging/` stay ignored.
 
 ## Golden rules
 
@@ -22,6 +24,11 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
 4. **Never knowledge**: only state goes in the state (discovery + user answers +
    pointers). Framework rules are NEVER copied here — they live in
    `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/`.
+5. **Shareable**: the state travels in the repo, so it must never hold absolute paths,
+   paths relative to the wizard install dir (`WF_DIR`), usernames or session ids. The
+   `gentle_ai` block is informational only: it describes the machine of whoever ran
+   `/wf-init`, not of whoever cloned the repo, and no logic outside the init may decide
+   based on it. `wf_state_sanitize` (state-helpers.sh) strips legacy leaks before a commit.
 
 ## Schema (schema_version 4)
 
@@ -197,6 +204,7 @@ Available helpers:
   - JSON structures: `wf_state_set '.field' "[item1,item2]"` (pass valid JSON as string, jq parses it)
   - Null: `wf_state_set '.field' "null"` (pass as string, jq parses it)
 - `wf_phase_done <done_phase> <next>` — Mark a phase done and advance pointer.
+- `wf_state_sanitize` — Strip machine-specific data (legacy `build_plan.builder_core.scripts`) before the state is committed. Idempotent.
 ```
 
 > **IMPORTANT rule**: the initial creation uses `wf_state_init` (cat >). **Updates**

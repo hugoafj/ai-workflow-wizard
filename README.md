@@ -87,6 +87,7 @@ After `/wf-init`, your repo has:
 - **`AGENTS.md`** — project-specific context that tells AI agents how this repo works ([learn more](AI_DEV_WORKFLOW.md#51-understanding-agentsmd))
 - **IDE satellites** — auto-generated files in `.cursor/rules/`, `.windsurf/rules/`, `.kiro/steering/`, `CLAUDE.md`, etc. that point to `AGENTS.md` ([learn more](AI_DEV_WORKFLOW.md#54-project-specific-satellites-what-they-are-and-why-we-need-them))
 - **Post-commit hook** — detects when `AGENTS.md` drifts out of sync with the codebase
+- **Wizard state** — `.wizard-state.json` and `.wizard-managed-files.json`, committed so your teammates never need to re-run `/wf-init`
 - **CI/CD templates** — GitHub Actions with quality guard, AI review, and release-please ([learn more](AI_DEV_WORKFLOW.md#10-block-6--cicd-pipeline--gga))
 - **Project-specific slash commands**: `/wf-onboard`, `/wf-settings`, `/wf-worktree` (plus `/wf-ladder` when the Decision Ladder is enabled). Every command is also packaged as a skill (1:1), so it can be invoked by natural language too.
 
@@ -104,6 +105,16 @@ Once set up, here's what working with the AI Workflow looks like:
 8. **Conventional commits + auto-release** — commits follow the `feat:`, `fix:`, `chore:` convention. release-please prepares changelogs and releases automatically.
 9. **Drift detection** — the post-commit hook warns when `AGENTS.md` needs an update. Run `/wf-refresh` to fix it.
 
+## Working in a Team
+
+Only one person runs `/wf-init`. Everything it generates, including the wizard state, is committed, so nobody else spends tokens re-initializing the project.
+
+1. **The maintainer** runs `/wf-init`, reviews the diff, and pushes the commit.
+2. **Every teammate** clones the repo and runs `/wf-onboard` once. It prepares *their* machine and never touches the repo: it installs the global commands (`/wf-init`, `/wf-refresh`, `/wf-cleanup`) and gentle-ai if missing, installs dependencies (which also activates Husky), recreates the post-commit hook when the project doesn't use Husky, and walks through the project's MCPs.
+3. **Anyone** can then run `/wf-refresh` or `/wf-cleanup`, because the state travels with the repo. If someone runs `/wf-init` in an already initialized repo, it says so and points to `/wf-onboard` or `/wf-refresh`.
+
+Repos initialized by an older wizard kept the state local. Ask the maintainer to run `/wf-refresh` once and commit; it asks before removing the old `.gitignore` entries and then versions the state.
+
 ## Commands
 
 | Command | Scope | Description |
@@ -111,7 +122,7 @@ Once set up, here's what working with the AI Workflow looks like:
 | `/wf-init` | Global | Bootstrap wizard — initializes the workflow in a project |
 | `/wf-refresh` | Global | Re-runs the Builder (B1–B9) to regenerate all managed artifacts when the project evolves ([learn more](AI_DEV_WORKFLOW.md#55-context-auto-update)) |
 | `/wf-cleanup` | Global | Removes wizard artifacts from a project |
-| `/wf-onboard` | Project | Onboarding guide for new developers |
+| `/wf-onboard` | Project | Sets up a teammate's machine after cloning: global commands, gentle-ai, dependencies, git hooks, MCPs |
 | `/wf-settings` | Project | Toggle optional modules: testing, testing extras, Decision Ladder, CI/CD ([learn more](AI_DEV_WORKFLOW.md#96-wf-settings-toggle-optional-modules-after-installation)) |
 | `/wf-worktree` | Project | Git worktree management with automatic port assignment ([learn more](AI_DEV_WORKFLOW.md#84-worktrees--wf-worktree-built-in-this-block)) |
 | `/wf-ladder` | Project (optional) | Decision Ladder: avoids over-engineering before implementing ([learn more](AI_DEV_WORKFLOW.md#58-optional-behavior-improvements--wf-ladder)) |

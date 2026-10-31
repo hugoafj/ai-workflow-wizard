@@ -346,7 +346,8 @@ _gi_add() {
 }
 
 _gi_add '.wf-status'
-_gi_add '.wizard-state.json'
+# .wizard-state.json and .wizard-managed-files.json are versioned on purpose: teammates who
+# clone the repo reuse them (/wf-onboard, /wf-refresh, /wf-cleanup) instead of re-running /wf-init.
 _gi_add '.wizard-state.json.tmp'
 _gi_add '.wizard-staging/'
 
@@ -404,9 +405,20 @@ GENERATED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 jq -n --arg version "$WIZARD_VERSION" --arg generated_at "$GENERATED_AT" --argjson files "$GENERATED_FILES" \
    '{wizard_version: $version, generated_at: $generated_at, files: $files}' > .wizard-managed-files.json
 
-# Add to .gitignore (so it's not committed)
-if ! grep -q "\.wizard-managed-files\.json" .gitignore 2>/dev/null; then
-  echo ".wizard-managed-files.json" >> .gitignore
+# Both .wizard-managed-files.json and .wizard-state.json are committed (see 8.4), so the
+# state must not carry machine-specific data. Strip it before the commit.
+wf_state_sanitize
+echo "8.3 OK — state sanitized for commit"
+
+# Old wizard versions ignored these files. Remove those entries so the files can be tracked.
+if [ -f .gitignore ]; then
+  GI_TMP=$(mktemp)
+  grep -vxF -e '.wizard-state.json' -e '.wizard-managed-files.json' .gitignore > "$GI_TMP" || true
+  if ! cmp -s "$GI_TMP" .gitignore; then
+    cat "$GI_TMP" > .gitignore
+    echo "8.3 — removed legacy .gitignore entries for the wizard state and manifest"
+  fi
+  rm -f "$GI_TMP"
 fi
 ```
 
@@ -467,6 +479,19 @@ git add -f .husky/ .commitlintrc.json .gga release-please-config.json .release-p
 [ -f package-lock.json ] && git add package-lock.json 2>/dev/null || true
 git add .gitignore
 
+# The state is versioned, so the commit must carry the FINAL pointer. Mark the wizard done
+# BEFORE committing (not in 8.6, which would leave the tree dirty right after the commit).
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+wf_phase_done phase8 done
+# If the commit or its verification fails below, the wizard is not done: put the pointer back.
+_wf_revert_done() {
+  wf_state_set '.phase_pointer' "phase8"
+  wf_state_set '.phases.phase8.status' "in_progress"
+}
+# Versioned on purpose so teammates can reuse the initialized wizard (-f: older .gitignore files ignored them)
+git add -f .wizard-state.json .wizard-managed-files.json
+
 WF_VER=$(jq -r '.wizard_version // "0.0.0"' .wizard-state.json)
 GA_VER=$(jq -r '.gentle_ai.version // "unknown"' .wizard-state.json)
 # IMPORTANT: if conventional commits is active, commitlint validates header <=100 and
@@ -481,6 +506,7 @@ git commit -m "chore: initialize AI Workflow Wizard
 - Add project commands: wf-onboard, wf-worktree, wf-settings
 - Add post-commit hook for drift detection
 - Add CI/CD (Block 6): AI review, quality guard, conventional commits
+- Add wizard state and manifest so teammates can reuse the setup
 - Update .gitignore for AI workflow files
 
 Powered by wf-init v$WF_VER | gentle-ai $GA_VER"
@@ -496,8 +522,17 @@ for f in $(jq -r '.build_plan.managed_paths[]' .wizard-state.json 2>/dev/null); 
 done
 if [ "$MISSING" -eq 1 ]; then
   echo "ERROR: One or more wizard-managed files missing from commit. Aborting." >&2
+  _wf_revert_done
   exit 1
 fi
+# The wizard state and manifest must be tracked, or teammates cannot reuse the initialized wizard
+for f in .wizard-state.json .wizard-managed-files.json; do
+  if ! git ls-tree -r --name-only HEAD | grep -qxF "$f"; then
+    echo "ERROR: $f is not versioned in HEAD. Aborting." >&2
+    _wf_revert_done
+    exit 1
+  fi
+done
 echo "8.4 OK — all wizard-managed files verified in commit"
 ```
 
@@ -538,6 +573,10 @@ Next steps:
 
 7. When the project evolves (new dependencies, new test frameworks, etc.),
    run /wf-refresh to keep AGENTS.md synchronized.
+
+8. Share it with your team: push the commit. The wizard state and manifest are versioned,
+   so nobody else needs to run /wf-init. A teammate who clones the repo runs /wf-onboard
+   once to set up their machine (global commands, gentle-ai, MCPs, dependencies).
 ```
 
 <if state.cd.missing_secrets is non-empty>:
@@ -588,11 +627,9 @@ fi
 ```
 
 ```bash
-WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
-source "$WF_DIR/lib/state-helpers.sh"
-
-# Validate state before final phase transition (phase-aware validation)
-wf_phase_done phase8 done
+# phase8 was already marked done in 8.4, BEFORE the commit: the state is versioned, so
+# rewriting it here would leave the working tree dirty right after the commit.
+[ "$(jq -r '.phase_pointer' .wizard-state.json)" = "done" ] || { echo "ERROR: phase8 not marked done (see 8.4)" >&2; exit 1; }
 ```
 
 ```

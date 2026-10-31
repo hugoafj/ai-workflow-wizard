@@ -21,7 +21,7 @@ if [ -f .gitignore ]; then
   echo "The following lines will be appended to .gitignore (idempotent - only missing lines added):"
   IDES=$(jq -r '.answers.ides[]?' .wizard-state.json 2>/dev/null)
   echo "  .wf-status"
-  echo "  .wizard-state.json"
+  echo "  .wizard-state.json.tmp"
   echo "  .wizard-staging/"
   echo "  !.agents/"
   echo "$IDES" | grep -q "cursor" && echo "  !.cursor/"
@@ -59,8 +59,12 @@ Changes to .gitignore:
     !.kiro/  (if applicable)
     !.github/copilot-instructions.md  (if applicable)
     .wf-status          (ignored — it's local)
-    .wizard-state.json  (ignored — it's local)
     .wizard-staging/    (ignored — it's temporary)
+  Any older .gitignore entries for .wizard-state.json / .wizard-managed-files.json are removed.
+
+Also committed (versioned, so teammates reuse the setup instead of re-running /wf-init):
+  .wizard-state.json
+  .wizard-managed-files.json
 ```
 
 Side effects that Phase 8 will apply AFTER your approval — visible now so the approval
