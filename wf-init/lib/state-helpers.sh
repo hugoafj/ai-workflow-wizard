@@ -14,6 +14,7 @@ export -f wf_state_set 2>/dev/null || true
 export -f wf_state_validate 2>/dev/null || true
 export -f wf_phase_done 2>/dev/null || true
 export -f wf_sha256 2>/dev/null || true
+export -f wf_state_sanitize 2>/dev/null || true
 
 # Ensure PATH includes Homebrew locations for macOS subshells (fixes #4)
 # Idempotent prepend: only add if not already present (avoids PATH pollution in persistent shells)
@@ -415,5 +416,21 @@ wf_sha256() {
     sha256sum -- "$1" | awk '{print $1}'
   else
     shasum -a 256 -- "$1" | awk '{print $1}'
+  fi
+}
+
+# Strip machine-specific data from the state before it is committed.
+# .wizard-state.json is versioned, so it must not carry absolute or relative paths
+# to the wizard install dir. Older builders recorded them in build_plan.builder_core.scripts
+# (nothing reads that field). Idempotent; a no-op on clean states.
+wf_state_sanitize() {
+  local tmp
+  tmp="$(mktemp)"
+  if jq 'del(.build_plan.builder_core.scripts)' "$WF_STATE" > "$tmp" 2>/dev/null; then
+    mv "$tmp" "$WF_STATE"
+  else
+    rm -f "$tmp"
+    echo "ERROR: wf_state_sanitize failed" >&2
+    return 1
   fi
 }

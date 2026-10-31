@@ -223,8 +223,8 @@ done
 # 5. Other wizard artifacts
 echo ""
 echo "📁 Other artifacts:"
-[ -f ".wizard-state.json" ] && echo "  🗑 .wizard-state.json"
-[ -f ".wizard-managed-files.json" ] && echo "  🗑 .wizard-managed-files.json"
+[ -f ".wizard-state.json" ] && echo "  🗑 .wizard-state.json (versioned: deleting it affects teammates too, and is committed in Phase 3)"
+[ -f ".wizard-managed-files.json" ] && echo "  🗑 .wizard-managed-files.json (versioned, same as above)"
 [ -f "refresh-plan.json" ] && echo "  🗑 refresh-plan.json (from /wf-refresh)"
 [ -f ".wizard-refresh-baseline.json" ] && echo "  🗑 .wizard-refresh-baseline.json (from /wf-refresh R3)"
 [ -f ".wf-status" ] && echo "  🗑 .wf-status"

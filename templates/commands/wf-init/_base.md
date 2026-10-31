@@ -140,7 +140,7 @@ ls "$WF_DIR"
 
 ## Starting up
 
-First, check if there is an existing run in progress (resumption):
+First, check if there is an existing run in progress (resumption) or an already initialized repo:
 
 ```bash
 if [ -f .wizard-state.json ]; then
@@ -149,10 +149,26 @@ if [ -f .wizard-state.json ]; then
   case "$PTR" in
     phase45|phase46b) PTR="phase46" ;;
   esac
-  echo "wf-init run in progress detected. Current phase: $PTR"
-  echo "Resume from $PTR, or restart (deletes .wizard-state.json)? [resume / restart]"
-  # If resume: cat "$WF_DIR/${PTR}.md"  (or that phase's file)
-  # If restart: rm -f .wizard-state.json  and continue below.
+  if [ "$PTR" = "done" ]; then
+    # The state is versioned: a teammate's clone arrives with it already complete.
+    echo "This repo is already initialized by the AI Workflow Wizard (wizard $(jq -r '.wizard_version // "unknown"' .wizard-state.json))."
+    echo "You do NOT need /wf-init. Choose one:"
+    echo "  /wf-onboard  — set up YOUR machine for this repo (global commands, gentle-ai, MCPs, dependencies)"
+    echo "  /wf-refresh  — update the workflow when the project evolved"
+    echo "Re-run /wf-init from scratch anyway? [yes / no]"
+    # If no: STOP here. If yes: rm -f .wizard-state.json and continue below.
+  else
+    echo "wf-init run in progress detected. Current phase: $PTR"
+    echo "Resume from $PTR, or restart (deletes .wizard-state.json)? [resume / restart]"
+    # If resume: cat "$WF_DIR/${PTR}.md"  (or that phase's file)
+    # If restart: rm -f .wizard-state.json  and continue below.
+  fi
+elif [ -f AGENTS.md ] && grep -q '^<!-- wf-version:' AGENTS.md; then
+  # Initialized by an older wizard that kept the state local (never committed).
+  echo "This repo already has a wizard-generated AGENTS.md but no .wizard-state.json."
+  echo "Use /wf-onboard to set up your machine. The maintainer who ran /wf-init should run"
+  echo "/wf-refresh once and commit the result so everyone can use /wf-refresh and /wf-cleanup."
+  echo "Run /wf-init from scratch anyway? [yes / no]  (if no: STOP here)"
 fi
 ```
 

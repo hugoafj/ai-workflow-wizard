@@ -2209,7 +2209,7 @@ fi
 # behind the review gate contradicts AGENTS.md ("show me the full diff and wait
 # for my approval"), so preview the exact lines that would be appended and
 # require an explicit separate approval here.
-GI_PROPOSED_LINES=(".wizard-managed-files.json" "!.agents/")
+GI_PROPOSED_LINES=("!.agents/")
 while IFS= read -r ide; do
   case "$ide" in
     claude-code) GI_PROPOSED_LINES+=("!.claude/") ;;
@@ -2231,13 +2231,28 @@ for line in "${GI_PROPOSED_LINES[@]}"; do
   fi
 done
 
+# Older wizard versions ignored the state and the manifest. Both are versioned now (teammates
+# reuse them instead of re-running /wf-init), so the legacy entries are proposed for removal
+# in this same approval. Declining keeps the old behavior: the files stay local and ignored.
+GI_REMOVE_LINES=()
+for line in ".wizard-state.json" ".wizard-managed-files.json"; do
+  if grep -qxF "$line" .gitignore 2>/dev/null; then
+    GI_REMOVE_LINES+=("$line")
+  fi
+done
+
 APPROVE_GITIGNORE="false"
 GI_HAD_CANDIDATES="false"
-if [[ ${#MISSING_GI_LINES[@]} -gt 0 ]]; then
+if [[ ${#MISSING_GI_LINES[@]} -gt 0 ]] || [[ ${#GI_REMOVE_LINES[@]} -gt 0 ]]; then
   GI_HAD_CANDIDATES="true"
   echo ""
-  echo "🛡️  .gitignore changes (wizard-managed entries to be appended and committed):"
-  printf '    + %s\n' "${MISSING_GI_LINES[@]}"
+  echo "🛡️  .gitignore changes (wizard-managed entries to be changed and committed):"
+  if [[ ${#MISSING_GI_LINES[@]} -gt 0 ]]; then
+    printf '    + %s\n' "${MISSING_GI_LINES[@]}"
+  fi
+  if [[ ${#GI_REMOVE_LINES[@]} -gt 0 ]]; then
+    printf '    - %s   (now versioned so teammates can reuse it)\n' "${GI_REMOVE_LINES[@]}"
+  fi
   echo ""
   _r5_ask "Append these .gitignore entries and include them in the commit?" APPROVE_GITIGNORE
 fi
@@ -2365,7 +2380,7 @@ wf_r6_snapshot() {
   fi
   {
     jq -j '(.added[]?, .updated[]?, .deleted[]?, .deleted_modified[]?) | .path + "\u0000"' "$PLAN"
-    printf '%s\0' ".gitignore" "AGENTS.md" ".wf-status"
+    printf '%s\0' ".gitignore" "AGENTS.md" ".wf-status" ".wizard-state.json" ".wizard-managed-files.json"
     if [[ "$APPROVE_OPENSPEC" == "true" ]] && [[ -d openspec ]]; then
       git ls-files -z -- openspec
     fi
@@ -2442,6 +2457,8 @@ KEPT_NOT_HEAD_R6=""
 STRUCT_AGENTS_WRITTEN="false"
 # Set when the stale SDD .wf-status cleanup removes the file.
 WF_STATUS_REMOVED="false"
+# State and manifest to commit with this refresh (filled in the git step; empty when git ignores them).
+WF_META_FILES=()
 # Apply-only mode: copy approved files to the working tree but do NOT stage or commit.
 APPLY_ONLY=$(jq -r '.build_plan.apply_only // false' "$STAGING_STATE")
 
@@ -2650,8 +2667,23 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
   }
 
   GITIGNORE_MODIFIED=false
+
+  # Remove an exact legacy line (rewritten via a temp file, never sed -i).
+  _gi_remove() {
+    local line="$1" tmp
+    if grep -qxF "$line" .gitignore 2>/dev/null; then
+      tmp=$(mktemp)
+      grep -vxF -- "$line" .gitignore > "$tmp" || true
+      cat "$tmp" > .gitignore
+      rm -f "$tmp"
+      GITIGNORE_MODIFIED=true
+    fi
+  }
+
   if [[ "$APPROVE_GITIGNORE" == "true" ]]; then
-    _gi_add ".wizard-managed-files.json"
+    # The state and the manifest are versioned now: drop the entries older wizards added.
+    _gi_remove ".wizard-state.json"
+    _gi_remove ".wizard-managed-files.json"
     _gi_add "!.agents/"
 
     while IFS= read -r ide; do
@@ -2712,6 +2744,46 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
   [[ "$APPROVE_DELETED_MODIFIED" == "true" ]] && DELETED_MODIFIED_COUNT=$DELETED_MODIFIED_REMOVED_COUNT
   [[ "$OPENSPEC_REMOVED" == "true" ]] && OPENSPEC_COUNT=$(tr -cd '\0' < "$OPENSPEC_LIST" | wc -c | tr -d '[:space:]')
 
+  # The manifest and the state are versioned (teammates reuse them), so they ride in the same
+  # commit and are written BEFORE staging. A failed commit is undone by the rollback snapshot,
+  # which covers both files, so a retry still runs the same plan from the same starting point.
+  jq -n \
+    --arg version "$TARGET_VERSION" \
+    --arg generated_at "$generated_at" \
+    --argjson files "$GENERATED_FILES" \
+    '{wizard_version: $version, generated_at: $generated_at, files: $files}' > ".wizard-managed-files.json"
+
+  # Kept-not-in-HEAD record: the paths the plan found plus the ones kept just now. Later runs
+  # read it and stay silent about them (see the retired-path scan in R4).
+  KEPT_JSON=$({ jq -r '.kept_not_in_head[]?' "$PLAN" 2>/dev/null || true; printf '%s' "$KEPT_NOT_HEAD_R6"; } | jq -R -s -c 'split("\n") | map(select(length > 0)) | unique')
+  # Update state build_plan in the STAGING state, then promote it below.
+  jq --argjson files "$GENERATED_FILES" --argjson paths "$MANAGED_PATHS" --argjson declined "$DECLINED_JSON" --argjson kept "$KEPT_JSON" \
+     '.build_plan.generated_files = $files | .build_plan.managed_paths = $paths | .migrations //= {} | .migrations.retired_pending = $declined | .migrations.kept_not_in_head = $kept | .updated_at = (now | todate)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
+  mv "$STAGING_STATE.tmp" "$STAGING_STATE"
+
+  # The state is committed: never promote machine-specific paths. Older builders recorded
+  # the wizard install dir in build_plan.builder_core.scripts (nothing reads it).
+  jq 'del(.build_plan.builder_core.scripts)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
+  mv "$STAGING_STATE.tmp" "$STAGING_STATE"
+
+  # Promote staging state to root (single source of truth for next refresh).
+  # apply_only is a per-run decision: drop it so the promoted state stays clean.
+  if [[ "$APPLY_ONLY" == "true" ]]; then
+    jq 'del(.build_plan.apply_only)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
+    mv "$STAGING_STATE.tmp" "$STAGING_STATE"
+  fi
+  cp "$STAGING_STATE" "$WF_STATE"
+  echo "✓ State promoted from staging to root"
+
+  # Commit the state and the manifest only when git does not ignore them. Already tracked files
+  # always qualify; a legacy .gitignore entry the user declined to remove keeps them local.
+  WF_META_FILES=()
+  for meta in .wizard-state.json .wizard-managed-files.json; do
+    if ! git check-ignore -q -- "$meta" 2>/dev/null; then
+      WF_META_FILES+=("$meta")
+    fi
+  done
+
   # Stage and commit only when not in apply-only mode (apply-only leaves the
   # changes unstaged in the working tree for the user to review and commit).
   if [[ "$APPLY_ONLY" != "true" ]]; then
@@ -2733,6 +2805,9 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
     # The regenerated Project Structure is in AGENTS.md, so it is staged in this run.
     if [[ "$STRUCT_AGENTS_WRITTEN" == "true" ]]; then
       printf 'AGENTS.md\0' >> "$GIT_ADD_LIST"
+    fi
+    if [[ ${#WF_META_FILES[@]} -gt 0 ]]; then
+      printf '%s\0' "${WF_META_FILES[@]}" >> "$GIT_ADD_LIST"
     fi
     if [ -s "$GIT_ADD_LIST" ]; then
       # Force-add: every path here was explicitly approved by the user, and some
@@ -2761,6 +2836,9 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
     if [[ "$STRUCT_AGENTS_WRITTEN" == "true" ]]; then
       printf 'AGENTS.md\0' >> "$COMMIT_PATHS"
     fi
+    if [[ ${#WF_META_FILES[@]} -gt 0 ]]; then
+      printf '%s\0' "${WF_META_FILES[@]}" >> "$COMMIT_PATHS"
+    fi
     if [[ "$OPENSPEC_REMOVED" == "true" ]]; then
       cat "$OPENSPEC_LIST" >> "$COMMIT_PATHS"
     fi
@@ -2773,6 +2851,10 @@ if [[ "$APPROVE_ADDED" == "true" ]] || [[ "$APPROVE_UPDATED" == "true" ]] || [[ 
       if [[ "$OPENSPEC_REMOVED" == "true" ]]; then
         OPENSPEC_MSG=$'\n- Removed SDD openspec/ directory (tracked files)'
       fi
+      META_MSG=""
+      if [[ ${#WF_META_FILES[@]} -gt 0 ]]; then
+        META_MSG=$'\n- Updated wizard state and manifest'
+      fi
       cat > "$COMMIT_MSG_FILE" <<MSG_EOF
 chore: refresh workflow to v$TARGET_VERSION
 
@@ -2780,7 +2862,7 @@ chore: refresh workflow to v$TARGET_VERSION
 - Added $ADDED_COUNT new files
 - Updated $UPDATED_COUNT files
 - Removed $DELETED_COUNT deprecated files
-- Removed $DELETED_MODIFIED_COUNT modified-deprecated files${OPENSPEC_MSG}
+- Removed $DELETED_MODIFIED_COUNT modified-deprecated files${OPENSPEC_MSG}${META_MSG}
 
 Generated with /wf-refresh
 MSG_EOF
@@ -2818,32 +2900,6 @@ MSG_EOF
 
   # The commit (or the apply-only step) is complete: the rollback no longer applies.
   ROLLBACK_ARMED="false"
-
-  # Manifest and state are written only after the commit succeeded (or in apply-only
-  # mode). A failed commit exits above: the rollback restores the working tree, the
-  # index and the state, so a retry runs the same plan from the same starting point.
-  jq -n \
-    --arg version "$TARGET_VERSION" \
-    --arg generated_at "$generated_at" \
-    --argjson files "$GENERATED_FILES" \
-    '{wizard_version: $version, generated_at: $generated_at, files: $files}' > ".wizard-managed-files.json"
-
-  # Kept-not-in-HEAD record: the paths the plan found plus the ones kept just now. Later runs
-  # read it and stay silent about them (see the retired-path scan in R4).
-  KEPT_JSON=$({ jq -r '.kept_not_in_head[]?' "$PLAN" 2>/dev/null || true; printf '%s' "$KEPT_NOT_HEAD_R6"; } | jq -R -s -c 'split("\n") | map(select(length > 0)) | unique')
-  # Update state build_plan in the STAGING state, then promote it below.
-  jq --argjson files "$GENERATED_FILES" --argjson paths "$MANAGED_PATHS" --argjson declined "$DECLINED_JSON" --argjson kept "$KEPT_JSON" \
-     '.build_plan.generated_files = $files | .build_plan.managed_paths = $paths | .migrations //= {} | .migrations.retired_pending = $declined | .migrations.kept_not_in_head = $kept | .updated_at = (now | todate)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
-  mv "$STAGING_STATE.tmp" "$STAGING_STATE"
-
-  # Promote staging state to root (single source of truth for next refresh).
-  # apply_only is a per-run decision: drop it so the promoted state stays clean.
-  if [[ "$APPLY_ONLY" == "true" ]]; then
-    jq 'del(.build_plan.apply_only)' "$STAGING_STATE" > "$STAGING_STATE.tmp"
-    mv "$STAGING_STATE.tmp" "$STAGING_STATE"
-  fi
-  cp "$STAGING_STATE" "$WF_STATE"
-  echo "✓ State promoted from staging to root"
 else
   if [[ "$WF_STATUS_REMOVED" == "true" ]]; then
     echo "ℹ No changes approved. The stale SDD .wf-status was removed even though nothing else changed; nothing was committed."
@@ -2875,10 +2931,12 @@ fi
     [[ -s "$COMMIT_PATHS" ]] && COMMITTED_COUNT=$(tr -cd '\0' < "$COMMIT_PATHS" | wc -c | tr -d '[:space:]')
     echo "Committed to git: $COMMITTED_COUNT files"
 
-    # Cross-validation warning: approved vs committed
+    # Cross-validation warning: approved vs committed. The state and the manifest are bookkeeping,
+    # not approved categories, so they are excluded from the committed count for this comparison.
     TOTAL_APPROVED=$((ADDED_COUNT + UPDATED_COUNT + DELETED_COUNT + DELETED_MODIFIED_COUNT + OPENSPEC_COUNT + STRUCT_AGENTS_EXTRA))
-    if [[ $TOTAL_APPROVED -gt 0 && $COMMITTED_COUNT -ne $TOTAL_APPROVED ]]; then
-      echo "⚠ WARNING: $TOTAL_APPROVED files approved but $COMMITTED_COUNT committed (difference: $((TOTAL_APPROVED - COMMITTED_COUNT)))"
+    COMMITTED_APPROVED=$((COMMITTED_COUNT - ${#WF_META_FILES[@]}))
+    if [[ $TOTAL_APPROVED -gt 0 && $COMMITTED_APPROVED -ne $TOTAL_APPROVED ]]; then
+      echo "⚠ WARNING: $TOTAL_APPROVED files approved but $COMMITTED_APPROVED committed (difference: $((TOTAL_APPROVED - COMMITTED_APPROVED)))"
       echo "  This can happen if files were already up-to-date, .gitignore filtered some paths, or untracked files were removed without a commit."
     fi
   else

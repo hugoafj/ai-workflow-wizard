@@ -1386,11 +1386,8 @@ def render_satellite(text, state, raw=None, strip_leading_comment=False):
 def record_build_plan(state, staging, core_created, skills_created, wf_dir, phase_now):
     """B6.5: record core build_plan facts into the staged state."""
     build = state.setdefault("build_plan", {})
+    # The state is versioned in the repo: never record machine-specific paths such as wf_dir.
     build["builder_core"] = {
-        "scripts": [
-            os.path.relpath(os.path.join(wf_dir, "lib", "builder-core.py")),
-            os.path.relpath(os.path.join(wf_dir, "lib", "builder-heavy.py")),
-        ],
         "core_generated": sorted(core_created),
         "core_skills": sorted(skills_created),
     }
