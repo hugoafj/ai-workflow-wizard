@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.11.2-beta.1...v0.12.0-beta.1) (2026-10-31)
+
+
+### Features
+
+* **wf-init:** version the wizard state so teammates skip /wf-init ([#197](https://github.com/hugoafj/ai-workflow-wizard/issues/197)) ([72335f5](https://github.com/hugoafj/ai-workflow-wizard/commit/72335f51d3aa9df5cbc31ca518d2f828a8635847))
+
 ## [0.11.2-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.11.1-beta.1...v0.11.2-beta.1) (2026-10-31)
 
 
