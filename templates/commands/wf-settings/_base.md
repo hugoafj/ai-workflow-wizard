@@ -78,15 +78,23 @@ Build the real state internally, and only show the menu (Phase 2).
 
 ## PHASE 2 — Show the settings menu
 
-Show the menu with the current state of each option. Sub-options only
-appear if the parent is active. The user writes the number of the option
-they want to adjust.
+Show the menu with the current state of each option. The user writes the
+number of the option they want to adjust.
 
 **MENU FORMAT — CRITICAL**:
 
 1. NEVER use code blocks (```) or markdown formatting for the menu.
-2. Show it as plain text, ONE option per line, sequential numbering.
-3. If the IDE collapses the lines, repeat until it displays correctly.
+2. Show it as plain text, ONE line per option.
+3. **FIXED NUMBERING — NEVER renumber**: always show all 14 options with the
+   numbers below, because each number maps to the `### N:` section in Phase 3.
+   Never hide an option or compact the numbers. An option that does not apply
+   is shown as `n/a (<reason>)`:
+   - 3, 4, 5 (testing extras): `n/a (testing is OFF)` when option 2 is OFF
+   - 7, 8, 9, 10 (CI sub-options): `n/a (CI is OFF)` when option 6 is OFF
+   - 11 (release-please standalone): `n/a (included in CI)` when option 6 is ON
+4. If the user picks an `n/a` option, explain why it does not apply (and which
+   option enables its parent) and apply nothing.
+5. If the IDE collapses the lines, repeat until it displays correctly.
 
 Example of how it should look:
 
@@ -697,8 +705,9 @@ jq '.ci.e2e_in_ci = <value>' .wizard-state.json > .wizard-state.json.tmp && mv .
 
 ### 11: release-please standalone
 
-> Only visible if CI = OFF. If CI is active, release-please is already
-> included and this option does not apply.
+> Only applicable if CI = OFF. If CI is active, release-please is already
+> included: the menu shows this option as `n/a (included in CI)` and, if the
+> user picks it, explain that and apply nothing.
 > **Single source**: the question text and artifact names live in
 > `templates/protocols/cicd/_base.md` (PHASE 5).
 

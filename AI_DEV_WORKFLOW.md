@@ -1696,7 +1696,7 @@ Unchanged from the original criteria: no mass retrofitting of tests onto legacy 
 
 Once `/wf-init` has run, several decisions the developer made (testing, testing extras, Decision Ladder, CI/CD, release strategy, active IDEs/CLIs) are fixed in the project, but they are not immutable, and it shouldn't require editing files by hand or re-running full `wf-init` to change them. `/wf-settings` (new standalone file, same format as `wf-onboard.md` and `wf-worktree.md`) closes that gap.
 
-**The modules it manages** (options 1–15 in `/wf-settings`):
+**The modules it manages** (options 1–14 in `/wf-settings`):
 
 | Module | What it toggles | Risk when changing |
 |---|---|---|
@@ -1713,7 +1713,7 @@ Once `/wf-init` has run, several decisions the developer made (testing, testing 
 | Release strategy (13) | Tag-based (`v*`) or push-to-main deploy trigger | Medium: changes how CD fires |
 | IDEs/CLIs (14) | Add/remove an active IDE: generates (satellite + commands + skills) or deletes everything related, downloading templates from the wizard's raw source | Real: creates or removes project files; requires explicit confirmation |
 
-**Note**: Option numbering in `/wf-settings` runs from 1 to 14. Option 1 maps to `wf-ladder`, option 2 to the testing infrastructure, and option 14 manages IDEs and CLIs. The `wf-conventional-pr` PR skill is always installed for every project and has no settings option.
+**Note**: Option numbering in `/wf-settings` runs from 1 to 14 and is **fixed**: the menu always shows all 14 options and never renumbers them, because each number maps to its `### N:` section. Options that do not apply are shown as `n/a (<reason>)` (3–5 when testing is OFF, 7–10 when CI is OFF, 11 when CI is ON), and choosing one applies nothing. Option 1 maps to `wf-ladder`, option 2 to the testing infrastructure, and option 14 manages IDEs and CLIs. The `wf-conventional-pr` PR skill is always installed for every project and has no settings option.
 
 **Interaction pattern**: the command always shows the real state first (reading `.wizard-state.json` and `AGENTS.md` directly, never assuming what the developer remembers choosing), lets you choose one or several changes, applies and confirms each individually, and asks "anything else?" before closing with a consolidated commit, without `git push`, like the rest of this workflow.
 
