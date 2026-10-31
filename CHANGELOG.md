@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.2-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.11.1-beta.1...v0.11.2-beta.1) (2026-10-31)
+
+
+### Bug Fixes
+
+* **wf-settings:** keep fixed menu numbering, show n/a for inapplicable options ([#195](https://github.com/hugoafj/ai-workflow-wizard/issues/195)) ([ee6dce6](https://github.com/hugoafj/ai-workflow-wizard/commit/ee6dce6b09c54e6aab40eed00aa92184b22fa888))
+
 ## [0.11.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.11.0-beta.1...v0.11.1-beta.1) (2026-10-30)
 
 
