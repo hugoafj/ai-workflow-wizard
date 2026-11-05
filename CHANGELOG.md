@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.12.0-beta.1...v0.13.0-beta.1) (2026-11-05)
+
+
+### Features
+
+* **wf-init:** configure testing per Node framework ([#199](https://github.com/hugoafj/ai-workflow-wizard/issues/199)) ([09438f4](https://github.com/hugoafj/ai-workflow-wizard/commit/09438f4e7332837d78a70b6b2353635ceecd3b24))
+
 ## [0.12.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.11.2-beta.1...v0.12.0-beta.1) (2026-10-31)
 
 
