@@ -209,7 +209,10 @@ MCP Status:
 cat package.json | grep '"dev"\|"build"\|"test"'
 ```
 
-Show the main project commands and confirm the developer can start:
+Show the main project commands, taken from the scripts that really exist in `package.json`
+(the example below is for a Vite project: a Nest project lists `npm run start:dev`, an Angular
+one `npm start`, and `test:e2e` is omitted when the project has no E2E layer), and confirm the
+developer can start:
 
 ```
 Your environment is configured. Main commands for this project:

@@ -236,6 +236,10 @@ wf_unit_config_target() {
     | if $k then .unit_configs[$k].target else empty end'
 }
 
+# True when <dir> holds a file whose name matches <glob>. Uses find, not a shell glob: zsh (the
+# default macOS shell) aborts a command whose glob matches nothing and prints an error.
+_wf_has_file() { [ -n "$(find "$1" -maxdepth 1 -type f -name "$2" 2>/dev/null | head -n 1)" ]; }
+
 # Detect an already-configured unit test runner: its dependency AND its config, never one
 # alone (a dependency without config is a broken layer, not a configured one).
 # Prints vitest | jest | mocha | karma | native (an Angular CLI "test" target), or nothing.
@@ -245,19 +249,19 @@ wf_detect_runner() {
   dir=$(dirname "$pkg")
   deps=$(jq -r '((.dependencies // {}) + (.devDependencies // {})) | keys[]' "$pkg" 2>/dev/null) || return 0
   if printf '%s\n' "$deps" | grep -qx vitest \
-     && { ls "$dir"/vitest.config.* >/dev/null 2>&1 \
-          || grep -qE '^[[:space:]]*test[[:space:]]*:' "$dir"/vite.config.* 2>/dev/null; }; then
+     && { _wf_has_file "$dir" 'vitest.config.*' \
+          || find "$dir" -maxdepth 1 -type f -name 'vite.config.*' -exec grep -lE '^[[:space:]]*test[[:space:]]*:' {} + 2>/dev/null | grep -q .; }; then
     echo vitest; return 0
   fi
   if printf '%s\n' "$deps" | grep -qx jest \
-     && { ls "$dir"/jest.config.* >/dev/null 2>&1 || jq -e '.jest' "$pkg" >/dev/null 2>&1; }; then
+     && { _wf_has_file "$dir" 'jest.config.*' || jq -e '.jest' "$pkg" >/dev/null 2>&1; }; then
     echo jest; return 0
   fi
   if printf '%s\n' "$deps" | grep -qx mocha \
-     && { ls "$dir"/.mocharc.* >/dev/null 2>&1 || jq -e '.mocha' "$pkg" >/dev/null 2>&1; }; then
+     && { _wf_has_file "$dir" '.mocharc.*' || jq -e '.mocha' "$pkg" >/dev/null 2>&1; }; then
     echo mocha; return 0
   fi
-  if printf '%s\n' "$deps" | grep -qx karma && ls "$dir"/karma.conf.* >/dev/null 2>&1; then
+  if printf '%s\n' "$deps" | grep -qx karma && _wf_has_file "$dir" 'karma.conf.*'; then
     echo karma; return 0
   fi
   if [ -f "$dir/angular.json" ] \

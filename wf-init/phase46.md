@@ -34,6 +34,8 @@ data file, `templates/protocols/testing/profiles.md`, read through `wf_testing_p
 phase from the profile, not from the examples below.
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
 FRAMEWORK=$(jq -r '.discovery.stack.framework // "generic"' .wizard-state.json)
 PROFILE=$(wf_profile_for_framework "$FRAMEWORK")
 PROFILE_JSON=$(wf_testing_profile "$PROFILE") || { echo "Cannot read the testing profiles; stopping." >&2; exit 1; }

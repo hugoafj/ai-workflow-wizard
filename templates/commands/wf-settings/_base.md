@@ -57,6 +57,7 @@ jq -r '.features.ci // false' .wizard-state.json 2>/dev/null
 jq -r '.features.release_please // false' .wizard-state.json 2>/dev/null
 jq -r '.testing.coverage_threshold // null' .wizard-state.json 2>/dev/null
 jq -r '.testing.visual_regression // false' .wizard-state.json 2>/dev/null
+jq -c '.testing.layers // []' .wizard-state.json 2>/dev/null
 jq -r '.testing.page_object_model // false' .wizard-state.json 2>/dev/null
 jq -r '.ci.e2e_in_ci // false' .wizard-state.json 2>/dev/null
 jq -r '.ci.ai_reviewer // "none"' .wizard-state.json 2>/dev/null
@@ -90,6 +91,8 @@ number of the option they want to adjust.
    Never hide an option or compact the numbers. An option that does not apply
    is shown as `n/a (<reason>)`:
    - 3, 4, 5 (testing extras): `n/a (testing is OFF)` when option 2 is OFF
+   - 4, 5 (visual regression, Page Object Model), additionally: `n/a (the E2E layer is not active)`
+     when `testing.layers` has no `e2e` (API profiles hide that layer by default)
    - 3 (coverage targets), additionally: `n/a (the project keeps its own runner config)` when
      `testing.runner_existing` is true, or `n/a (no wizard-managed unit config)` when the profile
      generates none (angular, generic without Vitest). The wizard never edits a runner config it
@@ -212,9 +215,14 @@ Do you want to keep it as is or change it?
 
 **If they want to change (enable)**: set up the test infrastructure the same way
 `wf-init.md` Phase 4.6 does (detect the test runner, then configure the unit,
-integration, and E2E layers the user chooses). Add the `## Testing Approach`
-section to `AGENTS.md`, using the verbatim content of
-`templates/protocols/testing/testing-approach.section.md`.
+integration, and E2E layers the user chooses), including the profile resolution and
+the existing-runner detection, and persist `testing.profile`, `runner`, `runner_existing`,
+`environment` and `test_pattern`. The `## Testing Approach` section of `AGENTS.md` is
+generated from `state.testing.profile` (file conventions from `profiles.md`, the coverage
+matrix from `testing-approach.section.md` for UI profiles or
+`testing-approach.backend.section.md` for API profiles, and the `data-testid` convention only for
+UI profiles), so do not paste `testing-approach.section.md` verbatim: it describes hooks and
+components. `/wf-refresh` regenerates the same section from the state.
 
 After enabling, ask about options:
 

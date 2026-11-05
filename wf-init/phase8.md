@@ -253,7 +253,9 @@ fi
                 echo "8.1c — profile $PROFILE installs no unit packages (the project's own runner is used)."
               else
                 echo "8.1c — installing $PROFILE unit packages: $UNIT_PKGS"
-                if npm install --save-dev $UNIT_PKGS; then
+                # xargs does the splitting: an unquoted $UNIT_PKGS stays ONE argument in zsh,
+                # the default macOS shell, and npm would reject it.
+                if echo "$PROFILE_JSON" | jq -r '.packages[]' | xargs npm install --save-dev; then
                   echo "8.1c OK — unit packages installed"
                 else
                   echo "8.1c WARNING — npm install failed (exit $?). Check package.json and network." >&2
