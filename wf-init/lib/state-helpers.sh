@@ -105,6 +105,7 @@ wf_state_init() {
     "runner_detected": null,
     "profile": null,
     "runner": null,
+    "runner_existing": null,
     "environment": null,
     "test_pattern": null,
     "layers": [],

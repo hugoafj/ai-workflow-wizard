@@ -133,14 +133,40 @@ def _heuristic_description(script_name: str) -> str:
     # Fallback
     return f"Run {script_name} script"
 
-def describe_command(script_name: str, stack_key: str = "") -> str:
-    """Get description for a command: stack override > heuristic > generic."""
+# Display names for runners other than Vitest (the "node" overrides above name Vitest).
+RUNNER_LABELS = {"jest": "Jest", "karma": "Karma", "mocha": "Mocha"}
+
+
+def _rebrand_runner(desc, runner):
+    """Swap the Vitest brand in a test description for the project's runner.
+
+    runner None/"" or "vitest" keeps the legacy wording unchanged; a runner without
+    a display name (e.g. "native") drops the brand instead of naming the wrong tool.
+    """
+    if not runner or runner == "vitest" or "Vitest" not in desc:
+        return desc
+    label = RUNNER_LABELS.get(runner)
+    if label:
+        return desc.replace("Vitest", label)
+    return desc.replace(" (Vitest)", "")
+
+
+def describe_command(script_name: str, stack_key: str = "", runner: str = None) -> str:
+    """Get description for a command: stack override > heuristic > generic.
+
+    `runner` is state.testing.runner; it re-brands the test descriptions so a Jest
+    or native-runner project is not documented as a Vitest one.
+    """
     stack = (stack_key or "").lower()
+    desc = None
     # Match stack prefix (e.g., "node-react" -> "node")
     for prefix, overrides in STACK_OVERRIDES.items():
         if stack.startswith(prefix) and script_name in overrides:
-            return overrides[script_name]
-    return _heuristic_description(script_name)
+            desc = overrides[script_name]
+            break
+    if desc is None:
+        desc = _heuristic_description(script_name)
+    return _rebrand_runner(desc, runner)
 
 def detect_project_structure(project_root: str) -> str:
     """Generate tree from actual filesystem (respecting common ignore patterns)."""
@@ -327,6 +353,40 @@ def sha256_text(text):
 def unresolved_placeholders(text):
     """Return leftover `{{...}}` that are NOT legitimate `${{ ... }}` expressions."""
     return re.findall(r"(?<!\$)\{\{[^}]*\}\}", text)
+
+
+# ---------------------------------------------------------------------------
+# Testing profiles (templates/protocols/testing/profiles.md)
+# ---------------------------------------------------------------------------
+
+_PROFILES_CACHE = {}
+
+
+def load_testing_profiles(raw):
+    """Fetch and parse the testing profile data (cached per template base)."""
+    if raw not in _PROFILES_CACHE:
+        text = fetch_with_retries(base_url(raw, "templates/protocols/testing/profiles.md"))
+        _PROFILES_CACHE[raw] = json.loads(extract_block(text, "json"))
+    return _PROFILES_CACHE[raw]
+
+
+def testing_profile(raw, state):
+    """Resolve (name, profile) for state.testing.profile.
+
+    A null profile is a legacy state and resolves to the data file's default
+    (react), the behavior every Node project had before profiles existed. An
+    unknown name also falls back to the default, with a warning on stderr.
+    """
+    data = load_testing_profiles(raw)
+    profiles = data["profiles"]
+    name = get_state_value(state, "testing.profile")
+    if not name:
+        name = data["default"]
+    elif name not in profiles:
+        print("builder: unknown testing.profile %r, using %r" % (name, data["default"]),
+              file=sys.stderr)
+        name = data["default"]
+    return name, profiles[name]
 
 
 # ---------------------------------------------------------------------------
@@ -627,7 +687,7 @@ def infer_placeholder(state, key):
             for c in commands:
                 # Extract script name (after "npm run " or just the command)
                 script_name = c.replace("- npm run ", "").replace("npm run ", "").strip()
-                desc = describe_command(script_name, stack)
+                desc = describe_command(script_name, stack, get_state_value(state, "testing.runner"))
                 lines.append("- %s — %s" % (c, desc))
             return "\n".join(lines)
         detected = detect_package_scripts()
@@ -637,7 +697,7 @@ def infer_placeholder(state, key):
             for c in detected.split(","):
                 c = c.strip()
                 script_name = c.replace("npm run ", "").strip()
-                desc = describe_command(script_name, stack)
+                desc = describe_command(script_name, stack, get_state_value(state, "testing.runner"))
                 bulleted_lines.append("- %s — %s" % (c, desc))
             bulleted = "\n".join(bulleted_lines)
             _warn_fallback(key, bulleted)
@@ -804,7 +864,7 @@ def resolve_placeholder(state, key):
             lines = []
             for v in value:
                 script_name = v.replace("- npm run ", "").replace("npm run ", "").strip()
-                desc = describe_command(script_name, stack)
+                desc = describe_command(script_name, stack, get_state_value(state, "testing.runner"))
                 lines.append("- %s — %s" % (v, desc))
             return "\n".join(lines)
         if isinstance(value, list):
@@ -957,6 +1017,11 @@ def testing_approach_section(state, raw=None):
     layers = normalize_layers(state)
     has_unit = "unit" in layers or "integration" in layers
     has_e2e = "e2e" in layers
+    # The file conventions and the UI/data-testid rules come from the testing
+    # profile (profiles.md). Without a template base there is no profile data,
+    # so the convention bullets are skipped, like the other template-fed parts.
+    profile = testing_profile(raw, state)[1] if raw and (has_unit or has_e2e) else None
+    ui = profile["ui"] if profile else True
     lines = []
     if has_unit:
         lines += [
@@ -967,10 +1032,13 @@ def testing_approach_section(state, raw=None):
             "```bash",
             "npm run test",
             "```",
-            "",
-            "- Unit: one test file next to the code it covers (`Component.test.tsx` next to the component).",
-            "- Integration: real render tests in `src/__tests__/integration/` (`*.integration.test.tsx`).",
         ]
+        if profile:
+            lines += [
+                "",
+                "- Unit: %s" % profile["unit_convention"],
+                "- Integration: %s" % profile["integration_convention"],
+            ]
     if has_e2e:
         lines += [
             "",
@@ -993,7 +1061,7 @@ def testing_approach_section(state, raw=None):
         # e2e projects, but nothing injected it into the generated AGENTS.md
         # and data-testid.section.md sat orphaned. Single source stays the
         # template file; append it verbatim when e2e is active.
-        if raw:
+        if raw and ui:
             try:
                 dt = fetch_with_retries(
                     base_url(raw, "templates/protocols/testing/data-testid.section.md"))
@@ -1004,7 +1072,7 @@ def testing_approach_section(state, raw=None):
             except RuntimeError:
                 pass
     if has_unit or has_e2e:
-        matrix, e2e_guidance = _testing_guidance_parts(raw)
+        matrix, e2e_guidance = _testing_guidance_parts(raw, ui)
         if matrix:
             lines += ["", matrix]
         if has_e2e and e2e_guidance:
@@ -1020,11 +1088,13 @@ def testing_approach_section(state, raw=None):
 TESTING_GUIDANCE_SPLIT = "### Playwright dual loop"
 
 
-def _testing_guidance_parts(raw):
+def _testing_guidance_parts(raw, ui=True):
     """Split templates/protocols/testing/testing-approach.section.md in two.
 
     Returns (coverage matrix, E2E guidance). The split point is the Playwright
     dual-loop heading. Returns ("", "") when there is no template base to read.
+    Stacks without UI (ui=False) get the backend matrix from
+    testing-approach.backend.section.md; the E2E guidance is shared.
     """
     if not raw:
         return "", ""
@@ -1035,6 +1105,12 @@ def _testing_guidance_parts(raw):
         return "", ""
     text = strip_internal_comment(text)
     head, sep, tail = text.partition(TESTING_GUIDANCE_SPLIT)
+    if not ui:
+        try:
+            head = strip_internal_comment(fetch_with_retries(
+                base_url(raw, "templates/protocols/testing/testing-approach.backend.section.md")))
+        except RuntimeError:
+            pass
     return head.strip(), (sep + tail).strip()
 
 

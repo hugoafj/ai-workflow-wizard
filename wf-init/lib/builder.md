@@ -409,19 +409,31 @@ For each command in the catalog (protocol `commands`) and each IDE ∈ IDES:
   protocols/cicd/hook.post-commit.tmpl.md}}`. Resolve it by injecting the body of
   `hook.post-commit.tmpl.md` WITHOUT the bash fence, WITHOUT the `#!/bin/bash` shebang,
   and WITHOUT the closing fence. Only the bare script.
-- If `LAYERS` includes unit/integration: write
-  `$WF_ROOT/templates/protocols/testing/vitest.config.tmpl.md` as
-  `STAGING/vitest.config.ts` (strip `# prose header` lines if they exist, no code fence).
-  Also generate `src/test/setup.ts` from `setup.tmpl.md`.
+- If `LAYERS` includes unit/integration, write the unit config chosen by the testing
+  profile. `$WF_ROOT/templates/protocols/testing/profiles.md` maps `state.testing.profile`
+  (null means `react`, the legacy behavior) to a `unit_configs` entry: template, target file,
+  coverage fragment and injection marker. Today that is `vitest.config.tmpl.md` (react),
+  `vitest.vue.config.tmpl.md` (vue), `vitest.node.config.tmpl.md` (node-api, and generic
+  when `state.testing.runner` is `vitest`) written as `STAGING/vitest.config.ts`, and
+  `jest.config.nest.tmpl.md` (nest) written as `STAGING/jest.config.js`. Angular and a
+  generic project without a Vitest runner get no unit config. Skip the whole step when
+  `state.testing.runner_existing` is true: the project keeps its own runner and config.
+  Strip `# prose header` lines if they exist, no code fence.
+  The react profile also expects `src/test/setup.ts` from `setup.tmpl.md`
+  (`builder-heavy.py` does not stage it today; the other profiles need no setup file).
   - **Coverage extra (fragment injection)**: if `state.testing.coverage_threshold` is a
-    number, inject `$WF_ROOT/templates/protocols/testing/coverage-thresholds.tmpl.md` inside
-    the `test: { ... }` block of the generated `vitest.config.ts` (before the closing `}`),
-    resolving `{{threshold}}` → `state.testing.coverage_threshold`.
+    number, inject the profile's coverage fragment (`coverage-thresholds.tmpl.md` for
+    Vitest, `coverage-thresholds.jest.tmpl.md` for Jest) at the entry's marker (inside the
+    `test: { ... }` block, or right after `module.exports = {`), resolving `{{threshold}}`
+    → `state.testing.coverage_threshold`.
 - If `LAYERS` includes e2e: write
   `$WF_ROOT/templates/protocols/testing/playwright.config.tmpl.md` as
   `STAGING/playwright.config.ts` (strip `# prose header`). Also
   `$WF_ROOT/templates/protocols/testing/e2e-example.tmpl.md` as
   `STAGING/e2e/example.spec.ts` (raw, already clean). Install browsers.
+  The template targets a Vite dev server; when the profile sets `dev_port` / `dev_command`
+  (angular 4200 / `npm start`, nest and node-api 3000, `npm run start:dev` for nest) replace
+  `http://localhost:5173` and `command: 'npm run dev'` with them.
   - **Visual regression extra (fragment injection)**: if `state.testing.visual_regression ==
     true`, inject `$WF_ROOT/templates/protocols/testing/visual-snapshots.tmpl.md` inside the
     `defineConfig({ ... })` block of the generated `playwright.config.ts` (before the closing

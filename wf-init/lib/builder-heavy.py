@@ -198,27 +198,43 @@ def write_hook(raw, state, staging):
 # ---------------------------------------------------------------------------
 
 def write_testing_configs(raw, state, staging):
-    """Write vitest/playwright configs with fragment injection (B8 testing)."""
+    """Write the unit and playwright configs with fragment injection (B8 testing).
+
+    The unit config comes from the testing profile (templates/protocols/testing/
+    profiles.md): react, vue and node-api get a Vitest config, nest a Jest config,
+    angular and a generic project whose runner is not Vitest get none. A project
+    that keeps its own runner (state.testing.runner_existing) gets no unit config.
+    """
     created = []
     layers = builder_core.normalize_layers(state)
+    if not layers:
+        return created  # no testing layers: do not fetch profile data at all
+    _, profile = builder_core.testing_profile(raw, state)
+    unit_configs = builder_core.load_testing_profiles(raw)["unit_configs"]
+    runner = builder_core.get_state_value(state, "testing.runner") or ""
+    cfg_key = profile["unit_config"] or profile["unit_config_by_runner"].get(runner)
+    runner_existing = bool(builder_core.get_state_value(state, "testing.runner_existing", False))
 
-    # Vitest (unit/integration layers).
-    if "unit" in layers or "integration" in layers:
+    # Unit config (unit/integration layers).
+    if ("unit" in layers or "integration" in layers) and cfg_key and not runner_existing:
+        spec = unit_configs[cfg_key]
         cfg = builder_core.fetch_with_retries(
-            builder_core.base_url(raw, "templates/protocols/testing/vitest.config.tmpl.md"))
-        cfg = builder_core.extract_block(cfg, "typescript")
-        # Inject coverage fragment inside the test: { } block. Skipped when the
-        # threshold is null, otherwise the config would render "lines: None".
+            builder_core.base_url(raw, "templates/protocols/testing/" + spec["template"]))
+        cfg = builder_core.extract_block(
+            cfg, "javascript" if spec["target"].endswith(".js") else "typescript")
+        # Inject the coverage fragment right after the config marker (the
+        # test: { } block for Vitest, the exported object for Jest). Skipped when
+        # the threshold is null, otherwise the config would render "lines: None".
         threshold = builder_core.get_state_value(state, "testing.coverage_threshold", "80")
         if threshold is not None:
             frag = builder_core.fetch_with_retries(
-                builder_core.base_url(raw, "templates/protocols/testing/coverage-thresholds.tmpl.md"))
+                builder_core.base_url(raw, "templates/protocols/testing/" + spec["coverage"]))
             frag = builder_core.strip_prose_header(frag)
             frag = frag.replace("{{threshold}}", str(threshold))
-            # Indent the fragment to sit inside the test: { } block (F11).
-            frag = textwrap.indent(frag, "    ")
-            cfg = cfg.replace("test: {\n", "test: {\n" + frag + "\n")
-        target = os.path.join(staging, "vitest.config.ts")
+            # Indent the fragment to sit inside the marked block (F11).
+            frag = textwrap.indent(frag, " " * spec["indent"])
+            cfg = cfg.replace(spec["marker"], spec["marker"] + frag + "\n")
+        target = os.path.join(staging, spec["target"])
         with open(target, "w", encoding="utf-8") as fh:
             fh.write(cfg + "\n")
         created.append(os.path.relpath(target, staging))
@@ -228,6 +244,12 @@ def write_testing_configs(raw, state, staging):
         cfg = builder_core.fetch_with_retries(
             builder_core.base_url(raw, "templates/protocols/testing/playwright.config.tmpl.md"))
         cfg = builder_core.extract_block(cfg, "typescript")
+        # The base template targets a Vite dev server (npm run dev, port 5173);
+        # profiles with a different dev server override both values.
+        if profile.get("dev_port"):
+            cfg = cfg.replace("http://localhost:5173", "http://localhost:%d" % profile["dev_port"])
+        if profile.get("dev_command"):
+            cfg = cfg.replace("command: 'npm run dev'", "command: '%s'" % profile["dev_command"])
         frag = builder_core.fetch_with_retries(
             builder_core.base_url(raw, "templates/protocols/testing/visual-snapshots.tmpl.md"))
         frag = builder_core.strip_prose_header(frag)

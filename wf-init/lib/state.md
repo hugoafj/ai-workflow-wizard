@@ -96,6 +96,7 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
     "runner_detected": null,
     "profile": null,
     "runner": null,
+    "runner_existing": null,
     "environment": null,
     "test_pattern": null,
     "layers": [],
@@ -177,8 +178,15 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
 - **`testing.runner`** / **`testing.environment`** / **`testing.test_pattern`**: the runner in
   use (`vitest` | `jest` | `karma` | ...), its test environment (`jsdom` | `node`) and the test
   file convention. When the project already has a configured runner, phase 4.6 records that one
-  and installs nothing for the unit layer; otherwise it records the profile default.
+  and sets `testing.runner_existing = true`; otherwise it records the profile default.
   `testing.runner_detected` keeps the raw detection result.
+- **`testing.runner_existing`**: `true` when the project already owns a configured unit runner
+  (its dependency AND its config). The wizard then keeps it: the Builder writes no unit config,
+  phase 8 installs no unit packages and does not touch the `test` scripts. `null`/`false` means
+  the wizard owns the runner (legacy states included, which keeps their previous behavior).
+- **Testing profile data**: `templates/protocols/testing/profiles.md` is the single source for what
+  each profile installs, generates and documents. The Builder reads it; a new framework is one
+  entry there plus its config template.
 - **`discovery.commands`**: array of npm script names detected in phase 1. The Builder renders
   the AGENTS.md **Commands** section from it; when absent, the Builder re-detects from
   `package.json` and warns.

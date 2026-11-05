@@ -1,0 +1,141 @@
+# Testing profiles
+
+<!--
+  SINGLE SOURCE of the per-framework testing data. Read by the Builder
+  (builder-core.py: AGENTS.md Testing Approach and command descriptions;
+  builder-heavy.py: unit/e2e config generation) and by phase46 / phase8
+  (menu, packages, scripts). Adding a framework = one entry in "profiles"
+  (plus its config template when it needs one); no phase or builder edit.
+
+  Framework -> profile mapping lives in wf-init/lib/state-helpers.sh
+  (wf_profile_for_framework). The profile name is stored in state.testing.profile.
+  A null or unknown profile resolves to "default" (react), the behavior every
+  Node project had before profiles existed.
+-->
+
+## Fields
+
+- `runner` / `environment`: what the wizard installs when the project has no runner.
+  `null` means the wizard does not pick one (the user decides in phase 4.6).
+- `ui`: the stack renders UI, so Testing Library style tests and the `data-testid`
+  convention apply.
+- `e2e`: `offer` shows the Playwright layer in phase 4.6, `off` hides it (API stacks).
+- `unit_config`: key into `unit_configs`; `null` means the wizard writes no unit config.
+  `unit_config_by_runner` is the fallback keyed by the runner the user chose.
+- `packages` / `scripts`: installed in phase 8 (8.1c) and set in `package.json` (8.1e)
+  only when the wizard owns the runner (`state.testing.runner_existing` is not true).
+- `dummy_test_import`: first line of the placeholder test phase 8 writes when the project
+  has no tests yet (empty when the runner provides globals).
+- `unit_convention` / `integration_convention`: bullets for AGENTS.md Testing Approach.
+- `dev_command` / `dev_port`: Playwright `webServer` values when they differ from the
+  Vite defaults of the base template (`npm run dev`, 5173); `null` keeps the template.
+
+```json
+{
+  "default": "react",
+  "profiles": {
+    "react": {
+      "label": "React (Vitest + Testing Library)",
+      "runner": "vitest",
+      "environment": "jsdom",
+      "ui": true,
+      "e2e": "offer",
+      "unit_config": "vitest-react",
+      "unit_config_by_runner": {},
+      "packages": ["vitest", "@testing-library/react", "@testing-library/user-event", "@testing-library/jest-dom", "@testing-library/dom", "jsdom", "@vitest/ui", "@vitest/coverage-v8", "@vitejs/plugin-react"],
+      "scripts": {"test": "vitest", "test:ui": "vitest --ui", "test:coverage": "vitest run --coverage"},
+      "dummy_test_import": "import { describe, it, expect } from 'vitest'",
+      "unit_convention": "one test file next to the code it covers (`Component.test.tsx` next to the component).",
+      "integration_convention": "real render tests in `src/__tests__/integration/` (`*.integration.test.tsx`).",
+      "dev_command": null,
+      "dev_port": null
+    },
+    "vue": {
+      "label": "Vue / Nuxt (Vitest + Vue Test Utils)",
+      "runner": "vitest",
+      "environment": "jsdom",
+      "ui": true,
+      "e2e": "offer",
+      "unit_config": "vitest-vue",
+      "unit_config_by_runner": {},
+      "packages": ["vitest", "@vue/test-utils", "jsdom", "@vitest/ui", "@vitest/coverage-v8", "@vitejs/plugin-vue"],
+      "scripts": {"test": "vitest", "test:ui": "vitest --ui", "test:coverage": "vitest run --coverage"},
+      "dummy_test_import": "import { describe, it, expect } from 'vitest'",
+      "unit_convention": "one test file next to the code it covers (`Component.test.ts` next to the component).",
+      "integration_convention": "mounted-component tests in `src/__tests__/integration/` (`*.integration.test.ts`).",
+      "dev_command": null,
+      "dev_port": null
+    },
+    "node-api": {
+      "label": "Node API: Express, Fastify, Hono, Koa (Vitest + supertest)",
+      "runner": "vitest",
+      "environment": "node",
+      "ui": false,
+      "e2e": "off",
+      "unit_config": "vitest-node",
+      "unit_config_by_runner": {},
+      "packages": ["vitest", "supertest", "@types/supertest", "@vitest/ui", "@vitest/coverage-v8"],
+      "scripts": {"test": "vitest", "test:ui": "vitest --ui", "test:coverage": "vitest run --coverage"},
+      "dummy_test_import": "import { describe, it, expect } from 'vitest'",
+      "unit_convention": "one test file next to the module it covers (`users.service.test.ts` next to `users.service.ts`).",
+      "integration_convention": "HTTP-level tests with supertest in `test/integration/` (`*.integration.test.ts`).",
+      "dev_command": "npm run dev",
+      "dev_port": 3000
+    },
+    "nest": {
+      "label": "NestJS (Jest + supertest)",
+      "runner": "jest",
+      "environment": "node",
+      "ui": false,
+      "e2e": "off",
+      "unit_config": "jest-nest",
+      "unit_config_by_runner": {},
+      "packages": ["jest", "ts-jest", "@types/jest", "@nestjs/testing", "supertest", "@types/supertest"],
+      "scripts": {"test": "jest", "test:watch": "jest --watch", "test:coverage": "jest --coverage"},
+      "dummy_test_import": "",
+      "unit_convention": "one `*.spec.ts` next to the provider, controller or pipe it covers (`users.service.spec.ts` next to `users.service.ts`), built with `@nestjs/testing`.",
+      "integration_convention": "supertest tests against the Nest app in `test/` (`*.e2e-spec.ts`).",
+      "dev_command": "npm run start:dev",
+      "dev_port": 3000
+    },
+    "angular": {
+      "label": "Angular (the project's native runner)",
+      "runner": null,
+      "environment": null,
+      "ui": true,
+      "e2e": "offer",
+      "unit_config": null,
+      "unit_config_by_runner": {},
+      "packages": [],
+      "scripts": {},
+      "dummy_test_import": "",
+      "unit_convention": "one `*.spec.ts` next to the component, service or pipe it covers (`app.component.spec.ts` next to `app.component.ts`).",
+      "integration_convention": "`TestBed` tests that render a component with its real child components, in the same `*.spec.ts` file or an `*.integration.spec.ts` beside it.",
+      "dev_command": "npm start",
+      "dev_port": 4200
+    },
+    "generic": {
+      "label": "Other Node project (you choose the runner)",
+      "runner": null,
+      "environment": null,
+      "ui": false,
+      "e2e": "offer",
+      "unit_config": null,
+      "unit_config_by_runner": {"vitest": "vitest-node"},
+      "packages": ["vitest", "@vitest/ui", "@vitest/coverage-v8"],
+      "scripts": {"test": "vitest", "test:ui": "vitest --ui", "test:coverage": "vitest run --coverage"},
+      "dummy_test_import": "import { describe, it, expect } from 'vitest'",
+      "unit_convention": "one test file next to the code it covers, following the naming the project already uses.",
+      "integration_convention": "tests that exercise several modules together, in the folder the project already uses for them.",
+      "dev_command": null,
+      "dev_port": null
+    }
+  },
+  "unit_configs": {
+    "vitest-react": {"template": "vitest.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "marker": "test: {\n", "indent": 4},
+    "vitest-vue": {"template": "vitest.vue.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "marker": "test: {\n", "indent": 4},
+    "vitest-node": {"template": "vitest.node.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "marker": "test: {\n", "indent": 4},
+    "jest-nest": {"template": "jest.config.nest.tmpl.md", "target": "jest.config.js", "coverage": "coverage-thresholds.jest.tmpl.md", "marker": "module.exports = {\n", "indent": 2}
+  }
+}
+```
