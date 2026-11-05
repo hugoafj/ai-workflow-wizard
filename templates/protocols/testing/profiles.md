@@ -30,6 +30,8 @@
   only when the wizard owns the runner (`state.testing.runner_existing` is not true).
 - `dummy_test_import`: first line of the placeholder test phase 8 writes when the project
   has no tests yet (empty when the runner provides globals).
+- `dummy_test_suffix`: file suffix of that placeholder test (`.spec.ts` for Nest, whose Jest
+  config only finds `*.spec.ts`); `null` means phase 8 writes none (Angular generates its own specs).
 - `unit_convention` / `integration_convention`: bullets for AGENTS.md Testing Approach.
 - `dev_command` / `dev_port`: Playwright `webServer` values when they differ from the
   Vite defaults of the base template (`npm run dev`, 5173); `null` keeps the template.
@@ -50,6 +52,7 @@
       "packages": ["vitest", "@testing-library/react", "@testing-library/user-event", "@testing-library/jest-dom", "@testing-library/dom", "jsdom", "@vitest/ui", "@vitest/coverage-v8", "@vitejs/plugin-react"],
       "scripts": {"test": "vitest", "test:ui": "vitest --ui", "test:coverage": "vitest run --coverage"},
       "dummy_test_import": "import { describe, it, expect } from 'vitest'",
+      "dummy_test_suffix": ".test.ts",
       "unit_convention": "one test file next to the code it covers (`Component.test.tsx` next to the component).",
       "integration_convention": "real render tests in `src/__tests__/integration/` (`*.integration.test.tsx`).",
       "dev_command": null,
@@ -67,6 +70,7 @@
       "packages": ["vitest", "@testing-library/react", "@testing-library/user-event", "@testing-library/jest-dom", "@testing-library/dom", "jsdom", "@vitest/ui", "@vitest/coverage-v8", "@vitejs/plugin-react"],
       "scripts": {"test": "vitest", "test:ui": "vitest --ui", "test:coverage": "vitest run --coverage"},
       "dummy_test_import": "import { describe, it, expect } from 'vitest'",
+      "dummy_test_suffix": ".test.ts",
       "unit_convention": "one test file next to the code it covers (`Component.test.tsx` next to the component).",
       "integration_convention": "real render tests in `src/__tests__/integration/` (`*.integration.test.tsx`).",
       "dev_command": null,
@@ -84,6 +88,7 @@
       "packages": ["vitest", "@vue/test-utils", "jsdom", "@vitest/ui", "@vitest/coverage-v8", "@vitejs/plugin-vue"],
       "scripts": {"test": "vitest", "test:ui": "vitest --ui", "test:coverage": "vitest run --coverage"},
       "dummy_test_import": "import { describe, it, expect } from 'vitest'",
+      "dummy_test_suffix": ".test.ts",
       "unit_convention": "one test file next to the code it covers (`Component.test.ts` next to the component).",
       "integration_convention": "mounted-component tests in `src/__tests__/integration/` (`*.integration.test.ts`).",
       "dev_command": null,
@@ -101,6 +106,7 @@
       "packages": ["vitest", "supertest", "@types/supertest", "@vitest/ui", "@vitest/coverage-v8"],
       "scripts": {"test": "vitest", "test:ui": "vitest --ui", "test:coverage": "vitest run --coverage"},
       "dummy_test_import": "import { describe, it, expect } from 'vitest'",
+      "dummy_test_suffix": ".test.ts",
       "unit_convention": "one test file next to the module it covers (`users.service.test.ts` next to `users.service.ts`).",
       "integration_convention": "HTTP-level tests with supertest in `test/integration/` (`*.integration.test.ts`).",
       "dev_command": "npm run dev",
@@ -118,6 +124,7 @@
       "packages": ["jest", "ts-jest", "@types/jest", "@nestjs/testing", "supertest", "@types/supertest"],
       "scripts": {"test": "jest", "test:watch": "jest --watch", "test:coverage": "jest --coverage"},
       "dummy_test_import": "",
+      "dummy_test_suffix": ".spec.ts",
       "unit_convention": "one `*.spec.ts` next to the provider, controller or pipe it covers (`users.service.spec.ts` next to `users.service.ts`), built with `@nestjs/testing`.",
       "integration_convention": "supertest tests against the Nest app in `test/` (`*.e2e-spec.ts`).",
       "dev_command": "npm run start:dev",
@@ -135,6 +142,7 @@
       "packages": [],
       "scripts": {},
       "dummy_test_import": "",
+      "dummy_test_suffix": null,
       "unit_convention": "one `*.spec.ts` next to the component, service or pipe it covers (`app.component.spec.ts` next to `app.component.ts`).",
       "integration_convention": "`TestBed` tests that render a component with its real child components, in the same `*.spec.ts` file or an `*.integration.spec.ts` beside it.",
       "dev_command": "npm start",
@@ -152,6 +160,7 @@
       "packages": ["vitest", "@vitest/ui", "@vitest/coverage-v8"],
       "scripts": {"test": "vitest", "test:ui": "vitest --ui", "test:coverage": "vitest run --coverage"},
       "dummy_test_import": "import { describe, it, expect } from 'vitest'",
+      "dummy_test_suffix": ".test.ts",
       "unit_convention": "one test file next to the code it covers, following the naming the project already uses.",
       "integration_convention": "tests that exercise several modules together, in the folder the project already uses for them.",
       "dev_command": null,

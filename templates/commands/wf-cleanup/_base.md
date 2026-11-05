@@ -214,7 +214,7 @@ done
 # 4c. Test configs (injected by the wizard — may also hold user settings)
 echo ""
 echo "🧪 Wizard test configs:"
-for f in vitest.config.ts playwright.config.ts; do
+for f in vitest.config.ts jest.config.js playwright.config.ts; do
   if [ -f "$f" ]; then
     echo "  🗑 $f (wizard — review before deleting: may contain your own settings)"
   fi
@@ -447,14 +447,14 @@ git config --unset core.hooksPath 2>/dev/null || true
 
 ### Report broken npm scripts
 
-If any test config was deleted (`vitest.config.ts`, `playwright.config.ts`, …)
+If any test config was deleted (`vitest.config.ts`, `jest.config.js`, `playwright.config.ts`, …)
 and `package.json` exists, report which npm scripts now reference deleted
 configs — otherwise CI breaks mysteriously weeks later with no clue why:
 
 ```bash
 if [ -f package.json ]; then
   # List ONLY the test configs actually deleted in this run:
-  DELETED_CONFIGS="vitest.config.ts playwright.config.ts"
+  DELETED_CONFIGS="vitest.config.ts jest.config.js playwright.config.ts"
   jq -r '.scripts // {} | to_entries[] | "\(.key)\t\(.value)"' package.json | while IFS=$'\t' read -r name value; do
     for cfg in $DELETED_CONFIGS; do
       case "$value" in *"$cfg"*) echo "⚠ Script '$name' references deleted $cfg";; esac

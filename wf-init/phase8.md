@@ -209,9 +209,19 @@ will fail if these don't exist. This section is stack-aware: Node installs npm p
 PHP would install composer packages, etc.
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
 STACK_KEY=$(jq -r '.discovery.stack.stack_key // .discovery.stack_key // "unknown"' .wizard-state.json)
 HAS_TESTING=$(jq -r '.testing.layers[]?' .wizard-state.json 2>/dev/null | wc -l)
 HAS_CONVENTIONAL=$(jq -r '.ci.conventional_commits // false' .wizard-state.json)
+# Testing profile (templates/protocols/testing/profiles.md). A null profile is a legacy
+# state and means "react", exactly what every Node project got before profiles existed.
+PROFILE=$(jq -r '.testing.profile // "react"' .wizard-state.json)
+RUNNER_EXISTING=$(jq -r '.testing.runner_existing // false' .wizard-state.json)
+PROFILE_JSON=""
+if [ "$HAS_TESTING" -gt 0 ]; then
+  PROFILE_JSON=$(wf_testing_profile "$PROFILE") || { echo "8.1c ERROR — cannot read the testing profiles." >&2; exit 1; }
+fi
 
 # Install dependencies by stack — only if testing or conventional commits are active
   if [ "$HAS_TESTING" -gt 0 ] || [ "$HAS_CONVENTIONAL" = "true" ]; then
@@ -221,11 +231,21 @@ HAS_CONVENTIONAL=$(jq -r '.ci.conventional_commits // false' .wizard-state.json)
         if [ "$HAS_TESTING" -gt 0 ]; then
           # Check for unit/integration layers
           if jq -e '.testing.layers[] | select(. == "unit" or . == "integration")' .wizard-state.json >/dev/null 2>&1; then
-            echo "8.1c — installing vitest + testing-library..."
-            if npm install --save-dev vitest @testing-library/react @testing-library/user-event @testing-library/jest-dom @testing-library/dom jsdom @vitest/ui @vitest/coverage-v8 @vitejs/plugin-react; then
-              echo "8.1c OK — vitest + testing-library installed"
+            if [ "$RUNNER_EXISTING" = "true" ]; then
+              echo "8.1c — the project keeps its own runner ($(jq -r '.testing.runner // "existing"' .wizard-state.json)): nothing to install for unit/integration."
             else
-              echo "8.1c WARNING — npm install failed (exit $?). Check package.json and network." >&2
+              # The packages come from the testing profile, never from a hardcoded React list.
+              UNIT_PKGS=$(echo "$PROFILE_JSON" | jq -r '.packages | join(" ")')
+              if [ -z "$UNIT_PKGS" ]; then
+                echo "8.1c — profile $PROFILE installs no unit packages (the project's own runner is used)."
+              else
+                echo "8.1c — installing $PROFILE unit packages: $UNIT_PKGS"
+                if npm install --save-dev $UNIT_PKGS; then
+                  echo "8.1c OK — unit packages installed"
+                else
+                  echo "8.1c WARNING — npm install failed (exit $?). Check package.json and network." >&2
+                fi
+              fi
             fi
           fi
           # Check for e2e layer
@@ -275,22 +295,25 @@ HAS_CONVENTIONAL=$(jq -r '.ci.conventional_commits // false' .wizard-state.json)
 # elsewhere. Glob the whole tree (minus node_modules) first.
 # Fix #18: Use detected test convention from discovery (state.discovery.test_dir or fallback)
 if [[ "$STACK_KEY" == node-* || "$STACK_KEY" == *-react || "$STACK_KEY" == *-vue || "$STACK_KEY" == *-nextjs || "$STACK_KEY" == *-node ]]; then
-  if jq -e '.testing.layers[] | select(. == "unit" or . == "integration")' .wizard-state.json >/dev/null 2>&1; then
+  # The placeholder test is only written when the wizard owns the runner and the profile
+  # defines one (Angular generates its own specs; a project with its own runner keeps its
+  # own conventions).
+  DUMMY_SUFFIX=""
+  [ -n "$PROFILE_JSON" ] && DUMMY_SUFFIX=$(echo "$PROFILE_JSON" | jq -r '.dummy_test_suffix // empty')
+  if [ "$RUNNER_EXISTING" != "true" ] && [ -n "$DUMMY_SUFFIX" ] \
+     && jq -e '.testing.layers[] | select(. == "unit" or . == "integration")' .wizard-state.json >/dev/null 2>&1; then
     EXISTING_TESTS=$(find . -path ./node_modules -prune -o -type f \( -name '*.test.*' -o -name '*.spec.*' \) -print 2>/dev/null | head -1)
     if [ -z "$EXISTING_TESTS" ]; then
       # Use detected test directory convention from discovery, fallback to src/__tests__/
       TEST_DIR=$(jq -r '.discovery.test_dir // "src/__tests__"' .wizard-state.json)
-      TEST_FILE="${TEST_DIR}/example.test.ts"
+      TEST_FILE="${TEST_DIR}/example${DUMMY_SUFFIX}"
+      DUMMY_IMPORT=$(echo "$PROFILE_JSON" | jq -r '.dummy_test_import // empty')
       mkdir -p "$(dirname "$TEST_FILE")"
-      cat > "$TEST_FILE" << 'TESTEOF'
-import { describe, it, expect } from 'vitest'
-
-describe('Example test', () => {
-  it('should pass', () => {
-    expect(true).toBe(true)
-  })
-})
-TESTEOF
+      {
+        # Vitest needs the explicit import; Jest provides globals, so its profile has none.
+        if [ -n "$DUMMY_IMPORT" ]; then printf '%s\n\n' "$DUMMY_IMPORT"; fi
+        printf '%s\n' "describe('Example test', () => {" "  it('should pass', () => {" "    expect(true).toBe(true)" "  })" "})"
+      } > "$TEST_FILE"
       git add "$TEST_FILE"
     fi
   fi
@@ -307,11 +330,19 @@ files — they are modified here, after the configs exist (same content as `test
 `e2e-scripts.tmpl.md`, but applied directly to the project's package.json):
 
 ```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
 HAS_TESTING=$(jq -r '.testing.layers[]?' .wizard-state.json 2>/dev/null | wc -l)
 if [ "$HAS_TESTING" -gt 0 ]; then
-  # unit/integration scripts
-  if jq -e '.testing.layers[] | select(. == "unit" or . == "integration")' .wizard-state.json >/dev/null 2>&1; then
-    npm pkg set scripts.test="vitest" scripts.test:ui="vitest --ui" scripts.test:coverage="vitest run --coverage" 2>/dev/null || true
+  PROFILE=$(jq -r '.testing.profile // "react"' .wizard-state.json)
+  RUNNER_EXISTING=$(jq -r '.testing.runner_existing // false' .wizard-state.json)
+  PROFILE_JSON=$(wf_testing_profile "$PROFILE") || { echo "8.1e ERROR — cannot read the testing profiles." >&2; exit 1; }
+  # unit/integration scripts: the profile's own, never over a project that keeps its runner
+  if jq -e '.testing.layers[] | select(. == "unit" or . == "integration")' .wizard-state.json >/dev/null 2>&1 \
+     && [ "$RUNNER_EXISTING" != "true" ]; then
+    echo "$PROFILE_JSON" | jq -r '.scripts | to_entries[] | "scripts.\(.key)=\(.value)"' | while IFS= read -r kv; do
+      npm pkg set "$kv" 2>/dev/null || true
+    done
   fi
   # e2e scripts
   if jq -e '.testing.layers[] | select(. == "e2e")' .wizard-state.json >/dev/null 2>&1; then
@@ -443,6 +474,7 @@ if echo "$IDES" | grep -q "claude-code"; then
   git add -f .claude/ 2>/dev/null || true
 fi
 git add vitest.config.ts 2>/dev/null || true
+git add jest.config.js 2>/dev/null || true
 git add playwright.config.ts 2>/dev/null || true
 git add -f e2e/ 2>/dev/null || true
 git add src/test/setup.ts 2>/dev/null || true

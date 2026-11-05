@@ -202,6 +202,72 @@ wf_profile_for_framework() {
   esac
 }
 
+# Print the testing profile data (JSON) from templates/protocols/testing/profiles.md, the
+# single source for what each profile installs, generates and documents (phase 4.6, phase 8,
+# the Builder). WF_PROFILES_FILE overrides the source with a local copy of that markdown file.
+wf_testing_profiles() {
+  local src
+  if [ -n "${WF_PROFILES_FILE:-}" ] && [ -f "$WF_PROFILES_FILE" ]; then
+    src=$(cat "$WF_PROFILES_FILE")
+  else
+    src=$(curl -fsSL "$WF_RAW/templates/protocols/testing/profiles.md" 2>/dev/null) || return 1
+  fi
+  printf '%s\n' "$src" | awk '/^```json[[:space:]]*$/{f=1;next} /^```[[:space:]]*$/{f=0} f'
+}
+
+# JSON of one profile; an empty or unknown name resolves to the data file's default (react).
+wf_testing_profile() {
+  local data
+  data=$(wf_testing_profiles) && [ -n "$data" ] \
+    || { echo "wf_testing_profile: cannot read templates/protocols/testing/profiles.md from $WF_RAW" >&2; return 1; }
+  printf '%s\n' "$data" | jq -c --arg p "${1:-}" '.profiles[$p] // .profiles[.default]'
+}
+
+# Target file of the unit config the Builder writes for <profile> + <runner> (the runner only
+# matters for profiles that pick a config by runner, i.e. generic). Prints nothing when the
+# Builder writes none (angular, generic without Vitest).
+wf_unit_config_target() {
+  local data
+  data=$(wf_testing_profiles) && [ -n "$data" ] \
+    || { echo "wf_unit_config_target: cannot read templates/protocols/testing/profiles.md from $WF_RAW" >&2; return 1; }
+  printf '%s\n' "$data" | jq -r --arg p "${1:-}" --arg r "${2:-}" '
+    (.profiles[$p] // .profiles[.default]) as $pr
+    | ($pr.unit_config // $pr.unit_config_by_runner[$r]) as $k
+    | if $k then .unit_configs[$k].target else empty end'
+}
+
+# Detect an already-configured unit test runner: its dependency AND its config, never one
+# alone (a dependency without config is a broken layer, not a configured one).
+# Prints vitest | jest | mocha | karma | native (an Angular CLI "test" target), or nothing.
+wf_detect_runner() {
+  local pkg="${1:-package.json}" deps dir
+  [ -f "$pkg" ] || return 0
+  dir=$(dirname "$pkg")
+  deps=$(jq -r '((.dependencies // {}) + (.devDependencies // {})) | keys[]' "$pkg" 2>/dev/null) || return 0
+  if printf '%s\n' "$deps" | grep -qx vitest \
+     && { ls "$dir"/vitest.config.* >/dev/null 2>&1 \
+          || grep -qE '^[[:space:]]*test[[:space:]]*:' "$dir"/vite.config.* 2>/dev/null; }; then
+    echo vitest; return 0
+  fi
+  if printf '%s\n' "$deps" | grep -qx jest \
+     && { ls "$dir"/jest.config.* >/dev/null 2>&1 || jq -e '.jest' "$pkg" >/dev/null 2>&1; }; then
+    echo jest; return 0
+  fi
+  if printf '%s\n' "$deps" | grep -qx mocha \
+     && { ls "$dir"/.mocharc.* >/dev/null 2>&1 || jq -e '.mocha' "$pkg" >/dev/null 2>&1; }; then
+    echo mocha; return 0
+  fi
+  if printf '%s\n' "$deps" | grep -qx karma && ls "$dir"/karma.conf.* >/dev/null 2>&1; then
+    echo karma; return 0
+  fi
+  if [ -f "$dir/angular.json" ] \
+     && jq -e '[.projects[]? | (.architect // .targets // {}) | .test | select(. != null)] | length > 0' \
+          "$dir/angular.json" >/dev/null 2>&1; then
+    echo native; return 0
+  fi
+  return 0
+}
+
 # Write a field safely using jq --arg to prevent injection/escaping issues
 # 
 # USAGE:

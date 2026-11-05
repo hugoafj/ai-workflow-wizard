@@ -73,15 +73,20 @@ SIDE EFFECTS in Phase 8 (installs + package.json changes):
   - npx husky init → creates .husky/, adds "prepare" script to package.json,
     installs commitlint; replaces Husky's factory pre-commit with an inert hook.
 </if>
-<if unit/integration layer active>:
-  - npm install: vitest, @testing-library/*, jsdom, @vitest/ui, @vitest/coverage-v8
-    (+ @vitejs/plugin-react on React stacks).
+<if unit/integration layer active and state.testing.runner_existing is not true>:
+  - npm install: the packages of state.testing.profile (profiles.md `packages`), e.g. react and
+    next: vitest, @testing-library/*, jsdom, @vitest/ui, @vitest/coverage-v8, @vitejs/plugin-react;
+    node-api: vitest, supertest; nest: jest, ts-jest, supertest.
+</if>
+<if unit/integration layer active and state.testing.runner_existing == true>:
+  - Nothing installed for the unit layer: the project keeps its own runner (state.testing.runner).
 </if>
 <if e2e layer active>:
   - npm install: @playwright/test; downloads Chromium via npx playwright install --with-deps.
 </if>
 <if any testing layer active>:
-  - package.json scripts added: test, test:ui, test:coverage (+ test:e2e, test:e2e:ui, test:e2e:report).
+  - package.json scripts added: the profile's test scripts (profiles.md `scripts`; none when the project
+    keeps its own runner) (+ test:e2e, test:e2e:ui, test:e2e:report).
 </if>
 Approving this gate approves these installs too.
 ```

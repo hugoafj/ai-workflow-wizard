@@ -1627,9 +1627,22 @@ for IDE in $IDES; do
 done
 [ "$CI" = "true" ] && EXPECTED+=(.github/workflows/quality-guard.yml)
 [ "$RELEASE" = "true" ] && EXPECTED+=(.github/workflows/release-please.yml release-please-config.json .release-please-manifest.json .commitlintrc.json)
-# Unit and integration layers render vitest.config.ts; the e2e layer renders playwright.config.ts.
-# Exact line match: a layer name must equal a whole line of LAYERS.
-if printf '%s\n' "$LAYERS" | grep -qxE 'unit|integration'; then EXPECTED+=(vitest.config.ts); fi
+# Unit and integration layers render the profile's unit config (vitest.config.ts, jest.config.js)
+# or nothing: angular, a generic project without Vitest, and a project that keeps its own
+# runner (state.testing.runner_existing) get no generated unit config. The e2e layer renders
+# playwright.config.ts. Exact line match: a layer name must equal a whole line of LAYERS.
+if printf '%s\n' "$LAYERS" | grep -qxE 'unit|integration'; then
+  _UNIT_CFG=""
+  if [ "$(jq -r '.testing.runner_existing // false' "$STAGING_STATE")" != "true" ]; then
+    if declare -F wf_unit_config_target >/dev/null 2>&1; then
+      _UNIT_CFG=$(wf_unit_config_target "$(jq -r '.testing.profile // "react"' "$STAGING_STATE")" "$(jq -r '.testing.runner // ""' "$STAGING_STATE")") \
+        || { echo "✗ FAIL: cannot read templates/protocols/testing/profiles.md to resolve the unit config"; exit 1; }
+    else
+      _UNIT_CFG="vitest.config.ts"   # helper unavailable: the legacy expectation
+    fi
+  fi
+  [ -n "$_UNIT_CFG" ] && EXPECTED+=("$_UNIT_CFG")
+fi
 if printf '%s\n' "$LAYERS" | grep -qxE 'e2e'; then EXPECTED+=(playwright.config.ts); fi
 for f in "${EXPECTED[@]}"; do
   [ -f "$STAGING/$f" ] || { echo "✗ FAIL: missing $STAGING/$f — Builder-Core/Heavy did not run or failed"; exit 1; }
