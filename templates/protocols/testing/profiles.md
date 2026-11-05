@@ -55,6 +55,23 @@
       "dev_command": null,
       "dev_port": null
     },
+    "next": {
+      "label": "Next.js (Vitest + Testing Library)",
+      "runner": "vitest",
+      "environment": "jsdom",
+      "ui": true,
+      "e2e": "offer",
+      "unit_config": "vitest-react",
+      "unit_config_by_runner": {},
+      "setup_file": {"template": "setup.tmpl.md", "target": "src/test/setup.ts"},
+      "packages": ["vitest", "@testing-library/react", "@testing-library/user-event", "@testing-library/jest-dom", "@testing-library/dom", "jsdom", "@vitest/ui", "@vitest/coverage-v8", "@vitejs/plugin-react"],
+      "scripts": {"test": "vitest", "test:ui": "vitest --ui", "test:coverage": "vitest run --coverage"},
+      "dummy_test_import": "import { describe, it, expect } from 'vitest'",
+      "unit_convention": "one test file next to the code it covers (`Component.test.tsx` next to the component).",
+      "integration_convention": "real render tests in `src/__tests__/integration/` (`*.integration.test.tsx`).",
+      "dev_command": null,
+      "dev_port": 3000
+    },
     "vue": {
       "label": "Vue / Nuxt (Vitest + Vue Test Utils)",
       "runner": "vitest",

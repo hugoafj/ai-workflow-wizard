@@ -434,7 +434,7 @@ For each command in the catalog (protocol `commands`) and each IDE ∈ IDES:
   `$WF_ROOT/templates/protocols/testing/e2e-example.tmpl.md` as
   `STAGING/e2e/example.spec.ts` (raw, already clean). Install browsers.
   The template targets a Vite dev server; when the profile sets `dev_port` / `dev_command`
-  (angular 4200 / `npm start`, nest and node-api 3000, `npm run start:dev` for nest) replace
+  (angular 4200 / `npm start`, next, nest and node-api 3000, `npm run start:dev` for nest) replace
   `http://localhost:5173` and `command: 'npm run dev'` with them.
   - **Visual regression extra (fragment injection)**: if `state.testing.visual_regression ==
     true`, inject `$WF_ROOT/templates/protocols/testing/visual-snapshots.tmpl.md` inside the

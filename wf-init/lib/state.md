@@ -170,7 +170,7 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
   `nest` | `angular` | `next` | `nuxt` | `vue` | `react` | `express` | `fastify` | `hono` | `koa`
   | `generic` (nothing matched). Other stacks: `laravel`, `django`. Never `null` once phase 1 ran.
 - **`testing.profile`**: testing profile resolved from the framework by
-  `wf_profile_for_framework`: `react` (react, next) | `vue` (vue, nuxt) | `node-api` (express,
+  `wf_profile_for_framework`: `react` (react, Vite projects included) | `next` | `vue` (vue, nuxt) | `node-api` (express,
   fastify, hono, koa) | `nest` | `angular` | `generic`. Selects runner, environment, packages and
   config template. `null` means a legacy state: the Builder treats it as `react`, the behavior
   every Node project had before profiles existed. R2 fills it from `stack_key` without

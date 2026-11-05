@@ -22,7 +22,8 @@ generated for the unit layer.
 
 | Profile | Frameworks | Runner when the project has none |
 |---|---|---|
-| `react` | React, Next, Vite | Vitest + Testing Library + jsdom |
+| `react` | React, Vite | Vitest + Testing Library + jsdom |
+| `next` | Next.js | Same as `react`; Playwright targets port 3000 |
 | `vue` | Vue, Nuxt | Vitest + Vue Test Utils + jsdom |
 | `node-api` | Express, Fastify, Hono, Koa | Vitest (node environment) + supertest |
 | `nest` | NestJS | Jest + supertest |

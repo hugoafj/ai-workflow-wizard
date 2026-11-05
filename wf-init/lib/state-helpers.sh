@@ -188,11 +188,12 @@ wf_detect_framework() {
 
 # Map a framework token (wf_detect_framework output) to its testing profile.
 # The profile selects runner, environment, packages and config template (phase 4.6, Builder B8).
-#   react|next -> react   vue|nuxt -> vue   express|fastify|hono|koa -> node-api
+#   react -> react   next -> next   vue|nuxt -> vue   express|fastify|hono|koa -> node-api
 #   nest -> nest          angular -> angular          anything else -> generic
 wf_profile_for_framework() {
   case "$1" in
-    react|next)                   echo "react" ;;
+    react)                        echo "react" ;;
+    next)                         echo "next" ;;
     vue|nuxt)                     echo "vue" ;;
     express|fastify|hono|koa)     echo "node-api" ;;
     nest)                         echo "nest" ;;
