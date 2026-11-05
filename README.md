@@ -30,6 +30,22 @@ In your IDE or CLI agent, run:
 
 The wizard discovers your stack, installs [gentle-ai](https://github.com/Gentleman-Programming/gentle-ai) (the foundation ecosystem), generates `AGENTS.md`, configures satellites per IDE, sets up git hooks, and prepares CI/CD templates.
 
+## Supported Frameworks
+
+The wizard detects your framework from `package.json` and sets up testing to match it. Nothing else in the workflow (MCPs, git flow, CI, release) depends on the framework.
+
+| Detected | Testing profile | Unit runner installed when you have none |
+|---|---|---|
+| React, Vite | `react` | Vitest + Testing Library + jsdom |
+| Next.js | `next` | Same as React; Playwright targets port 3000 |
+| Vue, Nuxt | `vue` | Vitest + Vue Test Utils + jsdom |
+| Express, Fastify, Hono, Koa | `node-api` | Vitest (node environment) + supertest; E2E is not offered by default |
+| NestJS | `nest` | Jest + ts-jest + supertest; E2E is not offered by default |
+| Angular | `angular` | None: it uses the Angular CLI runner |
+| Anything else | `generic` | You choose in Phase 4.6: Vitest (node environment) or none |
+
+If the project already has a configured unit runner (Vitest, Jest, Mocha, Karma, or an Angular `test` target), the wizard keeps it: nothing is installed, generated or scripted for the unit layer. React Native and Expo are not modeled and are treated as React. To support another framework, add one entry to `templates/protocols/testing/profiles.md`.
+
 ## Protecting Custom Content
 
 If you add team-specific rules, policies, or custom configurations to `AGENTS.md`, wrap them with markers so the wizard never overwrites them:

@@ -1676,7 +1676,7 @@ npm run test:e2e -- --headed --workers=1 --project=chromium e2e/<exact-name>.spe
 
 ### 9.3 `data-testid` convention, mandatory when E2E is present
 
-When the project activates the E2E layer in Phase 4.6, `/wf-init` adds to the Testing Approach section of `AGENTS.md` the requirement that every interactive element (buttons, inputs, links) receives its own `data-testid` **at component creation time**, not later when a test needs it. Format: `data-testid="<context>-<element>"` in kebab-case. The practical reason: without this, E2E specs depend on visible text or Tailwind classes, both fragile against copy or style changes that have nothing to do with the behavior the test is trying to verify.
+When the project activates the E2E layer in Phase 4.6 on a UI profile (react, next, vue, angular; API profiles such as node-api and nest have no markup and never get this convention), `/wf-init` adds to the Testing Approach section of `AGENTS.md` the requirement that every interactive element (buttons, inputs, links) receives its own `data-testid` **at component creation time**, not later when a test needs it. Format: `data-testid="<context>-<element>"` in kebab-case. The practical reason: without this, E2E specs depend on visible text or Tailwind classes, both fragile against copy or style changes that have nothing to do with the behavior the test is trying to verify.
 
 ### 9.4 Optional extras: coverage targets, visual regression, Page Object Model
 
