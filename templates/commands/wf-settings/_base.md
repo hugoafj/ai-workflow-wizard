@@ -57,6 +57,7 @@ jq -r '.features.ci // false' .wizard-state.json 2>/dev/null
 jq -r '.features.release_please // false' .wizard-state.json 2>/dev/null
 jq -r '.testing.coverage_threshold // null' .wizard-state.json 2>/dev/null
 jq -r '.testing.visual_regression // false' .wizard-state.json 2>/dev/null
+jq -c '.testing.layers // []' .wizard-state.json 2>/dev/null
 jq -r '.testing.page_object_model // false' .wizard-state.json 2>/dev/null
 jq -r '.ci.e2e_in_ci // false' .wizard-state.json 2>/dev/null
 jq -r '.ci.ai_reviewer // "none"' .wizard-state.json 2>/dev/null
@@ -90,6 +91,12 @@ number of the option they want to adjust.
    Never hide an option or compact the numbers. An option that does not apply
    is shown as `n/a (<reason>)`:
    - 3, 4, 5 (testing extras): `n/a (testing is OFF)` when option 2 is OFF
+   - 4, 5 (visual regression, Page Object Model), additionally: `n/a (the E2E layer is not active)`
+     when `testing.layers` has no `e2e` (API profiles hide that layer by default)
+   - 3 (coverage targets), additionally: `n/a (the project keeps its own runner config)` when
+     `testing.runner_existing` is true, or `n/a (no wizard-managed unit config)` when the profile
+     generates none (angular, generic without Vitest). The wizard never edits a runner config it
+     did not generate
    - 7, 8, 9, 10 (CI sub-options): `n/a (CI is OFF)` when option 6 is OFF
    - 11 (release-please standalone): `n/a (included in CI)` when option 6 is ON
 4. If the user picks an `n/a` option, explain why it does not apply (and which
@@ -208,9 +215,14 @@ Do you want to keep it as is or change it?
 
 **If they want to change (enable)**: set up the test infrastructure the same way
 `wf-init.md` Phase 4.6 does (detect the test runner, then configure the unit,
-integration, and E2E layers the user chooses). Add the `## Testing Approach`
-section to `AGENTS.md`, using the verbatim content of
-`templates/protocols/testing/testing-approach.section.md`.
+integration, and E2E layers the user chooses), including the profile resolution and
+the existing-runner detection, and persist `testing.profile`, `runner`, `runner_existing`,
+`environment` and `test_pattern`. The `## Testing Approach` section of `AGENTS.md` is
+generated from `state.testing.profile` (file conventions from `profiles.md`, the coverage
+matrix from `testing-approach.section.md` for UI profiles or
+`testing-approach.backend.section.md` for API profiles, and the `data-testid` convention only for
+UI profiles), so do not paste `testing-approach.section.md` verbatim: it describes hooks and
+components. `/wf-refresh` regenerates the same section from the state.
 
 After enabling, ask about options:
 
@@ -250,11 +262,13 @@ Do you want to keep or change?
 ```
 
 **If enabling**: ask for the threshold (same as in `wf-init.md` Phase 4.6) and
-add the `coverage.thresholds` block to `vitest.config.ts`. Write the threshold
-only to `vitest.config.ts` and to `.wizard-state.json` (`testing.coverage_threshold`,
-see the state update below).
+add the coverage threshold block to the unit config the wizard generated: `coverage.thresholds`
+in `vitest.config.ts` (react, next, vue, node-api, generic with Vitest) or `coverageThreshold` in
+`jest.config.js` (nest), the same mapping as `templates/protocols/testing/profiles.md`
+(`testing.profile`). Write the threshold only to that file and to `.wizard-state.json`
+(`testing.coverage_threshold`, see the state update below).
 
-**If disabling**: remove the `coverage.thresholds` block from `vitest.config.ts`
+**If disabling**: remove the coverage threshold block from that unit config
 and set `testing.coverage_threshold` to `null` in `.wizard-state.json`.
 
 Confirm:
@@ -1018,7 +1032,7 @@ Session settings summary:
 
 Modified files:
   AGENTS.md
-  vitest.config.ts
+  vitest.config.ts   (or jest.config.js for the nest profile)
 
 Do I write these changes and make the commit? [yes / no, abort / let me edit X first]
 ```
@@ -1041,7 +1055,7 @@ git commit -m "chore: update workflow settings
 
 - **Always read the real state before showing the menu** (Phase 1) — do not
   assume that `AGENTS.md` faithfully reflects `.wizard-state.json` or the
-  coverage block in `vitest.config.ts`. They may have diverged if someone
+  coverage block in the unit config. They may have diverged if someone
   edited one without the other.
 - **Each change is confirmed individually** before asking "anything
   else?" — do not silently process several changes and show everything together at the

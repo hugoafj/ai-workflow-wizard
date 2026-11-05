@@ -145,8 +145,8 @@ cat next.config.ts next.config.js 2>/dev/null | grep -i port
 ```
 
 If you don't find an explicit port, assume the detected framework's
-default (Vite: 5173, Next.js: 3000, Create React App: 3000, Vue CLI:
-8080) or ask if you cannot infer it:
+default (Vite: 5173, Next.js: 3000, Nuxt: 3000, Create React App: 3000, Vue CLI:
+8080, Angular: 4200, NestJS: 3000) or ask if you cannot infer it:
 
 ```
 I could not detect the default dev server port. What does this

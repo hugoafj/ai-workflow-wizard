@@ -1032,18 +1032,23 @@ _wf_resume_gate "R1"
 echo "ℹ Re-discovering project..."
 
 STACK_KEY="unknown"
+FRAMEWORK=""
 if [[ -f package.json ]]; then
-  STACK_KEY="node-react"
-  if command -v jq >/dev/null 2>&1; then
-    # Read the package NAME (key), not the version value: .dependencies.next
-    # returns "^14.0.0", which would produce a bogus "node-^14.0.0" key.
-    pkg_framework=$(jq -r '.dependencies | keys[] | select(. == "next" or . == "vue") | .' package.json 2>/dev/null | head -1 || true)
-    [[ -n "$pkg_framework" ]] && STACK_KEY="node-${pkg_framework}"
+  # Shared detection (state-helpers.sh): first dependency match wins, "generic"
+  # when nothing matches. It matches package NAMES, never version values, so a
+  # dependency like "next": "^14.0.0" cannot produce a bogus "node-^14.0.0" key.
+  FRAMEWORK="generic"
+  if command -v jq >/dev/null 2>&1 && declare -F wf_detect_framework >/dev/null 2>&1; then
+    FRAMEWORK=$(wf_detect_framework package.json 2>/dev/null || true)
+    FRAMEWORK="${FRAMEWORK:-generic}"
   fi
+  STACK_KEY="node-${FRAMEWORK}"
 elif [[ -f composer.json ]]; then
   STACK_KEY="php-laravel"
+  FRAMEWORK="laravel"
 elif [[ -f pyproject.toml ]]; then
   STACK_KEY="python-django"
+  FRAMEWORK="django"
 fi
 
 NODE_ENGINE=""
@@ -1276,6 +1281,9 @@ if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || 
     # Only write non-empty node_engine/npm_major to avoid clobbering good values with empty discovery results.
     STAGING_DIR=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' "$WF_STATE")
     JQ_FILTER='.discovery.stack.stack_key = $stack_key | .discovery.git_commits = $git_commits | .discovery.commands = $commands'
+    if [[ -n "$FRAMEWORK" ]]; then
+      JQ_FILTER="$JQ_FILTER | .discovery.stack.framework = \$framework"
+    fi
     if [[ -n "$NODE_ENGINE" ]]; then
       JQ_FILTER="$JQ_FILTER | .discovery.node_engine = \$node_engine"
     fi
@@ -1284,6 +1292,7 @@ if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || 
     fi
     WF_STATE="$STAGING_DIR/wizard-state.json" _apply_jq_filter \
       --arg stack_key "$STACK_KEY" \
+      --arg framework "$FRAMEWORK" \
       --arg node_engine "$NODE_ENGINE" \
       --arg npm_major "$NPM_MAJOR" \
       --argjson git_commits "$GIT_COMMITS" \
@@ -1405,6 +1414,29 @@ WF_STATE="$STAGING_STATE" _apply_jq_filter '
   .discovery.stack.stack_key = (.discovery.stack.stack_key // .discovery.stack_key) |
   del(.discovery.stack_key)
 '
+
+# 3. testing.profile / testing.runner: infer them for states written before the
+# framework-aware testing layer. The profile is derived from the stack_key suffix
+# with the SAME helper discovery uses (wf_profile_for_framework), so an old
+# `node-react` state maps to profile "react" and keeps generating exactly what it
+# generated before. The stack_key is read from the ROOT state, which still holds the
+# pre-refresh value: R1 may already have rewritten the staging stack_key after the user
+# accepted drift (e.g. node-react -> node-express), and following it would silently
+# change the test config of an installed project. A profile change is an explicit
+# action (set testing.profile, then re-run /wf-refresh). Only fills missing values
+# (idempotent); never overwrites a profile the user or phase 4.6 already chose. If the
+# helper is unavailable the profile stays null and the Builder falls back to "react".
+# runner is inferred only from a UNIT runner: runner_detected can also be "playwright".
+if declare -F wf_profile_for_framework >/dev/null 2>&1; then
+  _SK=$(jq -r '.discovery.stack.stack_key // .discovery.stack_key // ""' "$WF_STATE" 2>/dev/null || true)
+  [[ -n "$_SK" ]] || _SK=$(jq -r '.discovery.stack.stack_key // ""' "$STAGING_STATE")
+  _PROFILE=$(wf_profile_for_framework "${_SK#*-}")
+  WF_STATE="$STAGING_STATE" _apply_jq_filter --arg profile "$_PROFILE" '
+    .testing //= {} |
+    .testing.profile //= $profile |
+    .testing.runner //= (.testing.runner_detected | if IN("vitest", "jest", "mocha", "karma") then . else null end)
+  '
+fi
 
 # R2 normalization (FU9): normalize corrupted node_engine/npm_major values.
 # Values of "None" or "" become null so the builder defaults ("22"/"10") apply.
@@ -1601,9 +1633,22 @@ for IDE in $IDES; do
 done
 [ "$CI" = "true" ] && EXPECTED+=(.github/workflows/quality-guard.yml)
 [ "$RELEASE" = "true" ] && EXPECTED+=(.github/workflows/release-please.yml release-please-config.json .release-please-manifest.json .commitlintrc.json)
-# Unit and integration layers render vitest.config.ts; the e2e layer renders playwright.config.ts.
-# Exact line match: a layer name must equal a whole line of LAYERS.
-if printf '%s\n' "$LAYERS" | grep -qxE 'unit|integration'; then EXPECTED+=(vitest.config.ts); fi
+# Unit and integration layers render the profile's unit config (vitest.config.ts, jest.config.js)
+# or nothing: angular, a generic project without Vitest, and a project that keeps its own
+# runner (state.testing.runner_existing) get no generated unit config. The e2e layer renders
+# playwright.config.ts. Exact line match: a layer name must equal a whole line of LAYERS.
+if printf '%s\n' "$LAYERS" | grep -qxE 'unit|integration'; then
+  _UNIT_CFG=""
+  if [ "$(jq -r '.testing.runner_existing // false' "$STAGING_STATE")" != "true" ]; then
+    if declare -F wf_unit_config_target >/dev/null 2>&1; then
+      _UNIT_CFG=$(wf_unit_config_target "$(jq -r '.testing.profile // "react"' "$STAGING_STATE")" "$(jq -r '.testing.runner // ""' "$STAGING_STATE")") \
+        || { echo "✗ FAIL: cannot read templates/protocols/testing/profiles.md to resolve the unit config"; exit 1; }
+    else
+      _UNIT_CFG="vitest.config.ts"   # helper unavailable: the legacy expectation
+    fi
+  fi
+  [ -n "$_UNIT_CFG" ] && EXPECTED+=("$_UNIT_CFG")
+fi
 if printf '%s\n' "$LAYERS" | grep -qxE 'e2e'; then EXPECTED+=(playwright.config.ts); fi
 for f in "${EXPECTED[@]}"; do
   [ -f "$STAGING/$f" ] || { echo "✗ FAIL: missing $STAGING/$f — Builder-Core/Heavy did not run or failed"; exit 1; }
@@ -2565,9 +2610,21 @@ if [[ -f .wf-status ]] && grep -qE 'SDD drift|/sdd-init' .wf-status; then
   echo "✓ Removed stale SDD .wf-status (the post-commit hook regenerates it)"
 fi
 
+# GGA layout migration: older builders wrote .gga/config.yml, which GGA never reads, and the
+# Builder now stages a .gga FILE. After the removals above took the old file, drop the empty
+# .gga/ directory (rmdir only removes an empty one); otherwise `cp .gga` would land inside it.
+if [ -d .gga ] && [ -f "$STAGING/.gga" ]; then
+  rmdir .gga 2>/dev/null || true
+fi
+
 if [[ "$APPROVE_ADDED" == "true" ]]; then
   echo "ℹ Copying added files..."
   while IFS= read -r -d '' file; do
+    # Never copy a file onto a directory: cp would put it inside (a .gga/ that still holds files).
+    if [ -d "$file" ]; then
+      echo "  ⚠ Skipped $file: a directory with that name already exists. Move or remove it, then re-run /wf-refresh."
+      continue
+    fi
     mkdir -p "$(dirname "$file")"
     cp "$STAGING/$file" "$file"
     [[ "$file" == *".sh" ]] && chmod +x "$file"

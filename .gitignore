@@ -6,3 +6,6 @@ NOTES.md
 .codegraph/
 .tmp/
 .pi/
+.DS_Store
+# Personal editor settings (.vscode/mcp.json stays tracked)
+.vscode/settings.json

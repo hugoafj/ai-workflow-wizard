@@ -104,6 +104,11 @@ wf_state_init() {
   "agents": [],
   "testing": {
     "runner_detected": null,
+    "profile": null,
+    "runner": null,
+    "runner_existing": null,
+    "environment": null,
+    "test_pattern": null,
     "layers": [],
     "coverage_threshold": null,
     "visual_regression": false,
@@ -157,6 +162,122 @@ JSON
 
 # Read a field (e.g. wf_state_get '.answers.project_name')
 wf_state_get() { jq -r "$1 // empty" "$WF_STATE" 2>/dev/null; }
+
+# Detect the Node framework from a package.json (single source of truth, shared by
+# phase 1 discovery and /wf-refresh R1). Prints one token; first dependency match wins.
+# Package NAMES are matched (dependencies + devDependencies), never version values.
+# Order matters: nuxt before vue, next before react, nest/angular before the rest.
+#   nest | angular | next | nuxt | vue | react | express | fastify | hono | koa | generic
+# Prints nothing and returns 1 when the manifest is missing or is not valid JSON.
+wf_detect_framework() {
+  local pkg="${1:-package.json}"
+  [ -f "$pkg" ] || return 1
+  jq -r '
+    ((.dependencies // {}) + (.devDependencies // {})) as $d
+    | if   $d["@nestjs/core"]  then "nest"
+      elif $d["@angular/core"] then "angular"
+      elif $d["next"]          then "next"
+      elif $d["nuxt"]          then "nuxt"
+      elif $d["vue"]           then "vue"
+      elif $d["react"]         then "react"
+      elif $d["express"]       then "express"
+      elif $d["fastify"]       then "fastify"
+      elif $d["hono"]          then "hono"
+      elif $d["koa"]           then "koa"
+      else "generic" end' "$pkg" 2>/dev/null
+}
+
+# Map a framework token (wf_detect_framework output) to its testing profile.
+# The profile selects runner, environment, packages and config template (phase 4.6, Builder B8).
+#   react -> react   next -> next   vue|nuxt -> vue   express|fastify|hono|koa -> node-api
+#   nest -> nest          angular -> angular          anything else -> generic
+wf_profile_for_framework() {
+  case "$1" in
+    react)                        echo "react" ;;
+    next)                         echo "next" ;;
+    vue|nuxt)                     echo "vue" ;;
+    express|fastify|hono|koa)     echo "node-api" ;;
+    nest)                         echo "nest" ;;
+    angular)                      echo "angular" ;;
+    *)                            echo "generic" ;;
+  esac
+}
+
+# Print the testing profile data (JSON) from templates/protocols/testing/profiles.md, the
+# single source for what each profile installs, generates and documents (phase 4.6, phase 8,
+# the Builder). WF_PROFILES_FILE overrides the source with a local copy of that markdown file.
+wf_testing_profiles() {
+  local src
+  if [ -n "${WF_PROFILES_FILE:-}" ] && [ -f "$WF_PROFILES_FILE" ]; then
+    src=$(cat "$WF_PROFILES_FILE")
+  else
+    src=$(curl -fsSL "$WF_RAW/templates/protocols/testing/profiles.md" 2>/dev/null) || return 1
+  fi
+  printf '%s\n' "$src" | awk '/^```json[[:space:]]*$/{f=1;next} /^```[[:space:]]*$/{f=0} f'
+}
+
+# JSON of one profile; an empty or unknown name resolves to the data file's default (react).
+wf_testing_profile() {
+  local data name="${1:-}"
+  data=$(wf_testing_profiles) && [ -n "$data" ] \
+    || { echo "wf_testing_profile: cannot read templates/protocols/testing/profiles.md from $WF_RAW" >&2; return 1; }
+  printf '%s\n' "$data" | jq -e . >/dev/null 2>&1 \
+    || { echo "wf_testing_profile: the profile data read from $WF_RAW is not valid JSON" >&2; return 1; }
+  # Like the Builder, say so when a (typo'd) profile name falls back to the default one.
+  if [ -n "$name" ] && [ "$(printf '%s\n' "$data" | jq -r --arg p "$name" '.profiles | has($p)')" != "true" ]; then
+    echo "wf_testing_profile: unknown testing profile '$name', using the default profile" >&2
+  fi
+  printf '%s\n' "$data" | jq -c --arg p "$name" '.profiles[$p] // .profiles[.default]'
+}
+
+# Target file of the unit config the Builder writes for <profile> + <runner> (the runner only
+# matters for profiles that pick a config by runner, i.e. generic). Prints nothing when the
+# Builder writes none (angular, generic without Vitest).
+wf_unit_config_target() {
+  local data
+  data=$(wf_testing_profiles) && [ -n "$data" ] \
+    || { echo "wf_unit_config_target: cannot read templates/protocols/testing/profiles.md from $WF_RAW" >&2; return 1; }
+  printf '%s\n' "$data" | jq -r --arg p "${1:-}" --arg r "${2:-}" '
+    (.profiles[$p] // .profiles[.default]) as $pr
+    | ($pr.unit_config // $pr.unit_config_by_runner[$r]) as $k
+    | if $k then .unit_configs[$k].target else empty end'
+}
+
+# True when <dir> holds a file whose name matches <glob>. Uses find, not a shell glob: zsh (the
+# default macOS shell) aborts a command whose glob matches nothing and prints an error.
+_wf_has_file() { [ -n "$(find "$1" -maxdepth 1 -type f -name "$2" 2>/dev/null | head -n 1)" ]; }
+
+# Detect an already-configured unit test runner: its dependency AND its config, never one
+# alone (a dependency without config is a broken layer, not a configured one).
+# Prints vitest | jest | mocha | karma | native (an Angular CLI "test" target), or nothing.
+wf_detect_runner() {
+  local pkg="${1:-package.json}" deps dir
+  [ -f "$pkg" ] || return 0
+  dir=$(dirname "$pkg")
+  deps=$(jq -r '((.dependencies // {}) + (.devDependencies // {})) | keys[]' "$pkg" 2>/dev/null) || return 0
+  if printf '%s\n' "$deps" | grep -qx vitest \
+     && { _wf_has_file "$dir" 'vitest.config.*' \
+          || find "$dir" -maxdepth 1 -type f -name 'vite.config.*' -exec grep -lE '^[[:space:]]*test[[:space:]]*:' {} + 2>/dev/null | grep -q .; }; then
+    echo vitest; return 0
+  fi
+  if printf '%s\n' "$deps" | grep -qx jest \
+     && { _wf_has_file "$dir" 'jest.config.*' || jq -e '.jest' "$pkg" >/dev/null 2>&1; }; then
+    echo jest; return 0
+  fi
+  if printf '%s\n' "$deps" | grep -qx mocha \
+     && { _wf_has_file "$dir" '.mocharc.*' || jq -e '.mocha' "$pkg" >/dev/null 2>&1; }; then
+    echo mocha; return 0
+  fi
+  if printf '%s\n' "$deps" | grep -qx karma && _wf_has_file "$dir" 'karma.conf.*'; then
+    echo karma; return 0
+  fi
+  if [ -f "$dir/angular.json" ] \
+     && jq -e '[.projects[]? | (.architect // .targets // {}) | .test | select(. != null)] | length > 0' \
+          "$dir/angular.json" >/dev/null 2>&1; then
+    echo native; return 0
+  fi
+  return 0
+}
 
 # Write a field safely using jq --arg to prevent injection/escaping issues
 # 

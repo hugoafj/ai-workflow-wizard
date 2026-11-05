@@ -2,8 +2,8 @@
 #
 # Placeholder resolution:
 #   {{provider}}       → claude | gemini | codex | opencode | ollama:<model> | lmstudio[:model] | github:<model>
-#   {{file_patterns}}  → file patterns based on stack (e.g., *.ts,*.tsx,*.js,*.jsx)
-#   {{exclude_patterns}} → exclusions (e.g., *.test.ts,*.spec.ts,*.d.ts,dist/*,build/*)
+#   {{file_patterns}}  → comma-separated suffix globs from gga-patterns.md (e.g., *.ts,*.tsx,*.js,*.jsx)
+#   {{exclude_patterns}} → exclusions from gga-patterns.md (e.g., *.test.ts,*.spec.ts,*.d.ts,dist/**,build/**)
 #   {{pr_base_branch}} → detected main branch (e.g., main)
 #
 # Notes:

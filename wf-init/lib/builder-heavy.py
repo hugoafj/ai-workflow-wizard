@@ -198,36 +198,72 @@ def write_hook(raw, state, staging):
 # ---------------------------------------------------------------------------
 
 def write_testing_configs(raw, state, staging):
-    """Write vitest/playwright configs with fragment injection (B8 testing)."""
+    """Write the unit and playwright configs with fragment injection (B8 testing).
+
+    The unit config comes from the testing profile (templates/protocols/testing/
+    profiles.md): react, vue and node-api get a Vitest config, nest a Jest config,
+    angular and a generic project whose runner is not Vitest get none. A project
+    that keeps its own runner (state.testing.runner_existing) gets no unit config.
+    """
     created = []
     layers = builder_core.normalize_layers(state)
+    if not layers:
+        return created  # no testing layers: do not fetch profile data at all
+    _, profile = builder_core.testing_profile(raw, state)
+    unit_configs = builder_core.load_testing_profiles(raw)["unit_configs"]
+    runner = builder_core.get_state_value(state, "testing.runner") or ""
+    cfg_key = profile["unit_config"] or profile["unit_config_by_runner"].get(runner)
+    runner_existing = bool(builder_core.get_state_value(state, "testing.runner_existing", False))
 
-    # Vitest (unit/integration layers).
-    if "unit" in layers or "integration" in layers:
+    # Unit config (unit/integration layers).
+    if ("unit" in layers or "integration" in layers) and cfg_key and not runner_existing:
+        spec = unit_configs[cfg_key]
         cfg = builder_core.fetch_with_retries(
-            builder_core.base_url(raw, "templates/protocols/testing/vitest.config.tmpl.md"))
-        cfg = builder_core.extract_block(cfg, "typescript")
-        # Inject coverage fragment inside the test: { } block. Skipped when the
-        # threshold is null, otherwise the config would render "lines: None".
+            builder_core.base_url(raw, "templates/protocols/testing/" + spec["template"]))
+        cfg = builder_core.extract_block(
+            cfg, "javascript" if spec["target"].endswith(".js") else "typescript")
+        # Inject the coverage fragment right after the config marker (the
+        # test: { } block for Vitest, the exported object for Jest). Skipped when
+        # the threshold is null, otherwise the config would render "lines: None".
         threshold = builder_core.get_state_value(state, "testing.coverage_threshold", "80")
         if threshold is not None:
             frag = builder_core.fetch_with_retries(
-                builder_core.base_url(raw, "templates/protocols/testing/coverage-thresholds.tmpl.md"))
+                builder_core.base_url(raw, "templates/protocols/testing/" + spec["coverage"]))
             frag = builder_core.strip_prose_header(frag)
             frag = frag.replace("{{threshold}}", str(threshold))
-            # Indent the fragment to sit inside the test: { } block (F11).
-            frag = textwrap.indent(frag, "    ")
-            cfg = cfg.replace("test: {\n", "test: {\n" + frag + "\n")
-        target = os.path.join(staging, "vitest.config.ts")
+            # Indent the fragment to sit inside the marked block (F11).
+            frag = textwrap.indent(frag, " " * spec["indent"])
+            cfg = cfg.replace(spec["marker"], spec["marker"] + frag + "\n")
+        target = os.path.join(staging, spec["target"])
         with open(target, "w", encoding="utf-8") as fh:
             fh.write(cfg + "\n")
         created.append(os.path.relpath(target, staging))
+
+        # The config's setupFiles entry must point at a real file. Phase 8 promotes
+        # staging with `rsync -a`, which overwrites, so skip it when the project
+        # (the builder runs from the project root) already has its own.
+        setup = profile.get("setup_file")
+        if setup and not os.path.exists(os.path.join(os.getcwd(), setup["target"])):
+            body = builder_core.fetch_with_retries(
+                builder_core.base_url(raw, "templates/protocols/testing/" + setup["template"]))
+            body = builder_core.extract_block(body, "typescript")
+            setup_target = os.path.join(staging, setup["target"])
+            os.makedirs(os.path.dirname(setup_target), exist_ok=True)
+            with open(setup_target, "w", encoding="utf-8") as fh:
+                fh.write(body + "\n")
+            created.append(os.path.relpath(setup_target, staging))
 
     # Playwright (e2e layer).
     if "e2e" in layers:
         cfg = builder_core.fetch_with_retries(
             builder_core.base_url(raw, "templates/protocols/testing/playwright.config.tmpl.md"))
         cfg = builder_core.extract_block(cfg, "typescript")
+        # The base template targets a Vite dev server (npm run dev, port 5173);
+        # profiles with a different dev server override both values.
+        if profile.get("dev_port"):
+            cfg = cfg.replace("http://localhost:5173", "http://localhost:%d" % profile["dev_port"])
+        if profile.get("dev_command"):
+            cfg = cfg.replace("command: 'npm run dev'", "command: '%s'" % profile["dev_command"])
         frag = builder_core.fetch_with_retries(
             builder_core.base_url(raw, "templates/protocols/testing/visual-snapshots.tmpl.md"))
         frag = builder_core.strip_prose_header(frag)
@@ -320,19 +356,29 @@ def write_cicd(raw, state, staging):
     # --- AI review workflow (gga / claude / gemini) — only under full CI.
     if cicd and ai_reviewer in ("gga", "claude", "gemini"):
         if ai_reviewer == "gga":
-            # .gga config + gga-review workflow.
+            # .gga config + gga-review workflow. GGA reads a FILE named .gga in the project
+            # root (it ignores .gga/config.yml) and splits FILE_PATTERNS / EXCLUDE_PATTERNS
+            # on commas, matching a leading-* pattern as a suffix: no brace expansion.
             gga_cfg = builder_core.fetch_with_retries(builder_core.base_url(raw, "templates/protocols/cicd/variants/gga-config.tmpl.md"))
-            gga_cfg = builder_core.extract_block(gga_cfg, "yaml")
+            gga_cfg = builder_core.strip_prose_header(gga_cfg, keep_notes=True)
             gga_provider = ci.get("gga_provider", "claude")
             gga_cfg = gga_cfg.replace("{{provider}}", gga_provider)
-            file_patterns = ci.get("gga_file_patterns", "**/*.{ts,tsx,js,jsx}")
-            exclude_patterns = ci.get("gga_exclude_patterns", "**/*.test.{ts,tsx},**/*.spec.{ts,tsx},dist/**,build/**")
+            gga_data = json.loads(builder_core.extract_block(
+                builder_core.fetch_with_retries(builder_core.base_url(raw, "templates/protocols/cicd/variants/gga-patterns.md")), "json"))
+            framework = builder_core.get_state_value(state, "discovery.stack.framework", "") or ""
+            file_patterns = ci.get("gga_file_patterns") or gga_data["file_patterns_by_framework"].get(framework, gga_data["file_patterns"])
+            exclude_patterns = ci.get("gga_exclude_patterns") or gga_data["exclude_patterns"]
+            for label, value in (("gga_file_patterns", file_patterns), ("gga_exclude_patterns", exclude_patterns)):
+                if "{" in value or "}" in value:
+                    print("builder: ci.%s has braces, which GGA does not expand (comma-separated suffix globs only): %r"
+                          % (label, value), file=sys.stderr)
             gga_cfg = gga_cfg.replace("{{file_patterns}}", file_patterns)
             gga_cfg = gga_cfg.replace("{{exclude_patterns}}", exclude_patterns)
             pr_base = builder_core.get_state_value(state, "discovery.default_branch", "main")
             gga_cfg = gga_cfg.replace("{{pr_base_branch}}", pr_base)
-            gga_target = os.path.join(staging, ".gga", "config.yml")
-            os.makedirs(os.path.dirname(gga_target), exist_ok=True)
+            if builder_core.unresolved_placeholders(gga_cfg):
+                raise ValueError("unresolved placeholders in .gga")
+            gga_target = os.path.join(staging, ".gga")
             with open(gga_target, "w", encoding="utf-8") as fh:
                 fh.write(gga_cfg + "\n")
             created.append(os.path.relpath(gga_target, staging))

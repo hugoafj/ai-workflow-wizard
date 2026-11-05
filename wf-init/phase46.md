@@ -26,6 +26,32 @@ The testing stack lets the pipeline verify each change automatically. Without th
 
 This phase is optional but highly recommended. If the user prefers to configure it later, they can run `/wf-onboard` when they install a test runner.
 
+### Resolve the testing profile (framework-aware)
+
+The runner, packages, config and file conventions depend on the framework. They live in one
+data file, `templates/protocols/testing/profiles.md`, read through `wf_testing_profile`.
+**Never assume React**: take every runner name, package, file convention and script in this
+phase from the profile, not from the examples below.
+
+```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+FRAMEWORK=$(jq -r '.discovery.stack.framework // "generic"' .wizard-state.json)
+PROFILE=$(wf_profile_for_framework "$FRAMEWORK")
+PROFILE_JSON=$(wf_testing_profile "$PROFILE") || { echo "Cannot read the testing profiles; stopping." >&2; exit 1; }
+RUNNER_FOUND=$(wf_detect_runner package.json)   # vitest | jest | mocha | karma | native, or empty
+echo "Framework: $FRAMEWORK -> profile: $PROFILE ($(echo "$PROFILE_JSON" | jq -r .label))"
+echo "Existing unit runner (dependency + config): ${RUNNER_FOUND:-none}"
+```
+
+| Situation | What the wizard does |
+|---|---|
+| `RUNNER_FOUND` is set | The project owns its runner. Keep it: nothing installed, no unit config, no `test` script touched. Record `runner_existing = true` and the runner found. The unit/integration layers are still recorded so AGENTS.md documents the conventions. |
+| No runner; profile react, next, vue, node-api or nest | Offer the profile's runner. |
+| No runner; profile angular | The Angular CLI provides the runner. Install and generate nothing; record the layers for the conventions and tell the user to run `ng test` once to confirm. |
+| No runner; profile generic | Ask once: Vitest in a node environment, or skip unit tests. |
+| Profile has `"e2e": "off"` (node-api, nest) | Do not offer layer 3 (Playwright): API stacks have no browser flow. Offer it only if the user asks. |
+
 First detect if there's already a test runner configured:
 
 ```bash
@@ -42,7 +68,7 @@ BROKEN layer, not a configured one. A project with `@playwright/test` installed 
 specs). So for each layer report BOTH signals and only declare it configured when both are
 present:
 
-- Unit/integration: vitest/jest dependency AND `vitest.config.*`/`jest.config.*` (or a `test:` block in vite config).
+- Unit/integration: `wf_detect_runner` (above) already applies this rule: the runner dependency AND its config (`vitest.config.*` or a `test:` block in the vite config, `jest.config.*` or a `jest` key in `package.json`, `.mocharc.*`, `karma.conf.*`, an Angular `test` target).
 - E2E: playwright dependency AND `playwright.config.ts`.
 
 When the dependency exists but the config is missing, treat that layer as NOT configured and
@@ -62,23 +88,23 @@ automatically verifies that changes don't break existing behavior.
 What testing layers would you like to configure now?
 
 ────────────────────────────────────────────────────────────
-1. Unit tests: Vitest + Testing Library
+1. Unit tests: <profile.label>
 
-   WHAT IT DOES: tests functions, hooks, and utilities in isolation.
-   INSTALLS: vitest, @testing-library/react, @testing-library/user-event,
-             @testing-library/jest-dom, jsdom, @vitest/ui, @vitest/coverage-v8
-   GENERATES: vitest.config.ts, src/test/setup.ts
-   ADDS SCRIPTS: "test", "test:ui", "test:coverage"
-   CONVENTION: Component.test.tsx next to the tested file.
+   WHAT IT DOES: tests functions, services and components in isolation.
+   INSTALLS: <profile.packages, comma separated; "nothing" when the project owns its
+             runner or the profile has no packages>
+   GENERATES: <unit config file printed by wf_unit_config_target; "nothing" when none applies>
+   ADDS SCRIPTS: <the keys of profile.scripts; "nothing" when the project owns its runner>
+   CONVENTION: <profile.unit_convention>
 
 2. Integration tests: same stack as unit
 
-   WHAT IT DOES: tests components with real dependencies in jsdom.
+   WHAT IT DOES: tests several modules together with real dependencies.
    Doesn't require a separate install: uses the layer 1 runner.
-   CONVENTION: *.integration.test.tsx in src/__tests__/integration/
+   CONVENTION: <profile.integration_convention>
    Requires layer 1 to be activated.
 
-3. E2E tests: Playwright
+3. E2E tests: Playwright   (omit this entry when the profile has "e2e": "off")
 
    WHAT IT DOES: complete flows in a real browser (Chromium by default).
    INSTALLS: @playwright/test + browsers via npx playwright install
@@ -103,6 +129,8 @@ small project) that isn't justified in every case. The Decision
 Ladder of this same wizard exists precisely to avoid activating things the
 project doesn't need yet.
 
+If `runner_existing` is true, do not offer extra 1: the wizard never edits a runner config it does not own.
+
 ```
 Optional testing extras. None are activated unless you ask:
 
@@ -112,7 +140,7 @@ Optional testing extras. None are activated unless you ask:
    Define a minimum code coverage percentage. If the project
    drops below it, `npm run test -- --coverage` fails locally
    (and in CI, when the Block 6 pipeline exists). Cost: nearly zero.
-   It's one config line in vitest.config.ts.
+   It's one config block in the unit config (vitest.config.ts or jest.config.js).
 
 2. Visual regression (Playwright snapshots)
 
@@ -137,9 +165,10 @@ Which ones do I activate? [comma-separated numbers / none for now]
 
 **If they activated extra 1 (coverage targets)**, ask for the threshold. It is stored in
 `state.testing.coverage_threshold` (persistence below); the builder injects the
-`coverage.thresholds` block into `vitest.config.ts` in Phase 6b (step B8, from
-`coverage-thresholds.tmpl.md` resolving `{{threshold}}`) and Phase 8 promotes it to the real file;
-do NOT edit `vitest.config.ts` here, the file doesn't exist yet in this phase:
+coverage threshold block into the unit config in Phase 6b (step B8, from
+`coverage-thresholds.tmpl.md`, or `coverage-thresholds.jest.tmpl.md` for Jest, resolving
+`{{threshold}}`) and Phase 8 promotes it to the real file;
+do NOT edit the unit config here, the file doesn't exist yet in this phase:
 
 ```
 What minimum coverage percentage do you want to require? (recommended: 70-80%
@@ -172,37 +201,16 @@ PATTERN, not real pages: real Page Objects emerge with features as they are buil
 example locators with actual `data-testid` values grepped from components. Nothing is edited
 by hand here.
 
-**If they activated layer 1 or 1+2 (Vitest)**:
+**If they activated layer 1 or 1+2** (and the wizard owns the runner, i.e. `runner_existing` is not true):
 
-`vitest.config.ts`:
-```typescript
-import { defineConfig } from 'vitest/config'
-import react from '@vitejs/plugin-react'
+The Builder writes the unit config from the profile in Phase 6b (step B8).
+`wf_unit_config_target "$PROFILE" "$RUNNER"` prints its file name: react, next, vue and node-api
+(and a generic project that chose Vitest) get `vitest.config.ts`, nest gets `jest.config.js`,
+angular gets none. The react and next profiles also stage `src/test/setup.ts`, which their
+config lists in `setupFiles`. Phase 8 promotes these files and sets the `test` scripts from the
+profile (`scripts` in `profiles.md`). Nothing is written by hand here.
 
-export default defineConfig({
-  plugins: [react()],
-  test: {
-    environment: 'jsdom',
-    setupFiles: ['./src/test/setup.ts'],
-    globals: true,
-    exclude: ['**/node_modules/**', '**/e2e/**'],
-  },
-})
-```
-
-> **Why the `exclude`**: without it, Vitest picks up Playwright specs in `e2e/` and fails with "Playwright Test did not expect test() to be called here". This happens in any project that activates unit + e2e together.
-
-`src/test/setup.ts`:
-```typescript
-import '@testing-library/jest-dom'
-```
-
-Scripts added to `package.json` in Phase 8, step 8.1e (same content as `test-scripts.tmpl.md`):
-```json
-"test": "vitest",
-"test:ui": "vitest --ui",
-"test:coverage": "vitest run --coverage"
-```
+> **Why the Vitest configs exclude `e2e/`**: without it, Vitest picks up Playwright specs in `e2e/` and fails with "Playwright Test did not expect test() to be called here". This happens in any project that activates unit + e2e together.
 
 **If they activated layer 3 (Playwright)**:
 
@@ -231,6 +239,10 @@ export default defineConfig({
   },
 })
 ```
+
+The template targets a Vite dev server. The Builder replaces `http://localhost:5173` and
+`npm run dev` with the profile's `dev_port` / `dev_command` when it sets them (next and node-api
+3000, nest 3000 with `npm run start:dev`, angular 4200 with `npm start`).
 
 `e2e/example.spec.ts`:
 ```typescript
@@ -281,48 +293,13 @@ section of AGENTS.md (below). `visual_regression` and `page_object_model` stay i
 `.wizard-state.json` only; they surface in the generated `playwright.config.ts` and `e2e/pages/`.
 The wizard writes no other testing configuration file.
 
-**Update the Testing section of `AGENTS.md`**: find the `## Testing` (or `## Testing Approach`) section and replace it with:
-
-```markdown
-## Testing Approach
-
-<based on activated layers: include only active ones>
-- Unit: Vitest + Testing Library. `npm run test`. File: `Component.test.tsx` next to the component.
-- Integration: Vitest + Testing Library with real render. `npm run test`. File: `*.integration.test.tsx` in `src/__tests__/integration/`.
-- E2E: Playwright (Chromium). `npm run test:e2e`. Specs in `e2e/<feature-name>.spec.ts`.
-  One file per user flow, named by the flow, not by the component or hook.
-  Examples: `persistence.spec.ts`, `task-creation.spec.ts`, `categories.spec.ts`.
-
-<if layer 3 (e2e) activated>:
-### `data-testid` Convention (mandatory on interactive components)
-
-Every element that an E2E test interacts with (buttons, inputs, links,
-clickable elements) MUST have its own `data-testid` attribute, added
-by the agent when creating the component, not added later, a posteriori,
-only when a test needs it.
-
-Format: `data-testid="<context>-<element>"`, in kebab-case, specific
-without being redundant. Examples: `data-testid="task-item-delete-button"`,
-`data-testid="category-filter-select"`.
-
-Why: without this, E2E specs look for elements by visible text or
-Tailwind classes. Both change frequently during normal development and
-break tests unrelated to the actual change. `data-testid` is
-stable against style or copy refactors.
-
-Don't confuse with internal `data-*` attributes of third-party libraries
-(e.g. `data-radix-scroll-area-viewport` from Radix UI): those are internal
-library mechanisms, not the project's testing convention.
-
-Before declaring a task done, the agent MUST run and leave green:
-\`\`\`bash
-npm run lint
-npm run build
-npm run test        # if unit/integration
-npm run test -- --coverage  # if coverage targets activated; must meet the configured threshold
-npm run test:e2e    # if e2e
-\`\`\`
-```
+**Testing Approach in `AGENTS.md`**: do not write it by hand. The Builder
+(`testing_approach_section` in `builder-core.py`) generates the section from the active layers
+and the profile: the file conventions (`unit_convention`, `integration_convention`), the
+coverage matrix (a backend matrix for API profiles), the E2E guidance, and the `data-testid`
+convention only for UI profiles. Before declaring a task done the agent runs `npm run lint`,
+`npm run build`, `npm run test` (unit/integration), `npm run test -- --coverage` (when a
+coverage threshold is active) and `npm run test:e2e` (e2e).
 
 **Playwright MCP** (only if the user activated layer 3), registered in Phase 8, step 8.1e
 (from `playwright-mcp.settings.tmpl.md`), NOT here: `.claude/settings.json` and the IDE
@@ -363,14 +340,15 @@ Testing stack configured (in memory; everything is written in Phase 8):
   Layers: <unit / integration / e2e, only the activated ones>
 
   New files:
-    <if unit>  vitest.config.ts ✓  (with exclude: e2e/)
-    <if unit>  src/test/setup.ts ✓
+    <if unit, wizard owns the runner>  <unit config from the profile> ✓  (Vitest configs exclude e2e/)
+    <if react or next profile>         src/test/setup.ts ✓
+    <if runner_existing>               nothing for the unit layer: the project keeps its <runner>
     <if e2e>   playwright.config.ts ✓
     <if e2e>   e2e/example.spec.ts ✓
     <if POM>   e2e/pages/HomePage.ts ✓ (minimal scaffold)
 
   Files modified in Phase 8:
-    package.json  → test scripts added
+    package.json  → test scripts added (not when the project owns its runner)
     AGENTS.md     → Testing section updated
 
   Playwright MCP:
@@ -394,7 +372,7 @@ Testing stack configured. Reply **continue** to continue.
 
 ### ⏸ PAUSE: Waiting for user to confirm "continue"...
 
-> **📝 PERSISTENCE** (contract `wf-init/lib/state.md`): use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `testing.layers` (activated layers), `testing.runner_detected`, `testing.coverage_threshold` (number or null, if the coverage extra was activated), `testing.visual_regression` (bool), `testing.page_object_model` (bool), `mcps` (project MCPs to configure). Mark `wf_phase_done phase46 <next>`.
+> **📝 PERSISTENCE** (contract `wf-init/lib/state.md`): use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `testing.layers` (activated layers), `testing.profile`, `testing.runner`, `testing.runner_existing`, `testing.environment`, `testing.test_pattern`, `testing.runner_detected`, `testing.coverage_threshold` (number or null, if the coverage extra was activated), `testing.visual_regression` (bool), `testing.page_object_model` (bool), `mcps` (project MCPs to configure). Mark `wf_phase_done phase46 <next>`.
 > Calculate the next phase based on features:
 ```bash
 NEXT=
@@ -408,6 +386,11 @@ fi
 > Wait for the response. Only when they confirm, execute in bash:
 > - `wf_state_set '.testing.layers' '<activated layers array>'`, e.g. `["unit","integration","e2e"]`
 > - `wf_state_set '.testing.runner_detected' '"<runner>"'`, e.g. `"vitest"`, `"playwright"`
+> - `wf_state_set '.testing.profile' "\"$PROFILE\""`
+> - `wf_state_set '.testing.runner' '"<runner>"'`: the runner found (`$RUNNER_FOUND`), else the profile's `runner` (for generic, the one the user chose); `null` when there is none
+> - `wf_state_set '.testing.runner_existing' 'true'` when `RUNNER_FOUND` is set, else `'false'`
+> - `wf_state_set '.testing.environment' '"<jsdom|node>"'`: the profile's `environment` (`null` for angular and for a generic project without a runner)
+> - `wf_state_set '.testing.test_pattern' '"<profile.unit_convention>"'`
 > - `wf_state_set '.testing.coverage_threshold' '<number>'`, if coverage extra activated, else `null`
 > - `wf_state_set '.testing.visual_regression' 'true'` or `'false'`
 > - `wf_state_set '.testing.page_object_model' 'true'` or `'false'`
