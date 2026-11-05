@@ -1419,16 +1419,22 @@ WF_STATE="$STAGING_STATE" _apply_jq_filter '
 # framework-aware testing layer. The profile is derived from the stack_key suffix
 # with the SAME helper discovery uses (wf_profile_for_framework), so an old
 # `node-react` state maps to profile "react" and keeps generating exactly what it
-# generated before. Only fills missing values (idempotent); never overwrites a
-# profile the user or phase 4.6 already chose. If the helper is unavailable the
-# profile stays null and the Builder falls back to the legacy "react" profile.
+# generated before. The stack_key is read from the ROOT state, which still holds the
+# pre-refresh value: R1 may already have rewritten the staging stack_key after the user
+# accepted drift (e.g. node-react -> node-express), and following it would silently
+# change the test config of an installed project. A profile change is an explicit
+# action (set testing.profile, then re-run /wf-refresh). Only fills missing values
+# (idempotent); never overwrites a profile the user or phase 4.6 already chose. If the
+# helper is unavailable the profile stays null and the Builder falls back to "react".
+# runner is inferred only from a UNIT runner: runner_detected can also be "playwright".
 if declare -F wf_profile_for_framework >/dev/null 2>&1; then
-  _SK=$(jq -r '.discovery.stack.stack_key // ""' "$STAGING_STATE")
+  _SK=$(jq -r '.discovery.stack.stack_key // .discovery.stack_key // ""' "$WF_STATE" 2>/dev/null || true)
+  [[ -n "$_SK" ]] || _SK=$(jq -r '.discovery.stack.stack_key // ""' "$STAGING_STATE")
   _PROFILE=$(wf_profile_for_framework "${_SK#*-}")
   WF_STATE="$STAGING_STATE" _apply_jq_filter --arg profile "$_PROFILE" '
     .testing //= {} |
     .testing.profile //= $profile |
-    .testing.runner //= .testing.runner_detected
+    .testing.runner //= (.testing.runner_detected | if IN("vitest", "jest", "mocha", "karma") then . else null end)
   '
 fi
 

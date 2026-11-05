@@ -173,8 +173,11 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
   `wf_profile_for_framework`: `react` (react, Vite projects included) | `next` | `vue` (vue, nuxt) | `node-api` (express,
   fastify, hono, koa) | `nest` | `angular` | `generic`. Selects runner, environment, packages and
   config template. `null` means a legacy state: the Builder treats it as `react`, the behavior
-  every Node project had before profiles existed. R2 fills it from `stack_key` without
-  overwriting a value that is already set.
+  every Node project had before profiles existed. R2 fills it from the `stack_key` of the ROOT
+  state (the pre-refresh value, not one R1 just rewrote after accepted drift) without overwriting a
+  value that is already set, so an installed project never changes its test config as a side effect
+  of detection. To change an installed project's profile, set `testing.profile` and re-run
+  `/wf-refresh`.
 - **`testing.runner`** / **`testing.environment`** / **`testing.test_pattern`**: the runner in
   use (`vitest` | `jest` | `karma` | ...), its test environment (`jsdom` | `node`) and the test
   file convention. When the project already has a configured runner, phase 4.6 records that one

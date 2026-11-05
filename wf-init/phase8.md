@@ -228,7 +228,10 @@ PROFILE=$(jq -r '.testing.profile // "react"' .wizard-state.json)
 RUNNER_EXISTING=$(jq -r '.testing.runner_existing // false' .wizard-state.json)
 PROFILE_JSON=""
 if [ "$HAS_TESTING" -gt 0 ]; then
-  PROFILE_JSON=$(wf_testing_profile "$PROFILE") || { echo "8.1c ERROR — cannot read the testing profiles." >&2; exit 1; }
+  # Never abort here: the files are already promoted. Without the profile data the unit
+  # install, scripts and placeholder test are skipped with a warning (re-run this step later).
+  PROFILE_JSON=$(wf_testing_profile "$PROFILE" 2>/dev/null) || PROFILE_JSON=""
+  [ -n "$PROFILE_JSON" ] || echo "8.1c WARNING — cannot read the testing profiles (network?): skipping the unit install, scripts and placeholder test. Re-run this step once reachable." >&2
 fi
 
 # Install dependencies by stack — only if testing or conventional commits are active
@@ -241,6 +244,8 @@ fi
           if jq -e '.testing.layers[] | select(. == "unit" or . == "integration")' .wizard-state.json >/dev/null 2>&1; then
             if [ "$RUNNER_EXISTING" = "true" ]; then
               echo "8.1c — the project keeps its own runner ($(jq -r '.testing.runner // "existing"' .wizard-state.json)): nothing to install for unit/integration."
+            elif [ -z "$PROFILE_JSON" ]; then
+              echo "8.1c — skipped the unit install: the testing profile data is unavailable."
             else
               # The packages come from the testing profile, never from a hardcoded React list.
               UNIT_PKGS=$(echo "$PROFILE_JSON" | jq -r '.packages | join(" ")')
@@ -344,10 +349,12 @@ HAS_TESTING=$(jq -r '.testing.layers[]?' .wizard-state.json 2>/dev/null | wc -l)
 if [ "$HAS_TESTING" -gt 0 ]; then
   PROFILE=$(jq -r '.testing.profile // "react"' .wizard-state.json)
   RUNNER_EXISTING=$(jq -r '.testing.runner_existing // false' .wizard-state.json)
-  PROFILE_JSON=$(wf_testing_profile "$PROFILE") || { echo "8.1e ERROR — cannot read the testing profiles." >&2; exit 1; }
+  # Never abort here (files are already promoted): without the profile the unit scripts are skipped.
+  PROFILE_JSON=$(wf_testing_profile "$PROFILE" 2>/dev/null) || PROFILE_JSON=""
+  [ -n "$PROFILE_JSON" ] || echo "8.1e WARNING — cannot read the testing profiles (network?): the unit test scripts were not set." >&2
   # unit/integration scripts: the profile's own, never over a project that keeps its runner
   if jq -e '.testing.layers[] | select(. == "unit" or . == "integration")' .wizard-state.json >/dev/null 2>&1 \
-     && [ "$RUNNER_EXISTING" != "true" ]; then
+     && [ "$RUNNER_EXISTING" != "true" ] && [ -n "$PROFILE_JSON" ]; then
     echo "$PROFILE_JSON" | jq -r '.scripts | to_entries[] | "scripts.\(.key)=\(.value)"' | while IFS= read -r kv; do
       npm pkg set "$kv" 2>/dev/null || true
     done
