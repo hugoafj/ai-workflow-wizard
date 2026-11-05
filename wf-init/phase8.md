@@ -230,8 +230,9 @@ PROFILE_JSON=""
 if [ "$HAS_TESTING" -gt 0 ]; then
   # Never abort here: the files are already promoted. Without the profile data the unit
   # install, scripts and placeholder test are skipped with a warning (re-run this step later).
-  PROFILE_JSON=$(wf_testing_profile "$PROFILE" 2>/dev/null) || PROFILE_JSON=""
-  [ -n "$PROFILE_JSON" ] || echo "8.1c WARNING — cannot read the testing profiles (network?): skipping the unit install, scripts and placeholder test. Re-run this step once reachable." >&2
+  # The helper prints its own diagnostic on stderr (unreachable source, malformed profiles.md...); keep it.
+  PROFILE_JSON=$(wf_testing_profile "$PROFILE") || PROFILE_JSON=""
+  [ -n "$PROFILE_JSON" ] || echo "8.1c WARNING — the testing profile data could not be read (see the message above): skipping the unit install, scripts and placeholder test. Fix the cause and re-run this step." >&2
 fi
 
 # Install dependencies by stack — only if testing or conventional commits are active
@@ -255,7 +256,9 @@ fi
                 echo "8.1c — installing $PROFILE unit packages: $UNIT_PKGS"
                 # xargs does the splitting: an unquoted $UNIT_PKGS stays ONE argument in zsh,
                 # the default macOS shell, and npm would reject it.
-                if echo "$PROFILE_JSON" | jq -r '.packages[]' | xargs npm install --save-dev; then
+                # Same list that was just checked as non-empty (package names hold no spaces), so xargs
+                # can never run `npm install --save-dev` with no packages.
+                if echo "$UNIT_PKGS" | tr ' ' '\n' | xargs npm install --save-dev; then
                   echo "8.1c OK — unit packages installed"
                 else
                   echo "8.1c WARNING — npm install failed (exit $?). Check package.json and network." >&2
@@ -352,8 +355,8 @@ if [ "$HAS_TESTING" -gt 0 ]; then
   PROFILE=$(jq -r '.testing.profile // "react"' .wizard-state.json)
   RUNNER_EXISTING=$(jq -r '.testing.runner_existing // false' .wizard-state.json)
   # Never abort here (files are already promoted): without the profile the unit scripts are skipped.
-  PROFILE_JSON=$(wf_testing_profile "$PROFILE" 2>/dev/null) || PROFILE_JSON=""
-  [ -n "$PROFILE_JSON" ] || echo "8.1e WARNING — cannot read the testing profiles (network?): the unit test scripts were not set." >&2
+  PROFILE_JSON=$(wf_testing_profile "$PROFILE") || PROFILE_JSON=""
+  [ -n "$PROFILE_JSON" ] || echo "8.1e WARNING — the testing profile data could not be read (see the message above): the unit test scripts were not set." >&2
   # unit/integration scripts: the profile's own, never over a project that keeps its runner
   if jq -e '.testing.layers[] | select(. == "unit" or . == "integration")' .wizard-state.json >/dev/null 2>&1 \
      && [ "$RUNNER_EXISTING" != "true" ] && [ -n "$PROFILE_JSON" ]; then

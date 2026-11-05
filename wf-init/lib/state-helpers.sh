@@ -217,10 +217,16 @@ wf_testing_profiles() {
 
 # JSON of one profile; an empty or unknown name resolves to the data file's default (react).
 wf_testing_profile() {
-  local data
+  local data name="${1:-}"
   data=$(wf_testing_profiles) && [ -n "$data" ] \
     || { echo "wf_testing_profile: cannot read templates/protocols/testing/profiles.md from $WF_RAW" >&2; return 1; }
-  printf '%s\n' "$data" | jq -c --arg p "${1:-}" '.profiles[$p] // .profiles[.default]'
+  printf '%s\n' "$data" | jq -e . >/dev/null 2>&1 \
+    || { echo "wf_testing_profile: the profile data read from $WF_RAW is not valid JSON" >&2; return 1; }
+  # Like the Builder, say so when a (typo'd) profile name falls back to the default one.
+  if [ -n "$name" ] && [ "$(printf '%s\n' "$data" | jq -r --arg p "$name" '.profiles | has($p)')" != "true" ]; then
+    echo "wf_testing_profile: unknown testing profile '$name', using the default profile" >&2
+  fi
+  printf '%s\n' "$data" | jq -c --arg p "$name" '.profiles[$p] // .profiles[.default]'
 }
 
 # Target file of the unit config the Builder writes for <profile> + <runner> (the runner only
