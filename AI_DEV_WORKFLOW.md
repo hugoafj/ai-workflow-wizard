@@ -1756,7 +1756,10 @@ The **AI Review** has four possible providers (plus `None`):
   Codex, OpenCode, Ollama, LM Studio, GitHub Models). Uses your `AGENTS.md` as review
   rules. Two modes: local pre-commit hook (`gga init && gga install`) and PR review via CI
   (`gga run --pr-mode`). Binary via `gentle-ai install --component gga` or
-  `brew install gentleman-programming/tap/gga`.
+  `brew install gentleman-programming/tap/gga`. The wizard writes its config as a `.gga` file at
+  the project root (GGA does not read `.gga/config.yml`) with comma-separated suffix patterns from
+  `templates/protocols/cicd/variants/gga-patterns.md` (GGA does not expand braces); Vue and Nuxt
+  projects also review `*.vue`. `/wf-refresh` migrates the old `.gga/config.yml` layout.
 - **Claude Code Action** (if you have an Anthropic API key).
 - **Copilot review** (no API key, integrated in GitHub).
 - **Gemini via pr-agent** (free alternative, requires Google API key).

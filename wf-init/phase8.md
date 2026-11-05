@@ -30,6 +30,14 @@ if echo "$IDES" | grep -q "claude-code"; then
   mkdir -p .claude/skills
 fi
 
+# GGA layout migration: older builders wrote .gga/config.yml (a layout GGA never reads); the
+# Builder now stages a .gga FILE. rsync cannot replace a non-empty directory with a file, so move
+# the old directory aside (nothing is deleted).
+if [ -f "$STAGING/.gga" ] && [ -d .gga ]; then
+  GGA_ASIDE=".gga.old-layout.$(date +%s)"
+  mv .gga "$GGA_ASIDE" && echo "ℹ Moved the old .gga/ directory to $GGA_ASIDE (GGA only reads a .gga file). Delete it when you no longer need it."
+fi
+
 # Copy the entire staging tree to the project root, preserving relative paths
 # Use rsync for robust copy (handles nested dirs, perms, symlinks, timestamps)
 rsync -a "$STAGING/" ./

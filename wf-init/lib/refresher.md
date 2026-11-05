@@ -2587,9 +2587,21 @@ if [[ -f .wf-status ]] && grep -qE 'SDD drift|/sdd-init' .wf-status; then
   echo "✓ Removed stale SDD .wf-status (the post-commit hook regenerates it)"
 fi
 
+# GGA layout migration: older builders wrote .gga/config.yml, which GGA never reads, and the
+# Builder now stages a .gga FILE. After the removals above took the old file, drop the empty
+# .gga/ directory (rmdir only removes an empty one); otherwise `cp .gga` would land inside it.
+if [ -d .gga ] && [ -f "$STAGING/.gga" ]; then
+  rmdir .gga 2>/dev/null || true
+fi
+
 if [[ "$APPROVE_ADDED" == "true" ]]; then
   echo "ℹ Copying added files..."
   while IFS= read -r -d '' file; do
+    # Never copy a file onto a directory: cp would put it inside (a .gga/ that still holds files).
+    if [ -d "$file" ]; then
+      echo "  ⚠ Skipped $file: a directory with that name already exists. Move or remove it, then re-run /wf-refresh."
+      continue
+    fi
     mkdir -p "$(dirname "$file")"
     cp "$STAGING/$file" "$file"
     [[ "$file" == *".sh" ]] && chmod +x "$file"

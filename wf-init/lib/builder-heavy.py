@@ -356,19 +356,29 @@ def write_cicd(raw, state, staging):
     # --- AI review workflow (gga / claude / gemini) — only under full CI.
     if cicd and ai_reviewer in ("gga", "claude", "gemini"):
         if ai_reviewer == "gga":
-            # .gga config + gga-review workflow.
+            # .gga config + gga-review workflow. GGA reads a FILE named .gga in the project
+            # root (it ignores .gga/config.yml) and splits FILE_PATTERNS / EXCLUDE_PATTERNS
+            # on commas, matching a leading-* pattern as a suffix: no brace expansion.
             gga_cfg = builder_core.fetch_with_retries(builder_core.base_url(raw, "templates/protocols/cicd/variants/gga-config.tmpl.md"))
-            gga_cfg = builder_core.extract_block(gga_cfg, "yaml")
+            gga_cfg = builder_core.strip_prose_header(gga_cfg, keep_notes=True)
             gga_provider = ci.get("gga_provider", "claude")
             gga_cfg = gga_cfg.replace("{{provider}}", gga_provider)
-            file_patterns = ci.get("gga_file_patterns", "**/*.{ts,tsx,js,jsx}")
-            exclude_patterns = ci.get("gga_exclude_patterns", "**/*.test.{ts,tsx},**/*.spec.{ts,tsx},dist/**,build/**")
+            gga_data = json.loads(builder_core.extract_block(
+                builder_core.fetch_with_retries(builder_core.base_url(raw, "templates/protocols/cicd/variants/gga-patterns.md")), "json"))
+            framework = builder_core.get_state_value(state, "discovery.stack.framework", "") or ""
+            file_patterns = ci.get("gga_file_patterns") or gga_data["file_patterns_by_framework"].get(framework, gga_data["file_patterns"])
+            exclude_patterns = ci.get("gga_exclude_patterns") or gga_data["exclude_patterns"]
+            for label, value in (("gga_file_patterns", file_patterns), ("gga_exclude_patterns", exclude_patterns)):
+                if "{" in value or "}" in value:
+                    print("builder: ci.%s has braces, which GGA does not expand (comma-separated suffix globs only): %r"
+                          % (label, value), file=sys.stderr)
             gga_cfg = gga_cfg.replace("{{file_patterns}}", file_patterns)
             gga_cfg = gga_cfg.replace("{{exclude_patterns}}", exclude_patterns)
             pr_base = builder_core.get_state_value(state, "discovery.default_branch", "main")
             gga_cfg = gga_cfg.replace("{{pr_base_branch}}", pr_base)
-            gga_target = os.path.join(staging, ".gga", "config.yml")
-            os.makedirs(os.path.dirname(gga_target), exist_ok=True)
+            if builder_core.unresolved_placeholders(gga_cfg):
+                raise ValueError("unresolved placeholders in .gga")
+            gga_target = os.path.join(staging, ".gga")
             with open(gga_target, "w", encoding="utf-8") as fh:
                 fh.write(gga_cfg + "\n")
             created.append(os.path.relpath(gga_target, staging))

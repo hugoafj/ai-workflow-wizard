@@ -460,7 +460,11 @@ details) using `$WF_ROOT/templates/protocols/cicd/` as the single source.
   defaulting to `8`)** — this avoids the `npm ci` lockfile out-of-sync failure.
   - **E2E toggle**: if `state.ci.e2e_in_ci == false`, do not include `npm run test:e2e` in
     the quality guard (even if `LAYERS` includes e2e). The e2e script still exists for local use.
-- `.gga`: fill `PR_BASE_BRANCH` with `state.discovery.default_branch` (uncommented).
+- `.gga`: a FILE named `.gga` in the project root (GGA does not read `.gga/config.yml`). Fill
+  `PR_BASE_BRANCH` with `state.discovery.default_branch` (uncommented) and `FILE_PATTERNS` /
+  `EXCLUDE_PATTERNS` from `variants/gga-patterns.md`: comma-separated suffix globs, no brace
+  expansion, `*.vue` added for Vue and Nuxt; `state.ci.gga_file_patterns` / `gga_exclude_patterns`
+  override them.
 - **GGA local**: if `local` ∈ gga_modes AND conventional_commits → `.husky/pre-commit` with
   `gga run` (not `gga install`, which Husky shadows). If local without Husky → `gga install` in Phase 8.
 - **GGA CI**: `gga-review.yml` installs GGA via `git clone` (NOT `curl|bash`).

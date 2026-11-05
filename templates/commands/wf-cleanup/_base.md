@@ -231,6 +231,7 @@ echo "📁 Other artifacts:"
 [ -f ".commitlintrc.json" ] && echo "  🗑 .commitlintrc.json"
 [ -d ".husky" ] && echo "  🗑 .husky/ (conventional commits)"
 [ -f ".gga" ] && echo "  🗑 .gga (GGA config)"
+[ -f ".gga/config.yml" ] && echo "  🗑 .gga/config.yml (GGA config, legacy location)"
 [ -f ".pr_agent.toml" ] && echo "  🗑 .pr_agent.toml"
 [ -f "release-please-config.json" ] && echo "  🗑 release-please-config.json"
 [ -f ".release-please-manifest.json" ] && echo "  🗑 .release-please-manifest.json"
@@ -407,6 +408,8 @@ Remove the remaining detected items:
 
 ```bash
 rm -f .wizard-state.json .wf-status .commitlintrc.json .gga .pr_agent.toml
+# Legacy location written by older builders (GGA never read it): the file, then the directory if empty.
+rm -f .gga/config.yml; [ -d .gga ] && rmdir .gga 2>/dev/null || true
 rm -f .wizard-managed-files.json
 rm -f refresh-plan.json .wizard-refresh-baseline.json
 rm -f release-please-config.json .release-please-manifest.json
