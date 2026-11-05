@@ -94,6 +94,10 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
 
   "testing": {
     "runner_detected": null,
+    "profile": null,
+    "runner": null,
+    "environment": null,
+    "test_pattern": null,
     "layers": [],
     "coverage_threshold": null,
     "visual_regression": false,
@@ -156,9 +160,25 @@ It is local to the run and goes in `.gitignore` (same as `.wf-status`).
   `phase6.md` file; `phase6` is a backward-compatible alias). Phase 6b is `phase6b-build-heavy`,
   which advances to `phase7` when complete. Phase 47 is `phase47-cicd` (the old `phase47` key is
   not used).
-- **`discovery.stack.stack_key`**: normalized stack key (e.g. `node-react`, `php-laravel`,
-  `python-django`). This is what the Builder uses to select `variants/<stack_key>.md`.
+- **`discovery.stack.stack_key`**: normalized stack key (e.g. `node-react`, `node-nest`,
+  `node-generic`, `php-laravel`, `python-django`). For Node it is `node-<framework>`. This is
+  what the Builder uses to select `variants/<stack_key>.md`.
   **Never branch with `if stack === ...`**: the key selects a file.
+- **`discovery.stack.framework`**: for Node, the output of `wf_detect_framework`
+  (`state-helpers.sh`), derived from `package.json` dependencies, first match wins:
+  `nest` | `angular` | `next` | `nuxt` | `vue` | `react` | `express` | `fastify` | `hono` | `koa`
+  | `generic` (nothing matched). Other stacks: `laravel`, `django`. Never `null` once phase 1 ran.
+- **`testing.profile`**: testing profile resolved from the framework by
+  `wf_profile_for_framework`: `react` (react, next) | `vue` (vue, nuxt) | `node-api` (express,
+  fastify, hono, koa) | `nest` | `angular` | `generic`. Selects runner, environment, packages and
+  config template. `null` means a legacy state: the Builder treats it as `react`, the behavior
+  every Node project had before profiles existed. R2 fills it from `stack_key` without
+  overwriting a value that is already set.
+- **`testing.runner`** / **`testing.environment`** / **`testing.test_pattern`**: the runner in
+  use (`vitest` | `jest` | `karma` | ...), its test environment (`jsdom` | `node`) and the test
+  file convention. When the project already has a configured runner, phase 4.6 records that one
+  and installs nothing for the unit layer; otherwise it records the profile default.
+  `testing.runner_detected` keeps the raw detection result.
 - **`discovery.commands`**: array of npm script names detected in phase 1. The Builder renders
   the AGENTS.md **Commands** section from it; when absent, the Builder re-detects from
   `package.json` and warns.

@@ -1,0 +1,35 @@
+# framework-aware-testing
+
+Branch: `feat/framework-aware-testing` (from `main`). Approved plan: `/Users/user/.claude/plans/actualmente-que-framworks-de-sharded-matsumoto.md`.
+Engram mirror: project `ai-workflow-wizard`, topic `odd/framework-aware-testing/tasks`. Delivery strategy: ask-on-risk, no push. Test runner: none (manual fixtures).
+
+## Specs
+
+S1. "We need to make it work well in every framework, and for example if it is Express, Nest or similar, it should only be configured according to the framework" (translated from Spanish). Frameworks in scope: Express (and Fastify/Hono/Koa as node-api), Nest, Angular, Vue, Nuxt, Next, Vite-React.
+S2. Detection derives the framework from `package.json` dependencies, first match wins: `@nestjs/core` nest, `@angular/core` angular, `next` next, `nuxt` nuxt, `vue` vue, `react` react (vite if `vite` present), `express|fastify|hono|koa` node-api, else node-generic. `stack_key` = `node-<framework>`; `discovery.stack.framework` is written. Existing keys `node-react`, `node-next`, `node-vue` keep their value.
+S3. Runner policy (user decision): "Respect the project's runner". If the project already has a runner with its config (vitest, jest, mocha, karma, cypress, playwright), keep it. If none, use the framework default: react/next/vite-react Vitest + Testing Library React + jsdom (output byte-identical to today); vue/nuxt Vitest + `@vue/test-utils` + `@vitejs/plugin-vue`; node-api Vitest node env + supertest, no jsdom, no Testing Library, no `data-testid`, Playwright off by default; nest Jest + supertest (detect and keep if present); angular native runner, no generated config.
+S4. Frameworks not modeled fall to `node-generic`, never to React: keep an existing runner; otherwise Phase 4.6 asks once (Vitest node env or reusing an existing Vite `test:` block, Jest, or skip); no Testing Library, jsdom or React plugin unless `react` is a dependency; Playwright/`data-testid` only offered when a UI framework is detected. Adding a framework later is one profile entry plus its config template.
+S5. State schema adds `testing.profile`, `testing.runner`, `testing.environment`, `testing.test_pattern`; defaults and validation updated; R2 migration infers `profile` from `stack_key` and `runner` from `runner_detected` so old states stay valid.
+S6. Gitflow, MCPs, CI and release output stay unchanged for every framework.
+S7. `AI_DEV_WORKFLOW.md` is synced before each commit that touches the topics listed in `AGENTS.md`.
+
+Acceptance: fixture projects (vite-react, next, vue, express, nest with Jest, angular, svelte unknown, existing Vitest) in a `mktemp -d` dir; vite-react and next output identical to the base commit; old-state R2 migration validates. No test suite exists.
+
+## Tasks
+
+- [x] T1 Detection, schema, migration (S2, S5). Route: inline. Files: `wf-init/lib/refresher.md` (R1, R2), `wf-init/subagent-discovery.md`, `wf-init/phase1.md`, `wf-init/lib/state.md`, `wf-init/lib/state-helpers.sh`, plus the R1/R2 prose in `AI_DEV_WORKFLOW.md` (pulled forward from T4 because `AGENTS.md` requires the doc sync before each commit). Evidence: `bash -n` OK; `wf_detect_framework` 10/10 fixtures (vite-react, next, nuxt+vue, vue in devDependencies, nest+express, angular, express, fastify, svelte and `{}` as generic) plus missing and malformed manifests; the real R1 block extracted from `refresher.md` gives the right `STACK_KEY`/`FRAMEWORK` for node, php, python and no manifest; the real R2 block fills `profile`/`runner`, keeps a preset `profile`, and is idempotent. Commit: pending human diff review
+- [ ] T2 Profiles, templates, builder (S3, S4). Route: inline. Files: `templates/protocols/testing/*`, `wf-init/lib/builder-heavy.py`, `wf-init/lib/builder-core.py`, `wf-init/lib/builder.md`. Commit: pending
+- [ ] T3 Phases and commands (S3, S4, S6). Route: inline. Files: `wf-init/phase46.md`, `phase7.md`, `phase8.md`, `refresher.md:1604-1606`, `templates/commands/wf-settings/_base.md`, `wf-cleanup/_base.md`, `gga-config.tmpl.md`, `wf-worktree/_base.md`. Commit: pending
+- [ ] T4 Docs sync (S7). Route: inline. Files: `AI_DEV_WORKFLOW.md`. Commit: pending
+- [ ] T5 Fixture verification and independent verifier (acceptance). Route: delegated direct (verifier, item 3 and 6). Commit: none
+
+Route declaration: all writes inline. The units share state schema and helpers (not independent), so the Writer trigger does not fire.
+
+## Log
+
+L1 (2026-11-05, user, translated from Spanish): "We need to make it work well in every framework, and for example if it is Express, Nest or similar, it should only be configured according to the framework."
+L2 (2026-11-05, user, translated from Spanish, answering the runner-policy question): "I want option 1, 'Respect the project's runner', the one you recommend, but what happens with the other frameworks that are not covered?"
+L3 (2026-11-05): Plan approved via ExitPlanMode. Unmodeled frameworks answered in S4 (node-generic fallback).
+L4 (2026-11-05): Branch created from `main` because `feat/versioned-wizard-state` carries unrelated commit 8aab449. Unrelated working-tree change `.vscode/settings.json` left untouched.
+L5 (2026-11-05, user, translated from Spanish): "Wait: documentation, code and plans must be in English." All repo artifacts, feature docs and plans are written in English; user quotes are logged as English translations marked as such.
+L6 (2026-11-05): T1 design choices. (a) One shared helper pair in `state-helpers.sh` (`wf_detect_framework`, `wf_profile_for_framework`) so discovery, R1 and R2 never carry three copies of the mapping; the Builder will read `testing.profile` and not re-derive it. (b) Detection reads `dependencies` and `devDependencies` (the old R1 read only `dependencies`). (c) A legacy state keeps profile `react` after R2 even if it is really Express: that is deliberate, so existing projects do not change generated output silently. R1 will surface the new `node-express` stack as drift, but switching the testing profile of an installed project needs an explicit action (candidate for T3 in `/wf-settings`). (d) Out of scope, noted for later: `react-native` and Expo projects still resolve to `react`.

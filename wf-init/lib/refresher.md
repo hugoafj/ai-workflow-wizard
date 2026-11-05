@@ -1032,18 +1032,23 @@ _wf_resume_gate "R1"
 echo "ℹ Re-discovering project..."
 
 STACK_KEY="unknown"
+FRAMEWORK=""
 if [[ -f package.json ]]; then
-  STACK_KEY="node-react"
-  if command -v jq >/dev/null 2>&1; then
-    # Read the package NAME (key), not the version value: .dependencies.next
-    # returns "^14.0.0", which would produce a bogus "node-^14.0.0" key.
-    pkg_framework=$(jq -r '.dependencies | keys[] | select(. == "next" or . == "vue") | .' package.json 2>/dev/null | head -1 || true)
-    [[ -n "$pkg_framework" ]] && STACK_KEY="node-${pkg_framework}"
+  # Shared detection (state-helpers.sh): first dependency match wins, "generic"
+  # when nothing matches. It matches package NAMES, never version values, so a
+  # dependency like "next": "^14.0.0" cannot produce a bogus "node-^14.0.0" key.
+  FRAMEWORK="generic"
+  if command -v jq >/dev/null 2>&1 && declare -F wf_detect_framework >/dev/null 2>&1; then
+    FRAMEWORK=$(wf_detect_framework package.json 2>/dev/null || true)
+    FRAMEWORK="${FRAMEWORK:-generic}"
   fi
+  STACK_KEY="node-${FRAMEWORK}"
 elif [[ -f composer.json ]]; then
   STACK_KEY="php-laravel"
+  FRAMEWORK="laravel"
 elif [[ -f pyproject.toml ]]; then
   STACK_KEY="python-django"
+  FRAMEWORK="django"
 fi
 
 NODE_ENGINE=""
@@ -1276,6 +1281,9 @@ if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || 
     # Only write non-empty node_engine/npm_major to avoid clobbering good values with empty discovery results.
     STAGING_DIR=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' "$WF_STATE")
     JQ_FILTER='.discovery.stack.stack_key = $stack_key | .discovery.git_commits = $git_commits | .discovery.commands = $commands'
+    if [[ -n "$FRAMEWORK" ]]; then
+      JQ_FILTER="$JQ_FILTER | .discovery.stack.framework = \$framework"
+    fi
     if [[ -n "$NODE_ENGINE" ]]; then
       JQ_FILTER="$JQ_FILTER | .discovery.node_engine = \$node_engine"
     fi
@@ -1284,6 +1292,7 @@ if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || 
     fi
     WF_STATE="$STAGING_DIR/wizard-state.json" _apply_jq_filter \
       --arg stack_key "$STACK_KEY" \
+      --arg framework "$FRAMEWORK" \
       --arg node_engine "$NODE_ENGINE" \
       --arg npm_major "$NPM_MAJOR" \
       --argjson git_commits "$GIT_COMMITS" \
@@ -1405,6 +1414,23 @@ WF_STATE="$STAGING_STATE" _apply_jq_filter '
   .discovery.stack.stack_key = (.discovery.stack.stack_key // .discovery.stack_key) |
   del(.discovery.stack_key)
 '
+
+# 3. testing.profile / testing.runner: infer them for states written before the
+# framework-aware testing layer. The profile is derived from the stack_key suffix
+# with the SAME helper discovery uses (wf_profile_for_framework), so an old
+# `node-react` state maps to profile "react" and keeps generating exactly what it
+# generated before. Only fills missing values (idempotent); never overwrites a
+# profile the user or phase 4.6 already chose. If the helper is unavailable the
+# profile stays null and the Builder falls back to the legacy "react" profile.
+if declare -F wf_profile_for_framework >/dev/null 2>&1; then
+  _SK=$(jq -r '.discovery.stack.stack_key // ""' "$STAGING_STATE")
+  _PROFILE=$(wf_profile_for_framework "${_SK#*-}")
+  WF_STATE="$STAGING_STATE" _apply_jq_filter --arg profile "$_PROFILE" '
+    .testing //= {} |
+    .testing.profile //= $profile |
+    .testing.runner //= .testing.runner_detected
+  '
+fi
 
 # R2 normalization (FU9): normalize corrupted node_engine/npm_major values.
 # Values of "None" or "" become null so the builder defaults ("22"/"10") apply.

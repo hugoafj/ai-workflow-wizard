@@ -26,7 +26,7 @@
 ```
 DISCOVERY REPORT
 ================
-Detected stack: <stack>
+Detected stack: <stack_key> (framework: <framework>)
 Code files: ~<N>
 Git commits: <N>
 

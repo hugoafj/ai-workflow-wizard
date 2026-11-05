@@ -103,6 +103,10 @@ wf_state_init() {
   "agents": [],
   "testing": {
     "runner_detected": null,
+    "profile": null,
+    "runner": null,
+    "environment": null,
+    "test_pattern": null,
     "layers": [],
     "coverage_threshold": null,
     "visual_regression": false,
@@ -156,6 +160,45 @@ JSON
 
 # Read a field (e.g. wf_state_get '.answers.project_name')
 wf_state_get() { jq -r "$1 // empty" "$WF_STATE" 2>/dev/null; }
+
+# Detect the Node framework from a package.json (single source of truth, shared by
+# phase 1 discovery and /wf-refresh R1). Prints one token; first dependency match wins.
+# Package NAMES are matched (dependencies + devDependencies), never version values.
+# Order matters: nuxt before vue, next before react, nest/angular before the rest.
+#   nest | angular | next | nuxt | vue | react | express | fastify | hono | koa | generic
+# Prints nothing and returns 1 when the manifest is missing or is not valid JSON.
+wf_detect_framework() {
+  local pkg="${1:-package.json}"
+  [ -f "$pkg" ] || return 1
+  jq -r '
+    ((.dependencies // {}) + (.devDependencies // {})) as $d
+    | if   $d["@nestjs/core"]  then "nest"
+      elif $d["@angular/core"] then "angular"
+      elif $d["next"]          then "next"
+      elif $d["nuxt"]          then "nuxt"
+      elif $d["vue"]           then "vue"
+      elif $d["react"]         then "react"
+      elif $d["express"]       then "express"
+      elif $d["fastify"]       then "fastify"
+      elif $d["hono"]          then "hono"
+      elif $d["koa"]           then "koa"
+      else "generic" end' "$pkg" 2>/dev/null
+}
+
+# Map a framework token (wf_detect_framework output) to its testing profile.
+# The profile selects runner, environment, packages and config template (phase 4.6, Builder B8).
+#   react|next -> react   vue|nuxt -> vue   express|fastify|hono|koa -> node-api
+#   nest -> nest          angular -> angular          anything else -> generic
+wf_profile_for_framework() {
+  case "$1" in
+    react|next)                   echo "react" ;;
+    vue|nuxt)                     echo "vue" ;;
+    express|fastify|hono|koa)     echo "node-api" ;;
+    nest)                         echo "nest" ;;
+    angular)                      echo "angular" ;;
+    *)                            echo "generic" ;;
+  esac
+}
 
 # Write a field safely using jq --arg to prevent injection/escaping issues
 # 

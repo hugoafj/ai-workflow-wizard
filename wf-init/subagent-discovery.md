@@ -32,6 +32,11 @@ ls -la "{PROJECT_PATH}"
 # Package manifest
 cat "{PROJECT_PATH}/package.json" 2>/dev/null || cat "{PROJECT_PATH}/composer.json" 2>/dev/null || cat "{PROJECT_PATH}/pyproject.toml" 2>/dev/null || cat "{PROJECT_PATH}/Cargo.toml" 2>/dev/null
 
+# Node framework (shared helper from state-helpers.sh; first dependency match wins,
+# prints "generic" when no known framework matches). Use its output verbatim as
+# .discovery.stack.framework; do NOT guess the framework from file names.
+[ -f "{PROJECT_PATH}/package.json" ] && ( source "{WF_PATH}/lib/state-helpers.sh" && wf_detect_framework "{PROJECT_PATH}/package.json" ) 2>/dev/null
+
 # Previous workflow artifacts
 ls "{PROJECT_PATH}/AGENTS.md" "{PROJECT_PATH}/CLAUDE.md" "{PROJECT_PATH}/GEMINI.md" 2>/dev/null
 ls -d "{PROJECT_PATH}/.cursor" "{PROJECT_PATH}/.windsurf" "{PROJECT_PATH}/.devin" "{PROJECT_PATH}/.kiro" 2>/dev/null
@@ -103,9 +108,12 @@ Use `wf_state_set` to persist to `.wizard-state.json`:
 
 ```
 .discovery.stack.primary        → "node" | "php" | "python" | "rust" | "other"
-.discovery.stack.framework      → "react" | "next" | "laravel" | "express" | null
+.discovery.stack.framework      → Node: the wf_detect_framework output, one of "nest" | "angular" |
+                                  "next" | "nuxt" | "vue" | "react" | "express" | "fastify" |
+                                  "hono" | "koa" | "generic"; other stacks: "laravel" | "django" | null
 .discovery.stack.detected_from  → "package.json" | "composer.json" | etc.
-.discovery.stack.stack_key   → normalized key (e.g. "node-react", "php-laravel")
+.discovery.stack.stack_key   → "node-<framework>" for Node (e.g. "node-nest", "node-generic"),
+                               "php-laravel", "python-django"
 .discovery.code_files           → number of code files
 .discovery.git_commits          → number of commits
 .discovery.committers           → number of unique committers
