@@ -419,8 +419,10 @@ For each command in the catalog (protocol `commands`) and each IDE ∈ IDES:
   generic project without a Vitest runner get no unit config. Skip the whole step when
   `state.testing.runner_existing` is true: the project keeps its own runner and config.
   Strip `# prose header` lines if they exist, no code fence.
-  The react profile also expects `src/test/setup.ts` from `setup.tmpl.md`
-  (`builder-heavy.py` does not stage it today; the other profiles need no setup file).
+  The profile's `setup_file` (react: `src/test/setup.ts` from `setup.tmpl.md`, the file
+  `vitest.config.ts` lists in `setupFiles`) is staged next to the config, unless the
+  project already has that file: phase 8 promotes with `rsync -a`, which would overwrite it.
+  The other profiles' configs reference no setup file.
   - **Coverage extra (fragment injection)**: if `state.testing.coverage_threshold` is a
     number, inject the profile's coverage fragment (`coverage-thresholds.tmpl.md` for
     Vitest, `coverage-thresholds.jest.tmpl.md` for Jest) at the entry's marker (inside the

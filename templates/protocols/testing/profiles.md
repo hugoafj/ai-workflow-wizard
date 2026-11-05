@@ -22,6 +22,10 @@
 - `e2e`: `offer` shows the Playwright layer in phase 4.6, `off` hides it (API stacks).
 - `unit_config`: key into `unit_configs`; `null` means the wizard writes no unit config.
   `unit_config_by_runner` is the fallback keyed by the runner the user chose.
+- `setup_file`: a file the unit config points to (`setupFiles`), staged next to it as
+  `{template, target}`. `null` means the profile's config references none. The Builder never
+  stages it over a file the project already has, because phase 8 promotes with `rsync -a`,
+  which overwrites.
 - `packages` / `scripts`: installed in phase 8 (8.1c) and set in `package.json` (8.1e)
   only when the wizard owns the runner (`state.testing.runner_existing` is not true).
 - `dummy_test_import`: first line of the placeholder test phase 8 writes when the project
@@ -42,6 +46,7 @@
       "e2e": "offer",
       "unit_config": "vitest-react",
       "unit_config_by_runner": {},
+      "setup_file": {"template": "setup.tmpl.md", "target": "src/test/setup.ts"},
       "packages": ["vitest", "@testing-library/react", "@testing-library/user-event", "@testing-library/jest-dom", "@testing-library/dom", "jsdom", "@vitest/ui", "@vitest/coverage-v8", "@vitejs/plugin-react"],
       "scripts": {"test": "vitest", "test:ui": "vitest --ui", "test:coverage": "vitest run --coverage"},
       "dummy_test_import": "import { describe, it, expect } from 'vitest'",
@@ -58,6 +63,7 @@
       "e2e": "offer",
       "unit_config": "vitest-vue",
       "unit_config_by_runner": {},
+      "setup_file": null,
       "packages": ["vitest", "@vue/test-utils", "jsdom", "@vitest/ui", "@vitest/coverage-v8", "@vitejs/plugin-vue"],
       "scripts": {"test": "vitest", "test:ui": "vitest --ui", "test:coverage": "vitest run --coverage"},
       "dummy_test_import": "import { describe, it, expect } from 'vitest'",
@@ -74,6 +80,7 @@
       "e2e": "off",
       "unit_config": "vitest-node",
       "unit_config_by_runner": {},
+      "setup_file": null,
       "packages": ["vitest", "supertest", "@types/supertest", "@vitest/ui", "@vitest/coverage-v8"],
       "scripts": {"test": "vitest", "test:ui": "vitest --ui", "test:coverage": "vitest run --coverage"},
       "dummy_test_import": "import { describe, it, expect } from 'vitest'",
@@ -90,6 +97,7 @@
       "e2e": "off",
       "unit_config": "jest-nest",
       "unit_config_by_runner": {},
+      "setup_file": null,
       "packages": ["jest", "ts-jest", "@types/jest", "@nestjs/testing", "supertest", "@types/supertest"],
       "scripts": {"test": "jest", "test:watch": "jest --watch", "test:coverage": "jest --coverage"},
       "dummy_test_import": "",
@@ -106,6 +114,7 @@
       "e2e": "offer",
       "unit_config": null,
       "unit_config_by_runner": {},
+      "setup_file": null,
       "packages": [],
       "scripts": {},
       "dummy_test_import": "",
@@ -122,6 +131,7 @@
       "e2e": "offer",
       "unit_config": null,
       "unit_config_by_runner": {"vitest": "vitest-node"},
+      "setup_file": null,
       "packages": ["vitest", "@vitest/ui", "@vitest/coverage-v8"],
       "scripts": {"test": "vitest", "test:ui": "vitest --ui", "test:coverage": "vitest run --coverage"},
       "dummy_test_import": "import { describe, it, expect } from 'vitest'",

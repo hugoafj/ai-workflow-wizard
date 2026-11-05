@@ -239,6 +239,20 @@ def write_testing_configs(raw, state, staging):
             fh.write(cfg + "\n")
         created.append(os.path.relpath(target, staging))
 
+        # The config's setupFiles entry must point at a real file. Phase 8 promotes
+        # staging with `rsync -a`, which overwrites, so skip it when the project
+        # (the builder runs from the project root) already has its own.
+        setup = profile.get("setup_file")
+        if setup and not os.path.exists(os.path.join(os.getcwd(), setup["target"])):
+            body = builder_core.fetch_with_retries(
+                builder_core.base_url(raw, "templates/protocols/testing/" + setup["template"]))
+            body = builder_core.extract_block(body, "typescript")
+            setup_target = os.path.join(staging, setup["target"])
+            os.makedirs(os.path.dirname(setup_target), exist_ok=True)
+            with open(setup_target, "w", encoding="utf-8") as fh:
+                fh.write(body + "\n")
+            created.append(os.path.relpath(setup_target, staging))
+
     # Playwright (e2e layer).
     if "e2e" in layers:
         cfg = builder_core.fetch_with_retries(
