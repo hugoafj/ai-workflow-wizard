@@ -56,6 +56,9 @@ jq -r '.features.testing // false' .wizard-state.json 2>/dev/null
 jq -r '.features.ci // false' .wizard-state.json 2>/dev/null
 jq -r '.features.release_please // false' .wizard-state.json 2>/dev/null
 jq -r '.testing.coverage_threshold // null' .wizard-state.json 2>/dev/null
+jq -r '.testing.coverage_mode // "none"' .wizard-state.json 2>/dev/null
+jq -r '.testing.coverage_autoupdate // false' .wizard-state.json 2>/dev/null
+jq -r '.testing.frontend_coverage_threshold // null' .wizard-state.json 2>/dev/null
 jq -r '.testing.visual_regression // false' .wizard-state.json 2>/dev/null
 jq -c '.testing.layers // []' .wizard-state.json 2>/dev/null
 jq -r '.testing.page_object_model // false' .wizard-state.json 2>/dev/null
@@ -94,9 +97,9 @@ number of the option they want to adjust.
    - 4, 5 (visual regression, Page Object Model), additionally: `n/a (the E2E layer is not active)`
      when `testing.layers` has no `e2e` (API profiles hide that layer by default)
    - 3 (coverage targets), additionally: `n/a (the project keeps its own runner config)` when
-     `testing.runner_existing` is true, or `n/a (no wizard-managed unit config)` when the profile
-     generates none (angular, laravel, php, generic without Vitest). The wizard never edits a runner config it
-     did not generate
+     `testing.runner_existing` is true and the profile is not `laravel` or `php` (their floor lives in the CI
+     workflow, so the wizard enforces it without editing the runner), or `n/a (no coverage target for this profile)`
+     when the profile is angular, or a generic project without a runner that has a unit config
    - 7, 8, 9, 10 (CI sub-options): `n/a (CI is OFF)` when option 6 is OFF
    - 11 (release-please standalone): `n/a (included in CI)` when option 6 is ON
 4. If the user picks an `n/a` option, explain why it does not apply (and which
@@ -109,7 +112,7 @@ Workflow settings, current state:
 
 1. wf-ladder (Decision Ladder): <ON/OFF>
 2. Testing infrastructure: <ON/OFF>
-3. Coverage targets: <80%/OFF>
+3. Coverage targets: <full 80% / ratchet 34% (auto-raise ON) / OFF>
 4. Visual regression: <ON/OFF>
 5. Page Object Model: <ON/OFF>
 6. CI: <ON/OFF>
@@ -255,35 +258,60 @@ jq '.features.testing = <value>' .wizard-state.json > .wizard-state.json.tmp && 
 ### 3: Coverage targets
 
 ```
-Coverage targets: <ON (threshold: N%) / OFF>
+Coverage targets: <OFF / full (threshold: N%) / ratchet (floor: N%, auto-raise: ON|OFF)>
 
 Do you want to keep or change?
-  [keep / change to <new_threshold>% / disable]
+  [keep / full <N>% / ratchet <N>% / ratchet <N>% auto-raise off / disable]
 ```
 
-**If enabling**: ask for the threshold (same as in `wf-init.md` Phase 4.6) and
-add the coverage threshold block to the unit config the wizard generated: `coverage.thresholds`
-in `vitest.config.ts` (react, next, vue, node-api, generic with Vitest, or the frontend layer of a PHP project) or `coverageThreshold` in
-`jest.config.js` (nest), the same mapping as `templates/protocols/testing/profiles.md`
-(`testing.profile`). Write the threshold only to that file and to `.wizard-state.json`
-(`testing.coverage_threshold`, see the state update below).
+**Frontend floor**: if the frontend layer is active (a PHP project with a frontend), ask for the frontend
+floor the same way and store it as `testing.frontend_coverage_threshold`.
 
-**If disabling**: remove the coverage threshold block from that unit config
-and set `testing.coverage_threshold` to `null` in `.wizard-state.json`.
+**If choosing `full <N>%`**: `coverage_mode` = `full`, `coverage_threshold` = N, `coverage_autoupdate` = `false`.
+
+**If choosing `ratchet <N>%`**: `coverage_mode` = `ratchet`, `coverage_threshold` = N (`0` starts the floor at
+zero), `coverage_autoupdate` = `true`. With `auto-raise off`, `coverage_autoupdate` = `false`. If N is lower than
+the current floor, warn before confirming: "Lowering the floor lets coverage drop without a failure."
+
+**If switching from ratchet to full**: warn before confirming: "PRs can go red if coverage is below N%. Add
+tests or lower the floor first if needed."
+
+**If disabling**: `coverage_mode`, `coverage_threshold` and `frontend_coverage_threshold` = `null`;
+`coverage_autoupdate` = `false`.
+
+**Missing `test:coverage` script**: when enabling or keeping a mode, check the project's package.json:
+```bash
+jq -e '.scripts["test:coverage"]' package.json >/dev/null 2>&1 || echo "missing"
+```
+If it prints `missing`, ask one question: "Your package.json has no `test:coverage` script, and CI fails without
+it. Add it now with the profile's command (`vitest run --coverage` or `jest --coverage`)?" If yes, run
+`npm pkg set scripts.test:coverage="<command>"`. If no, continue and warn that CI fails until it is added.
+
+**Auto-raise off**: after the change, say: "The floor is fixed at N% and will not rise on its own. To raise it,
+run `npm run test:coverage` to see the current coverage, then change the floor in this option."
 
 Confirm:
 ```
-✓ Coverage targets: <enabled (threshold: N%) / disabled>
+✓ Coverage targets: <full (threshold: N%) / ratchet (floor: N%, auto-raise: ON|OFF) / disabled>
+✓ .wizard-state.json: testing.coverage_mode, testing.coverage_threshold, testing.coverage_autoupdate
+→ Run /wf-refresh to regenerate the unit config, the quality guard and the coverage-ratchet workflow.
 ```
+
+This option does not edit the unit config: `/wf-refresh` regenerates it from the state, so a hand edit of the
+threshold in the config is overwritten by the next refresh.
 
 **State update**:
 ```bash
-# If enabling (replace N with the threshold):
-jq '.testing.coverage_threshold = N' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+# full N
+jq '.testing.coverage_mode = "full" | .testing.coverage_threshold = N | .testing.coverage_autoupdate = false' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
 
-# If disabling:
-jq '.testing.coverage_threshold = null' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+# ratchet N (auto-raise on; use false for auto-raise off)
+jq '.testing.coverage_mode = "ratchet" | .testing.coverage_threshold = N | .testing.coverage_autoupdate = true' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
+
+# disable
+jq '.testing.coverage_mode = null | .testing.coverage_threshold = null | .testing.frontend_coverage_threshold = null | .testing.coverage_autoupdate = false' .wizard-state.json > .wizard-state.json.tmp && mv .wizard-state.json.tmp .wizard-state.json
 ```
+When the frontend layer is active, also set `.testing.frontend_coverage_threshold = M` in the same expression.
 
 ---
 
