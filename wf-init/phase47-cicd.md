@@ -292,7 +292,7 @@ On your server make sure you have:
 CI/CD configured. Reply **continue** so I can assemble the artifacts (Builder → staging on disk, not in memory).
 
 ### [WIZARD ACTION]
-When user confirms, run EXACTLY:
+When user confirms, relay every `ℹ` line this block prints to the user, then run EXACTLY:
 
 ```bash
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
@@ -339,6 +339,14 @@ if [ "$PHASE5_DONE" = "done" ]; then
 else
   NEXT="phase5"
   echo "ℹ Next: Phase 5 for project details"
+fi
+
+# release-please creates v* tags on merge. An external pipeline that already deploys on
+# push to main would then deploy twice, so tell the operator what to change in that pipeline.
+FEATURES_RELEASE=$(jq -r '.features.release_please // false' .wizard-state.json)
+if [ "$FEATURES_RELEASE" = "true" ]; then
+  echo "ℹ If this project already has an external pipeline (for example AWS CodePipeline) that deploys on push to main,"
+  echo "  point its Source stage at v* tags only. Otherwise the main branch and the release-please tag both trigger a deploy."
 fi
 
 # Validate state before phase transition (phase-aware validation)
