@@ -43,6 +43,11 @@ cat "{PROJECT_PATH}/package.json" 2>/dev/null || cat "{PROJECT_PATH}/composer.js
 # the manifest cat above lists package.json first, so do NOT decide the stack from that order.
 ( source "{WF_PATH}/lib/state-helpers.sh" && wf_detect_stack "{PROJECT_PATH}" ) 2>/dev/null
 
+# Frontend of a PHP project (php- stack only): react | next | vue | nuxt | angular | none, plus the
+# folder that holds its JavaScript sources (empty when none of the usual ones exists: then ask the
+# developer once). When react and vue are both dependencies, the one the sources import wins.
+[ -f "{PROJECT_PATH}/composer.json" ] && ( source "{WF_PATH}/lib/state-helpers.sh" && wf_detect_frontend "{PROJECT_PATH}" && wf_detect_frontend_root "{PROJECT_PATH}" ) 2>/dev/null
+
 # Previous workflow artifacts
 ls "{PROJECT_PATH}/AGENTS.md" "{PROJECT_PATH}/CLAUDE.md" "{PROJECT_PATH}/GEMINI.md" 2>/dev/null
 ls -d "{PROJECT_PATH}/.cursor" "{PROJECT_PATH}/.windsurf" "{PROJECT_PATH}/.devin" "{PROJECT_PATH}/.kiro" 2>/dev/null
@@ -122,6 +127,8 @@ Use `wf_state_set` to persist to `.wizard-state.json`:
 .discovery.stack.framework      → the second token of the wf_detect_stack output. Node: one of "nest" |
                                   "angular" | "next" | "nuxt" | "vue" | "react" | "express" | "fastify" |
                                   "hono" | "koa" | "generic"; PHP: "laravel" | "generic"; "django" | null
+.discovery.stack.frontend       → PHP stacks only: the wf_detect_frontend output (react | next | vue | nuxt |
+                                  angular | none); null for every other stack
 .discovery.stack.detected_from  → "package.json" | "composer.json" | etc. (the manifest the stack came from)
 .discovery.stack.stack_key   → the first token of the wf_detect_stack output: "node-<framework>" for Node
                                (e.g. "node-nest", "node-generic"), "php-laravel", "php-generic", "python-django"

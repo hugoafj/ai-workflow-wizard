@@ -75,7 +75,7 @@ wf_state_init() {
     "warning_incomplete": false
   },
   "discovery": {
-    "stack": { "primary": null, "framework": null, "detected_from": null, "stack_key": null },
+    "stack": { "primary": null, "framework": null, "detected_from": null, "stack_key": null, "frontend": null },
     "node_engine": null,
     "npm_major": null,
     "default_branch": null,
@@ -110,6 +110,10 @@ wf_state_init() {
     "environment": null,
     "test_pattern": null,
     "test_command": null,
+    "frontend_profile": null,
+    "frontend_runner": null,
+    "frontend_runner_existing": null,
+    "frontend_root": null,
     "layers": [],
     "coverage_threshold": null,
     "visual_regression": false,
@@ -222,6 +226,47 @@ wf_detect_stack() {
   echo "unknown"
 }
 
+# Folder that holds the JavaScript sources of a PHP project's frontend, relative to <dir>: the first
+# of resources/js, resources/assets/js, resources/ts, resources/assets/ts that exists (Laravel's
+# standard place first, then the older resources/assets layout). Prints nothing when none exists, so
+# the caller asks the developer once and stores the answer in testing.frontend_root.
+wf_detect_frontend_root() {
+  local dir="${1:-.}" c
+  for c in resources/js resources/assets/js resources/ts resources/assets/ts; do
+    if [ -d "$dir/$c" ]; then echo "$c"; return 0; fi
+  done
+  return 0
+}
+
+# Detect the UI framework of a PHP project's frontend from its package.json (phase 1 discovery and
+# /wf-refresh R1, for a php- stack). Prints react | next | vue | nuxt | angular, or none. The same
+# dependency order as wf_detect_framework, except when BOTH react and vue are dependencies (a
+# project that migrated, or keeps a few components of the old one): then the framework that more
+# source files import wins, and the dependency order only breaks a tie. Package presence alone is
+# never enough: the Laravel skeleton ships a package.json with Vite and axios and no UI framework.
+wf_detect_frontend() {
+  local dir="${1:-.}" pkg="${1:-.}/package.json" fw root react vue
+  [ -f "$pkg" ] || { echo none; return 0; }
+  fw=$(wf_detect_framework "$pkg" 2>/dev/null) || { echo none; return 0; }
+  case "$fw" in
+    angular|next|nuxt) echo "$fw"; return 0 ;;
+    vue|react) ;;
+    *) echo none; return 0 ;;
+  esac
+  if jq -e '((.dependencies // {}) + (.devDependencies // {})) | (.react and .vue)' "$pkg" >/dev/null 2>&1; then
+    root=$(wf_detect_frontend_root "$dir"); root="$dir/${root:-.}"
+    react=$(grep -rIlE --include='*.js' --include='*.jsx' --include='*.ts' --include='*.tsx' \
+              --exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=.git \
+              -e "from ['\"]react['\"]" -e "require\(['\"]react['\"]\)" "$root" 2>/dev/null | wc -l | tr -d ' ')
+    vue=$(grep -rIlE --include='*.js' --include='*.ts' --include='*.vue' \
+            --exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=.git \
+            -e "from ['\"]vue['\"]" -e "require\(['\"]vue['\"]\)" "$root" 2>/dev/null | wc -l | tr -d ' ')
+    vue=$((vue + $(find "$root" -name node_modules -prune -o -name vendor -prune -o -name '*.vue' -print 2>/dev/null | wc -l | tr -d ' ')))
+    if [ "$react" -gt "$vue" ]; then fw=react; elif [ "$vue" -gt "$react" ]; then fw=vue; fi
+  fi
+  echo "$fw"
+}
+
 # Map a framework token (wf_detect_framework / wf_detect_stack output) to its testing profile.
 # The profile selects runner, environment, packages and config template (phase 4.6, Builder B8).
 #   react -> react   next -> next   vue|nuxt -> vue   express|fastify|hono|koa -> node-api
@@ -271,14 +316,15 @@ wf_testing_profile() {
 
 # Target file of the unit config the Builder writes for <profile> + <runner> (the runner only
 # matters for profiles that pick a config by runner, i.e. generic). Prints nothing when the
-# Builder writes none (angular, generic without Vitest).
+# Builder writes none (angular, generic without Vitest). A third argument "frontend" asks for the
+# config of the frontend layer of a PHP project (the profile's unit_config_frontend) instead.
 wf_unit_config_target() {
   local data
   data=$(wf_testing_profiles) && [ -n "$data" ] \
     || { echo "wf_unit_config_target: cannot read templates/protocols/testing/profiles.md from $WF_RAW" >&2; return 1; }
-  printf '%s\n' "$data" | jq -r --arg p "${1:-}" --arg r "${2:-}" '
+  printf '%s\n' "$data" | jq -r --arg p "${1:-}" --arg r "${2:-}" --arg f "${3:-}" '
     (.profiles[$p] // .profiles[.default]) as $pr
-    | ($pr.unit_config // $pr.unit_config_by_runner[$r]) as $k
+    | (if $f == "frontend" then $pr.unit_config_frontend else ($pr.unit_config // $pr.unit_config_by_runner[$r]) end) as $k
     | if $k then .unit_configs[$k].target else empty end'
 }
 

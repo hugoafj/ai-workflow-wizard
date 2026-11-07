@@ -1052,6 +1052,14 @@ elif [[ -f pyproject.toml ]]; then
   FRAMEWORK="django"
 fi
 
+# The frontend of a PHP project (react | next | vue | nuxt | angular | none), from package.json
+# dependencies and, when react and vue are both there, from which one the sources import
+# (state-helpers.sh, the same helper phase 1 uses). Empty for any other stack.
+FRONTEND=""
+if [[ "$STACK_KEY" == php-* ]] && command -v jq >/dev/null 2>&1 && declare -F wf_detect_frontend >/dev/null 2>&1; then
+  FRONTEND=$(wf_detect_frontend . 2>/dev/null || true)
+fi
+
 NODE_ENGINE=""
 if [[ -f package.json ]] && command -v node >/dev/null 2>&1; then
   NODE_ENGINE=$(node -e "try { process.stdout.write(require('./package.json').engines?.node||'') } catch {}" 2>/dev/null || true)
@@ -1065,6 +1073,7 @@ fi
 GIT_COMMITS=$(git log --oneline 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")
 
 OLD_STACK=$(jq -r '.discovery.stack.stack_key // .discovery.stack_key // ""' "$WF_STATE")
+OLD_FRONTEND=$(jq -r '.discovery.stack.frontend // ""' "$WF_STATE")
 OLD_NODE=$(jq -r '.discovery.node_engine // ""' "$WF_STATE")
 OLD_NPM=$(jq -r '.discovery.npm_major // ""' "$WF_STATE")
 OLD_COMMANDS=$(jq -r '.discovery.commands // ""' "$WF_STATE")
@@ -1294,7 +1303,7 @@ _wf_norm_commands() {
 OLD_COMMANDS_CLEAN=$(_wf_norm_commands "$OLD_COMMANDS")
 COMMANDS_CLEAN=$(_wf_norm_commands "$COMMANDS")
 
-if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || [[ "$OLD_NPM" != "$NPM_MAJOR" ]] || [[ "$OLD_COMMANDS_CLEAN" != "$COMMANDS_CLEAN" ]]; then
+if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ -n "$FRONTEND" && "$OLD_FRONTEND" != "$FRONTEND" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || [[ "$OLD_NPM" != "$NPM_MAJOR" ]] || [[ "$OLD_COMMANDS_CLEAN" != "$COMMANDS_CLEAN" ]]; then
   echo "⚠ Project content drift detected:"
   [[ "$OLD_STACK" != "$STACK_KEY" ]] && echo "  - Stack: $OLD_STACK → $STACK_KEY"
   [[ "$OLD_NODE" != "$NODE_ENGINE" ]] && echo "  - Node engine: $OLD_NODE → $NODE_ENGINE"
@@ -1318,6 +1327,9 @@ if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || 
     if [[ -n "$FRAMEWORK" ]]; then
       JQ_FILTER="$JQ_FILTER | .discovery.stack.framework = \$framework"
     fi
+    if [[ -n "$FRONTEND" ]]; then
+      JQ_FILTER="$JQ_FILTER | .discovery.stack.frontend = \$frontend"
+    fi
     if [[ -n "$NODE_ENGINE" ]]; then
       JQ_FILTER="$JQ_FILTER | .discovery.node_engine = \$node_engine"
     fi
@@ -1327,6 +1339,7 @@ if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || 
     WF_STATE="$STAGING_DIR/wizard-state.json" _apply_jq_filter \
       --arg stack_key "$STACK_KEY" \
       --arg framework "$FRAMEWORK" \
+      --arg frontend "$FRONTEND" \
       --arg node_engine "$NODE_ENGINE" \
       --arg npm_major "$NPM_MAJOR" \
       --argjson git_commits "$GIT_COMMITS" \
@@ -1684,6 +1697,16 @@ if printf '%s\n' "$LAYERS" | grep -qxE 'unit|integration'; then
     fi
   fi
   [ -n "$_UNIT_CFG" ] && EXPECTED+=("$_UNIT_CFG")
+fi
+# The frontend layer of a PHP project renders the config of its JS profile (vitest.config.ts), unless
+# the frontend keeps its own runner (state.testing.frontend_runner_existing).
+if printf '%s\n' "$LAYERS" | grep -qxE 'frontend'; then
+  if [ "$(jq -r '.testing.frontend_runner_existing // false' "$STAGING_STATE")" != "true" ] \
+     && declare -F wf_unit_config_target >/dev/null 2>&1; then
+    _FE_CFG=$(wf_unit_config_target "$(jq -r '.testing.frontend_profile // "react"' "$STAGING_STATE")" "" frontend) \
+      || { echo "✗ FAIL: cannot read templates/protocols/testing/profiles.md to resolve the frontend unit config"; exit 1; }
+    [ -n "$_FE_CFG" ] && EXPECTED+=("$_FE_CFG")
+  fi
 fi
 if printf '%s\n' "$LAYERS" | grep -qxE 'e2e'; then EXPECTED+=(playwright.config.ts); fi
 for f in "${EXPECTED[@]}"; do

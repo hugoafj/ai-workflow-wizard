@@ -263,7 +263,7 @@ Do you want to keep or change?
 
 **If enabling**: ask for the threshold (same as in `wf-init.md` Phase 4.6) and
 add the coverage threshold block to the unit config the wizard generated: `coverage.thresholds`
-in `vitest.config.ts` (react, next, vue, node-api, generic with Vitest) or `coverageThreshold` in
+in `vitest.config.ts` (react, next, vue, node-api, generic with Vitest, or the frontend layer of a PHP project) or `coverageThreshold` in
 `jest.config.js` (nest), the same mapping as `templates/protocols/testing/profiles.md`
 (`testing.profile`). Write the threshold only to that file and to `.wizard-state.json`
 (`testing.coverage_threshold`, see the state update below).

@@ -454,7 +454,7 @@ details) using `$WF_ROOT/templates/protocols/cicd/` as the single source.
       `github_action_config.auto_improve: "true"` with `"false"` in the assembled template.
   - **If `claude`**: toggle `inline_suggestions` — if `INLINE_SUGGESTIONS == false`,
     omit the `claude_args:` block with `--allowedTools` from the assembled template.
-- `variants/quality-guard.yml.md` ALWAYS (conditioned on real scripts); for a PHP stack (`stack_key` starting with `php-`) `variants/quality-guard.php.yml.md` takes its place, filled with `{{php_version}}` (`discovery.php_version`, else `composer.json` `config.platform.php`, else the first X.Y of `require.php`, else 8.3) and `{{test_command}}` (`testing.test_command`, else `php artisan test`, `vendor/bin/pest` or `vendor/bin/phpunit`). **Fill `{{node_version}}`
+- `variants/quality-guard.yml.md` ALWAYS (conditioned on real scripts); for a PHP stack with the `frontend` layer active the PHP variant also gets the Node setup, `npm ci`, `npm run test` and the build script; for a PHP stack (`stack_key` starting with `php-`) `variants/quality-guard.php.yml.md` takes its place, filled with `{{php_version}}` (`discovery.php_version`, else `composer.json` `config.platform.php`, else the first X.Y of `require.php`, else 8.3) and `{{test_command}}` (`testing.test_command`, else `php artisan test`, `vendor/bin/pest` or `vendor/bin/phpunit`). **Fill `{{node_version}}`
   with `state.discovery.node_engine` or 22 by default, and `{{npm_major}}` with
   `state.discovery.npm_major` or the current npm major (`npm --version | cut -d. -f1`,
   defaulting to `8`)** — this avoids the `npm ci` lockfile out-of-sync failure.

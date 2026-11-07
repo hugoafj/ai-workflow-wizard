@@ -321,6 +321,40 @@ fi
             fi
           fi
         fi
+        # Frontend unit layer: the JS profile of the project's UI framework, installed with npm.
+        if [ "$HAS_TESTING" -gt 0 ] \
+           && jq -e '.testing.layers[] | select(. == "frontend")' .wizard-state.json >/dev/null 2>&1; then
+          if [ "$(jq -r '.testing.frontend_runner_existing // false' .wizard-state.json)" = "true" ]; then
+            echo "8.1c — the frontend keeps its own runner ($(jq -r '.testing.frontend_runner // "existing"' .wizard-state.json)): nothing to install for the frontend."
+          else
+            FRONTEND_PROFILE=$(jq -r '.testing.frontend_profile // "react"' .wizard-state.json)
+            FRONTEND_JSON=$(wf_testing_profile "$FRONTEND_PROFILE") || FRONTEND_JSON=""
+            if [ -z "$FRONTEND_JSON" ]; then
+              echo "8.1c — skipped the frontend install: the testing profile data is unavailable."
+            else
+              FRONTEND_PKGS=$(echo "$FRONTEND_JSON" | jq -r '(.packages + (.frontend_extra_packages // [])) | unique | join(" ")')
+              echo "8.1c — installing $FRONTEND_PROFILE frontend packages: $FRONTEND_PKGS"
+              if echo "$FRONTEND_PKGS" | tr ' ' '\n' | xargs npm install --save-dev; then
+                echo "8.1c OK — frontend packages installed"
+              else
+                echo "8.1c WARNING — npm install failed (exit $?). Check package.json and network." >&2
+              fi
+              # Placeholder test: Vitest exits 1 when it finds no test file, which would turn
+              # `npm run test` and the CI step red. Only when the frontend has no test yet.
+              FRONTEND_ROOT=$(jq -r '.testing.frontend_root // "resources/js"' .wizard-state.json)
+              FRONTEND_TESTS=$(find tests/js "$FRONTEND_ROOT" -name node_modules -prune -o -type f \( -name '*.test.*' -o -name '*.spec.*' \) -print 2>/dev/null | head -1)
+              if [ -z "$FRONTEND_TESTS" ]; then
+                DUMMY_IMPORT=$(echo "$FRONTEND_JSON" | jq -r '.dummy_test_import // empty')
+                mkdir -p tests/js
+                {
+                  if [ -n "$DUMMY_IMPORT" ]; then printf '%s\n\n' "$DUMMY_IMPORT"; fi
+                  printf '%s\n' "describe('Example test', () => {" "  it('should pass', () => {" "    expect(true).toBe(true)" "  })" "})"
+                } > tests/js/example.test.ts
+                git add tests/js/example.test.ts
+              fi
+            fi
+          fi
+        fi
         ;;
       # Add more stacks as needed
     esac
@@ -388,6 +422,17 @@ if [ "$HAS_TESTING" -gt 0 ]; then
     echo "$PROFILE_JSON" | jq -r '.scripts | to_entries[] | "scripts.\(.key)=\(.value)"' | while IFS= read -r kv; do
       npm pkg set "$kv" 2>/dev/null || true
     done
+  fi
+  # frontend unit scripts (the frontend layer of a PHP project): the JS profile's own, never over a
+  # frontend that keeps its runner
+  if jq -e '.testing.layers[] | select(. == "frontend")' .wizard-state.json >/dev/null 2>&1 \
+     && [ "$(jq -r '.testing.frontend_runner_existing // false' .wizard-state.json)" != "true" ]; then
+    FRONTEND_JSON=$(wf_testing_profile "$(jq -r '.testing.frontend_profile // "react"' .wizard-state.json)") || FRONTEND_JSON=""
+    if [ -n "$FRONTEND_JSON" ]; then
+      echo "$FRONTEND_JSON" | jq -r '.scripts | to_entries[] | "scripts.\(.key)=\(.value)"' | while IFS= read -r kv; do
+        npm pkg set "$kv" 2>/dev/null || true
+      done
+    fi
   fi
   # e2e scripts
   if jq -e '.testing.layers[] | select(. == "e2e")' .wizard-state.json >/dev/null 2>&1; then

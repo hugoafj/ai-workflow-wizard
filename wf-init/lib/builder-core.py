@@ -540,6 +540,8 @@ def eval_semantic_cond(cond, state, raw=None):
         return bool(get_state_value(state, "discovery.has_typescript", True))
     if "test:sanitization script exists" in c:
         return bool(get_state_value(state, "testing.has_sanitization", False))
+    if "frontend layer is active" in c:
+        return "frontend" in layers
     # PHP quality guard (variants/quality-guard.php.yml.md): the project files are read from the cwd.
     if "project is a laravel app" in c:
         return stack_key(state) == "php-laravel"
@@ -875,6 +877,8 @@ def infer_placeholder(state, key):
                 php_checks.append("vendor/bin/phpstan analyse")
             if "unit" in layers or "integration" in layers:
                 php_checks.append(php_test_command(state))
+            if "frontend" in layers:
+                php_checks.append("npm run test")
             if not php_checks:
                 return ("- No automated checks detected yet: add the project's lint and test "
                         "commands, then run `/wf-refresh`.")
@@ -1122,6 +1126,19 @@ def resolve_router_ifs(text, state):
     return "".join(out)
 
 
+def frontend_profile(raw, state):
+    """(name, profile) of the frontend of a PHP project: state testing.frontend_profile, else the default."""
+    data = load_testing_profiles(raw)
+    name = get_state_value(state, "testing.frontend_profile")
+    if not name:
+        name = data["default"]
+    elif name not in data["profiles"]:
+        print("builder: unknown testing.frontend_profile %r, using %r" % (name, data["default"]),
+              file=sys.stderr)
+        name = data["default"]
+    return name, data["profiles"][name]
+
+
 def testing_conventions(raw, state, profile):
     """(unit, integration) convention bullets of a profile.
 
@@ -1156,6 +1173,7 @@ def testing_approach_section(state, raw=None):
     layers = normalize_layers(state)
     has_unit = "unit" in layers or "integration" in layers
     has_e2e = "e2e" in layers
+    has_frontend = "frontend" in layers
     # The file conventions and the UI/data-testid rules come from the testing
     # profile (profiles.md). Without a template base there is no profile data,
     # so the convention bullets are skipped, like the other template-fed parts.
@@ -1182,6 +1200,25 @@ def testing_approach_section(state, raw=None):
                 "- Unit: %s" % unit_conv,
                 "- Integration: %s" % integration_conv,
             ]
+    if has_frontend:
+        # The frontend of a PHP project: the JS profile of its UI framework (state
+        # testing.frontend_profile), run through npm next to the PHP suite.
+        fprofile = frontend_profile(raw, state)[1] if raw else None
+        root = get_state_value(state, "testing.frontend_root")
+        lines += [] if not lines else [""]
+        lines += [
+            "### Frontend",
+            "",
+            "Run the frontend unit suite before considering a change done:",
+            "",
+            "```bash",
+            "npm run test",
+            "```",
+        ]
+        if fprofile:
+            lines += ["", "- Frontend unit: %s" % fprofile["unit_convention"]]
+        if root:
+            lines += ["- Frontend sources live in `%s/`; tests may also live in `tests/js/`." % root]
     if has_e2e:
         lines += [
             "",
@@ -1220,7 +1257,7 @@ def testing_approach_section(state, raw=None):
             lines += ["", matrix]
         if has_e2e and e2e_guidance:
             lines += ["", e2e_guidance]
-    if not has_unit and not has_e2e:
+    if not has_unit and not has_e2e and not has_frontend:
         lines += [
             "No automated test layers are active. Follow `testing.checks_before_done` "
             "for the manual done-gate instead.",

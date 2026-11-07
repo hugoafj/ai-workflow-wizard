@@ -39,6 +39,12 @@
 - `dummy_test_suffix`: file suffix of that placeholder test (`.spec.ts` for Nest, whose Jest
   config only finds `*.spec.ts`); `null` means phase 8 writes none (Angular generates its own specs).
 - `unit_convention` / `integration_convention`: bullets for AGENTS.md Testing Approach.
+- `unit_config_frontend` / `setup_file_frontend` / `frontend_extra_packages`: optional, only for the
+  profiles a PHP project can use for its frontend (react, next, vue). When `state.testing.layers` has
+  `frontend`, the Builder writes the config named by `unit_config_frontend` (scoped to
+  `state.testing.frontend_root` and `tests/js`, with JSX allowed in `.js` for React) instead of
+  `unit_config`, stages `setup_file_frontend`, and phase 8 installs `packages` plus
+  `frontend_extra_packages` with npm. They never apply to a Node project, whose `unit_config` is used.
 - `layout_dirs` / `layout_fallback`: optional. When the project has NONE of the `layout_dirs`
   (a non-standard layout), the conventions come from the profile named in `layout_fallback`, which
   says "follow the layout the project already uses" instead of naming folders that do not exist.
@@ -65,7 +71,10 @@
       "unit_convention": "one test file next to the code it covers (`Component.test.tsx` next to the component).",
       "integration_convention": "real render tests in `src/__tests__/integration/` (`*.integration.test.tsx`).",
       "dev_command": null,
-      "dev_port": null
+      "dev_port": null,
+      "unit_config_frontend": "vitest-frontend",
+      "setup_file_frontend": {"template": "setup.tmpl.md", "target": "tests/js/setup.ts"},
+      "frontend_extra_packages": ["vite"]
     },
     "next": {
       "label": "Next.js (Vitest + Testing Library)",
@@ -83,7 +92,10 @@
       "unit_convention": "one test file next to the code it covers (`Component.test.tsx` next to the component).",
       "integration_convention": "real render tests in `src/__tests__/integration/` (`*.integration.test.tsx`).",
       "dev_command": null,
-      "dev_port": 3000
+      "dev_port": 3000,
+      "unit_config_frontend": "vitest-frontend",
+      "setup_file_frontend": {"template": "setup.tmpl.md", "target": "tests/js/setup.ts"},
+      "frontend_extra_packages": ["vite"]
     },
     "vue": {
       "label": "Vue / Nuxt (Vitest + Vue Test Utils)",
@@ -101,7 +113,10 @@
       "unit_convention": "one test file next to the code it covers (`Component.test.ts` next to the component).",
       "integration_convention": "mounted-component tests in `src/__tests__/integration/` (`*.integration.test.ts`).",
       "dev_command": null,
-      "dev_port": null
+      "dev_port": null,
+      "unit_config_frontend": "vitest-frontend-vue",
+      "setup_file_frontend": null,
+      "frontend_extra_packages": ["vite"]
     },
     "node-api": {
       "label": "Node API: Express, Fastify, Hono, Koa (Vitest + supertest)",
@@ -221,6 +236,8 @@
   "unit_configs": {
     "vitest-react": {"template": "vitest.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "marker": "test: {\n", "indent": 4},
     "vitest-vue": {"template": "vitest.vue.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "marker": "test: {\n", "indent": 4},
+    "vitest-frontend": {"template": "vitest.frontend.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "marker": "test: {\n", "indent": 4},
+    "vitest-frontend-vue": {"template": "vitest.frontend.vue.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "marker": "test: {\n", "indent": 4},
     "vitest-node": {"template": "vitest.node.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "marker": "test: {\n", "indent": 4},
     "jest-nest": {"template": "jest.config.nest.tmpl.md", "target": "jest.config.js", "coverage": "coverage-thresholds.jest.tmpl.md", "marker": "module.exports = {\n", "indent": 2}
   }

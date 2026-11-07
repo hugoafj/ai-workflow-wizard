@@ -197,6 +197,41 @@ def write_hook(raw, state, staging):
 # B8. Testing configs
 # ---------------------------------------------------------------------------
 
+def _inject_coverage(raw, state, cfg, spec):
+    """Inject the coverage fragment right after the config marker (the test: { } block for Vitest,
+    the exported object for Jest). Skipped when the threshold is null, otherwise the config would
+    render "lines: None"."""
+    threshold = builder_core.get_state_value(state, "testing.coverage_threshold", "80")
+    if threshold is None:
+        return cfg
+    frag = builder_core.fetch_with_retries(
+        builder_core.base_url(raw, "templates/protocols/testing/" + spec["coverage"]))
+    frag = builder_core.strip_prose_header(frag)
+    frag = frag.replace("{{threshold}}", str(threshold))
+    # Indent the fragment to sit inside the marked block (F11).
+    frag = textwrap.indent(frag, " " * spec["indent"])
+    return cfg.replace(spec["marker"], spec["marker"] + frag + "\n")
+
+
+def _stage_setup_file(raw, staging, setup, created):
+    """Stage a profile's setup file unless the project already has one (the builder runs from the
+    project root). Phase 8 promotes staging with `rsync -a`, which overwrites."""
+    if setup and not os.path.exists(os.path.join(os.getcwd(), setup["target"])):
+        body = builder_core.fetch_with_retries(
+            builder_core.base_url(raw, "templates/protocols/testing/" + setup["template"]))
+        body = builder_core.extract_block(body, "typescript")
+        setup_target = os.path.join(staging, setup["target"])
+        os.makedirs(os.path.dirname(setup_target), exist_ok=True)
+        with open(setup_target, "w", encoding="utf-8") as fh:
+            fh.write(body + "\n")
+        created.append(os.path.relpath(setup_target, staging))
+
+
+def _js_regex(path):
+    """A folder path as the body of a JavaScript regex literal (slashes and dots escaped)."""
+    return re.sub(r"([.*+?^${}()|\[\]\\])", r"\\\1", path).replace("/", "\\/")
+
+
 def write_testing_configs(raw, state, staging):
     """Write the unit and playwright configs with fragment injection (B8 testing).
 
@@ -222,18 +257,7 @@ def write_testing_configs(raw, state, staging):
             builder_core.base_url(raw, "templates/protocols/testing/" + spec["template"]))
         cfg = builder_core.extract_block(
             cfg, "javascript" if spec["target"].endswith(".js") else "typescript")
-        # Inject the coverage fragment right after the config marker (the
-        # test: { } block for Vitest, the exported object for Jest). Skipped when
-        # the threshold is null, otherwise the config would render "lines: None".
-        threshold = builder_core.get_state_value(state, "testing.coverage_threshold", "80")
-        if threshold is not None:
-            frag = builder_core.fetch_with_retries(
-                builder_core.base_url(raw, "templates/protocols/testing/" + spec["coverage"]))
-            frag = builder_core.strip_prose_header(frag)
-            frag = frag.replace("{{threshold}}", str(threshold))
-            # Indent the fragment to sit inside the marked block (F11).
-            frag = textwrap.indent(frag, " " * spec["indent"])
-            cfg = cfg.replace(spec["marker"], spec["marker"] + frag + "\n")
+        cfg = _inject_coverage(raw, state, cfg, spec)
         target = os.path.join(staging, spec["target"])
         with open(target, "w", encoding="utf-8") as fh:
             fh.write(cfg + "\n")
@@ -242,16 +266,26 @@ def write_testing_configs(raw, state, staging):
         # The config's setupFiles entry must point at a real file. Phase 8 promotes
         # staging with `rsync -a`, which overwrites, so skip it when the project
         # (the builder runs from the project root) already has its own.
-        setup = profile.get("setup_file")
-        if setup and not os.path.exists(os.path.join(os.getcwd(), setup["target"])):
-            body = builder_core.fetch_with_retries(
-                builder_core.base_url(raw, "templates/protocols/testing/" + setup["template"]))
-            body = builder_core.extract_block(body, "typescript")
-            setup_target = os.path.join(staging, setup["target"])
-            os.makedirs(os.path.dirname(setup_target), exist_ok=True)
-            with open(setup_target, "w", encoding="utf-8") as fh:
-                fh.write(body + "\n")
-            created.append(os.path.relpath(setup_target, staging))
+        _stage_setup_file(raw, staging, profile.get("setup_file"), created)
+
+    # Frontend unit config (frontend layer of a PHP project): the JS profile of its UI framework,
+    # scoped to the frontend folder so other *.test.* files of the project are never picked up.
+    if "frontend" in layers and not bool(builder_core.get_state_value(state, "testing.frontend_runner_existing", False)):
+        fprofile = builder_core.frontend_profile(raw, state)[1]
+        fkey = fprofile.get("unit_config_frontend")
+        if fkey:
+            spec = unit_configs[fkey]
+            root = (builder_core.get_state_value(state, "testing.frontend_root") or "resources/js").strip("/")
+            cfg = builder_core.fetch_with_retries(
+                builder_core.base_url(raw, "templates/protocols/testing/" + spec["template"]))
+            cfg = builder_core.extract_block(cfg, "typescript")
+            cfg = cfg.replace("{{frontend_root_regex}}", _js_regex(root)).replace("{{frontend_root}}", root)
+            cfg = _inject_coverage(raw, state, cfg, spec)
+            target = os.path.join(staging, spec["target"])
+            with open(target, "w", encoding="utf-8") as fh:
+                fh.write(cfg + "\n")
+            created.append(os.path.relpath(target, staging))
+            _stage_setup_file(raw, staging, fprofile.get("setup_file_frontend"), created)
 
     # Playwright (e2e layer).
     if "e2e" in layers:

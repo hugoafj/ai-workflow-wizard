@@ -48,7 +48,34 @@ else
 fi
 echo "Framework: $FRAMEWORK -> profile: $PROFILE ($(echo "$PROFILE_JSON" | jq -r .label))"
 echo "Existing unit runner (dependency + config): ${RUNNER_FOUND:-none}"
+
+# The frontend of a PHP project (discovery.stack.frontend, never "none" for a Laravel app that
+# has React or Vue): it gets its own JS profile and runner, next to the PHP one.
+FRONTEND=$(jq -r '.discovery.stack.frontend // "none"' .wizard-state.json)
+if [ "${STACK_KEY%%-*}" = "php" ] && [ "$FRONTEND" != "none" ]; then
+  FRONTEND_PROFILE=$(wf_profile_for_framework "$FRONTEND")
+  FRONTEND_RUNNER_FOUND=$(wf_detect_runner package.json)   # vitest | jest | mocha | karma | native, or empty
+  FRONTEND_ROOT=$(jq -r '.testing.frontend_root // empty' .wizard-state.json)
+  [ -n "$FRONTEND_ROOT" ] || FRONTEND_ROOT=$(wf_detect_frontend_root .)
+  echo "Frontend: $FRONTEND -> profile: $FRONTEND_PROFILE ($(wf_testing_profile "$FRONTEND_PROFILE" | jq -r .label))"
+  echo "Frontend sources: ${FRONTEND_ROOT:-not found}"
+  echo "Existing frontend runner (dependency + config): ${FRONTEND_RUNNER_FOUND:-none}"
+fi
 ```
+
+**A PHP project with a frontend** (`FRONTEND` is not `none`) is offered a fourth layer, "Frontend unit
+tests", next to the PHP layers. It uses the JS profile of its UI framework (`FRONTEND_PROFILE`), not the
+PHP one, and it is independent: the PHP runner being kept never keeps the frontend's, and the other way
+round. Rules for it:
+
+- `FRONTEND_RUNNER_FOUND` is set: the frontend owns its runner. Install and generate nothing for it,
+  record `frontend_runner_existing = true`, and AGENTS.md documents `npm run test`.
+- `FRONTEND_ROOT` is empty (none of `resources/js`, `resources/assets/js`, `resources/ts`,
+  `resources/assets/ts` exists): ask the developer ONCE which folder holds the JavaScript sources, then
+  save the answer as `testing.frontend_root`. Never guess a folder.
+- A project whose frontend is not standard (JSX inside `.js`, Laravel Mix or webpack, Babel) is handled
+  by the generated config, not by questions: the Vitest config it writes treats the `.js` files under
+  the frontend folder as JSX and only runs tests under that folder and `tests/js/`.
 
 | Situation | What the wizard does |
 |---|---|
@@ -111,6 +138,15 @@ What testing layers would you like to configure now?
    CONVENTION: <profile.integration_convention>
    Requires layer 1 to be activated.
 
+4. Frontend unit tests: <frontend profile label>   (only for a PHP project whose `FRONTEND` is not "none")
+
+   WHAT IT DOES: tests the JavaScript components of the frontend in isolation, in jsdom.
+   INSTALLS: <frontend profile packages plus frontend_extra_packages, comma separated; "nothing" when
+             the frontend already owns its runner>
+   GENERATES: vitest.config.ts scoped to <FRONTEND_ROOT> and tests/js/, a setup file, an example test
+   ADDS SCRIPTS: <the keys of the frontend profile's scripts>
+   CONVENTION: <frontend profile.unit_convention>
+
 3. E2E tests: Playwright   (omit this entry when the profile has "e2e": "off")
 
    WHAT IT DOES: complete flows in a real browser (Chromium by default).
@@ -122,7 +158,7 @@ What testing layers would you like to configure now?
 
 ────────────────────────────────────────────────────────────
 
-What do I activate? [1 / 2 / 1,2 / 1,2,3 / 3 only / none for now]
+What do I activate? [1 / 2 / 1,2 / 1,2,3 / 3 only / 4 (PHP project with a frontend) / none for now]
 ```
 
 ### ⏸ PAUSE: Waiting for user response...
@@ -367,7 +403,8 @@ Testing stack configured (in memory; everything is written in Phase 8):
     <if POM>                - Page Object Model active
 
   Final checks_before_done (Node profiles; a PHP profile lists `vendor/bin/pint --dirty --test` and
-  `vendor/bin/phpstan analyse` when the project uses them, plus the profile's test_command):
+  `vendor/bin/phpstan analyse` when the project uses them, plus the profile's test_command, plus
+  `npm run test` when the frontend layer is active):
     - npm run lint
     - npm run build
     <if unit>      - npm run test
@@ -399,6 +436,7 @@ fi
 > - `wf_state_set '.testing.runner_existing' 'true'` when `RUNNER_FOUND` is set, else `'false'`
 > - `wf_state_set '.testing.environment' '"<jsdom|node>"'`: the profile's `environment` (`null` for angular and for a generic project without a runner)
 > - `wf_state_set '.testing.test_pattern' '"<profile.unit_convention>"'`
+> - for the "Frontend unit tests" layer (only a PHP project with a frontend): add `"frontend"` to `testing.layers`, and save `wf_state_set '.testing.frontend_profile' "\"$FRONTEND_PROFILE\""`, `wf_state_set '.testing.frontend_runner' '"<runner>"'` (the one found, else the profile's `runner`; `null` when none), `wf_state_set '.testing.frontend_runner_existing' 'true'` when `FRONTEND_RUNNER_FOUND` is set, else `'false'`, and `wf_state_set '.testing.frontend_root' "\"$FRONTEND_ROOT\""` (the detected folder or the one the developer gave)
 > - `wf_state_set '.testing.test_command' '"<profile.test_command>"'`, only for a profile that has one (`laravel`, `php`); the Node profiles keep `null` because their command is the `test` script
 > - `wf_state_set '.testing.coverage_threshold' '<number>'`, if coverage extra activated, else `null`
 > - `wf_state_set '.testing.visual_regression' 'true'` or `'false'`

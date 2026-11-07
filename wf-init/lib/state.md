@@ -68,7 +68,7 @@ instead of re-running `/wf-init`. Only `.wizard-state.json.tmp` and `.wizard-sta
   },
 
   "discovery": {
-    "stack": { "primary": null, "framework": null, "detected_from": null, "stack_key": null },
+    "stack": { "primary": null, "framework": null, "detected_from": null, "stack_key": null, "frontend": null },
     "node_engine": null,
     "npm_major": null,
     "default_branch": null,
@@ -107,6 +107,10 @@ instead of re-running `/wf-init`. Only `.wizard-state.json.tmp` and `.wizard-sta
     "environment": null,
     "test_pattern": null,
     "test_command": null,
+    "frontend_profile": null,
+    "frontend_runner": null,
+    "frontend_runner_existing": null,
+    "frontend_root": null,
     "layers": [],
     "coverage_threshold": null,
     "visual_regression": false,
@@ -205,6 +209,19 @@ instead of re-running `/wf-init`. Only `.wizard-state.json.tmp` and `.wizard-sta
   projects). `null` for the Node profiles, whose command is the `test` script (`npm run test`). The
   Builder documents it in AGENTS.md (Testing Approach and the checks before done); editing it here and
   re-running `/wf-refresh` is how a project with a non-standard runner command keeps its own.
+- **`discovery.stack.frontend`**: only for a PHP stack: the UI framework of its frontend, from
+  `wf_detect_frontend` (`state-helpers.sh`): `react` | `next` | `vue` | `nuxt` | `angular` | `none`. It
+  comes from the `package.json` dependencies, never from the mere presence of that file (the Laravel
+  skeleton ships one with Vite and axios and no UI); when react and vue are both dependencies, the one
+  the sources import wins. `null` for every other stack.
+- **`testing.layers`** may also hold `frontend`: the unit tests of the frontend of a PHP project, run with
+  the JS profile of `discovery.stack.frontend` next to the PHP runner. It is independent of `unit`.
+- **`testing.frontend_profile`** / **`testing.frontend_runner`** / **`testing.frontend_runner_existing`** /
+  **`testing.frontend_root`**: the JS profile of that frontend (`wf_profile_for_framework` of
+  `discovery.stack.frontend`), its runner, whether the frontend already owns a configured runner (then the
+  wizard installs and generates nothing for it), and the folder with its JavaScript sources
+  (`wf_detect_frontend_root`; phase 4.6 asks once when none of the usual ones exists). Editing
+  `frontend_root` here and re-running `/wf-refresh` is how a non-standard layout is kept.
 - **`testing.runner_existing`**: `true` when the project already owns a configured unit runner
   (its dependency AND its config). The wizard then keeps it: the Builder writes no unit config,
   phase 8 installs no unit packages and does not touch the `test` scripts. `null`/`false` means
