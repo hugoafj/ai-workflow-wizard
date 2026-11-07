@@ -258,7 +258,9 @@ wf_detect_frontend() {
     react=$(grep -rIlE --include='*.js' --include='*.jsx' --include='*.ts' --include='*.tsx' \
               --exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=.git \
               -e "from ['\"]react['\"]" -e "require\(['\"]react['\"]\)" "$root" 2>/dev/null | wc -l | tr -d ' ')
-    vue=$(grep -rIlE --include='*.js' --include='*.ts' --include='*.vue' \
+    # .vue files are counted once, below, by existing: grepping them too would count a .vue file that
+    # imports vue twice and tilt the tie towards vue.
+    vue=$(grep -rIlE --include='*.js' --include='*.ts' \
             --exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=.git \
             -e "from ['\"]vue['\"]" -e "require\(['\"]vue['\"]\)" "$root" 2>/dev/null | wc -l | tr -d ' ')
     vue=$((vue + $(find "$root" -name node_modules -prune -o -name vendor -prune -o -name '*.vue' -print 2>/dev/null | wc -l | tr -d ' ')))
