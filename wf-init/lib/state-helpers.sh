@@ -417,6 +417,35 @@ wf_detect_php_commands() {
   fi
 }
 
+# Print a notice addressed to the AGENT when the project folder is not the root of its git repository
+# (git rev-parse --show-prefix is not empty), and nothing otherwise. Used at the end of /wf-init (8.5)
+# and /wf-refresh (R6). The wizard assumes the project folder IS the repository root; it does not try to
+# fix other layouts, it says so and offers help.
+wf_git_prefix_notice() {
+  local dir="${1:-.}" prefix top
+  prefix=$(git -C "$dir" rev-parse --show-prefix 2>/dev/null) || return 0
+  [ -n "$prefix" ] || return 0
+  top=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || return 0
+  prefix="${prefix%/}"
+  cat <<NOTICE_EOF
+
+⚠ This project is not at the root of its git repository.
+  Project folder:  $top/$prefix
+  Repository root: $top
+
+The wizard assumes the project folder IS the repository root, so some of the files it generated will
+not work as generated:
+  - .github/workflows/*.yml: GitHub only reads workflows from $top/.github/workflows, and their steps
+    run from the repository root. They need to live there and set \`working-directory: $prefix\`.
+  - Anything else that expects the repository root (git hooks such as .husky or post-commit) may need
+    its paths adjusted.
+
+AGENT: tell the user that this layout is not standard for the wizard (it is a legitimate layout, it is
+just not automated), list which of the files above exist in this project, and ask whether they want
+your help adjusting them. Do not change anything before they answer.
+NOTICE_EOF
+}
+
 # Write a field safely using jq --arg to prevent injection/escaping issues
 # 
 # USAGE:

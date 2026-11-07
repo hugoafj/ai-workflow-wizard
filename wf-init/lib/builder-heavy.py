@@ -271,8 +271,13 @@ def write_testing_configs(raw, state, staging):
     # Frontend unit config (frontend layer of a PHP project): the JS profile of its UI framework,
     # scoped to the frontend folder so other *.test.* files of the project are never picked up.
     if "frontend" in layers and not bool(builder_core.get_state_value(state, "testing.frontend_runner_existing", False)):
-        fprofile = builder_core.frontend_profile(raw, state)[1]
+        fname, fprofile = builder_core.frontend_profile(raw, state)
         fkey = fprofile.get("unit_config_frontend")
+        if not fkey:
+            # Phase 4.6 does not offer the layer for such a profile; if the state has it anyway, say so
+            # instead of leaving the developer to believe the frontend tests were set up.
+            print("builder: the frontend layer is active but the %r profile has no frontend config (it uses its "
+                  "own runner): nothing was generated for the frontend tests." % fname, file=sys.stderr)
         if fkey:
             spec = unit_configs[fkey]
             root = (builder_core.get_state_value(state, "testing.frontend_root") or "resources/js").strip("/")

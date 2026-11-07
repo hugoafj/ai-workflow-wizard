@@ -702,6 +702,15 @@ Next steps:
    once to set up their machine (global commands, gentle-ai, MCPs, dependencies).
 ```
 
+Then run this block and show its output after the box. It prints nothing when the project folder is the
+repository root; otherwise it is a notice for you (the agent) to relay and act on:
+
+```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+wf_git_prefix_notice . || true
+```
+
 <if state.cd.missing_secrets is non-empty>:
   ```
   ⚠ MISSING SECRETS — these workflows will fail until you configure them:

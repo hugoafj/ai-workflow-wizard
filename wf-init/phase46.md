@@ -60,14 +60,22 @@ if [ "${STACK_KEY%%-*}" = "php" ] && [ "$FRONTEND" != "none" ]; then
   echo "Frontend: $FRONTEND -> profile: $FRONTEND_PROFILE ($(wf_testing_profile "$FRONTEND_PROFILE" | jq -r .label))"
   echo "Frontend sources: ${FRONTEND_ROOT:-not found}"
   echo "Existing frontend runner (dependency + config): ${FRONTEND_RUNNER_FOUND:-none}"
+  # Only a frontend profile that has a wizard-generated config (unit_config_frontend: react, next, vue)
+  # can be set up here; Angular brings its own runner and has none.
+  FRONTEND_OFFER=no
+  if wf_testing_profile "$FRONTEND_PROFILE" | jq -e '.unit_config_frontend' >/dev/null 2>&1; then FRONTEND_OFFER=yes; fi
+  echo "Frontend tests offered by the wizard: $FRONTEND_OFFER"
 fi
 ```
 
-**A PHP project with a frontend** (`FRONTEND` is not `none`) is offered a fourth layer, "Frontend unit
-tests", next to the PHP layers. It uses the JS profile of its UI framework (`FRONTEND_PROFILE`), not the
+**A PHP project with a frontend** (`FRONTEND` is not `none` and `FRONTEND_OFFER` is `yes`) is offered a
+fourth layer, "Frontend unit tests", next to the PHP layers. It uses the JS profile of its UI framework (`FRONTEND_PROFILE`), not the
 PHP one, and it is independent: the PHP runner being kept never keeps the frontend's, and the other way
 round. Rules for it:
 
+- `FRONTEND_OFFER` is `no` (today only Angular, whose profile has no wizard-generated config): do NOT offer
+  the layer and do not record `frontend` in `testing.layers`. Tell the developer that the frontend uses its
+  own runner (`ng test` for Angular) and that the wizard does not set it up, so nothing is generated for it.
 - `FRONTEND_RUNNER_FOUND` is set: the frontend owns its runner. Install and generate nothing for it,
   record `frontend_runner_existing = true`, and AGENTS.md documents `npm run test`.
 - `FRONTEND_ROOT` is empty (none of `resources/js`, `resources/assets/js`, `resources/ts`,
@@ -138,7 +146,7 @@ What testing layers would you like to configure now?
    CONVENTION: <profile.integration_convention>
    Requires layer 1 to be activated.
 
-4. Frontend unit tests: <frontend profile label>   (only for a PHP project whose `FRONTEND` is not "none")
+4. Frontend unit tests: <frontend profile label>   (only for a PHP project whose `FRONTEND` is not "none" and whose `FRONTEND_OFFER` is "yes")
 
    WHAT IT DOES: tests the JavaScript components of the frontend in isolation, in jsdom.
    INSTALLS: <frontend profile packages plus frontend_extra_packages, comma separated; "nothing" when

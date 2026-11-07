@@ -3081,6 +3081,9 @@ if [[ "$APPLY_ONLY" == "true" ]]; then
 else
   echo "ℹ Next: git push (when ready)"
 fi
+# A project that lives in a subfolder of its git repository needs manual CI and hook adjustments: say so
+# (the notice is addressed to the agent and prints nothing when the project is the repository root).
+if declare -F wf_git_prefix_notice >/dev/null 2>&1; then wf_git_prefix_notice . || true; fi
 ```
 
 ---
