@@ -43,7 +43,9 @@ generated for the unit layer.
 4. **Frontend** (a PHP project whose `discovery.stack.frontend` is not `none`) — the unit tests of its UI with the
    JS profile of that framework (React: Vitest + Testing Library; Vue: Vitest + Vue Test Utils). Generates a
    `vitest.config.ts` that only runs tests under the frontend folder and `tests/js/` and, for React, treats the
-   `.js` files there as JSX; `tests/js/setup.ts`; an example test when the frontend has none. Independent of
+   `.js` files there as JSX, or, when the project already has a `vite.config.*`, merges that Vite config in so the
+   aliases and plugins of the app apply to the tests (Vitest ignores `vite.config.*` once a `vitest.config.*`
+   exists); `tests/js/setup.ts`; an example test when the frontend has none. Independent of
    layer 1: the PHP runner being kept never keeps the frontend's, and the other way round. Recorded as
    `frontend` in `state.testing.layers`.
    Scripts: `test:e2e`, `test:e2e:ui`, `test:e2e:report`. Activates the Playwright MCP.

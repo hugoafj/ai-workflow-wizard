@@ -45,6 +45,11 @@
   `state.testing.frontend_root` and `tests/js`, with JSX allowed in `.js` for React) instead of
   `unit_config`, stages `setup_file_frontend`, and phase 8 installs `packages` plus
   `frontend_extra_packages` with npm. They never apply to a Node project, whose `unit_config` is used.
+- `unit_config_frontend_vite`: optional, next to `unit_config_frontend`. Used instead of it when the project
+  already has a `vite.config.*` at its root: the generated Vitest config then merges that Vite config in, so the
+  aliases and plugins of the app (for example the `@` alias of laravel-vite-plugin) also apply to the tests.
+  Vitest ignores `vite.config.*` as soon as a `vitest.config.*` exists, so without the merge they would be lost.
+  A project without a `vite.config.*` (Laravel Mix, webpack) keeps `unit_config_frontend`, unchanged.
 - `layout_dirs` / `layout_fallback`: optional. When the project has NONE of the `layout_dirs`
   (a non-standard layout), the conventions come from the profile named in `layout_fallback`, which
   says "follow the layout the project already uses" instead of naming folders that do not exist.
@@ -73,6 +78,7 @@
       "dev_command": null,
       "dev_port": null,
       "unit_config_frontend": "vitest-frontend",
+      "unit_config_frontend_vite": "vitest-frontend-vite",
       "setup_file_frontend": {"template": "setup.tmpl.md", "target": "tests/js/setup.ts"},
       "frontend_extra_packages": ["vite"]
     },
@@ -94,6 +100,7 @@
       "dev_command": null,
       "dev_port": 3000,
       "unit_config_frontend": "vitest-frontend",
+      "unit_config_frontend_vite": "vitest-frontend-vite",
       "setup_file_frontend": {"template": "setup.tmpl.md", "target": "tests/js/setup.ts"},
       "frontend_extra_packages": ["vite"]
     },
@@ -115,6 +122,7 @@
       "dev_command": null,
       "dev_port": null,
       "unit_config_frontend": "vitest-frontend-vue",
+      "unit_config_frontend_vite": "vitest-frontend-vue-vite",
       "setup_file_frontend": null,
       "frontend_extra_packages": ["vite"]
     },
@@ -237,6 +245,8 @@
     "vitest-react": {"template": "vitest.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "marker": "test: {\n", "indent": 4},
     "vitest-vue": {"template": "vitest.vue.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "marker": "test: {\n", "indent": 4},
     "vitest-frontend": {"template": "vitest.frontend.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "marker": "test: {\n", "indent": 4},
+    "vitest-frontend-vite": {"template": "vitest.frontend.vite.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "marker": "test: {\n", "indent": 8},
+    "vitest-frontend-vue-vite": {"template": "vitest.frontend.vue.vite.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "marker": "test: {\n", "indent": 8},
     "vitest-frontend-vue": {"template": "vitest.frontend.vue.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "marker": "test: {\n", "indent": 4},
     "vitest-node": {"template": "vitest.node.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "marker": "test: {\n", "indent": 4},
     "jest-nest": {"template": "jest.config.nest.tmpl.md", "target": "jest.config.js", "coverage": "coverage-thresholds.jest.tmpl.md", "marker": "module.exports = {\n", "indent": 2}

@@ -46,7 +46,7 @@ The wizard detects your framework from `package.json` (Node) or `composer.json` 
 | Other PHP | `php` | PHPUnit, run with `vendor/bin/phpunit`; E2E is not offered by default |
 | Anything else | `generic` | You choose in Phase 4.6: Vitest (node environment) or none |
 
-A Laravel (or other PHP) project that also has React or Vue gets a separate **frontend** layer with the JS profile of that framework: Vitest scoped to the frontend folder (`resources/js`, `resources/assets/js`, ...), `.js` files treated as JSX for React, and its own CI steps. The frontend is read from the `package.json` dependencies, and from the sources when React and Vue are both there.
+A Laravel (or other PHP) project that also has React or Vue gets a separate **frontend** layer with the JS profile of that framework: Vitest scoped to the frontend folder (`resources/js`, `resources/assets/js`, ...), `.js` files treated as JSX for React, and its own CI steps. When the project already has a `vite.config.*`, the generated Vitest config merges it in, so the aliases and plugins of the app (for example the `@` alias of laravel-vite-plugin) also apply to the tests. The frontend is read from the `package.json` dependencies, and from the sources when React and Vue are both there.
 
 If the project already has a configured unit runner (Vitest, Jest, Mocha, Karma, an Angular `test` target, or PHPUnit/Pest with its `phpunit.xml`), the wizard keeps it: nothing is installed, generated or scripted for the unit layer. React Native and Expo are not modeled and are treated as React. To support another framework, add one entry to `templates/protocols/testing/profiles.md`.
 
