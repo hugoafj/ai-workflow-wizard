@@ -214,6 +214,8 @@ corresponding to scripts that actually exist in `package.json` (detected
 in Phase 0 — do not include a step for a script that does not exist):
 
 > **Single source**: write this artifact VERBATIM from `https://raw.githubusercontent.com/hugoafj/ai-workflow-wizard/main/templates/protocols/cicd/variants/quality-guard.yml.md`. Do not edit it inline here; if it changes, change it in the template.
+>
+> **PHP stacks** (`stack_key` starting with `php-`) use `variants/quality-guard.php.yml.md` instead, with the same rule: setup-php and `composer install`, then only the steps the project supports (Pint when `laravel/pint` is a dependency (only the files the PR changes, `--diff` against the base branch, so existing violations in a legacy codebase do not fail every PR), PHPStan when `phpstan/phpstan` or Larastan is, the test command while a unit or integration layer is active, and the Laravel environment preparation for `php-laravel`). The Node variant above is unchanged for every other stack.
 
 Show the user which steps were included and which were omitted because the
 corresponding script does not exist, so they can confirm it is correct:

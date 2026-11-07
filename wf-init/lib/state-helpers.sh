@@ -109,6 +109,7 @@ wf_state_init() {
     "runner_existing": null,
     "environment": null,
     "test_pattern": null,
+    "test_command": null,
     "layers": [],
     "coverage_threshold": null,
     "visual_regression": false,
@@ -187,10 +188,47 @@ wf_detect_framework() {
       else "generic" end' "$pkg" 2>/dev/null
 }
 
-# Map a framework token (wf_detect_framework output) to its testing profile.
+# Detect the PHP framework from a composer.json (shared by phase 1 discovery and /wf-refresh R1,
+# through wf_detect_stack). Prints one token: laravel | generic. Package NAMES are matched
+# (require + require-dev), never version values. Prints nothing and returns 1 when the manifest
+# is missing, is not valid JSON, or jq is not installed.
+wf_detect_php_framework() {
+  local pkg="${1:-composer.json}"
+  [ -f "$pkg" ] || return 1
+  jq -r '
+    ((.require // {}) + (."require-dev" // {})) as $d
+    | if $d["laravel/framework"] then "laravel" else "generic" end' "$pkg" 2>/dev/null || return 1
+}
+
+# Detect the project stack from the manifests in <dir> (single source of truth for phase 1
+# discovery and /wf-refresh R1). Prints "<stack_key> <framework>" on one line, both tokens
+# without spaces. A Laravel composer.json wins over package.json, because a Laravel app ships a
+# package.json for its assets and that must not turn it into a Node project. Everything else
+# keeps the previous precedence: package.json, then composer.json, then pyproject.toml.
+#   php-laravel laravel | node-<framework> <framework> | php-generic generic | python-django django
+#   unknown (no manifest: stack_key "unknown", framework empty)
+wf_detect_stack() {
+  local dir="${1:-.}" fw
+  if [ -f "$dir/composer.json" ] && [ "$(wf_detect_php_framework "$dir/composer.json" 2>/dev/null)" = "laravel" ]; then
+    echo "php-laravel laravel"; return 0
+  fi
+  if [ -f "$dir/package.json" ]; then
+    fw=$(wf_detect_framework "$dir/package.json" 2>/dev/null || true)
+    fw="${fw:-generic}"
+    echo "node-$fw $fw"; return 0
+  fi
+  if [ -f "$dir/composer.json" ]; then echo "php-generic generic"; return 0; fi
+  if [ -f "$dir/pyproject.toml" ]; then echo "python-django django"; return 0; fi
+  echo "unknown"
+}
+
+# Map a framework token (wf_detect_framework / wf_detect_stack output) to its testing profile.
 # The profile selects runner, environment, packages and config template (phase 4.6, Builder B8).
 #   react -> react   next -> next   vue|nuxt -> vue   express|fastify|hono|koa -> node-api
-#   nest -> nest          angular -> angular          anything else -> generic
+#   nest -> nest          angular -> angular          laravel -> laravel
+#   anything else -> generic (a Node project) or php (a PHP project)
+# "generic" is a framework token of both ecosystems, so pass the stack key's ecosystem as $2
+# (the part before the first "-" of stack_key: node | php). Without it the answer is the Node one.
 wf_profile_for_framework() {
   case "$1" in
     react)                        echo "react" ;;
@@ -199,7 +237,8 @@ wf_profile_for_framework() {
     express|fastify|hono|koa)     echo "node-api" ;;
     nest)                         echo "nest" ;;
     angular)                      echo "angular" ;;
-    *)                            echo "generic" ;;
+    laravel)                      echo "laravel" ;;
+    *)                            if [ "${2:-}" = "php" ]; then echo "php"; else echo "generic"; fi ;;
   esac
 }
 
@@ -277,6 +316,59 @@ wf_detect_runner() {
     echo native; return 0
   fi
   return 0
+}
+
+# Detect an already-configured PHP unit test runner from a composer.json: its dependency
+# (require or require-dev) AND its config next to it, never one alone (the same rule as
+# wf_detect_runner). Pest wins over PHPUnit because Pest is built on top of it.
+# Prints pest | phpunit, or nothing. Returns 0 even when composer.json or jq is missing.
+wf_detect_php_runner() {
+  local pkg="${1:-composer.json}" deps dir
+  [ -f "$pkg" ] || return 0
+  dir=$(dirname "$pkg")
+  deps=$(jq -r '((.require // {}) + (."require-dev" // {})) | keys[]' "$pkg" 2>/dev/null) || return 0
+  if printf '%s\n' "$deps" | grep -qx 'pestphp/pest' \
+     && { [ -f "$dir/tests/Pest.php" ] || _wf_has_file "$dir" 'phpunit.xml*'; }; then
+    echo pest; return 0
+  fi
+  if printf '%s\n' "$deps" | grep -qx 'phpunit/phpunit' && _wf_has_file "$dir" 'phpunit.xml*'; then
+    echo phpunit; return 0
+  fi
+  return 0
+}
+
+# Print the commands of a PHP project, one per line, for discovery.commands (phase 1 discovery
+# and /wf-refresh R1). The Builder has a Python mirror of these rules (detect_php_commands in
+# builder-core.py): change both together. In this order:
+#   1. every Composer script as `composer run <name>`, sorted, except the ones Composer runs by
+#      itself (names starting with pre- or post-, plus init and command);
+#   2. the test command when there is no `test` script: `php artisan test` when ./artisan exists,
+#      else `vendor/bin/pest` or `vendor/bin/phpunit` by dependency;
+#   3. `vendor/bin/pint --dirty --test` when laravel/pint is a dependency (only the files with
+#      uncommitted changes: a legacy codebase is never forced to be clean, see the CI variant);
+#   4. `vendor/bin/phpstan analyse` when phpstan or larastan is a dependency;
+#   5. every npm script as `npm run <name>`, sorted, when a package.json with scripts exists
+#      (the frontend of a Laravel app).
+# Returns 1, printing nothing, when composer.json is missing or is not valid JSON.
+wf_detect_php_commands() {
+  local dir="${1:-.}" artisan=false
+  [ -f "$dir/composer.json" ] || return 1
+  [ -f "$dir/artisan" ] && artisan=true
+  jq -r --argjson artisan "$artisan" '
+    ((.require // {}) + (."require-dev" // {})) as $d
+    | ((.scripts // {}) | keys | map(select((test("^(pre|post)-") or . == "init" or . == "command") | not)) | sort) as $s
+    | ($s[] | "composer run " + .),
+      (if ($s | index("test")) then empty
+       elif $artisan then "php artisan test"
+       elif $d["pestphp/pest"] then "vendor/bin/pest"
+       elif $d["phpunit/phpunit"] then "vendor/bin/phpunit"
+       else empty end),
+      (if $d["laravel/pint"] then "vendor/bin/pint --dirty --test" else empty end),
+      (if ($d["phpstan/phpstan"] or $d["larastan/larastan"] or $d["nunomaduro/larastan"]) then "vendor/bin/phpstan analyse" else empty end)
+  ' "$dir/composer.json" 2>/dev/null || return 1
+  if [ -f "$dir/package.json" ]; then
+    jq -r '((.scripts // {}) | keys | sort[]) | "npm run " + .' "$dir/package.json" 2>/dev/null || true
+  fi
 }
 
 # Write a field safely using jq --arg to prevent injection/escaping issues

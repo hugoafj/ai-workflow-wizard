@@ -26,13 +26,22 @@
   `{template, target}`. `null` means the profile's config references none. The Builder never
   stages it over a file the project already has, because phase 8 promotes with `rsync -a`,
   which overwrites.
+- `ecosystem`: the package manager the profile installs with. Absent means `npm` (every Node
+  profile); `php` means Composer, and then `packages` are `composer require --dev` requirements.
 - `packages` / `scripts`: installed in phase 8 (8.1c) and set in `package.json` (8.1e)
-  only when the wizard owns the runner (`state.testing.runner_existing` is not true).
+  only when the wizard owns the runner (`state.testing.runner_existing` is not true). A `php`
+  profile has no `scripts`: the wizard never edits `composer.json` scripts, it documents `test_command`.
+- `test_command`: the command that runs the unit and integration tests, documented in AGENTS.md
+  and used by the checks before declaring a task done. Absent means the `test` script of
+  `package.json` (`npm test`); the `php` profiles set it because they have no such script.
 - `dummy_test_import`: first line of the placeholder test phase 8 writes when the project
   has no tests yet (empty when the runner provides globals).
 - `dummy_test_suffix`: file suffix of that placeholder test (`.spec.ts` for Nest, whose Jest
   config only finds `*.spec.ts`); `null` means phase 8 writes none (Angular generates its own specs).
 - `unit_convention` / `integration_convention`: bullets for AGENTS.md Testing Approach.
+- `layout_dirs` / `layout_fallback`: optional. When the project has NONE of the `layout_dirs`
+  (a non-standard layout), the conventions come from the profile named in `layout_fallback`, which
+  says "follow the layout the project already uses" instead of naming folders that do not exist.
 - `dev_command` / `dev_port`: Playwright `webServer` values when they differ from the
   Vite defaults of the base template (`npm run dev`, 5173); `null` keeps the template.
 
@@ -147,6 +156,48 @@
       "integration_convention": "`TestBed` tests that render a component with its real child components, in the same `*.spec.ts` file or an `*.integration.spec.ts` beside it.",
       "dev_command": "npm start",
       "dev_port": 4200
+    },
+    "laravel": {
+      "label": "Laravel (PHPUnit or Pest)",
+      "ecosystem": "php",
+      "runner": "phpunit",
+      "environment": null,
+      "ui": false,
+      "e2e": "off",
+      "unit_config": null,
+      "unit_config_by_runner": {},
+      "setup_file": null,
+      "packages": ["phpunit/phpunit"],
+      "scripts": {},
+      "test_command": "php artisan test",
+      "dummy_test_import": "",
+      "dummy_test_suffix": null,
+      "layout_dirs": ["tests/Unit", "tests/Feature"],
+      "layout_fallback": "php",
+      "unit_convention": "unit tests in `tests/Unit/` (`UserServiceTest.php` for `UserService.php`) for logic that does not need the framework booted.",
+      "integration_convention": "feature tests in `tests/Feature/` (`*Test.php`) that boot the app and exercise routes, controllers and the database (use `RefreshDatabase`).",
+      "dev_command": null,
+      "dev_port": null
+    },
+    "php": {
+      "label": "Other PHP project (PHPUnit)",
+      "ecosystem": "php",
+      "runner": "phpunit",
+      "environment": null,
+      "ui": false,
+      "e2e": "off",
+      "unit_config": null,
+      "unit_config_by_runner": {},
+      "setup_file": null,
+      "packages": ["phpunit/phpunit"],
+      "scripts": {},
+      "test_command": "vendor/bin/phpunit",
+      "dummy_test_import": "",
+      "dummy_test_suffix": null,
+      "unit_convention": "one test class per class under test in `tests/` (`FooTest.php` for `Foo.php`), following the layout the project already uses.",
+      "integration_convention": "tests that exercise several classes together, in the folder the project already uses for them.",
+      "dev_command": null,
+      "dev_port": null
     },
     "generic": {
       "label": "Other Node project (you choose the runner)",

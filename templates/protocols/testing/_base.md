@@ -28,6 +28,8 @@ generated for the unit layer.
 | `node-api` | Express, Fastify, Hono, Koa | Vitest (node environment) + supertest |
 | `nest` | NestJS | Jest + supertest |
 | `angular` | Angular | The project's native runner (no config generated) |
+| `laravel` | Laravel | PHPUnit (Pest also accepted), run with `php artisan test`; installed with Composer, no config generated |
+| `php` | Any other PHP project | PHPUnit, run with `vendor/bin/phpunit`; installed with Composer, no config generated |
 | `generic` | Anything else | Chosen in phase 46 (Vitest in node environment, or none) |
 
 ## The three layers (user selection → state.testing.layers)

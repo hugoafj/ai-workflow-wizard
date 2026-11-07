@@ -37,9 +37,15 @@ phase from the profile, not from the examples below.
 WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 FRAMEWORK=$(jq -r '.discovery.stack.framework // "generic"' .wizard-state.json)
-PROFILE=$(wf_profile_for_framework "$FRAMEWORK")
+STACK_KEY=$(jq -r '.discovery.stack.stack_key // .discovery.stack_key // "unknown"' .wizard-state.json)
+# Second argument: the ecosystem (node | php), because "generic" is a framework token of both.
+PROFILE=$(wf_profile_for_framework "$FRAMEWORK" "${STACK_KEY%%-*}")
 PROFILE_JSON=$(wf_testing_profile "$PROFILE") || { echo "Cannot read the testing profiles; stopping." >&2; exit 1; }
-RUNNER_FOUND=$(wf_detect_runner package.json)   # vitest | jest | mocha | karma | native, or empty
+if [ "$(echo "$PROFILE_JSON" | jq -r '.ecosystem // "npm"')" = "php" ]; then
+  RUNNER_FOUND=$(wf_detect_php_runner composer.json)   # pest | phpunit, or empty
+else
+  RUNNER_FOUND=$(wf_detect_runner package.json)   # vitest | jest | mocha | karma | native, or empty
+fi
 echo "Framework: $FRAMEWORK -> profile: $PROFILE ($(echo "$PROFILE_JSON" | jq -r .label))"
 echo "Existing unit runner (dependency + config): ${RUNNER_FOUND:-none}"
 ```
@@ -47,10 +53,10 @@ echo "Existing unit runner (dependency + config): ${RUNNER_FOUND:-none}"
 | Situation | What the wizard does |
 |---|---|
 | `RUNNER_FOUND` is set | The project owns its runner. Keep it: nothing installed, no unit config, no `test` script touched. Record `runner_existing = true` and the runner found. The unit/integration layers are still recorded so AGENTS.md documents the conventions. |
-| No runner; profile react, next, vue, node-api or nest | Offer the profile's runner. |
+| No runner; profile react, next, vue, node-api, nest, laravel or php | Offer the profile's runner. For `laravel` and `php` that is PHPUnit, installed with `composer require --dev` (profile `ecosystem` is `php`); nothing is added to `composer.json` scripts, AGENTS.md documents the profile's `test_command`. |
 | No runner; profile angular | The Angular CLI provides the runner. Install and generate nothing; record the layers for the conventions and tell the user to run `ng test` once to confirm. |
 | No runner; profile generic | Ask once: Vitest in a node environment, or skip unit tests. |
-| Profile has `"e2e": "off"` (node-api, nest) | Do not offer layer 3 (Playwright): API stacks have no browser flow. Offer it only if the user asks. |
+| Profile has `"e2e": "off"` (node-api, nest, laravel, php) | Do not offer layer 3 (Playwright): API stacks have no browser flow. Offer it only if the user asks. |
 
 First detect if there's already a test runner configured:
 
@@ -69,6 +75,7 @@ specs). So for each layer report BOTH signals and only declare it configured whe
 present:
 
 - Unit/integration: `wf_detect_runner` (above) already applies this rule: the runner dependency AND its config (`vitest.config.*` or a `test:` block in the vite config, `jest.config.*` or a `jest` key in `package.json`, `.mocharc.*`, `karma.conf.*`, an Angular `test` target).
+- PHP (profiles `laravel` and `php`): `wf_detect_php_runner` applies the same rule: `pestphp/pest` or `phpunit/phpunit` in `composer.json` (`require` or `require-dev`) AND `phpunit.xml` / `phpunit.xml.dist` (Pest also accepts `tests/Pest.php`). The `grep` above only reads `package.json`, so skip it for these profiles.
 - E2E: playwright dependency AND `playwright.config.ts`.
 
 When the dependency exists but the config is missing, treat that layer as NOT configured and
@@ -359,7 +366,8 @@ Testing stack configured (in memory; everything is written in Phase 8):
     <if visual regression> - Visual regression (snapshots) active
     <if POM>                - Page Object Model active
 
-  Final checks_before_done:
+  Final checks_before_done (Node profiles; a PHP profile lists `vendor/bin/pint --dirty --test` and
+  `vendor/bin/phpstan analyse` when the project uses them, plus the profile's test_command):
     - npm run lint
     - npm run build
     <if unit>      - npm run test
@@ -391,6 +399,7 @@ fi
 > - `wf_state_set '.testing.runner_existing' 'true'` when `RUNNER_FOUND` is set, else `'false'`
 > - `wf_state_set '.testing.environment' '"<jsdom|node>"'`: the profile's `environment` (`null` for angular and for a generic project without a runner)
 > - `wf_state_set '.testing.test_pattern' '"<profile.unit_convention>"'`
+> - `wf_state_set '.testing.test_command' '"<profile.test_command>"'`, only for a profile that has one (`laravel`, `php`); the Node profiles keep `null` because their command is the `test` script
 > - `wf_state_set '.testing.coverage_threshold' '<number>'`, if coverage extra activated, else `null`
 > - `wf_state_set '.testing.visual_regression' 'true'` or `'false'`
 > - `wf_state_set '.testing.page_object_model' 'true'` or `'false'`

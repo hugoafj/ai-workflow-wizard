@@ -95,7 +95,7 @@ number of the option they want to adjust.
      when `testing.layers` has no `e2e` (API profiles hide that layer by default)
    - 3 (coverage targets), additionally: `n/a (the project keeps its own runner config)` when
      `testing.runner_existing` is true, or `n/a (no wizard-managed unit config)` when the profile
-     generates none (angular, generic without Vitest). The wizard never edits a runner config it
+     generates none (angular, laravel, php, generic without Vitest). The wizard never edits a runner config it
      did not generate
    - 7, 8, 9, 10 (CI sub-options): `n/a (CI is OFF)` when option 6 is OFF
    - 11 (release-please standalone): `n/a (included in CI)` when option 6 is ON

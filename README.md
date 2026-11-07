@@ -32,7 +32,7 @@ The wizard discovers your stack, installs [gentle-ai](https://github.com/Gentlem
 
 ## Supported Frameworks
 
-The wizard detects your framework from `package.json` and sets up testing to match it. Nothing else in the workflow (MCPs, git flow, CI, release) depends on the framework.
+The wizard detects your framework from `package.json` (Node) or `composer.json` (PHP) and sets up testing to match it. A `composer.json` that requires `laravel/framework` wins over the `package.json` every Laravel app ships for its assets. MCPs, git flow and release do not depend on the framework; the CI quality guard has a Node variant and a PHP one.
 
 | Detected | Testing profile | Unit runner installed when you have none |
 |---|---|---|
@@ -42,9 +42,11 @@ The wizard detects your framework from `package.json` and sets up testing to mat
 | Express, Fastify, Hono, Koa | `node-api` | Vitest (node environment) + supertest; E2E is not offered by default |
 | NestJS | `nest` | Jest + ts-jest + supertest; E2E is not offered by default |
 | Angular | `angular` | None: it uses the Angular CLI runner |
+| Laravel | `laravel` | PHPUnit (Pest also accepted), run with `php artisan test`; E2E is not offered by default |
+| Other PHP | `php` | PHPUnit, run with `vendor/bin/phpunit`; E2E is not offered by default |
 | Anything else | `generic` | You choose in Phase 4.6: Vitest (node environment) or none |
 
-If the project already has a configured unit runner (Vitest, Jest, Mocha, Karma, or an Angular `test` target), the wizard keeps it: nothing is installed, generated or scripted for the unit layer. React Native and Expo are not modeled and are treated as React. To support another framework, add one entry to `templates/protocols/testing/profiles.md`.
+If the project already has a configured unit runner (Vitest, Jest, Mocha, Karma, an Angular `test` target, or PHPUnit/Pest with its `phpunit.xml`), the wizard keeps it: nothing is installed, generated or scripted for the unit layer. React Native and Expo are not modeled and are treated as React. To support another framework, add one entry to `templates/protocols/testing/profiles.md`.
 
 ## Protecting Custom Content
 

@@ -338,13 +338,19 @@ def write_cicd(raw, state, staging):
 
     # --- Quality guard workflow (only under full CI).
     if cicd:
-        qg_url = builder_core.base_url(raw, "templates/protocols/cicd/variants/quality-guard.yml.md")
+        # A PHP stack has its own variant; every other stack keeps the Node one untouched.
+        is_php = builder_core.stack_key(state).startswith("php-")
+        qg_name = "quality-guard.php.yml.md" if is_php else "quality-guard.yml.md"
+        qg_url = builder_core.base_url(raw, "templates/protocols/cicd/variants/" + qg_name)
         qg = builder_core.fetch_with_retries(qg_url)
         qg = builder_core.strip_prose_header(qg, keep_notes=True)
         qg = builder_core.resolve_if_blocks(qg, state, raw)
         qg = builder_core.resolve_gh_escapes(qg)
         qg = qg.replace("{{node_version}}", str(builder_core._coalesce(state, "discovery.node_engine", "22")))
         qg = qg.replace("{{npm_major}}", str(builder_core._coalesce(state, "discovery.npm_major", "10")))
+        if is_php:
+            qg = qg.replace("{{php_version}}", builder_core.php_version(state))
+            qg = qg.replace("{{test_command}}", builder_core.php_test_command(state))
         if builder_core.unresolved_placeholders(qg):
             raise ValueError("unresolved placeholders in quality-guard.yml")
         qg_target = os.path.join(staging, ".github", "workflows", "quality-guard.yml")

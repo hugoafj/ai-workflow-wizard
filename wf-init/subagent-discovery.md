@@ -37,6 +37,12 @@ cat "{PROJECT_PATH}/package.json" 2>/dev/null || cat "{PROJECT_PATH}/composer.js
 # .discovery.stack.framework; do NOT guess the framework from file names.
 [ -f "{PROJECT_PATH}/package.json" ] && ( source "{WF_PATH}/lib/state-helpers.sh" && wf_detect_framework "{PROJECT_PATH}/package.json" ) 2>/dev/null
 
+# Stack (same shared helper as /wf-refresh R1). Prints "<stack_key> <framework>". A Laravel
+# composer.json wins over package.json, because a Laravel app ships a package.json for its
+# assets. Use its output verbatim as .discovery.stack.stack_key and .discovery.stack.framework;
+# the manifest cat above lists package.json first, so do NOT decide the stack from that order.
+( source "{WF_PATH}/lib/state-helpers.sh" && wf_detect_stack "{PROJECT_PATH}" ) 2>/dev/null
+
 # Previous workflow artifacts
 ls "{PROJECT_PATH}/AGENTS.md" "{PROJECT_PATH}/CLAUDE.md" "{PROJECT_PATH}/GEMINI.md" 2>/dev/null
 ls -d "{PROJECT_PATH}/.cursor" "{PROJECT_PATH}/.windsurf" "{PROJECT_PATH}/.devin" "{PROJECT_PATH}/.kiro" 2>/dev/null
@@ -53,7 +59,7 @@ find "{PROJECT_PATH}" -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.
 # them from .discovery.commands; without it the section falls back to a
 # generic re-detection)
 # Detect package manager and emit "npm run X" / "pnpm X" / "yarn X"
-node <<'NODEEOF'
+[ -f "{PROJECT_PATH}/package.json" ] && node <<'NODEEOF'
 const fs = require('fs');
 const path = '{PROJECT_PATH}';
 const pkg = JSON.parse(fs.readFileSync(path + '/package.json', 'utf8'));
@@ -70,6 +76,11 @@ const cmds = Object.keys(scripts).map(s => `${prefix} ${s}`);
 process.stdout.write(cmds.join('\n'));
 NODEEOF
 echo
+
+# PHP commands (feeds .discovery.commands of a PHP stack, one per line: Composer scripts, the test
+# command, Pint, PHPStan/Larastan, then the npm scripts of the frontend, if any). Same helper as
+# /wf-refresh R1; for a PHP project use it INSTEAD of the npm list above.
+[ -f "{PROJECT_PATH}/composer.json" ] && ( source "{WF_PATH}/lib/state-helpers.sh" && wf_detect_php_commands "{PROJECT_PATH}" ) 2>/dev/null
 
 # Root structure with purpose (one per line, feeds .discovery.conventions.structure)
 # Output format: "folder/  # Purpose" — one entry per line for multiline tree
@@ -107,13 +118,13 @@ ls "{PROJECT_PATH}/.github/workflows/" 2>/dev/null | wc -l
 Use `wf_state_set` to persist to `.wizard-state.json`:
 
 ```
-.discovery.stack.primary        → "node" | "php" | "python" | "rust" | "other"
-.discovery.stack.framework      → Node: the wf_detect_framework output, one of "nest" | "angular" |
-                                  "next" | "nuxt" | "vue" | "react" | "express" | "fastify" |
-                                  "hono" | "koa" | "generic"; other stacks: "laravel" | "django" | null
-.discovery.stack.detected_from  → "package.json" | "composer.json" | etc.
-.discovery.stack.stack_key   → "node-<framework>" for Node (e.g. "node-nest", "node-generic"),
-                               "php-laravel", "python-django"
+.discovery.stack.primary        → "node" | "php" | "python" | "rust" | "other" (the prefix of stack_key)
+.discovery.stack.framework      → the second token of the wf_detect_stack output. Node: one of "nest" |
+                                  "angular" | "next" | "nuxt" | "vue" | "react" | "express" | "fastify" |
+                                  "hono" | "koa" | "generic"; PHP: "laravel" | "generic"; "django" | null
+.discovery.stack.detected_from  → "package.json" | "composer.json" | etc. (the manifest the stack came from)
+.discovery.stack.stack_key   → the first token of the wf_detect_stack output: "node-<framework>" for Node
+                               (e.g. "node-nest", "node-generic"), "php-laravel", "php-generic", "python-django"
 .discovery.code_files           → number of code files
 .discovery.git_commits          → number of commits
 .discovery.committers           → number of unique committers
@@ -121,7 +132,8 @@ Use `wf_state_set` to persist to `.wizard-state.json`:
 .discovery.node_engine          → detected Node version (or null)
 .discovery.npm_major            → local npm major version (or null)
 .discovery.default_branch       → default branch
-.discovery.commands             → [npm script names] for node stacks | null (the Builder
+.discovery.commands             → Node: [npm script names]; PHP: the wf_detect_php_commands lines
+                                  verbatim; otherwise null (the Builder
                                   renders the AGENTS.md Commands section from this)
 .discovery.prior_artifacts      → { agents_md: bool, claude_md: bool, satellites: [...], hook: bool }
 ```

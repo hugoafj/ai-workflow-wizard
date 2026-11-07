@@ -65,6 +65,13 @@ STACK_OVERRIDES = {
         "typecheck": "Run mypy/pyright",
         "migrate": "Run database migrations",
     },
+    "php": {
+        "php artisan test": "Run PHPUnit/Pest tests",
+        "vendor/bin/phpunit": "Run PHPUnit tests",
+        "vendor/bin/pest": "Run Pest tests",
+        "vendor/bin/pint --dirty --test": "Check code style of the changed files (Laravel Pint)",
+        "vendor/bin/phpstan analyse": "Run static analysis (PHPStan/Larastan)",
+    },
     "go": {
         "test": "Run go test",
         "build": "Run go build",
@@ -533,6 +540,13 @@ def eval_semantic_cond(cond, state, raw=None):
         return bool(get_state_value(state, "discovery.has_typescript", True))
     if "test:sanitization script exists" in c:
         return bool(get_state_value(state, "testing.has_sanitization", False))
+    # PHP quality guard (variants/quality-guard.php.yml.md): the project files are read from the cwd.
+    if "project is a laravel app" in c:
+        return stack_key(state) == "php-laravel"
+    if "composer.json requires laravel/pint" in c:
+        return "laravel/pint" in _read_composer()[0]
+    if "composer.json requires phpstan or larastan" in c:
+        return bool(_read_composer()[0] & PHPSTAN_PACKAGES)
 
     # Fallback: boolean literal phrases.
     if c in ("true", "yes", "1"):
@@ -664,6 +678,98 @@ def detect_package_scripts():
     return ", ".join("npm run %s" % n for n in names)
 
 
+def _command_key(command):
+    """Name a discovered command is looked up by in the description tables.
+
+    `npm run build` and `composer run build` are both `build`; a direct command such as
+    `php artisan test` keeps its full text (STACK_OVERRIDES["php"] is keyed by it).
+    """
+    return (command.replace("- npm run ", "").replace("npm run ", "")
+            .replace("composer run ", "").strip())
+
+
+PHPSTAN_PACKAGES = {"phpstan/phpstan", "larastan/larastan", "nunomaduro/larastan"}
+
+
+def _read_composer():
+    """(dependency names, scripts) of composer.json in the project root; empty when unreadable."""
+    try:
+        with open(os.path.join(os.getcwd(), "composer.json"), "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return set(), {}
+    if not isinstance(data, dict):
+        return set(), {}
+    deps = set()
+    for section in ("require", "require-dev"):
+        found = data.get(section)
+        if isinstance(found, dict):
+            deps.update(found.keys())
+    scripts = data.get("scripts")
+    return deps, (scripts if isinstance(scripts, dict) else {})
+
+
+def _php_direct_test_command(deps):
+    """Test command of a PHP project that has no `test` Composer script."""
+    if os.path.exists(os.path.join(os.getcwd(), "artisan")):
+        return "php artisan test"
+    if "pestphp/pest" in deps:
+        return "vendor/bin/pest"
+    if "phpunit/phpunit" in deps:
+        return "vendor/bin/phpunit"
+    return None
+
+
+def php_test_command(state):
+    """Command that runs a PHP project's tests: state testing.test_command, else the direct one."""
+    return (get_state_value(state, "testing.test_command")
+            or _php_direct_test_command(_read_composer()[0]) or "vendor/bin/phpunit")
+
+
+def php_version(state):
+    """PHP version for CI: discovery.php_version, else composer.json config.platform.php (the version the
+    project declares it runs on), else the first X.Y of require.php, else 8.3."""
+    known = get_state_value(state, "discovery.php_version", None)
+    if known:
+        return str(known)
+    try:
+        with open(os.path.join(os.getcwd(), "composer.json"), "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        platform = ((data.get("config") or {}).get("platform") or {}).get("php")
+        constraint = platform or (data.get("require") or {}).get("php") or ""
+    except (OSError, ValueError, AttributeError):
+        constraint = ""
+    found = re.search(r"\d+\.\d+", str(constraint))
+    return found.group(0) if found else "8.3"
+
+
+def detect_php_commands():
+    """Commands of a PHP project, in the order of wf_detect_php_commands (state-helpers.sh).
+
+    Same rules as that shell helper, which discovery and /wf-refresh R1 use: change both together.
+    Composer scripts (minus the events Composer runs itself), the direct test command when there
+    is no `test` script, Pint, PHPStan/Larastan, then the npm scripts of the frontend.
+    """
+    deps, scripts = _read_composer()
+    if not deps and not scripts:
+        return []
+    names = sorted(n for n in scripts
+                   if not (n.startswith("pre-") or n.startswith("post-") or n in ("init", "command")))
+    cmds = ["composer run %s" % n for n in names]
+    if "test" not in names:
+        direct = _php_direct_test_command(deps)
+        if direct:
+            cmds.append(direct)
+    if "laravel/pint" in deps:
+        cmds.append("vendor/bin/pint --dirty --test")
+    if deps & PHPSTAN_PACKAGES:
+        cmds.append("vendor/bin/phpstan analyse")
+    npm = detect_package_scripts()
+    if npm:
+        cmds.extend(c.strip() for c in npm.split(","))
+    return cmds
+
+
 def _warn_fallback(key, value):
     print("WARNING: %s is empty in state — using fallback %r. Re-run /wf-init phase1 discovery or set state.%s." % (key, value, key), file=sys.stderr)
 
@@ -685,18 +791,21 @@ def infer_placeholder(state, key):
                 return commands
             lines = []
             for c in commands:
-                # Extract script name (after "npm run " or just the command)
-                script_name = c.replace("- npm run ", "").replace("npm run ", "").strip()
+                # Extract script name (after "npm run " / "composer run " or just the command)
+                script_name = _command_key(c)
                 desc = describe_command(script_name, stack, get_state_value(state, "testing.runner"))
                 lines.append("- %s — %s" % (c, desc))
             return "\n".join(lines)
         detected = detect_package_scripts()
+        if stack.startswith("php"):
+            # A PHP project: Composer scripts and tools, then the frontend's npm scripts.
+            detected = ", ".join(detect_php_commands()) or detected
         if detected:
             # Convert comma-separated to bulleted format with heuristic descriptions
             bulleted_lines = []
             for c in detected.split(","):
                 c = c.strip()
-                script_name = c.replace("npm run ", "").strip()
+                script_name = _command_key(c)
                 desc = describe_command(script_name, stack, get_state_value(state, "testing.runner"))
                 bulleted_lines.append("- %s — %s" % (c, desc))
             bulleted = "\n".join(bulleted_lines)
@@ -755,6 +864,21 @@ def infer_placeholder(state, key):
         return detect_project_structure(project_root)
 
     if key == "testing.checks_before_done":
+        if stack_key(state).startswith("php"):
+            # PHP has no npm scripts: Pint and PHPStan when the project uses them, and the
+            # test command while a unit/integration layer is active.
+            deps, _scripts = _read_composer()
+            php_checks = []
+            if "laravel/pint" in deps:
+                php_checks.append("vendor/bin/pint --dirty --test")
+            if deps & PHPSTAN_PACKAGES:
+                php_checks.append("vendor/bin/phpstan analyse")
+            if "unit" in layers or "integration" in layers:
+                php_checks.append(php_test_command(state))
+            if not php_checks:
+                return ("- No automated checks detected yet: add the project's lint and test "
+                        "commands, then run `/wf-refresh`.")
+            return "\n".join("- `%s`" % c for c in php_checks)
         # Gate on the active test layers, not features.testing. lint + build are
         # always part of the done gate;
         # test / test:e2e follow the unit/integration/e2e layers.
@@ -998,6 +1122,21 @@ def resolve_router_ifs(text, state):
     return "".join(out)
 
 
+def testing_conventions(raw, state, profile):
+    """(unit, integration) convention bullets of a profile.
+
+    A profile that lists `layout_dirs` falls back to the profile named in `layout_fallback` when the
+    project has none of those folders (cwd is the project root), so AGENTS.md never names folders
+    that do not exist.
+    """
+    dirs = profile.get("layout_dirs")
+    if dirs and not any(os.path.isdir(os.path.join(os.getcwd(), d)) for d in dirs):
+        fallback = load_testing_profiles(raw)["profiles"].get(profile.get("layout_fallback"))
+        if fallback:
+            return fallback["unit_convention"], fallback["integration_convention"]
+    return profile["unit_convention"], profile["integration_convention"]
+
+
 def testing_approach_section(state, raw=None):
     """Generate the Testing Approach section body from the active test layers.
 
@@ -1022,6 +1161,9 @@ def testing_approach_section(state, raw=None):
     # so the convention bullets are skipped, like the other template-fed parts.
     profile = testing_profile(raw, state)[1] if raw and (has_unit or has_e2e) else None
     ui = profile["ui"] if profile else True
+    # The Node profiles have no test_command: their command is the `test` script of package.json.
+    test_cmd = (get_state_value(state, "testing.test_command")
+                or (profile or {}).get("test_command") or "npm run test")
     lines = []
     if has_unit:
         lines += [
@@ -1030,14 +1172,15 @@ def testing_approach_section(state, raw=None):
             "Run the unit/integration suite before considering a change done:",
             "",
             "```bash",
-            "npm run test",
+            test_cmd,
             "```",
         ]
         if profile:
+            unit_conv, integration_conv = testing_conventions(raw, state, profile)
             lines += [
                 "",
-                "- Unit: %s" % profile["unit_convention"],
-                "- Integration: %s" % profile["integration_convention"],
+                "- Unit: %s" % unit_conv,
+                "- Integration: %s" % integration_conv,
             ]
     if has_e2e:
         lines += [

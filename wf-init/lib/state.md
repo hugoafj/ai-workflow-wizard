@@ -106,6 +106,7 @@ instead of re-running `/wf-init`. Only `.wizard-state.json.tmp` and `.wizard-sta
     "runner_existing": null,
     "environment": null,
     "test_pattern": null,
+    "test_command": null,
     "layers": [],
     "coverage_threshold": null,
     "visual_regression": false,
@@ -169,18 +170,27 @@ instead of re-running `/wf-init`. Only `.wizard-state.json.tmp` and `.wizard-sta
   which advances to `phase7` when complete. Phase 47 is `phase47-cicd` (the old `phase47` key is
   not used).
 - **`discovery.stack.stack_key`**: normalized stack key (e.g. `node-react`, `node-nest`,
-  `node-generic`, `php-laravel`, `python-django`). For Node it is `node-<framework>`. This is
+  `node-generic`, `php-laravel`, `php-generic`, `python-django`). For Node it is `node-<framework>`.
+  It comes from `wf_detect_stack` (`state-helpers.sh`): a `composer.json` that requires
+  `laravel/framework` gives `php-laravel` even when a `package.json` is also present (a Laravel app
+  ships one for its assets); any other `composer.json` gives `php-generic`. This is
   what the Builder uses to select `variants/<stack_key>.md`.
   **Never branch with `if stack === ...`**: the key selects a file.
 - **`discovery.stack.framework`**: for Node, the output of `wf_detect_framework`
   (`state-helpers.sh`), derived from `package.json` dependencies, first match wins:
   `nest` | `angular` | `next` | `nuxt` | `vue` | `react` | `express` | `fastify` | `hono` | `koa`
-  | `generic` (nothing matched). Other stacks: `laravel`, `django`. Never `null` once phase 1 ran.
+  | `generic` (nothing matched). PHP (`wf_detect_php_framework`, from `composer.json` `require` and
+  `require-dev`): `laravel` | `generic`. Other stacks: `django`. Never `null` once phase 1 ran.
 - **`testing.profile`**: testing profile resolved from the framework by
   `wf_profile_for_framework`: `react` (react, Vite projects included) | `next` | `vue` (vue, nuxt) | `node-api` (express,
-  fastify, hono, koa) | `nest` | `angular` | `generic`. Selects runner, environment, packages and
-  config template. `null` means a legacy state: the Builder treats it as `react`, the behavior
-  every Node project had before profiles existed. R2 fills it from the `stack_key` of the ROOT
+  fastify, hono, koa) | `nest` | `angular` | `generic` | `laravel` | `php`. Selects runner, environment, packages and
+  config template. `laravel` and `php` are Composer profiles (`ecosystem: php` in
+  `profiles.md`): PHPUnit, no generated unit config, no npm scripts, the command documented is
+  the profile's `test_command`. `generic` is a framework token of both ecosystems, so the
+  helper takes the stack key's ecosystem (`node` | `php`) as a second argument.
+  `null` means a legacy state: for a Node stack the Builder treats it as `react`, the behavior
+  every Node project had before profiles existed, and phase 8 picks `laravel` or `php` for a
+  PHP `stack_key` instead. R2 fills it from the `stack_key` of the ROOT
   state (the pre-refresh value, not one R1 just rewrote after accepted drift) without overwriting a
   value that is already set, so an installed project never changes its test config as a side effect
   of detection. To change an installed project's profile, set `testing.profile` and re-run
@@ -190,6 +200,11 @@ instead of re-running `/wf-init`. Only `.wizard-state.json.tmp` and `.wizard-sta
   file convention. When the project already has a configured runner, phase 4.6 records that one
   and sets `testing.runner_existing = true`; otherwise it records the profile default.
   `testing.runner_detected` keeps the raw detection result.
+- **`testing.test_command`**: the command that runs the unit and integration tests, copied by phase 4.6
+  from the profile's `test_command` (`php artisan test` for Laravel, `vendor/bin/phpunit` for other PHP
+  projects). `null` for the Node profiles, whose command is the `test` script (`npm run test`). The
+  Builder documents it in AGENTS.md (Testing Approach and the checks before done); editing it here and
+  re-running `/wf-refresh` is how a project with a non-standard runner command keeps its own.
 - **`testing.runner_existing`**: `true` when the project already owns a configured unit runner
   (its dependency AND its config). The wizard then keeps it: the Builder writes no unit config,
   phase 8 installs no unit packages and does not touch the `test` scripts. `null`/`false` means
