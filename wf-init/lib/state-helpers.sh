@@ -116,6 +116,9 @@ wf_state_init() {
     "frontend_root": null,
     "layers": [],
     "coverage_threshold": null,
+    "coverage_mode": null,
+    "coverage_autoupdate": false,
+    "frontend_coverage_threshold": null,
     "visual_regression": false,
     "page_object_model": false
   },
@@ -663,10 +666,19 @@ wf_state_validate() {
   fi
 
   # For phase46, coverage_threshold may be null (coverage extra not activated) but the field must exist.
-  # When coverage is active it must hold a number.
+  # When coverage is active it must hold a number (0 is valid for the ratchet mode).
+  # coverage_mode and coverage_autoupdate may be absent in states written before ratchet existed.
   if [ "$phase" = "phase46" ]; then
     if ! jq -e '.testing | has("coverage_threshold") and (.coverage_threshold == null or (.coverage_threshold | type == "number"))' "$WF_STATE" >/dev/null 2>&1; then
       echo "ERROR: wf_state_validate - testing.coverage_threshold missing or not a number" >&2
+      valid=false
+    fi
+    if ! jq -e '.testing | (.coverage_mode == null or (.coverage_mode | IN("full", "ratchet"))) and ((.coverage_autoupdate // false) | type == "boolean")' "$WF_STATE" >/dev/null 2>&1; then
+      echo "ERROR: wf_state_validate - testing.coverage_mode must be null, full or ratchet, and coverage_autoupdate a boolean" >&2
+      valid=false
+    fi
+    if ! jq -e '.testing | (.frontend_coverage_threshold == null or (.frontend_coverage_threshold | type == "number"))' "$WF_STATE" >/dev/null 2>&1; then
+      echo "ERROR: wf_state_validate - testing.frontend_coverage_threshold must be null or a number" >&2
       valid=false
     fi
   fi

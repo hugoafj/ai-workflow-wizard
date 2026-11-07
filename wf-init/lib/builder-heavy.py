@@ -197,20 +197,272 @@ def write_hook(raw, state, staging):
 # B8. Testing configs
 # ---------------------------------------------------------------------------
 
-def _inject_coverage(raw, state, cfg, spec):
+def coverage_mode(state):
+    """'full', 'ratchet', or None when no coverage is configured. States written before
+    testing.coverage_mode existed: a threshold means full."""
+    mode = builder_core.get_state_value(state, "testing.coverage_mode")
+    if mode is None:
+        threshold = builder_core.get_state_value(state, "testing.coverage_threshold", "80")
+        return "full" if threshold is not None else None
+    return mode
+
+
+def frontend_threshold_key(state):
+    """Where the frontend floor lives. States written before testing.frontend_coverage_threshold
+    existed share the backend floor, as they always did."""
+    testing = state.get("testing") if isinstance(state.get("testing"), dict) else {}
+    return "testing.frontend_coverage_threshold" if "frontend_coverage_threshold" in testing \
+        else "testing.coverage_threshold"
+
+
+def _inject_coverage(raw, state, cfg, spec, key="testing.coverage_threshold"):
     """Inject the coverage fragment right after the config marker (the test: { } block for Vitest,
-    the exported object for Jest). Skipped when the threshold is null, otherwise the config would
-    render "lines: None"."""
-    threshold = builder_core.get_state_value(state, "testing.coverage_threshold", "80")
-    if threshold is None:
+    the exported object for Jest). Skipped when no mode is set or the threshold is null, otherwise
+    the config would render "lines: None". The ratchet fragment only exists where the profile
+    declares coverage_ratchet; any other profile keeps the full fragment."""
+    mode = coverage_mode(state)
+    threshold = builder_core.get_state_value(state, key, "80")
+    if mode is None or threshold is None:
         return cfg
+    rel = spec["coverage"]
+    if mode == "ratchet" and spec.get("coverage_ratchet"):
+        rel = spec["coverage_ratchet"]
     frag = builder_core.fetch_with_retries(
-        builder_core.base_url(raw, "templates/protocols/testing/" + spec["coverage"]))
+        builder_core.base_url(raw, "templates/protocols/testing/" + rel))
     frag = builder_core.strip_prose_header(frag)
     frag = frag.replace("{{threshold}}", str(threshold))
     # Indent the fragment to sit inside the marked block (F11).
     frag = textwrap.indent(frag, " " * spec["indent"])
     return cfg.replace(spec["marker"], spec["marker"] + frag + "\n")
+
+
+def node_test_command(raw, state):
+    """The Node quality guard runs npm run test:coverage only when the wizard writes a unit config
+    with a coverage block (the CI then enforces the floor); otherwise plain npm run test. The
+    condition mirrors write_testing_configs so the workflow never calls a script that was not set."""
+    if coverage_mode(state) is None:
+        return "npm run test"
+    layers = builder_core.normalize_layers(state)
+    if not ("unit" in layers or "integration" in layers):
+        return "npm run test"
+    if bool(builder_core.get_state_value(state, "testing.runner_existing", False)):
+        return "npm run test"
+    _, profile = builder_core.testing_profile(raw, state)
+    runner = builder_core.get_state_value(state, "testing.runner") or ""
+    cfg_key = profile["unit_config"] or profile["unit_config_by_runner"].get(runner)
+    return "npm run test:coverage" if cfg_key else "npm run test"
+
+
+def frontend_unit_spec(raw, state):
+    """The unit-config spec the frontend layer of a PHP project gets (profiles.md unit_configs), or None
+    when that layer generates no config. Mirrors the frontend branch of write_testing_configs."""
+    if "frontend" not in builder_core.normalize_layers(state):
+        return None
+    if bool(builder_core.get_state_value(state, "testing.frontend_runner_existing", False)):
+        return None
+    _, fprofile = builder_core.frontend_profile(raw, state)
+    fkey = fprofile.get("unit_config_frontend")
+    if fkey and _project_vite_config() and fprofile.get("unit_config_frontend_vite"):
+        fkey = fprofile["unit_config_frontend_vite"]
+    if not fkey:
+        return None
+    return builder_core.load_testing_profiles(raw)["unit_configs"][fkey]
+
+
+def frontend_coverage_active(raw, state):
+    """True when the frontend config carries a coverage block: a mode is set and the frontend floor is not null."""
+    return frontend_unit_spec(raw, state) is not None and coverage_mode(state) is not None \
+        and builder_core.get_state_value(state, frontend_threshold_key(state), "80") is not None
+
+
+def backend_coverage_active(state):
+    """True when a PHP project's backend tests run under a coverage floor in the quality guard."""
+    layers = builder_core.normalize_layers(state)
+    return coverage_mode(state) is not None and ("unit" in layers or "integration" in layers) \
+        and builder_core.get_state_value(state, "testing.coverage_threshold", "80") is not None
+
+
+def frontend_test_command(raw, state):
+    return "npm run test:coverage" if frontend_coverage_active(raw, state) else "npm run test"
+
+
+# The statement coverage of a PHP run, read from the Clover report (Pest and PHPUnit both write it).
+PHP_CLOVER_PCT = ('php -r \'$x = simplexml_load_file("coverage.xml"); $m = $x->project->metrics; '
+                  'echo (int) $m["statements"] > 0 ? round(100 * (int) $m["coveredstatements"] / (int) $m["statements"], 2) : 0;\'')
+
+
+def php_backend_steps(state):
+    """The backend test step(s) of the PHP quality guard. The first line carries no indent: the template
+    already indents the placeholder."""
+    command = builder_core.php_test_command(state)
+    if not backend_coverage_active(state):
+        return "- name: Unit & integration tests\n        run: %s" % command
+    floor = builder_core.get_state_value(state, "testing.coverage_threshold")
+    return "\n".join([
+        "- name: Unit & integration tests (coverage)",
+        "        env:",
+        "          COVERAGE_FLOOR: \"%s\"" % floor,
+        "        run: %s --coverage-clover coverage.xml" % command,
+        "      - name: Enforce the backend coverage floor",
+        "        env:",
+        "          COVERAGE_FLOOR: \"%s\"" % floor,
+        "        run: |",
+        "          PCT=$(%s)" % PHP_CLOVER_PCT,
+        "          echo \"Backend statement coverage: ${PCT}% (floor ${COVERAGE_FLOOR}%)\"",
+        "          php -r 'exit((float) $argv[1] >= (float) $argv[2] ? 0 : 1);' \"$PCT\" \"$COVERAGE_FLOOR\" "
+        "|| { echo \"::error::Backend coverage ${PCT}% is below the floor ${COVERAGE_FLOOR}%\"; exit 1; }",
+    ])
+
+
+def _raise_steps(metrics, files):
+    """The shared job step of the coverage-ratchet workflow. Each floor is an integer, and it rises only when
+    the measured coverage clears it by at least one point, so a fraction of a point never opens a PR. The
+    state and the config files change together, in one chore PR; an open coverage PR is left alone."""
+    lines = [
+        "- name: Raise the floors and open a chore PR",
+        "        env:",
+        "          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}",
+    ]
+    for m in metrics:
+        lines.append("          PCT_%s: ${{ %s }}" % (m["name"].upper(), m["pct"]))
+    lines += ["        run: |", "          set -euo pipefail", "          SUMMARY=\"\""]
+    for m in metrics:
+        v = m["name"].upper()
+        lines += [
+            "          OLD_%s=$(jq -r '.%s // 0' .wizard-state.json)" % (v, m["key"]),
+            "          NEW_%s=$(awk -v p=\"$PCT_%s\" 'BEGIN { printf \"%%d\", p }')" % (v, v),
+            "          if awk -v n=\"$NEW_%s\" -v o=\"$OLD_%s\" 'BEGIN { exit !(n >= o + 1) }'; then" % (v, v),
+            "            jq --argjson v \"$NEW_%s\" '.%s = $v' .wizard-state.json > .wizard-state.json.tmp "
+            "&& mv .wizard-state.json.tmp .wizard-state.json" % (v, m["key"]),
+            "            sed -i.bak -E 's/%s/%s'\"$NEW_%s\"'%s/g' %s && rm -f %s.bak"
+            % (m["sed_re"], m["sed_prefix"], v, m["sed_suffix"], m["file"], m["file"]),
+            "            SUMMARY=\"$SUMMARY %s $OLD_%s%% -> $NEW_%s%%;\"" % (m["label"], v, v),
+            "          fi",
+        ]
+    gh_open = ("'[.[] | select(.title | startswith(\"chore(coverage): raise coverage floor\"))] | length'")
+    lines += [
+        "          if [ -z \"$SUMMARY\" ]; then",
+        "            echo \"No floor rises: coverage is less than one point above the floors.\"",
+        "            exit 0",
+        "          fi",
+        "          if [ \"$(gh pr list --state open --json title --jq %s)\" != \"0\" ]; then" % gh_open,
+        "            echo \"A coverage floor PR is already open; it is measured again after it merges.\"",
+        "            exit 0",
+        "          fi",
+        "          git config user.name \"github-actions[bot]\"",
+        "          git config user.email \"41898282+github-actions[bot]@users.noreply.github.com\"",
+        "          BRANCH=\"chore/coverage-floor-${GITHUB_RUN_ID}\"",
+        "          git checkout -b \"$BRANCH\"",
+        "          git add %s" % " ".join(files),
+        "          git commit -m \"chore(coverage): raise coverage floor\" -m \"$SUMMARY\"",
+        "          git push -u origin \"$BRANCH\"",
+        "          gh pr create --base main --head \"$BRANCH\" --title \"chore(coverage): raise coverage floor\" "
+        "--body \"Raised by the coverage-ratchet workflow:$SUMMARY\"",
+    ]
+    return "\n".join(lines)
+
+
+def write_coverage_ratchet(raw, state, staging, created):
+    """The coverage-ratchet workflow: in ratchet mode with the job on, measure coverage on each merge to main
+    and raise the floors through a chore PR. Node and PHP projects get their own template."""
+    if not builder_core.bool_feature(state, "ci") or coverage_mode(state) != "ratchet":
+        return
+    if not bool(builder_core.get_state_value(state, "testing.coverage_autoupdate", False)):
+        return
+    node_version = str(builder_core._coalesce(state, "discovery.node_engine", "22"))
+    npm_major = str(builder_core._coalesce(state, "discovery.npm_major", "10"))
+    if builder_core.stack_key(state).startswith("php-"):
+        metrics, files, measure = [], [".wizard-state.json"], []
+        if backend_coverage_active(state):
+            metrics.append({"name": "backend", "label": "backend", "pct": "steps.backend.outputs.pct",
+                            "key": "testing.coverage_threshold", "file": ".github/workflows/quality-guard.yml",
+                            "sed_re": 'COVERAGE_FLOOR: "[0-9.]+"', "sed_prefix": 'COVERAGE_FLOOR: "',
+                            "sed_suffix": '"'})
+            files.append(".github/workflows/quality-guard.yml")
+            measure.append("\n".join([
+                "- name: Measure backend coverage",
+                "        id: backend",
+                "        run: |",
+                "          %s --coverage-clover coverage.xml" % builder_core.php_test_command(state),
+                "          echo \"pct=$(%s)\" >> \"$GITHUB_OUTPUT\"" % PHP_CLOVER_PCT,
+            ]))
+        spec = frontend_unit_spec(raw, state)
+        fkey = frontend_threshold_key(state)
+        if spec is not None and frontend_coverage_active(raw, state) and fkey != "testing.coverage_threshold":
+            metrics.append({"name": "frontend", "label": "frontend", "pct": "steps.frontend.outputs.pct",
+                            "key": fkey, "file": spec["target"], "sed_re": "lines: [0-9.]+,",
+                            "sed_prefix": "lines: ", "sed_suffix": ","})
+            files.append(spec["target"])
+            install = "npm ci" if os.path.exists("package-lock.json") else "npm install"
+            measure.append("\n".join([
+                "- uses: actions/setup-node@v4",
+                "        with:",
+                "          node-version: \"%s\"" % node_version,
+                "",
+                "      - name: Install frontend dependencies",
+                "        run: %s" % install,
+                "",
+                "      - name: Measure frontend coverage",
+                "        id: frontend",
+                "        run: |",
+                "          npm run test:coverage",
+                "          echo \"pct=$(jq -r '.total.lines.pct' coverage/coverage-summary.json)\" >> \"$GITHUB_OUTPUT\"",
+            ]))
+        if not metrics:
+            return
+        template ="templates/protocols/cicd/variants/coverage-ratchet.php.yml.md"
+        laravel_env = ""
+        if builder_core.stack_key(state) == "php-laravel":
+            laravel_env = "\n".join([
+                "- name: Prepare Laravel environment",
+                "        run: |",
+                "          [ -f .env ] || cp .env.example .env 2>/dev/null || touch .env",
+                "          php artisan key:generate --ansi",
+            ])
+        extensions = builder_core.php_extensions()
+        subs = {
+            "{{php_version}}": builder_core.php_version(state),
+            "{{php_extensions_line}}": ("extensions: \"%s\"" % ", ".join(extensions)) if extensions else "",
+            "{{laravel_env_steps}}": laravel_env,
+            "{{measure_steps}}": "\n\n      ".join(measure),
+            "{{raise_steps}}": _raise_steps(metrics, files),
+        }
+    else:
+        if node_test_command(raw, state) != "npm run test:coverage":
+            return
+        _, profile = builder_core.testing_profile(raw, state)
+        runner = builder_core.get_state_value(state, "testing.runner") or ""
+        cfg_key = profile["unit_config"] or profile["unit_config_by_runner"].get(runner)
+        target = builder_core.load_testing_profiles(raw)["unit_configs"][cfg_key]["target"]
+        metrics = [{"name": "lines", "label": "lines", "pct": "steps.measure.outputs.pct",
+                    "key": "testing.coverage_threshold", "file": target, "sed_re": "lines: [0-9.]+,",
+                    "sed_prefix": "lines: ", "sed_suffix": ","}]
+        measure = ["\n".join([
+            "- name: Measure coverage",
+            "        id: measure",
+            "        run: |",
+            "          npm run test:coverage",
+            "          echo \"pct=$(jq -r '.total.lines.pct' coverage/coverage-summary.json)\" >> \"$GITHUB_OUTPUT\"",
+        ])]
+        template = "templates/protocols/cicd/variants/coverage-ratchet.yml.md"
+        subs = {
+            "{{node_version}}": node_version,
+            "{{npm_major}}": npm_major,
+            "{{measure_steps}}": "\n\n      ".join(measure),
+            "{{raise_steps}}": _raise_steps(metrics, [".wizard-state.json", target]),
+        }
+    body = builder_core.fetch_with_retries(builder_core.base_url(raw, template))
+    body = builder_core.strip_prose_header(body, keep_notes=True)
+    body = builder_core.resolve_gh_escapes(body)
+    for token, value in subs.items():
+        body = body.replace(token, value)
+    if builder_core.unresolved_placeholders(body):
+        raise ValueError("unresolved placeholders in coverage-ratchet.yml")
+    target_path = os.path.join(staging, ".github", "workflows", "coverage-ratchet.yml")
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+    with open(target_path, "w", encoding="utf-8") as fh:
+        fh.write(body + "\n")
+    created.append(os.path.relpath(target_path, staging))
 
 
 def _stage_setup_file(raw, staging, setup, created):
@@ -304,7 +556,7 @@ def write_testing_configs(raw, state, staging):
             cfg = builder_core.extract_block(cfg, "typescript")
             cfg = cfg.replace("{{frontend_root_regex}}", _js_regex(root)).replace("{{frontend_root}}", root)
             cfg = cfg.replace("{{vite_config_file}}", vite_file or "")
-            cfg = _inject_coverage(raw, state, cfg, spec)
+            cfg = _inject_coverage(raw, state, cfg, spec, key=frontend_threshold_key(state))
             target = os.path.join(staging, spec["target"])
             with open(target, "w", encoding="utf-8") as fh:
                 fh.write(cfg + "\n")
@@ -406,10 +658,15 @@ def write_cicd(raw, state, staging):
         qg = builder_core.resolve_gh_escapes(qg)
         qg = qg.replace("{{node_version}}", str(builder_core._coalesce(state, "discovery.node_engine", "22")))
         qg = qg.replace("{{npm_major}}", str(builder_core._coalesce(state, "discovery.npm_major", "10")))
+        if not is_php:
+            qg = qg.replace("{{node_test_command}}", node_test_command(raw, state))
         if is_php:
             qg = qg.replace("{{php_version}}", builder_core.php_version(state))
             qg = qg.replace("{{php_extensions}}", ", ".join(builder_core.php_extensions()))
             qg = qg.replace("{{test_command}}", builder_core.php_test_command(state))
+            qg = qg.replace("{{php_coverage_driver}}", "pcov" if backend_coverage_active(state) else "none")
+            qg = qg.replace("{{backend_test_steps}}", php_backend_steps(state))
+            qg = qg.replace("{{frontend_test_command}}", frontend_test_command(raw, state))
         if builder_core.unresolved_placeholders(qg):
             raise ValueError("unresolved placeholders in quality-guard.yml")
         qg_target = os.path.join(staging, ".github", "workflows", "quality-guard.yml")
@@ -664,6 +921,9 @@ def write_cicd(raw, state, staging):
             with open(dep_target, "w", encoding="utf-8") as fh:
                 fh.write(dep + "\n")
             created.append(os.path.relpath(dep_target, staging))
+
+    # --- Coverage ratchet: the job that raises the floors through a chore PR (ratchet mode, job on).
+    write_coverage_ratchet(raw, state, staging, created)
 
     return created
 

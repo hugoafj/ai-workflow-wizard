@@ -180,7 +180,7 @@ small project) that isn't justified in every case. The Decision
 Ladder of this same wizard exists precisely to avoid activating things the
 project doesn't need yet.
 
-If `runner_existing` is true, do not offer extra 1: the wizard never edits a runner config it does not own.
+Offer extra 1 only where something is enforced. Node profiles with a wizard-generated unit config (react, next, vue, node-api, nest, and generic with a runner that has one) get it, unless `runner_existing` is true: the wizard never edits a runner config it does not own. PHP profiles (`laravel`, `php`) get it even when the project keeps its own runner, because their floor lives in the CI workflow, not in a config the wizard edits. Do not offer it for `angular`, which runs `ng test`, or for `generic` without a runner that has a unit config: nothing would be enforced.
 
 ```
 Optional testing extras. None are activated unless you ask:
@@ -214,12 +214,28 @@ Which ones do I activate? [comma-separated numbers / none for now]
 
 ### ⏸ PAUSE: Waiting for user response...
 
-**If they activated extra 1 (coverage targets)**, ask for the threshold. It is stored in
-`state.testing.coverage_threshold` (persistence below); the builder injects the
-coverage threshold block into the unit config in Phase 6b (step B8, from
-`coverage-thresholds.tmpl.md`, or `coverage-thresholds.jest.tmpl.md` for Jest, resolving
-`{{threshold}}`) and Phase 8 promotes it to the real file;
-do NOT edit the unit config here, the file doesn't exist yet in this phase:
+**If they activated extra 1 (coverage targets)**, ask for the mode first. The default follows the
+Phase 3 classification: `legacy` defaults to `ratchet`, `greenfield` defaults to `full`. The mode is
+stored in `state.testing.coverage_mode` (persistence below); the builder injects the coverage block into
+the unit config in Phase 6b (step B8) and Phase 8 promotes it to the real file. Do NOT edit the unit
+config here, the file doesn't exist yet in this phase.
+
+Ratchet works for every profile that offers the extra: the raise is a CI job that reads the coverage report
+(Clover for PHP, json-summary for Vitest and Jest), so it does not depend on the test runner's own options.
+
+```
+Coverage mode for this project? (default: <ratchet | full>, from its classification)
+
+  full      CI requires the minimum you set on every run. Use it when the code already meets it.
+  ratchet   The floor starts at the current coverage and never drops. It rises by itself through
+            a chore PR when coverage improves (no release, no version bump).
+
+[full / ratchet]
+```
+
+**If they chose `full`**, ask for the threshold (stored in `state.testing.coverage_threshold`;
+`coverage_autoupdate` is `false`). If the project also has the Frontend unit tests layer (PHP with a
+frontend), ask the same question for the frontend and store it in `state.testing.frontend_coverage_threshold`:
 
 ```
 What minimum coverage percentage do you want to require? (recommended: 70-80%
@@ -228,6 +244,11 @@ utility libs that warrant it)
 
 [70 / 80 / 90 / other: specify]
 ```
+
+**If they chose `ratchet`**, do not ask for a threshold. Store `coverage_threshold` as `0`,
+`coverage_autoupdate` as `true`, and `frontend_coverage_threshold` as `0` when the frontend layer is active
+(otherwise `null`). Tell the user: *"The coverage floor starts at 0% and rises
+automatically as coverage improves."*
 
 **If they activated extra 2 (visual regression)**, save `testing.visual_regression: true` in
 state (persistence below). The builder injects the snapshot configuration into
@@ -425,7 +446,7 @@ Testing stack configured. Reply **continue** to continue.
 
 ### ⏸ PAUSE: Waiting for user to confirm "continue"...
 
-> **📝 PERSISTENCE** (contract `wf-init/lib/state.md`): use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `testing.layers` (activated layers), `testing.profile`, `testing.runner`, `testing.runner_existing`, `testing.environment`, `testing.test_pattern`, `testing.runner_detected`, `testing.coverage_threshold` (number or null, if the coverage extra was activated), `testing.visual_regression` (bool), `testing.page_object_model` (bool), `mcps` (project MCPs to configure). Mark `wf_phase_done phase46 <next>`.
+> **📝 PERSISTENCE** (contract `wf-init/lib/state.md`): use `wf_state_set` or the `edit` tool to save in `.wizard-state.json` → `testing.layers` (activated layers), `testing.profile`, `testing.runner`, `testing.runner_existing`, `testing.environment`, `testing.test_pattern`, `testing.runner_detected`, `testing.coverage_mode` (`full`, `ratchet` or null), `testing.coverage_threshold` (number or null, if the coverage extra was activated), `testing.coverage_autoupdate` (bool), `testing.visual_regression` (bool), `testing.page_object_model` (bool), `mcps` (project MCPs to configure). Mark `wf_phase_done phase46 <next>`.
 > Calculate the next phase based on features:
 ```bash
 NEXT=
@@ -446,7 +467,9 @@ fi
 > - `wf_state_set '.testing.test_pattern' '"<profile.unit_convention>"'`
 > - for the "Frontend unit tests" layer (only a PHP project with a frontend): add `"frontend"` to `testing.layers`, and save `wf_state_set '.testing.frontend_profile' "\"$FRONTEND_PROFILE\""`, `wf_state_set '.testing.frontend_runner' '"<runner>"'` (the one found, else the profile's `runner`; `null` when none), `wf_state_set '.testing.frontend_runner_existing' 'true'` when `FRONTEND_RUNNER_FOUND` is set, else `'false'`, and `wf_state_set '.testing.frontend_root' "\"$FRONTEND_ROOT\""` (the detected folder or the one the developer gave)
 > - `wf_state_set '.testing.test_command' '"<profile.test_command>"'`, only for a profile that has one (`laravel`, `php`); the Node profiles keep `null` because their command is the `test` script
-> - `wf_state_set '.testing.coverage_threshold' '<number>'`, if coverage extra activated, else `null`
+> - coverage extra activated: `wf_state_set '.testing.coverage_mode' '"<full|ratchet>"'`; `wf_state_set '.testing.coverage_threshold' '<number>'` (the number for `full`, `0` for `ratchet`); `wf_state_set '.testing.coverage_autoupdate' '<true for ratchet, false for full>'`
+> - coverage extra not activated: `wf_state_set '.testing.coverage_mode' 'null'`; `wf_state_set '.testing.coverage_threshold' 'null'`; `wf_state_set '.testing.coverage_autoupdate' 'false'`; `wf_state_set '.testing.frontend_coverage_threshold' 'null'`
+> - frontend layer active with the extra: `wf_state_set '.testing.frontend_coverage_threshold' '<number>'` (the number for `full`, `0` for `ratchet`), else `null`
 > - `wf_state_set '.testing.visual_regression' 'true'` or `'false'`
 > - `wf_state_set '.testing.page_object_model' 'true'` or `'false'`
 > - `wf_state_set '.mcps' '<array of selected MCPs>'`

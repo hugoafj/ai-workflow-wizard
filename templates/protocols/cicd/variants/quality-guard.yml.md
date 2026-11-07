@@ -3,6 +3,7 @@
 # Placeholder resolution:
 #   {{node_version}} → project engines.node, or 22 by default
 #   {{npm_major}}    → user's local npm major version (e.g., 11)
+#   {{node_test_command}} → npm run test:coverage when coverage_mode is set (the CI then enforces the floor), else npm run test
 #
 # Conditional resolution:
 #   <if type-check script or tsconfig.json exists>: → include type-check step
@@ -61,7 +62,7 @@ jobs:
 
       <if unit or integration layer is active>:
       - name: Unit & integration tests
-        run: npm run test
+        run: {{node_test_command}}
 
       <if test:sanitization script exists>:
       - name: Sanitization tests

@@ -192,7 +192,7 @@ if [ -d ".github/workflows" ]; then
   for wf in .github/workflows/*; do
     wf_name=$(basename "$wf")
     case "$wf_name" in
-      gemini-review.yml|claude-review.yml|gga-review.yml|quality-guard.yml|security-review*.yml|ai-summary-job.*.yml|release-please.yml|deploy.yml)
+      gemini-review.yml|claude-review.yml|gga-review.yml|quality-guard.yml|security-review*.yml|ai-summary-job.*.yml|release-please.yml|deploy.yml|coverage-ratchet.yml)
         echo "  🗑 $wf (wizard)"
         ;;
       *)
@@ -395,7 +395,7 @@ rm -f .agents/protocols/wf-orchestrator.md
 Remove each wizard workflow detected in Phase 0:
 
 ```bash
-rm -f .github/workflows/quality-guard.yml .github/workflows/deploy.yml
+rm -f .github/workflows/quality-guard.yml .github/workflows/deploy.yml .github/workflows/coverage-ratchet.yml
 ```
 
 ### MCP settings

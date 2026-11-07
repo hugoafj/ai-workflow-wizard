@@ -113,6 +113,9 @@ instead of re-running `/wf-init`. Only `.wizard-state.json.tmp` and `.wizard-sta
     "frontend_root": null,
     "layers": [],
     "coverage_threshold": null,
+    "coverage_mode": null,
+    "coverage_autoupdate": false,
+    "frontend_coverage_threshold": null,
     "visual_regression": false,
     "page_object_model": false
   },
