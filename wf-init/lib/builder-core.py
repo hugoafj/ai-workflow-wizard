@@ -551,6 +551,8 @@ def eval_semantic_cond(cond, state, raw=None):
     # PHP quality guard (variants/quality-guard.php.yml.md): the project files are read from the cwd.
     if "project is a laravel app" in c:
         return stack_key(state) == "php-laravel"
+    if "composer requires php extensions" in c:
+        return bool(php_extensions())
     if "composer.json requires laravel/pint" in c:
         return "laravel/pint" in _read_composer()[0]
     if "composer.json requires phpstan or larastan" in c:
@@ -732,6 +734,51 @@ def php_test_command(state):
     """Command that runs a PHP project's tests: state testing.test_command, else the direct one."""
     return (get_state_value(state, "testing.test_command")
             or _php_direct_test_command(_read_composer()[0]) or "vendor/bin/phpunit")
+
+
+# Extensions compiled into every PHP build: they can never be missing from a runner, so they are left out of
+# the list (asking for them would only add noise to the workflow).
+PHP_BUILT_IN_EXTENSIONS = {"core", "date", "hash", "pcre", "reflection", "spl", "standard"}
+
+
+def php_extensions():
+    """PHP extensions the project needs, sorted, from the `ext-*` requirements of composer.json and composer.lock.
+
+    Composer is the only ecosystem that declares the language's native extensions in the manifest, so this is
+    certain, not a guess: the root requirements, the requirements of every locked package (that is how
+    `mongodb/laravel-mongodb` brings `ext-mongodb`) and the lock file's platform sections. A clean CI runner
+    only has the default extensions, so `composer install` fails when one of these is missing. Only the
+    extensions compiled into every PHP are left out; the rest are kept even when most runners have them,
+    because asking setup-php for one it already has is harmless while leaving out one a runner lacks is
+    not. Missing or invalid files give an empty list.
+    """
+    found = set()
+
+    def add(requirements):
+        if isinstance(requirements, dict):
+            for name in requirements:
+                if isinstance(name, str) and name.startswith("ext-") and len(name) > 4:
+                    found.add(name[4:].lower())
+
+    for filename in ("composer.json", "composer.lock"):
+        try:
+            with open(os.path.join(os.getcwd(), filename), "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+        except (OSError, ValueError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        add(data.get("require"))
+        add(data.get("require-dev"))
+        add(data.get("platform"))
+        add(data.get("platform-dev"))
+        for section in ("packages", "packages-dev"):
+            packages = data.get(section)
+            if isinstance(packages, list):
+                for package in packages:
+                    if isinstance(package, dict):
+                        add(package.get("require"))
+    return sorted(found - PHP_BUILT_IN_EXTENSIONS)
 
 
 def php_version(state):

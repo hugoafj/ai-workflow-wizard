@@ -5,11 +5,13 @@
 #
 # Placeholder resolution:
 #   {{php_version}}  → state discovery.php_version, else composer.json "config.platform.php", else the first X.Y of "require.php", else 8.3
+#   {{php_extensions}} → the ext-* requirements of composer.json and composer.lock (root, every locked package, platform), sorted
 #   {{test_command}} → state testing.test_command, else php artisan test (Laravel), pest or phpunit
 #   {{node_version}} and {{npm_major}} → as in quality-guard.yml.md (only used by the frontend steps)
 #
 # Conditional resolution:
 #   <if the project is a Laravel app>:                  → prepare .env and APP_KEY (stack_key php-laravel)
+#   <if composer requires php extensions>:               → ask setup-php for them (a clean runner only has the default ones)
 #   <if composer.json requires laravel/pint>:           → include the code style step (changed files only)
 #   <if composer.json requires phpstan or larastan>:    → include the static analysis step
 #   <if unit or integration layer is active>:           → include the test step
@@ -20,6 +22,8 @@
 #   - setup-php installs PHP and Composer on the runner; the PHP version comes from the project
 #   - Pint only checks the files the PR changed (--diff against the base branch), so a legacy codebase
 #     with existing style violations does not fail every PR; full history is fetched for that diff
+#   - setup-php gets the extensions the project and its locked packages require, because `composer install` fails on
+#     a clean runner when one is missing (mongodb/laravel-mongodb needs ext-mongodb, which is not a default one)
 #   - composer audit runs with continue-on-error: true so a transitive advisory does not block the PR
 #   - the test step runs the suite with the project's own command; tests that need a database,
 #     Redis or another service need a `services:` block added to this job by the team
@@ -52,6 +56,8 @@ jobs:
           php-version: "{{php_version}}"
           tools: composer:v2
           coverage: none
+          <if composer requires php extensions>:
+          extensions: "{{php_extensions}}"
 
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress

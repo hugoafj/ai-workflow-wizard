@@ -389,6 +389,7 @@ def write_cicd(raw, state, staging):
         qg = qg.replace("{{npm_major}}", str(builder_core._coalesce(state, "discovery.npm_major", "10")))
         if is_php:
             qg = qg.replace("{{php_version}}", builder_core.php_version(state))
+            qg = qg.replace("{{php_extensions}}", ", ".join(builder_core.php_extensions()))
             qg = qg.replace("{{test_command}}", builder_core.php_test_command(state))
         if builder_core.unresolved_placeholders(qg):
             raise ValueError("unresolved placeholders in quality-guard.yml")
