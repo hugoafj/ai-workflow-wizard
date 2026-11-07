@@ -14,6 +14,8 @@
 # Notes:
 #   - Node 22 is active LTS, satisfies >=18/>=20/>=22 of the current ecosystem
 #   - npm is pinned before npm ci to avoid lockfile desync
+#   - with a coverage mode set, the unit step runs test:coverage; the init writes that script into package.json
+#     (phase 8.1e), and a project that removed it fails this step on purpose, so a floor never passes silently
 #   - continue-on-error: true on security audit to avoid blocking on transitive deps
 #   - failure handler posts a comment explaining which step failed
 
