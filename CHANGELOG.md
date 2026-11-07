@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.14.1-beta.1...v0.15.0-beta.1) (2026-11-07)
+
+
+### Features
+
+* **wf-init:** coverage modes, ratchet job and PHP coverage ([#205](https://github.com/hugoafj/ai-workflow-wizard/issues/205)) ([0c8e762](https://github.com/hugoafj/ai-workflow-wizard/commit/0c8e762aa60b4b8c1decac390f99b50c5f19cc2f))
+
 ## [0.14.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.14.0-beta.1...v0.14.1-beta.1) (2026-11-07)
 
 
