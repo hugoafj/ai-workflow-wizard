@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.14.0-beta.1...v0.14.1-beta.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **wf-init:** reuse the project's Vite config in the generated frontend Vitest config ([#203](https://github.com/hugoafj/ai-workflow-wizard/issues/203)) ([661ded8](https://github.com/hugoafj/ai-workflow-wizard/commit/661ded8d669f4385ff3b25a54086f367d4c8cb9e))
+
 ## [0.14.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.13.0-beta.1...v0.14.0-beta.1) (2026-11-07)
 
 
