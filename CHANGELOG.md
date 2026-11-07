@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.13.0-beta.1...v0.14.0-beta.1) (2026-11-07)
+
+
+### Features
+
+* **wf-init:** support PHP and Laravel projects, with React or Vue frontends ([#201](https://github.com/hugoafj/ai-workflow-wizard/issues/201)) ([9e0c66b](https://github.com/hugoafj/ai-workflow-wizard/commit/9e0c66b17429737945cae587bca8eea1f42dcecd))
+
 ## [0.13.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.12.0-beta.1...v0.13.0-beta.1) (2026-11-05)
 
 
