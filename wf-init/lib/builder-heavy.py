@@ -372,7 +372,8 @@ def _raise_steps(metrics, files):
         "          git commit -m \"chore(coverage): raise coverage floor\" -m \"$SUMMARY\"",
         "          git push -u origin \"$BRANCH\"",
         "          gh pr create --base main --head \"$BRANCH\" --title \"chore(coverage): raise coverage floor\" "
-        "--body \"Raised by the coverage-ratchet workflow:$SUMMARY\"",
+        "--body \"Raised by the coverage-ratchet workflow:$SUMMARY\" "
+        "|| { if [ \"$(gh pr list --head \"$BRANCH\" --state all --json number --jq 'length')\" = \"0\" ]; then git push origin --delete \"$BRANCH\"; fi; echo \"::error::could not open the PR\"; exit 1; }",
     ]
     return "\n".join(lines)
 
