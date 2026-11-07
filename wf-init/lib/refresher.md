@@ -1303,14 +1303,25 @@ _wf_norm_commands() {
 OLD_COMMANDS_CLEAN=$(_wf_norm_commands "$OLD_COMMANDS")
 COMMANDS_CLEAN=$(_wf_norm_commands "$COMMANDS")
 
-if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ -n "$FRONTEND" && "$OLD_FRONTEND" != "$FRONTEND" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || [[ "$OLD_NPM" != "$NPM_MAJOR" ]] || [[ "$OLD_COMMANDS_CLEAN" != "$COMMANDS_CLEAN" ]]; then
+# What changed about the frontend of a PHP project, decided ONCE and used both to trigger the drift report
+# and to print it, so the report is never empty. A first detection of "none" is not news (nothing to
+# configure); a first detection of a UI framework is; a change keeps its profile (R2 never switches a
+# profile that is already set), so the report says how to switch it.
+FRONTEND_CHANGE=""
+if [[ -n "$FRONTEND" && "$OLD_FRONTEND" != "$FRONTEND" ]]; then
+  if [[ -n "$OLD_FRONTEND" ]]; then
+    FRONTEND_CHANGE="$OLD_FRONTEND → $FRONTEND (its testing profile does not change by itself: set testing.frontend_profile and re-run /wf-refresh to switch its tests)"
+  elif [[ "$FRONTEND" != "none" ]]; then
+    FRONTEND_CHANGE="not recorded → $FRONTEND (newly detected; this refresh does not set up its tests)"
+  fi
+fi
+
+if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ -n "$FRONTEND_CHANGE" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || [[ "$OLD_NPM" != "$NPM_MAJOR" ]] || [[ "$OLD_COMMANDS_CLEAN" != "$COMMANDS_CLEAN" ]]; then
   echo "⚠ Project content drift detected:"
   [[ "$OLD_STACK" != "$STACK_KEY" ]] && echo "  - Stack: $OLD_STACK → $STACK_KEY"
   [[ "$OLD_NODE" != "$NODE_ENGINE" ]] && echo "  - Node engine: $OLD_NODE → $NODE_ENGINE"
   [[ "$OLD_NPM" != "$NPM_MAJOR" ]] && echo "  - npm major: $OLD_NPM → $NPM_MAJOR"
-  # The frontend testing profile and config never change by themselves (R2 keeps a profile that is already
-  # set): say so, so the change is not silent. Switching them is an explicit action.
-  [[ -n "$OLD_FRONTEND" && -n "$FRONTEND" && "$OLD_FRONTEND" != "$FRONTEND" ]] && echo "  - Frontend: $OLD_FRONTEND → $FRONTEND (its testing profile does not change by itself: set testing.frontend_profile and re-run /wf-refresh to switch its tests)"
+  [[ -n "$FRONTEND_CHANGE" ]] && echo "  - Frontend: $FRONTEND_CHANGE"
   if [[ "$OLD_COMMANDS_CLEAN" != "$COMMANDS_CLEAN" ]]; then
     echo "  - Commands:"
     { diff -u \

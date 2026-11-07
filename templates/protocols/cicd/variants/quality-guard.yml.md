@@ -20,7 +20,7 @@ name: CI Quality Guard
 
 on:
   pull_request:
-    branches: [main, master]
+    types: [opened, synchronize, reopened]
 
 jobs:
   quality-guard:
