@@ -236,10 +236,17 @@ def _inject_coverage(raw, state, cfg, spec, key="testing.coverage_threshold"):
     return cfg.replace(spec["marker"], spec["marker"] + frag + "\n")
 
 
+# Runs the coverage script and fails closed when the project has none: a configured floor that cannot be
+# enforced must not pass silently. An if/else, not `||`, so a failing coverage run fails the step.
+COVERAGE_OR_PLAIN = ("if node -e \"process.exit(Number(!require('./package.json').scripts?.['test:coverage']))\"; "
+                     "then npm run test:coverage; "
+                     "else echo \"no test:coverage script in package.json, add it or set the coverage mode to none\"; exit 1; fi")
+
+
 def node_test_command(raw, state):
-    """The Node quality guard runs npm run test:coverage only when the wizard writes a unit config
-    with a coverage block (the CI then enforces the floor); otherwise plain npm run test. The
-    condition mirrors write_testing_configs so the workflow never calls a script that was not set."""
+    """The Node quality guard runs the coverage script only when the wizard writes a unit config with a
+    coverage block (the CI then enforces the floor); otherwise plain npm run test. The condition mirrors
+    write_testing_configs. A coverage block without a test:coverage script fails the step, never passes it."""
     if coverage_mode(state) is None:
         return "npm run test"
     layers = builder_core.normalize_layers(state)
@@ -250,7 +257,7 @@ def node_test_command(raw, state):
     _, profile = builder_core.testing_profile(raw, state)
     runner = builder_core.get_state_value(state, "testing.runner") or ""
     cfg_key = profile["unit_config"] or profile["unit_config_by_runner"].get(runner)
-    return "npm run test:coverage" if cfg_key else "npm run test"
+    return COVERAGE_OR_PLAIN if cfg_key else "npm run test"
 
 
 def frontend_unit_spec(raw, state):
@@ -283,7 +290,7 @@ def backend_coverage_active(state):
 
 
 def frontend_test_command(raw, state):
-    return "npm run test:coverage" if frontend_coverage_active(raw, state) else "npm run test"
+    return COVERAGE_OR_PLAIN if frontend_coverage_active(raw, state) else "npm run test"
 
 
 # The statement coverage of a PHP run, read from the Clover report (Pest and PHPUnit both write it).
@@ -345,7 +352,9 @@ def _raise_steps(metrics, files):
         "            echo \"No floor rises: coverage is less than one point above the floors.\"",
         "            exit 0",
         "          fi",
-        "          if [ \"$(gh pr list --state open --json title --jq %s)\" != \"0\" ]; then" % gh_open,
+        "          OPEN=$(gh pr list --state open --json title --jq %s) || { echo \"::error::could not list the open PRs\"; exit 1; }" % gh_open,
+        "          case \"$OPEN\" in ''|*[!0-9]*) echo \"::error::unexpected output from gh pr list\"; exit 1;; esac",
+        "          if [ \"$OPEN\" != \"0\" ]; then",
         "            echo \"A coverage floor PR is already open; it is measured again after it merges.\"",
         "            exit 0",
         "          fi",
@@ -428,7 +437,7 @@ def write_coverage_ratchet(raw, state, staging, created):
             "{{raise_steps}}": _raise_steps(metrics, files),
         }
     else:
-        if node_test_command(raw, state) != "npm run test:coverage":
+        if node_test_command(raw, state) == "npm run test":
             return
         _, profile = builder_core.testing_profile(raw, state)
         runner = builder_core.get_state_value(state, "testing.runner") or ""
