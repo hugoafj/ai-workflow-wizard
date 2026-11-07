@@ -540,6 +540,12 @@ def eval_semantic_cond(cond, state, raw=None):
         return bool(get_state_value(state, "discovery.has_typescript", True))
     if "test:sanitization script exists" in c:
         return bool(get_state_value(state, "testing.has_sanitization", False))
+    # Compound phrases first: the plain "frontend layer is active" below matches them as a substring.
+    # The project root is the cwd, as for the composer.json conditions further down.
+    if "frontend layer is active and package-lock.json exists" in c:
+        return "frontend" in layers and os.path.exists(os.path.join(os.getcwd(), "package-lock.json"))
+    if "frontend layer is active and package-lock.json is missing" in c:
+        return "frontend" in layers and not os.path.exists(os.path.join(os.getcwd(), "package-lock.json"))
     if "frontend layer is active" in c:
         return "frontend" in layers
     # PHP quality guard (variants/quality-guard.php.yml.md): the project files are read from the cwd.

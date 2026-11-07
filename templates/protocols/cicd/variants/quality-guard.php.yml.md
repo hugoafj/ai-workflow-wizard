@@ -14,6 +14,7 @@
 #   <if composer.json requires phpstan or larastan>:    → include the static analysis step
 #   <if unit or integration layer is active>:           → include the test step
 #   <if the frontend layer is active>:                  → include the Node setup, the install, frontend tests and build
+#   <if ... and package-lock.json exists / is missing>: → setup-node with or without the npm cache
 #
 # Notes:
 #   - setup-php installs PHP and Composer on the runner; the PHP version comes from the project
@@ -24,8 +25,8 @@
 #     Redis or another service need a `services:` block added to this job by the team
 #   - the frontend steps only exist when testing.layers has `frontend`: Node setup, the install, `npm run test`
 #     and the build script when package.json has one; the install is `npm ci` with a package-lock.json and
-#     `npm install` without one, and setup-node does not cache npm (that cache needs a lock file, which a
-#     yarn or pnpm project may not have)
+#     `npm install` without one; setup-node caches npm only when the project has a package-lock.json at the
+#     moment the workflow is generated (that cache needs a lock file, which a yarn or pnpm project may not have)
 #   - failure handler posts a comment explaining which step failed
 
 name: CI Quality Guard
@@ -77,7 +78,13 @@ jobs:
       - name: Unit & integration tests
         run: {{test_command}}
 
-      <if the frontend layer is active>:
+      <if the frontend layer is active and package-lock.json exists>:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "{{node_version}}"
+          cache: npm
+
+      <if the frontend layer is active and package-lock.json is missing>:
       - uses: actions/setup-node@v4
         with:
           node-version: "{{node_version}}"
