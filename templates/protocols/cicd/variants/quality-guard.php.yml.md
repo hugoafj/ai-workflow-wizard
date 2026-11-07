@@ -8,6 +8,10 @@
 #   {{php_extensions}} → the ext-* requirements of composer.json and composer.lock (root, every locked package, platform), sorted
 #   {{test_command}} → state testing.test_command, else php artisan test (Laravel), pest or phpunit
 #   {{node_version}} and {{npm_major}} → as in quality-guard.yml.md (only used by the frontend steps)
+#   {{php_coverage_driver}} → pcov when the backend runs under a coverage floor (coverage_mode set), else none
+#   {{backend_test_steps}}  → the backend test step; with a coverage floor it runs the suite with a Clover report and
+#                             fails when the statement coverage is below COVERAGE_FLOOR (the state's floor)
+#   {{frontend_test_command}} → npm run test:coverage when the frontend config carries a floor, else npm run test
 #
 # Conditional resolution:
 #   <if the project is a Laravel app>:                  → prepare .env and APP_KEY (stack_key php-laravel)
@@ -55,7 +59,7 @@ jobs:
         with:
           php-version: "{{php_version}}"
           tools: composer:v2
-          coverage: none
+          coverage: {{php_coverage_driver}}
           <if composer requires php extensions>:
           extensions: "{{php_extensions}}"
 
@@ -81,8 +85,7 @@ jobs:
         continue-on-error: true
 
       <if unit or integration layer is active>:
-      - name: Unit & integration tests
-        run: {{test_command}}
+      {{backend_test_steps}}
 
       <if the frontend layer is active and package-lock.json exists>:
       - uses: actions/setup-node@v4
@@ -110,7 +113,7 @@ jobs:
 
       <if the frontend layer is active>:
       - name: Frontend unit tests
-        run: npm run test
+        run: {{frontend_test_command}}
 
       <if the frontend layer is active>:
       - name: Build frontend

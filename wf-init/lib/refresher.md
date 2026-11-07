@@ -1695,6 +1695,7 @@ for IDE in $IDES; do
   esac
 done
 [ "$CI" = "true" ] && EXPECTED+=(.github/workflows/quality-guard.yml)
+[ "$CI" = "true" ] && [ "$(jq -r '.testing.coverage_mode // ""' "$STAGING_STATE")" = "ratchet" ] && [ "$(jq -r '.testing.coverage_autoupdate // false' "$STAGING_STATE")" = "true" ] && EXPECTED+=(.github/workflows/coverage-ratchet.yml)
 [ "$RELEASE" = "true" ] && EXPECTED+=(.github/workflows/release-please.yml release-please-config.json .release-please-manifest.json .commitlintrc.json)
 # Unit and integration layers render the profile's unit config (vitest.config.ts, jest.config.js)
 # or nothing: angular, a generic project without Vitest, and a project that keeps its own

@@ -3,6 +3,7 @@
 # Placeholder resolution:
 #   {{node_version}} → project engines.node, or 22 by default
 #   {{npm_major}}    → user's local npm major version (e.g., 11)
+#   {{node_test_command}} → npm run test:coverage when coverage_mode is set (the CI then enforces the floor), else npm run test
 #
 # Conditional resolution:
 #   <if type-check script or tsconfig.json exists>: → include type-check step
@@ -13,6 +14,8 @@
 # Notes:
 #   - Node 22 is active LTS, satisfies >=18/>=20/>=22 of the current ecosystem
 #   - npm is pinned before npm ci to avoid lockfile desync
+#   - with a coverage mode set, the unit step runs test:coverage; the init writes that script into package.json
+#     (phase 8.1e), and a project that removed it fails this step on purpose, so a floor never passes silently
 #   - continue-on-error: true on security audit to avoid blocking on transitive deps
 #   - failure handler posts a comment explaining which step failed
 
@@ -61,7 +64,7 @@ jobs:
 
       <if unit or integration layer is active>:
       - name: Unit & integration tests
-        run: npm run test
+        run: {{node_test_command}}
 
       <if test:sanitization script exists>:
       - name: Sanitization tests

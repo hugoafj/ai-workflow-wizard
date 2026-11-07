@@ -529,8 +529,8 @@ The wizard phases:
 - **Phase 2** — Migration of previous artifacts (if any with their own content).
 - **Phase 3** — Mode: greenfield vs legacy (auto-detect + confirmation).
 - **Phase 4** — Reverse engineering (legacy only).
-- **Phase 4.6**: Testing stack setup (conditional, only if testing is enabled in Phase 0c). Detects or installs the selected testing layers (unit, integration, E2E), asks about the optional extras (coverage targets, visual regression, Page Object Model), and registers the Playwright MCP when applicable. Layer detection checks wiring, not just dependencies: a Playwright dependency without `playwright.config.ts` counts as NOT configured and the wizard offers to generate the config. The Page Object Model extra stages a minimal `e2e/pages/HomePage.ts` scaffold plus an AGENTS.md convention line.
-- **Phase 4.7** — CI/CD configuration (conditional, only if CI, CD, or release-please is enabled). Collects AI reviewer, security review, conventional commits, release-please, E2E in CI, and tag-based deploy preferences; writes no files here.
+- **Phase 4.6**: Testing stack setup (conditional, only if testing is enabled in Phase 0c). Detects or installs the selected testing layers (unit, integration, E2E), asks about the optional extras (coverage targets, visual regression, Page Object Model), and for coverage asks the mode (`full` or `ratchet`, defaulting from the Phase 3 classification), and registers the Playwright MCP when applicable. Layer detection checks wiring, not just dependencies: a Playwright dependency without `playwright.config.ts` counts as NOT configured and the wizard offers to generate the config. The Page Object Model extra stages a minimal `e2e/pages/HomePage.ts` scaffold plus an AGENTS.md convention line.
+- **Phase 4.7** — CI/CD configuration (conditional, only if CI, CD, or release-please is enabled). Collects AI reviewer, security review, conventional commits, release-please, E2E in CI, and tag-based deploy preferences; writes no files here. When release-please is enabled, it ends with a notice: an external pipeline that deploys on push to `main` should listen for `v*` tags instead, or each release deploys twice.
 - **Phase 5** — Minimum questions (4-5 depending on path).
 - **Phase 6a**: Deterministic assembly (Builder-Core): `AGENTS.md`, packaged protocols, and per-IDE satellites into `.wizard-staging/` on disk (does not promote to the project root yet). Runs the deterministic script `wf-init/lib/builder-core.py` (`python3 "$WF_DIR/lib/builder-core.py" --state .wizard-state.json --staging .wizard-staging --raw "$WF_RAW" --wf-dir "$WF_DIR"`); it hard-fails on unresolved placeholders instead of guessing. List state fields render as UTF-8 markdown bullets (`critical_constraints` → readable rule list, never escaped JSON); missing satellite templates hard-fail with the affected IDE listed instead of skipping silently. The Testing Approach section is built from the active test layers: it carries the coverage matrix, the Playwright guidance, and, when E2E is active, the `data-testid` convention.
 - **Phase 6b** — Deterministic assembly (Builder-Heavy): per-IDE commands, post-commit hook, testing configs, and CI/CD into `.wizard-staging/`. Runs the deterministic script `wf-init/lib/builder-heavy.py` with the same argument contract (B7-B9).
@@ -909,7 +909,7 @@ What you will see, in order:
 
 **Phase 4.6: Testing stack setup** (conditional, only if testing is enabled). Detects or installs the selected testing layers, and asks about the optional extras (coverage targets, visual regression, Page Object Model).
 
-**Phase 4.7 — CI/CD configuration** (conditional, only if CI, CD, or release-please is enabled). Collects AI reviewer, security review, conventional commits, release-please, and tag-based deploy preferences; writes no files here.
+**Phase 4.7 — CI/CD configuration** (conditional, only if CI, CD, or release-please is enabled). Collects AI reviewer, security review, conventional commits, release-please, and tag-based deploy preferences; writes no files here. When release-please is enabled, it ends with a notice about external pipelines that deploy on push to `main` (point them at `v*` tags).
 
 **Phase 5 — Minimum questions**. 4-5 questions depending on path. Answer short and specific. The key question is **which IDEs/CLIs you will use** — that determines the custom satellites generated.
 
@@ -1690,11 +1690,13 @@ When the project activates the E2E layer in Phase 4.6 on a UI profile (react, ne
 
 ### 9.4 Optional extras: coverage targets, visual regression, Page Object Model
 
+**Coverage targets have two modes.** `full` requires the minimum you set on every CI run. `ratchet` (the default for `legacy` projects) starts at 0% and never drops. When coverage improves, the `coverage-ratchet` workflow measures on each merge to `main` and opens a `chore(coverage)` PR that raises the floor; the floor is stored in the state (`testing.coverage_threshold`) and the config follows it. Either way, the CI enforces the floor whenever a mode is set, so it is enforced, not only measured. A project whose `package.json` has no `test:coverage` script fails the unit step on purpose, so a floor never passes silently. PHP projects (Laravel, PHP) get the same two modes on their backend tests (a Clover report, pcov), and a PHP project with a frontend gets a second floor for the frontend (`testing.frontend_coverage_threshold`). Ratchet raises each floor through a `chore(coverage)` PR: it never creates a release, and it deploys only when the CD listens to pushes to `main` (see the notice in Phase 4.7). Both modes are chosen in Phase 4.6 and changed with `/wf-settings` option 3, followed by `/wf-refresh`.
+
 All three are asked in Phase 4.6, after the layers, and **none activate without the user explicitly requesting it**. Each has a real cost that isn't justified in every project:
 
 | Extra | What it does | Real cost | When it's worth it |
 |---|---|---|---|---|
-| Coverage targets | Minimum coverage threshold; fails `npm run test -- --coverage` if not met | Nearly zero — one config block in the unit config (`vitest.config.ts` or `jest.config.js`); not offered when the project keeps its own runner | Almost always — cheap and provides an objective quality signal |
+| Coverage targets | A `full` threshold or a `ratchet` floor, enforced by `test:coverage` in CI; `ratchet` can raise the floor through a `chore(coverage)` PR | Nearly zero — a config block plus a CI step; not offered for `angular` or a generic project without a runner, and a project that keeps its own runner gets it only for PHP (the floor lives in the CI workflow) | Almost always — cheap and provides an objective quality signal |
 | Visual regression (snapshots) | Compares screenshots against a saved reference | Real and ongoing — each run is slower, and references need manual re-generation when design intentionally changes | Projects with stable UI where an accidental visual change would be costly |
 | Page Object Model | Organizes Playwright selectors into reusable classes. Activating it stages a minimal `e2e/pages/HomePage.ts` scaffold plus an AGENTS.md convention line; real page objects emerge as features add specs | None at runtime, but it's an abstraction layer | Projects with multiple E2E specs; for 2-3 flows it's over-engineering, same logic the workflow's Decision Ladder already applies |
 
@@ -1759,7 +1761,7 @@ They can be activated separately via `/wf-settings`.
 | **AI Review on PR** | An AI reads the PR diff and comments on issues | 24/7 quality review without waiting for a human |
 | **Security Review** | SAST scan by AI (pr-agent or Claude) | Catches leaked secrets, injections, etc. |
 | **Conventional Commits** | Husky + commitlint enforce `feat:`, `fix:` format... | Readable history + enables automatic changelog |
-| **release-please** | Generates release PR + changelog based on commits | Traceable releases without writing changelog manually |
+| **release-please** | Generates release PR + changelog based on commits. The workflow passes `release-please-config.json` and `.release-please-manifest.json` to the action, so the generated config and manifest are the ones that apply | Traceable releases without writing changelog manually |
 
 The **AI Review** has four possible providers (plus `None`):
 - **GGA (Gentleman Guardian Angel) — recommended.** Provider-agnostic (Claude, Gemini,

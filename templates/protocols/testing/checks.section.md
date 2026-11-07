@@ -3,7 +3,7 @@ Before declaring a task done, the agent MUST run and leave green:
 npm run lint
 npm run build
 npm run test        # if there is unit/integration
-npm run test -- --coverage  # if coverage targets are active — must meet the configured threshold
+npm run test:coverage  # if testing.coverage_threshold or testing.coverage_mode is set in .wizard-state.json — must meet the configured floor
 npm run test:e2e    # if there is e2e
 \`\`\`
 

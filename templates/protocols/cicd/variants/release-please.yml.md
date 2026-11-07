@@ -33,5 +33,8 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
 
   # {{AI_SUMMARY_JOB}}
