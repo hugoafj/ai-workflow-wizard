@@ -340,9 +340,10 @@ fi
                 echo "8.1c WARNING — npm install failed (exit $?). Check package.json and network." >&2
               fi
               # Placeholder test: Vitest exits 1 when it finds no test file, which would turn
-              # `npm run test` and the CI step red. Only when the frontend has no test yet.
+              # `npm run test` and the CI step red. Only when the frontend has no test yet, counted with the same
+              # extensions the generated Vitest config runs (js, jsx, ts, tsx): a .cjs or .mjs test does not count.
               FRONTEND_ROOT=$(jq -r '.testing.frontend_root // "resources/js"' .wizard-state.json)
-              FRONTEND_TESTS=$(find tests/js "$FRONTEND_ROOT" -name node_modules -prune -o -type f \( -name '*.test.*' -o -name '*.spec.*' \) -print 2>/dev/null | head -1)
+              FRONTEND_TESTS=$(find tests/js "$FRONTEND_ROOT" -name node_modules -prune -o -type f \( -name '*.test.js' -o -name '*.test.jsx' -o -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.js' -o -name '*.spec.jsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' \) -print 2>/dev/null | head -1)
               if [ -z "$FRONTEND_TESTS" ]; then
                 DUMMY_IMPORT=$(echo "$FRONTEND_JSON" | jq -r '.dummy_test_import // empty')
                 mkdir -p tests/js

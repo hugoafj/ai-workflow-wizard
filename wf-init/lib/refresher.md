@@ -1308,6 +1308,9 @@ if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ -n "$FRONTEND" && "$OLD_FRONTEND" !=
   [[ "$OLD_STACK" != "$STACK_KEY" ]] && echo "  - Stack: $OLD_STACK → $STACK_KEY"
   [[ "$OLD_NODE" != "$NODE_ENGINE" ]] && echo "  - Node engine: $OLD_NODE → $NODE_ENGINE"
   [[ "$OLD_NPM" != "$NPM_MAJOR" ]] && echo "  - npm major: $OLD_NPM → $NPM_MAJOR"
+  # The frontend testing profile and config never change by themselves (R2 keeps a profile that is already
+  # set): say so, so the change is not silent. Switching them is an explicit action.
+  [[ -n "$OLD_FRONTEND" && -n "$FRONTEND" && "$OLD_FRONTEND" != "$FRONTEND" ]] && echo "  - Frontend: $OLD_FRONTEND → $FRONTEND (its testing profile does not change by itself: set testing.frontend_profile and re-run /wf-refresh to switch its tests)"
   if [[ "$OLD_COMMANDS_CLEAN" != "$COMMANDS_CLEAN" ]]; then
     echo "  - Commands:"
     { diff -u \

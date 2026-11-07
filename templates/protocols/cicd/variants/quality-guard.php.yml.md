@@ -13,7 +13,7 @@
 #   <if composer.json requires laravel/pint>:           → include the code style step (changed files only)
 #   <if composer.json requires phpstan or larastan>:    → include the static analysis step
 #   <if unit or integration layer is active>:           → include the test step
-#   <if the frontend layer is active>:                  → include the Node setup, npm ci, frontend tests and build
+#   <if the frontend layer is active>:                  → include the Node setup, the install, frontend tests and build
 #
 # Notes:
 #   - setup-php installs PHP and Composer on the runner; the PHP version comes from the project
@@ -22,8 +22,10 @@
 #   - composer audit runs with continue-on-error: true so a transitive advisory does not block the PR
 #   - the test step runs the suite with the project's own command; tests that need a database,
 #     Redis or another service need a `services:` block added to this job by the team
-#   - the frontend steps only exist when testing.layers has `frontend`: Node setup, npm ci, `npm run test`
-#     and the build script when package.json has one
+#   - the frontend steps only exist when testing.layers has `frontend`: Node setup, the install, `npm run test`
+#     and the build script when package.json has one; the install is `npm ci` with a package-lock.json and
+#     `npm install` without one, and setup-node does not cache npm (that cache needs a lock file, which a
+#     yarn or pnpm project may not have)
 #   - failure handler posts a comment explaining which step failed
 
 name: CI Quality Guard
@@ -79,7 +81,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "{{node_version}}"
-          cache: npm
 
       <if the frontend layer is active>:
       - name: Pin npm version (match local lockfile)
@@ -87,7 +88,12 @@ jobs:
 
       <if the frontend layer is active>:
       - name: Install frontend dependencies
-        run: npm ci
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
 
       <if the frontend layer is active>:
       - name: Frontend unit tests
