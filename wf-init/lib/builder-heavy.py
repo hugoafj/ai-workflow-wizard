@@ -207,6 +207,12 @@ def coverage_mode(state):
     return mode
 
 
+def explicit_coverage_mode(state):
+    """The mode the user chose in phase 4.6 or wf-settings. Only this one turns on enforcement in the CI: a state
+    written before the mode existed keeps the CI it always had, and only its unit config is regenerated."""
+    return builder_core.get_state_value(state, "testing.coverage_mode")
+
+
 def frontend_threshold_key(state):
     """Where the frontend floor lives. States written before testing.frontend_coverage_threshold
     existed share the backend floor, as they always did."""
@@ -247,7 +253,7 @@ def node_test_command(raw, state):
     """The Node quality guard runs the coverage script only when the wizard writes a unit config with a
     coverage block (the CI then enforces the floor); otherwise plain npm run test. The condition mirrors
     write_testing_configs. A coverage block without a test:coverage script fails the step, never passes it."""
-    if coverage_mode(state) is None:
+    if explicit_coverage_mode(state) is None:
         return "npm run test"
     layers = builder_core.normalize_layers(state)
     if not ("unit" in layers or "integration" in layers):
@@ -278,14 +284,14 @@ def frontend_unit_spec(raw, state):
 
 def frontend_coverage_active(raw, state):
     """True when the frontend config carries a coverage block: a mode is set and the frontend floor is not null."""
-    return frontend_unit_spec(raw, state) is not None and coverage_mode(state) is not None \
+    return frontend_unit_spec(raw, state) is not None and explicit_coverage_mode(state) is not None \
         and builder_core.get_state_value(state, frontend_threshold_key(state), "80") is not None
 
 
 def backend_coverage_active(state):
     """True when a PHP project's backend tests run under a coverage floor in the quality guard."""
     layers = builder_core.normalize_layers(state)
-    return coverage_mode(state) is not None and ("unit" in layers or "integration" in layers) \
+    return explicit_coverage_mode(state) is not None and ("unit" in layers or "integration" in layers) \
         and builder_core.get_state_value(state, "testing.coverage_threshold", "80") is not None
 
 
@@ -374,7 +380,7 @@ def _raise_steps(metrics, files):
 def write_coverage_ratchet(raw, state, staging, created):
     """The coverage-ratchet workflow: in ratchet mode with the job on, measure coverage on each merge to main
     and raise the floors through a chore PR. Node and PHP projects get their own template."""
-    if not builder_core.bool_feature(state, "ci") or coverage_mode(state) != "ratchet":
+    if not builder_core.bool_feature(state, "ci") or explicit_coverage_mode(state) != "ratchet":
         return
     if not bool(builder_core.get_state_value(state, "testing.coverage_autoupdate", False)):
         return
