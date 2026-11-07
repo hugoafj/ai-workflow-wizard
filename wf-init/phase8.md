@@ -224,7 +224,11 @@ HAS_TESTING=$(jq -r '.testing.layers[]?' .wizard-state.json 2>/dev/null | wc -l)
 HAS_CONVENTIONAL=$(jq -r '.ci.conventional_commits // false' .wizard-state.json)
 # Testing profile (templates/protocols/testing/profiles.md). A null profile is a legacy
 # state and means "react", exactly what every Node project got before profiles existed.
-PROFILE=$(jq -r '.testing.profile // "react"' .wizard-state.json)
+PROFILE=$(jq -r '.testing.profile // empty' .wizard-state.json)
+if [ -z "$PROFILE" ]; then
+  # Legacy state without a profile: a PHP project must never fall to the Node default.
+  case "$STACK_KEY" in php-laravel) PROFILE=laravel ;; php-*) PROFILE=php ;; *) PROFILE=react ;; esac
+fi
 RUNNER_EXISTING=$(jq -r '.testing.runner_existing // false' .wizard-state.json)
 PROFILE_JSON=""
 if [ "$HAS_TESTING" -gt 0 ]; then
@@ -292,14 +296,64 @@ fi
           fi
         fi
         ;;
-      php-*|laravel|symfony)
-        # PHP stacks: composer require for phpunit
-        if [ "$HAS_TESTING" -gt 0 ]; then
-          echo "8.1c — installing phpunit..."
-          if composer require --dev phpunit/phpunit; then
-            echo "8.1c OK — phpunit installed"
+      php-*)
+        # PHP stacks (profile ecosystem "php"): composer require --dev, from the profile and only
+        # when the wizard owns the runner. A Laravel app normally ships PHPUnit or Pest with its
+        # phpunit.xml, so this is a no-op there and composer.json is left untouched.
+        if [ "$HAS_TESTING" -gt 0 ] \
+           && jq -e '.testing.layers[] | select(. == "unit" or . == "integration")' .wizard-state.json >/dev/null 2>&1; then
+          if [ "$RUNNER_EXISTING" = "true" ]; then
+            echo "8.1c — the project keeps its own runner ($(jq -r '.testing.runner // "existing"' .wizard-state.json)): nothing to install for unit/integration."
+          elif [ -z "$PROFILE_JSON" ]; then
+            echo "8.1c — skipped the unit install: the testing profile data is unavailable."
           else
-            echo "8.1c WARNING — composer require failed (exit $?)." >&2
+            PHP_PKGS=$(echo "$PROFILE_JSON" | jq -r '.packages | join(" ")')
+            if [ -z "$PHP_PKGS" ]; then
+              echo "8.1c — profile $PROFILE installs no unit packages."
+            else
+              echo "8.1c — installing $PROFILE unit packages: $PHP_PKGS"
+              # xargs does the splitting (an unquoted variable stays ONE argument in zsh).
+              if echo "$PHP_PKGS" | tr ' ' '\n' | xargs composer require --dev; then
+                echo "8.1c OK — unit packages installed"
+              else
+                echo "8.1c WARNING — composer require failed (exit $?)." >&2
+              fi
+            fi
+          fi
+        fi
+        # Frontend unit layer: the JS profile of the project's UI framework, installed with npm.
+        if [ "$HAS_TESTING" -gt 0 ] \
+           && jq -e '.testing.layers[] | select(. == "frontend")' .wizard-state.json >/dev/null 2>&1; then
+          if [ "$(jq -r '.testing.frontend_runner_existing // false' .wizard-state.json)" = "true" ]; then
+            echo "8.1c — the frontend keeps its own runner ($(jq -r '.testing.frontend_runner // "existing"' .wizard-state.json)): nothing to install for the frontend."
+          else
+            FRONTEND_PROFILE=$(jq -r '.testing.frontend_profile // "react"' .wizard-state.json)
+            FRONTEND_JSON=$(wf_testing_profile "$FRONTEND_PROFILE") || FRONTEND_JSON=""
+            if [ -z "$FRONTEND_JSON" ]; then
+              echo "8.1c — skipped the frontend install: the testing profile data is unavailable."
+            else
+              FRONTEND_PKGS=$(echo "$FRONTEND_JSON" | jq -r '(.packages + (.frontend_extra_packages // [])) | unique | join(" ")')
+              echo "8.1c — installing $FRONTEND_PROFILE frontend packages: $FRONTEND_PKGS"
+              if echo "$FRONTEND_PKGS" | tr ' ' '\n' | xargs npm install --save-dev; then
+                echo "8.1c OK — frontend packages installed"
+              else
+                echo "8.1c WARNING — npm install failed (exit $?). Check package.json and network." >&2
+              fi
+              # Placeholder test: Vitest exits 1 when it finds no test file, which would turn
+              # `npm run test` and the CI step red. Only when the frontend has no test yet, counted with the same
+              # extensions the generated Vitest config runs (js, jsx, ts, tsx): a .cjs or .mjs test does not count.
+              FRONTEND_ROOT=$(jq -r '.testing.frontend_root // "resources/js"' .wizard-state.json)
+              FRONTEND_TESTS=$(find tests/js "$FRONTEND_ROOT" -name node_modules -prune -o -type f \( -name '*.test.js' -o -name '*.test.jsx' -o -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.js' -o -name '*.spec.jsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' \) -print 2>/dev/null | head -1)
+              if [ -z "$FRONTEND_TESTS" ]; then
+                DUMMY_IMPORT=$(echo "$FRONTEND_JSON" | jq -r '.dummy_test_import // empty')
+                mkdir -p tests/js
+                {
+                  if [ -n "$DUMMY_IMPORT" ]; then printf '%s\n\n' "$DUMMY_IMPORT"; fi
+                  printf '%s\n' "describe('Example test', () => {" "  it('should pass', () => {" "    expect(true).toBe(true)" "  })" "})"
+                } > tests/js/example.test.ts
+                git add tests/js/example.test.ts
+              fi
+            fi
           fi
         fi
         ;;
@@ -352,7 +406,13 @@ WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
 source "$WF_DIR/lib/state-helpers.sh"
 HAS_TESTING=$(jq -r '.testing.layers[]?' .wizard-state.json 2>/dev/null | wc -l)
 if [ "$HAS_TESTING" -gt 0 ]; then
-  PROFILE=$(jq -r '.testing.profile // "react"' .wizard-state.json)
+  PROFILE=$(jq -r '.testing.profile // empty' .wizard-state.json)
+  if [ -z "$PROFILE" ]; then
+    # Legacy state without a profile: a PHP project must never get Node's npm scripts.
+    case "$(jq -r '.discovery.stack.stack_key // .discovery.stack_key // ""' .wizard-state.json)" in
+      php-laravel) PROFILE=laravel ;; php-*) PROFILE=php ;; *) PROFILE=react ;;
+    esac
+  fi
   RUNNER_EXISTING=$(jq -r '.testing.runner_existing // false' .wizard-state.json)
   # Never abort here (files are already promoted): without the profile the unit scripts are skipped.
   PROFILE_JSON=$(wf_testing_profile "$PROFILE") || PROFILE_JSON=""
@@ -363,6 +423,17 @@ if [ "$HAS_TESTING" -gt 0 ]; then
     echo "$PROFILE_JSON" | jq -r '.scripts | to_entries[] | "scripts.\(.key)=\(.value)"' | while IFS= read -r kv; do
       npm pkg set "$kv" 2>/dev/null || true
     done
+  fi
+  # frontend unit scripts (the frontend layer of a PHP project): the JS profile's own, never over a
+  # frontend that keeps its runner
+  if jq -e '.testing.layers[] | select(. == "frontend")' .wizard-state.json >/dev/null 2>&1 \
+     && [ "$(jq -r '.testing.frontend_runner_existing // false' .wizard-state.json)" != "true" ]; then
+    FRONTEND_JSON=$(wf_testing_profile "$(jq -r '.testing.frontend_profile // "react"' .wizard-state.json)") || FRONTEND_JSON=""
+    if [ -n "$FRONTEND_JSON" ]; then
+      echo "$FRONTEND_JSON" | jq -r '.scripts | to_entries[] | "scripts.\(.key)=\(.value)"' | while IFS= read -r kv; do
+        npm pkg set "$kv" 2>/dev/null || true
+      done
+    fi
   fi
   # e2e scripts
   if jq -e '.testing.layers[] | select(. == "e2e")' .wizard-state.json >/dev/null 2>&1; then
@@ -629,6 +700,15 @@ Next steps:
 8. Share it with your team: push the commit. The wizard state and manifest are versioned,
    so nobody else needs to run /wf-init. A teammate who clones the repo runs /wf-onboard
    once to set up their machine (global commands, gentle-ai, MCPs, dependencies).
+```
+
+Then run this block and show its output after the box. It prints nothing when the project folder is the
+repository root; otherwise it is a notice for you (the agent) to relay and act on:
+
+```bash
+WF_DIR="${WF_DIR:-/tmp/wf-init-phases}"
+source "$WF_DIR/lib/state-helpers.sh"
+wf_git_prefix_notice . || true
 ```
 
 <if state.cd.missing_secrets is non-empty>:

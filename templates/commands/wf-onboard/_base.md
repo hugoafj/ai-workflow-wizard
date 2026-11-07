@@ -89,6 +89,10 @@ if [ -f package.json ]; then
   command -v node >/dev/null 2>&1 && echo "✓ node $(node --version)" || echo "✗ node missing (required by this project)"
   command -v npm >/dev/null 2>&1 && echo "✓ npm $(npm --version)" || echo "✗ npm missing (required by this project)"
 fi
+if [ -f composer.json ]; then
+  command -v php >/dev/null 2>&1 && echo "✓ php $(php -r 'echo PHP_VERSION;')" || echo "✗ php missing (required by this project)"
+  command -v composer >/dev/null 2>&1 && echo "✓ composer $(composer --version 2>/dev/null | head -n 1)" || echo "✗ composer missing (required by this project)"
+fi
 ```
 
 If a required tool is missing, tell the developer how to install it (for example
@@ -234,13 +238,22 @@ if [ -f package.json ]; then
   else echo "→ npm install   (no lockfile: this may create one; do not commit it)"
   fi
 fi
+if [ -f composer.json ]; then
+  if [ -f composer.lock ]; then echo "→ composer install   (uses composer.lock, which stays unchanged)"
+  else echo "→ composer install   (no lockfile: this may create composer.lock; do not commit it)"
+  fi
+fi
 ```
 
 Run the matching command. This also activates Husky: its `prepare` script points
 `core.hooksPath` to the versioned `.husky/` hooks (commit-msg validation, drift detector).
 
-For non-Node stacks, run the install command listed under `## Commands` in AGENTS.md
-(for example `composer install` or `pip install -r requirements.txt`). It is not automated.
+A PHP project (`composer.json`) uses `composer install` the same way; a Laravel app with a frontend
+runs both installs. Never create or edit `.env` here: it holds secrets, so tell the developer to copy
+`.env.example` and run `php artisan key:generate` themselves.
+
+For other stacks, run the install command listed under `## Commands` in AGENTS.md
+(for example `pip install -r requirements.txt`). It is not automated.
 
 ### Git hooks
 
@@ -389,7 +402,7 @@ MCP Status:
 ## PHASE 4 — Final verification
 
 Show the project's real commands. They come from the versioned state (detected by `/wf-init`
-from `package.json`), so nothing here is hardcoded:
+from `package.json` or, for a PHP project, `composer.json`), so nothing here is hardcoded:
 
 ```bash
 jq -r '.discovery.commands // empty' .wizard-state.json 2>/dev/null \

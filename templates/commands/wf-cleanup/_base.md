@@ -219,6 +219,12 @@ for f in vitest.config.ts jest.config.js playwright.config.ts; do
     echo "  🗑 $f (wizard — review before deleting: may contain your own settings)"
   fi
 done
+# Support files of the frontend layer of a PHP project (the Vitest setup file and the placeholder test)
+for f in tests/js/setup.ts tests/js/example.test.ts; do
+  if [ -f "$f" ]; then
+    echo "  🗑 $f (wizard — review before deleting: it may now hold your own tests)"
+  fi
+done
 
 # 5. Other wizard artifacts
 echo ""
@@ -400,7 +406,9 @@ entry. If the file only contained that entry, delete the file.
 ### Test configs
 
 For each test config detected, remove the wizard-injected blocks. If the user
-confirmed deleting the whole file, delete it.
+confirmed deleting the whole file, delete it. The two support files of the frontend
+layer (`tests/js/setup.ts`, `tests/js/example.test.ts`) hold no injected blocks: delete
+them only when the user confirmed it, because the example test may have grown real tests.
 
 ### Other artifacts
 

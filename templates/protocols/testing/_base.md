@@ -28,6 +28,8 @@ generated for the unit layer.
 | `node-api` | Express, Fastify, Hono, Koa | Vitest (node environment) + supertest |
 | `nest` | NestJS | Jest + supertest |
 | `angular` | Angular | The project's native runner (no config generated) |
+| `laravel` | Laravel | PHPUnit (Pest also accepted), run with `php artisan test`; installed with Composer, no config generated |
+| `php` | Any other PHP project | PHPUnit, run with `vendor/bin/phpunit`; installed with Composer, no config generated |
 | `generic` | Anything else | Chosen in phase 46 (Vitest in node environment, or none) |
 
 ## The three layers (user selection → state.testing.layers)
@@ -38,6 +40,12 @@ generated for the unit layer.
 2. **Integration** — same runner as unit. The convention comes from the profile
    (render tests for UI stacks, supertest for API stacks). Requires layer 1.
 3. **E2E** — Playwright (Chromium by default). Generates `playwright.config.ts`, `e2e/`.
+4. **Frontend** (a PHP project whose `discovery.stack.frontend` is not `none`) — the unit tests of its UI with the
+   JS profile of that framework (React: Vitest + Testing Library; Vue: Vitest + Vue Test Utils). Generates a
+   `vitest.config.ts` that only runs tests under the frontend folder and `tests/js/` and, for React, treats the
+   `.js` files there as JSX; `tests/js/setup.ts`; an example test when the frontend has none. Independent of
+   layer 1: the PHP runner being kept never keeps the frontend's, and the other way round. Recorded as
+   `frontend` in `state.testing.layers`.
    Scripts: `test:e2e`, `test:e2e:ui`, `test:e2e:report`. Activates the Playwright MCP.
    API profiles (`"e2e": "off"` in `profiles.md`) do not offer it in phase 46.
 

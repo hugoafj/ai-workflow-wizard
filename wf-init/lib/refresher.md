@@ -1033,22 +1033,31 @@ echo "ℹ Re-discovering project..."
 
 STACK_KEY="unknown"
 FRAMEWORK=""
-if [[ -f package.json ]]; then
-  # Shared detection (state-helpers.sh): first dependency match wins, "generic"
-  # when nothing matches. It matches package NAMES, never version values, so a
-  # dependency like "next": "^14.0.0" cannot produce a bogus "node-^14.0.0" key.
+if command -v jq >/dev/null 2>&1 && declare -F wf_detect_stack >/dev/null 2>&1; then
+  # Shared detection (state-helpers.sh), the same one phase 1 uses. A Laravel composer.json
+  # wins over package.json (a Laravel app ships a package.json for its assets); otherwise the
+  # first dependency match wins and "generic" means nothing matched. It matches package NAMES,
+  # never version values, so "next": "^14.0.0" cannot produce a bogus "node-^14.0.0" key.
+  read -r STACK_KEY FRAMEWORK < <(wf_detect_stack . 2>/dev/null || echo unknown) || true
+  if [[ "$STACK_KEY" == "unknown" ]]; then FRAMEWORK=""; fi
+elif [[ -f package.json ]]; then
+  # The helpers (or jq) are unavailable: keep the manifest-only detection.
+  STACK_KEY="node-generic"
   FRAMEWORK="generic"
-  if command -v jq >/dev/null 2>&1 && declare -F wf_detect_framework >/dev/null 2>&1; then
-    FRAMEWORK=$(wf_detect_framework package.json 2>/dev/null || true)
-    FRAMEWORK="${FRAMEWORK:-generic}"
-  fi
-  STACK_KEY="node-${FRAMEWORK}"
 elif [[ -f composer.json ]]; then
-  STACK_KEY="php-laravel"
-  FRAMEWORK="laravel"
+  STACK_KEY="php-generic"
+  FRAMEWORK="generic"
 elif [[ -f pyproject.toml ]]; then
   STACK_KEY="python-django"
   FRAMEWORK="django"
+fi
+
+# The frontend of a PHP project (react | next | vue | nuxt | angular | none), from package.json
+# dependencies and, when react and vue are both there, from which one the sources import
+# (state-helpers.sh, the same helper phase 1 uses). Empty for any other stack.
+FRONTEND=""
+if [[ "$STACK_KEY" == php-* ]] && command -v jq >/dev/null 2>&1 && declare -F wf_detect_frontend >/dev/null 2>&1; then
+  FRONTEND=$(wf_detect_frontend . 2>/dev/null || true)
 fi
 
 NODE_ENGINE=""
@@ -1064,6 +1073,7 @@ fi
 GIT_COMMITS=$(git log --oneline 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")
 
 OLD_STACK=$(jq -r '.discovery.stack.stack_key // .discovery.stack_key // ""' "$WF_STATE")
+OLD_FRONTEND=$(jq -r '.discovery.stack.frontend // ""' "$WF_STATE")
 OLD_NODE=$(jq -r '.discovery.node_engine // ""' "$WF_STATE")
 OLD_NPM=$(jq -r '.discovery.npm_major // ""' "$WF_STATE")
 OLD_COMMANDS=$(jq -r '.discovery.commands // ""' "$WF_STATE")
@@ -1076,6 +1086,15 @@ COMMANDS=""
 if [[ -f package.json ]] && command -v jq >/dev/null 2>&1; then
   COMMANDS=$(jq -r '[.scripts | keys[] | "npm run " + .] | join(", ")' package.json 2>/dev/null || true)
 fi
+# A PHP project (php-laravel, php-generic): Composer scripts and tools, then the npm scripts of its
+# frontend, from the shared helper (state-helpers.sh), the same one phase 1 discovery uses.
+PHP_COMMANDS=""
+if [[ "$STACK_KEY" == php-* ]] && command -v jq >/dev/null 2>&1 && declare -F wf_detect_php_commands >/dev/null 2>&1; then
+  PHP_COMMANDS=$(wf_detect_php_commands . 2>/dev/null || true)
+fi
+if [[ -n "$PHP_COMMANDS" ]]; then
+  COMMANDS=$(printf '%s\n' "$PHP_COMMANDS" | paste -sd, - | sed 's/,/, /g')
+fi
 if [[ -z "$COMMANDS" ]]; then
   COMMANDS="$OLD_COMMANDS"
 fi
@@ -1083,7 +1102,7 @@ fi
 # FU3a: Parse AGENTS.md Commands section into name->description map and emit merged bullets.
 # The builder renders discovery.commands verbatim, so we write the bulleted list to state.
 # This runs unconditionally when package.json exists and we have script names.
-if [[ -f package.json ]] && command -v jq >/dev/null 2>&1; then
+if [[ -f package.json ]] && [[ -z "$PHP_COMMANDS" ]] && command -v jq >/dev/null 2>&1; then
   # Extract fresh script names from package.json (without "npm run " prefix for matching)
   SCRIPT_NAMES=$(jq -r '.scripts | keys[]' package.json 2>/dev/null || true)
   
@@ -1156,6 +1175,30 @@ if [[ -f package.json ]] && command -v jq >/dev/null 2>&1; then
       echo "⚠ No command descriptions matched the current AGENTS.md Commands section — re-run /wf-init phase1 if this section should be annotated"
     fi
   fi
+fi
+
+# FU3a for PHP: the commands are whole command lines (`composer run test`, `vendor/bin/pint --dirty --test`),
+# not npm script names, so the descriptions are carried over line by line. A line of the current
+# AGENTS.md Commands section keeps its description when it starts with the same command, with or
+# without backticks (the Builder writes it plain, this block writes it backticked).
+if [[ -n "$PHP_COMMANDS" ]]; then
+  OLD_COMMAND_LINES=""
+  if [[ -f AGENTS.md ]]; then OLD_COMMAND_LINES=$(_wf_section "Commands" 2>/dev/null || true); fi
+  MERGED_COMMANDS=""
+  while IFS= read -r c; do
+    [[ -z "$c" ]] && continue
+    out="- \`$c\`"
+    while IFS= read -r old; do
+      old="${old//\`/}"
+      if [[ "$old" == "- $c — "* ]]; then out="- \`$c\` — ${old#"- $c — "}"
+      elif [[ "$old" == "- $c - "* ]]; then out="- \`$c\` — ${old#"- $c - "}"; fi
+    done <<< "$OLD_COMMAND_LINES"
+    MERGED_COMMANDS+="$out"$'\n'
+  done <<< "$PHP_COMMANDS"
+  MERGED_COMMANDS="${MERGED_COMMANDS%$'\n'}"
+  COMMANDS="$MERGED_COMMANDS"
+  STAGING_DIR=$(jq -r '.build_plan.staging_dir // ".wizard-staging"' "$WF_STATE")
+  WF_STATE="$STAGING_DIR/wizard-state.json" _apply_jq_filter --arg commands "$MERGED_COMMANDS" '.discovery.commands = $commands'
 fi
 
 # FU3c: Regenerate Project Structure from live tree and merge comments from AGENTS.md.
@@ -1260,11 +1303,25 @@ _wf_norm_commands() {
 OLD_COMMANDS_CLEAN=$(_wf_norm_commands "$OLD_COMMANDS")
 COMMANDS_CLEAN=$(_wf_norm_commands "$COMMANDS")
 
-if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || [[ "$OLD_NPM" != "$NPM_MAJOR" ]] || [[ "$OLD_COMMANDS_CLEAN" != "$COMMANDS_CLEAN" ]]; then
+# What changed about the frontend of a PHP project, decided ONCE and used both to trigger the drift report
+# and to print it, so the report is never empty. A first detection of "none" is not news (nothing to
+# configure); a first detection of a UI framework is; a change keeps its profile (R2 never switches a
+# profile that is already set), so the report says how to switch it.
+FRONTEND_CHANGE=""
+if [[ -n "$FRONTEND" && "$OLD_FRONTEND" != "$FRONTEND" ]]; then
+  if [[ -n "$OLD_FRONTEND" ]]; then
+    FRONTEND_CHANGE="$OLD_FRONTEND → $FRONTEND (its testing profile does not change by itself: set testing.frontend_profile and re-run /wf-refresh to switch its tests)"
+  elif [[ "$FRONTEND" != "none" ]]; then
+    FRONTEND_CHANGE="not recorded → $FRONTEND (newly detected; this refresh does not set up its tests)"
+  fi
+fi
+
+if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ -n "$FRONTEND_CHANGE" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || [[ "$OLD_NPM" != "$NPM_MAJOR" ]] || [[ "$OLD_COMMANDS_CLEAN" != "$COMMANDS_CLEAN" ]]; then
   echo "⚠ Project content drift detected:"
   [[ "$OLD_STACK" != "$STACK_KEY" ]] && echo "  - Stack: $OLD_STACK → $STACK_KEY"
   [[ "$OLD_NODE" != "$NODE_ENGINE" ]] && echo "  - Node engine: $OLD_NODE → $NODE_ENGINE"
   [[ "$OLD_NPM" != "$NPM_MAJOR" ]] && echo "  - npm major: $OLD_NPM → $NPM_MAJOR"
+  [[ -n "$FRONTEND_CHANGE" ]] && echo "  - Frontend: $FRONTEND_CHANGE"
   if [[ "$OLD_COMMANDS_CLEAN" != "$COMMANDS_CLEAN" ]]; then
     echo "  - Commands:"
     { diff -u \
@@ -1284,6 +1341,9 @@ if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || 
     if [[ -n "$FRAMEWORK" ]]; then
       JQ_FILTER="$JQ_FILTER | .discovery.stack.framework = \$framework"
     fi
+    if [[ -n "$FRONTEND" ]]; then
+      JQ_FILTER="$JQ_FILTER | .discovery.stack.frontend = \$frontend"
+    fi
     if [[ -n "$NODE_ENGINE" ]]; then
       JQ_FILTER="$JQ_FILTER | .discovery.node_engine = \$node_engine"
     fi
@@ -1293,6 +1353,7 @@ if [[ "$OLD_STACK" != "$STACK_KEY" ]] || [[ "$OLD_NODE" != "$NODE_ENGINE" ]] || 
     WF_STATE="$STAGING_DIR/wizard-state.json" _apply_jq_filter \
       --arg stack_key "$STACK_KEY" \
       --arg framework "$FRAMEWORK" \
+      --arg frontend "$FRONTEND" \
       --arg node_engine "$NODE_ENGINE" \
       --arg npm_major "$NPM_MAJOR" \
       --argjson git_commits "$GIT_COMMITS" \
@@ -1430,7 +1491,9 @@ WF_STATE="$STAGING_STATE" _apply_jq_filter '
 if declare -F wf_profile_for_framework >/dev/null 2>&1; then
   _SK=$(jq -r '.discovery.stack.stack_key // .discovery.stack_key // ""' "$WF_STATE" 2>/dev/null || true)
   [[ -n "$_SK" ]] || _SK=$(jq -r '.discovery.stack.stack_key // ""' "$STAGING_STATE")
-  _PROFILE=$(wf_profile_for_framework "${_SK#*-}")
+  # Second argument: the ecosystem (node | php), because "generic" is a framework token of both
+  # and a PHP project must never get the Node generic profile.
+  _PROFILE=$(wf_profile_for_framework "${_SK#*-}" "${_SK%%-*}")
   WF_STATE="$STAGING_STATE" _apply_jq_filter --arg profile "$_PROFILE" '
     .testing //= {} |
     .testing.profile //= $profile |
@@ -1648,6 +1711,16 @@ if printf '%s\n' "$LAYERS" | grep -qxE 'unit|integration'; then
     fi
   fi
   [ -n "$_UNIT_CFG" ] && EXPECTED+=("$_UNIT_CFG")
+fi
+# The frontend layer of a PHP project renders the config of its JS profile (vitest.config.ts), unless
+# the frontend keeps its own runner (state.testing.frontend_runner_existing).
+if printf '%s\n' "$LAYERS" | grep -qxE 'frontend'; then
+  if [ "$(jq -r '.testing.frontend_runner_existing // false' "$STAGING_STATE")" != "true" ] \
+     && declare -F wf_unit_config_target >/dev/null 2>&1; then
+    _FE_CFG=$(wf_unit_config_target "$(jq -r '.testing.frontend_profile // "react"' "$STAGING_STATE")" "" frontend) \
+      || { echo "✗ FAIL: cannot read templates/protocols/testing/profiles.md to resolve the frontend unit config"; exit 1; }
+    [ -n "$_FE_CFG" ] && EXPECTED+=("$_FE_CFG")
+  fi
 fi
 if printf '%s\n' "$LAYERS" | grep -qxE 'e2e'; then EXPECTED+=(playwright.config.ts); fi
 for f in "${EXPECTED[@]}"; do
@@ -3008,6 +3081,9 @@ if [[ "$APPLY_ONLY" == "true" ]]; then
 else
   echo "ℹ Next: git push (when ready)"
 fi
+# A project that lives in a subfolder of its git repository needs manual CI and hook adjustments: say so
+# (the notice is addressed to the agent and prints nothing when the project is the repository root).
+if declare -F wf_git_prefix_notice >/dev/null 2>&1; then wf_git_prefix_notice . || true; fi
 ```
 
 ---

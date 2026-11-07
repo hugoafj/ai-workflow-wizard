@@ -95,7 +95,7 @@ number of the option they want to adjust.
      when `testing.layers` has no `e2e` (API profiles hide that layer by default)
    - 3 (coverage targets), additionally: `n/a (the project keeps its own runner config)` when
      `testing.runner_existing` is true, or `n/a (no wizard-managed unit config)` when the profile
-     generates none (angular, generic without Vitest). The wizard never edits a runner config it
+     generates none (angular, laravel, php, generic without Vitest). The wizard never edits a runner config it
      did not generate
    - 7, 8, 9, 10 (CI sub-options): `n/a (CI is OFF)` when option 6 is OFF
    - 11 (release-please standalone): `n/a (included in CI)` when option 6 is ON
@@ -263,7 +263,7 @@ Do you want to keep or change?
 
 **If enabling**: ask for the threshold (same as in `wf-init.md` Phase 4.6) and
 add the coverage threshold block to the unit config the wizard generated: `coverage.thresholds`
-in `vitest.config.ts` (react, next, vue, node-api, generic with Vitest) or `coverageThreshold` in
+in `vitest.config.ts` (react, next, vue, node-api, generic with Vitest, or the frontend layer of a PHP project) or `coverageThreshold` in
 `jest.config.js` (nest), the same mapping as `templates/protocols/testing/profiles.md`
 (`testing.profile`). Write the threshold only to that file and to `.wizard-state.json`
 (`testing.coverage_threshold`, see the state update below).
