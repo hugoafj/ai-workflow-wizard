@@ -27,7 +27,26 @@ permissions:
   pull-requests: write
 
 jobs:
+  # Runs first: with the ratchet off (the user disabled it, or auto-raise is off) the workflow stops here, so a
+  # leftover file never re-arms a floor the user turned off.
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      on: ${{ steps.check.outputs.on }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: check
+        run: |
+          if jq -e '.testing.coverage_mode == "ratchet" and .testing.coverage_autoupdate == true' .wizard-state.json >/dev/null; then
+            echo "on=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "on=false" >> "$GITHUB_OUTPUT"
+          fi
+
   ratchet:
+    needs: gate
+    if: needs.gate.outputs.on == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

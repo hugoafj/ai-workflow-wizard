@@ -56,7 +56,7 @@ jq -r '.features.testing // false' .wizard-state.json 2>/dev/null
 jq -r '.features.ci // false' .wizard-state.json 2>/dev/null
 jq -r '.features.release_please // false' .wizard-state.json 2>/dev/null
 jq -r '.testing.coverage_threshold // null' .wizard-state.json 2>/dev/null
-jq -r '.testing.coverage_mode // "none"' .wizard-state.json 2>/dev/null
+jq -r 'if .testing.coverage_mode then .testing.coverage_mode elif .testing.coverage_threshold != null then "legacy (floor in the config, not enforced in CI: choose full or ratchet to enforce)" else "none" end' .wizard-state.json 2>/dev/null
 jq -r '.testing.coverage_autoupdate // false' .wizard-state.json 2>/dev/null
 jq -r '.testing.frontend_coverage_threshold // null' .wizard-state.json 2>/dev/null
 jq -r '.testing.visual_regression // false' .wizard-state.json 2>/dev/null
@@ -258,14 +258,16 @@ jq '.features.testing = <value>' .wizard-state.json > .wizard-state.json.tmp && 
 ### 3: Coverage targets
 
 ```
-Coverage targets: <OFF / full (threshold: N%) / ratchet (floor: N%, auto-raise: ON|OFF)>
+Coverage targets: <OFF / full (threshold: N%) / ratchet (floor: N%, auto-raise: ON|OFF) / legacy (floor N% in the config, not enforced in CI)>
 
 Do you want to keep or change?
   [keep / full <N>% / ratchet <N>% / ratchet <N>% auto-raise off / disable]
 ```
 
 **Frontend floor**: if the frontend layer is active (a PHP project with a frontend), ask for the frontend
-floor the same way and store it as `testing.frontend_coverage_threshold`.
+floor the same way and store it as `testing.frontend_coverage_threshold`. Unless the frontend keeps its own runner
+(`testing.frontend_runner_existing` is true): then do not ask, store `null`, and say the frontend floor does not
+apply because the wizard never edits that runner's config.
 
 **If choosing `full <N>%`**: `coverage_mode` = `full`, `coverage_threshold` = N, `coverage_autoupdate` = `false`.
 

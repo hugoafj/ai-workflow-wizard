@@ -235,7 +235,9 @@ Coverage mode for this project? (default: <ratchet | full>, from its classificat
 
 **If they chose `full`**, ask for the threshold (stored in `state.testing.coverage_threshold`;
 `coverage_autoupdate` is `false`). If the project also has the Frontend unit tests layer (PHP with a
-frontend), ask the same question for the frontend and store it in `state.testing.frontend_coverage_threshold`:
+frontend) and the frontend does not keep its own runner (`testing.frontend_runner_existing` is false), ask the same
+question for the frontend and store it in `state.testing.frontend_coverage_threshold`; otherwise store `null` (the
+wizard never edits a runner config it does not own, so there is no frontend floor to enforce):
 
 ```
 What minimum coverage percentage do you want to require? (recommended: 70-80%
@@ -246,8 +248,8 @@ utility libs that warrant it)
 ```
 
 **If they chose `ratchet`**, do not ask for a threshold. Store `coverage_threshold` as `0`,
-`coverage_autoupdate` as `true`, and `frontend_coverage_threshold` as `0` when the frontend layer is active
-(otherwise `null`). Tell the user: *"The coverage floor starts at 0% and rises
+`coverage_autoupdate` as `true`, and `frontend_coverage_threshold` as `0` when the frontend layer is active and its
+runner is not existing (otherwise `null`). Tell the user: *"The coverage floor starts at 0% and rises
 automatically as coverage improves."*
 
 **If they activated extra 2 (visual regression)**, save `testing.visual_regression: true` in
@@ -469,7 +471,7 @@ fi
 > - `wf_state_set '.testing.test_command' '"<profile.test_command>"'`, only for a profile that has one (`laravel`, `php`); the Node profiles keep `null` because their command is the `test` script
 > - coverage extra activated: `wf_state_set '.testing.coverage_mode' '"<full|ratchet>"'`; `wf_state_set '.testing.coverage_threshold' '<number>'` (the number for `full`, `0` for `ratchet`); `wf_state_set '.testing.coverage_autoupdate' '<true for ratchet, false for full>'`
 > - coverage extra not activated: `wf_state_set '.testing.coverage_mode' 'null'`; `wf_state_set '.testing.coverage_threshold' 'null'`; `wf_state_set '.testing.coverage_autoupdate' 'false'`; `wf_state_set '.testing.frontend_coverage_threshold' 'null'`
-> - frontend layer active with the extra: `wf_state_set '.testing.frontend_coverage_threshold' '<number>'` (the number for `full`, `0` for `ratchet`), else `null`
+> - frontend layer active with the extra and its runner not existing: `wf_state_set '.testing.frontend_coverage_threshold' '<number>'` (the number for `full`, `0` for `ratchet`), else `null`
 > - `wf_state_set '.testing.visual_regression' 'true'` or `'false'`
 > - `wf_state_set '.testing.page_object_model' 'true'` or `'false'`
 > - `wf_state_set '.mcps' '<array of selected MCPs>'`
