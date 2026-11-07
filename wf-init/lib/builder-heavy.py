@@ -227,6 +227,18 @@ def _stage_setup_file(raw, staging, setup, created):
         created.append(os.path.relpath(setup_target, staging))
 
 
+# The names Vite looks for, in its own order of precedence.
+VITE_CONFIG_NAMES = ("vite.config.js", "vite.config.mjs", "vite.config.ts", "vite.config.cjs", "vite.config.mts", "vite.config.cts")
+
+
+def _project_vite_config():
+    """Name of the project's own Vite config at its root (the builder runs from there), or None."""
+    for name in VITE_CONFIG_NAMES:
+        if os.path.isfile(os.path.join(os.getcwd(), name)):
+            return name
+    return None
+
+
 def _js_regex(path):
     """A folder path as the body of a JavaScript regex literal (slashes and dots escaped)."""
     return re.sub(r"([.*+?^${}()|\[\]\\])", r"\\\1", path).replace("/", "\\/")
@@ -273,6 +285,12 @@ def write_testing_configs(raw, state, staging):
     if "frontend" in layers and not bool(builder_core.get_state_value(state, "testing.frontend_runner_existing", False)):
         fname, fprofile = builder_core.frontend_profile(raw, state)
         fkey = fprofile.get("unit_config_frontend")
+        # A project that already has a Vite config keeps its aliases and plugins in the tests: Vitest ignores
+        # vite.config.* once a vitest.config.* exists, so the generated config merges it in. A project
+        # without one (Laravel Mix, webpack) keeps the config that has always been generated for it.
+        vite_file = _project_vite_config()
+        if fkey and vite_file and fprofile.get("unit_config_frontend_vite"):
+            fkey = fprofile["unit_config_frontend_vite"]
         if not fkey:
             # Phase 4.6 does not offer the layer for such a profile; if the state has it anyway, say so
             # instead of leaving the developer to believe the frontend tests were set up.
@@ -285,6 +303,7 @@ def write_testing_configs(raw, state, staging):
                 builder_core.base_url(raw, "templates/protocols/testing/" + spec["template"]))
             cfg = builder_core.extract_block(cfg, "typescript")
             cfg = cfg.replace("{{frontend_root_regex}}", _js_regex(root)).replace("{{frontend_root}}", root)
+            cfg = cfg.replace("{{vite_config_file}}", vite_file or "")
             cfg = _inject_coverage(raw, state, cfg, spec)
             target = os.path.join(staging, spec["target"])
             with open(target, "w", encoding="utf-8") as fh:
