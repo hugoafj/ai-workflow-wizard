@@ -465,9 +465,9 @@ details) using `$WF_ROOT/templates/protocols/cicd/` as the single source.
   - **If `claude`**: toggle `inline_suggestions` — if `INLINE_SUGGESTIONS == false`,
     omit the `claude_args:` block with `--allowedTools` from the assembled template.
 - `variants/quality-guard.yml.md` ALWAYS (conditioned on real scripts); for a PHP stack with the `frontend` layer active the PHP variant also gets the Node setup, `npm ci`, `npm run test` and the build script; for a PHP stack (`stack_key` starting with `php-`) `variants/quality-guard.php.yml.md` takes its place, filled with `{{php_version}}` (`discovery.php_version`, else `composer.json` `config.platform.php`, else the first X.Y of `require.php`, else 8.3), `{{php_extensions}}` (the `ext-*` requirements of `composer.json` and `composer.lock`: root, every locked package and the platform sections, minus the extensions compiled into every PHP; the `extensions:` line is left out when there are none) and `{{test_command}}` (`testing.test_command`, else `php artisan test`, `vendor/bin/pest` or `vendor/bin/phpunit`). **Fill `{{node_version}}`
-  with `state.discovery.node_engine` or 22 by default, and `{{npm_major}}` with
+  with `state.discovery.node_engine` or 24 by default, and `{{npm_major}}` with
   `state.discovery.npm_major` or the current npm major (`npm --version | cut -d. -f1`,
-  defaulting to `8`)** — this avoids the `npm ci` lockfile out-of-sync failure.
+  defaulting to `11`)** — this avoids the `npm ci` lockfile out-of-sync failure.
   - **E2E toggle**: if `state.ci.e2e_in_ci == false`, do not include `npm run test:e2e` in
     the quality guard (even if `LAYERS` includes e2e). The e2e script still exists for local use.
 - `.gga`: a FILE named `.gga` in the project root (GGA does not read `.gga/config.yml`). Fill

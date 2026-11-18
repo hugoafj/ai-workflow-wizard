@@ -1,7 +1,7 @@
 # quality-guard.yml — CI Quality Guard workflow
 #
 # Placeholder resolution:
-#   {{node_version}} → project engines.node, or 22 by default
+#   {{node_version}} → project engines.node, or 24 by default
 #   {{npm_major}}    → user's local npm major version (e.g., 11)
 #   {{node_test_command}} → npm run test:coverage when coverage_mode is set (the CI then enforces the floor), else npm run test
 #
@@ -12,7 +12,7 @@
 #   <if e2e layer active in ci>:                   → include Playwright steps (requires testing.layers incl. e2e AND ci.e2e_in_ci != false)
 #
 # Notes:
-#   - Node 22 is active LTS, satisfies >=18/>=20/>=22 of the current ecosystem
+#   - Node 24 is the default: Node 22 leaves LTS support on 2027-04-30, Node 24 is supported until 2028-04-30
 #   - npm is pinned before npm ci to avoid lockfile desync
 #   - with a coverage mode set, the unit step runs test:coverage; the init writes that script into package.json
 #     (phase 8.1e), and a project that removed it fails this step on purpose, so a floor never passes silently
