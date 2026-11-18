@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.16.0-beta.1...v0.16.1-beta.1) (2026-11-18)
+
+
+### Bug Fixes
+
+* **wf-init:** default CI to Node 24 and npm 11 ([#209](https://github.com/hugoafj/ai-workflow-wizard/issues/209)) ([f093a74](https://github.com/hugoafj/ai-workflow-wizard/commit/f093a74ae52844e3ddc808f53c8e98b353acb633))
+
 ## [0.16.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.15.0-beta.1...v0.16.0-beta.1) (2026-11-18)
 
 
