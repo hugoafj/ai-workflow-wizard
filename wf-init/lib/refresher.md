@@ -1502,7 +1502,7 @@ if declare -F wf_profile_for_framework >/dev/null 2>&1; then
 fi
 
 # R2 normalization (FU9): normalize corrupted node_engine/npm_major values.
-# Values of "None" or "" become null so the builder defaults ("22"/"10") apply.
+# Values of "None" or "" become null so the builder defaults ("24"/"11") apply.
 # Runs unconditionally and idempotently on every refresh.
 WF_STATE="$STAGING_STATE" _apply_jq_filter '
   if .discovery.node_engine == "None" or .discovery.node_engine == "" then

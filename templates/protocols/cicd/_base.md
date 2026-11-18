@@ -554,7 +554,7 @@ in the CD configuration without attempting to solve it automatically.
 1. **`npm ci` "lockfile out of sync"**: the `package-lock.json` is generated with the user's
    local npm/Node; the npm bundled with Node in CI may resolve peer-deps differently and
    `npm ci` fails even though the lock is valid locally. Fix in `quality-guard.yml`: use Node
-   `state.discovery.node_engine` or 22 (NOT hardcoded 20), and **pin npm** with
+   `state.discovery.node_engine` or 24 (NOT hardcoded 20), and **pin npm** with
    `npm install -g npm@{state.discovery.npm_major}` before `npm ci`.
 2. **Installing GGA in CI**: NOT `curl -fsSL install.sh | bash` (the `install.sh` references
    `bin/gga` relative to its dir; via pipe there is no stable BASH_SOURCE → `cp: cannot stat`).

@@ -9,3 +9,6 @@ NOTES.md
 .DS_Store
 # Personal editor settings (.vscode/mcp.json stays tracked)
 .vscode/settings.json
+# Python bytecode cache
+__pycache__/
+*.pyc

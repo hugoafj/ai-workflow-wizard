@@ -11,7 +11,7 @@ Delta specification for corrective changes to the builder-driven `/wf-refresh` p
 Three behavioral themes:
 
 1. **Regeneration-first with merge (FU2, FU3a–FU3e)** — R1 re-detects all discoverable fields unconditionally; current `AGENTS.md` is parsed once as a merge source (descriptions/comments/MCP purpose survive where names match); rich sections re-render from structured `discovery.*`; whole-section preservation is the final fallback only.
-2. **Coalescing at the builder boundary (FU1, R2)** — empty/`null`/`"None"` `node_engine`/`npm_major` resolve to `"22"`/`"10"`; R1 stops writing empty values; R2 normalizes already-corrupted state.
+2. **Coalescing at the builder boundary (FU1, R2)** — empty/`null`/`"None"` `node_engine`/`npm_major` resolve to `"24"`/`"11"`; R1 stops writing empty values; R2 normalizes already-corrupted state.
 3. **Safety completions (FU4–FU7)** — extended deprecated-path cleanup; non-tty runs emit a structured pending-prompts manifest with resume instead of bare `exit 2`; apply-only never stages deletions; locally-modified `updated` files require a dedicated overwrite approval.
 
 `AI_DEV_WORKFLOW.md` R1/R4/R5/R6 sections (~709, 762, 765-767, 1699-1710) update in the same change (AGENTS.md sync rule). No test runner (strict TDD false); requirements are verifiable via `bash -n`, `python3 -m py_compile`, and fixture dry-runs (proposal success criteria a–e).
@@ -22,38 +22,38 @@ Three behavioral themes:
 
 ### Requirement: FU1 — Node/npm defaults coalescing
 
-The builder SHALL resolve `discovery.node_engine`/`discovery.npm_major` through a single coalescing rule (`builder-core.py` `get_state_value`/`_coalesce`): missing key, `null`, `""`, and literal `"None"` all resolve to `"22"`/`"10"`. `quality-guard.yml` SHALL NEVER render `node-version: ""` or `node-version: "None"`; deploy variants (`deploy-*.yml`) SHALL use the same resolution. A non-empty project `engines.node` SHALL be honored (defaults never override real values). R1 SHALL NOT overwrite a non-empty stored value with an empty discovery result.
+The builder SHALL resolve `discovery.node_engine`/`discovery.npm_major` through a single coalescing rule (`builder-core.py` `get_state_value`/`_coalesce`): missing key, `null`, `""`, and literal `"None"` all resolve to `"24"`/`"11"`. `quality-guard.yml` SHALL NEVER render `node-version: ""` or `node-version: "None"`; deploy variants (`deploy-*.yml`) SHALL use the same resolution. A non-empty project `engines.node` SHALL be honored (defaults never override real values). R1 SHALL NOT overwrite a non-empty stored value with an empty discovery result.
 
 #### Scenario: Missing keys fall through to defaults
 
 - GIVEN state with no `discovery.node_engine`/`discovery.npm_major` keys
 - WHEN the builder renders `quality-guard.yml`
-- THEN `{{node_version}}`→`22`, `{{npm_major}}`→`10`
-- AND output contains `node-version: "22"` and `npm install -g npm@10`
+- THEN `{{node_version}}`→`24`, `{{npm_major}}`→`11`
+- AND output contains `node-version: "24"` and `npm install -g npm@11`
 
 #### Scenario: Empty string and null render defaults
 
 - GIVEN `discovery.node_engine`/`discovery.npm_major` are `""` or `null`
 - WHEN the builder renders `quality-guard.yml`
-- THEN output contains `node-version: "22"` and `npm@10`, never `node-version: ""` or `"None"`
+- THEN output contains `node-version: "24"` and `npm@11`, never `node-version: ""` or `"None"`
 
 #### Scenario: Literal "None" self-heals
 
 - GIVEN state persisted with `discovery.node_engine = "None"`
 - WHEN the builder renders `quality-guard.yml`
-- THEN output contains `node-version: "22"`, never the `"None"` string
+- THEN output contains `node-version: "24"`, never the `"None"` string
 
 #### Scenario: Real engines.node is honored
 
 - GIVEN `package.json` `engines.node = "20.x"` stored in state
 - WHEN the builder renders `quality-guard.yml` and `deploy.yml`
-- THEN both workflows contain `node-version: "20.x"`, not `22`
+- THEN both workflows contain `node-version: "20.x"`, not `24`
 
 #### Scenario: Deploy variant shares the resolution
 
 - GIVEN `cd` enabled with node assets but empty `discovery.node_engine`
 - WHEN the builder renders the deploy workflow
-- THEN `{{node_version}}` resolves to `22` (identical coalescing to quality-guard)
+- THEN `{{node_version}}` resolves to `24` (identical coalescing to quality-guard)
 
 #### Scenario: R1 never clobbers a good value with empty
 
@@ -311,14 +311,14 @@ R4 SHALL mark `updated` entries with `local_modified: true` when the working-tre
 
 ### Requirement: R2 — Normalize corrupted node/npm discovery values
 
-The R2 migration SHALL normalize `discovery.node_engine` and `discovery.npm_major` values of literal `"None"` or `""` to `null`/absent, so the builder defaults (`"22"`/`"10"`) apply. Valid values SHALL be preserved unchanged. Normalization SHALL run unconditionally and idempotently alongside the existing legacy normalization block (even when versions match), and SHALL operate on the staging state copy.
+The R2 migration SHALL normalize `discovery.node_engine` and `discovery.npm_major` values of literal `"None"` or `""` to `null`/absent, so the builder defaults (`"24"`/`"11"`) apply. Valid values SHALL be preserved unchanged. Normalization SHALL run unconditionally and idempotently alongside the existing legacy normalization block (even when versions match), and SHALL operate on the staging state copy.
 
 #### Scenario: Literal "None" normalizes to absent
 
 - GIVEN staging state holds `discovery.node_engine = "None"` and `discovery.npm_major = "None"`
 - WHEN R2 migration runs
 - THEN both values become `null`/absent
-- AND the builder renders `node-version: "22"` / `npm@10`
+- AND the builder renders `node-version: "24"` / `npm@11`
 
 #### Scenario: Empty strings normalize to absent
 
@@ -328,7 +328,7 @@ The R2 migration SHALL normalize `discovery.node_engine` and `discovery.npm_majo
 
 #### Scenario: Valid values are preserved
 
-- GIVEN staging state holds `discovery.node_engine = "20.x"` and `discovery.npm_major = "10"`
+- GIVEN staging state holds `discovery.node_engine = "20.x"` and `discovery.npm_major = "11"`
 - WHEN R2 migration runs
 - THEN both values are untouched
 
