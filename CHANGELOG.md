@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.15.0-beta.1...v0.16.0-beta.1) (2026-11-18)
+
+
+### Features
+
+* **wf-init:** install wf-context-ref skill by default ([#207](https://github.com/hugoafj/ai-workflow-wizard/issues/207)) ([5f32ecc](https://github.com/hugoafj/ai-workflow-wizard/commit/5f32ecc73bf868978fac953b4bb1a3538d823f35))
+
 ## [0.15.0-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.14.1-beta.1...v0.15.0-beta.1) (2026-11-07)
 
 
