@@ -1766,6 +1766,27 @@ def main(argv=None):
         print("ERROR: cannot fetch wf-conventional-pr template from %s: %s" % (wf_pr_url, exc), file=sys.stderr)
         raise RuntimeError("build stopped: wf-conventional-pr skill template unavailable (%s)" % wf_pr_url) from exc
 
+    # B4.6: wf-context-ref skill (always installed, next to wf-conventional-pr; it extends that skill and does not replace it).
+    # A failed fetch is fatal for the same reason as B4.5: the skill is installed for every project.
+    wf_ctx_url = base_url(raw, "templates/skills/wf-context-ref/SKILL.md")
+    try:
+        wf_ctx_text = fetch_with_retries(wf_ctx_url)
+        wf_ctx_targets = [os.path.join(staging, ".agents", "skills", "wf-context-ref")]
+        for ide in active_ides(state):
+            ide_skill_path = SKILL_PATHS.get(ide)
+            if ide_skill_path:
+                wf_ctx_targets.append(os.path.join(staging, ide_skill_path, "wf-context-ref"))
+        if "windsurf" in active_ides(state):
+            wf_ctx_targets.append(os.path.join(staging, DEVIN_SKILLS, "wf-context-ref"))
+        for tgt in dict.fromkeys(wf_ctx_targets):
+            os.makedirs(tgt, exist_ok=True)
+            with open(os.path.join(tgt, "SKILL.md"), "w", encoding="utf-8") as fh:
+                fh.write(wf_ctx_text.rstrip() + "\n")
+            skills_created.append(os.path.relpath(os.path.join(tgt, "SKILL.md"), staging))
+    except RuntimeError as exc:
+        print("ERROR: cannot fetch wf-context-ref template from %s: %s" % (wf_ctx_url, exc), file=sys.stderr)
+        raise RuntimeError("build stopped: wf-context-ref skill template unavailable (%s)" % wf_ctx_url) from exc
+
     # B5: AGENTS.md (router).
     router_text = render_router(raw, state)
     agents_rel = os.path.join("AGENTS.md")
