@@ -524,7 +524,7 @@ The wizard phases:
 
 - **Phase 0** — Self-contained prerequisite. Installs/verifies gentle-ai, runs `gentle-ai doctor`, confirms active agents for this project.
 - **Phase 0b** — System health check. Verifies `gentle-ai doctor` critical checks, warns on disk space and Engram reachability.
-- **Phase 0c**: Workflow feature selection. Lets the user toggle the Decision Ladder, testing, CI/CD, and release-please before discovery. The `wf-conventional-pr` PR skill is always installed, so it is not a question here.
+- **Phase 0c**: Workflow feature selection. Lets the user toggle the Decision Ladder, testing, CI/CD, and release-please before discovery. The `wf-conventional-pr` PR skill and the `wf-context-ref` work-reference skill are always installed, so they are not a question here.
 - **Phase 1** — Discovery (lists files, manifests, previous satellites, commits; also saves npm scripts to `discovery.commands` and the root folder summary for the AGENTS.md Commands / Project Structure sections).
 - **Phase 2** — Migration of previous artifacts (if any with their own content).
 - **Phase 3** — Mode: greenfield vs legacy (auto-detect + confirmation).
@@ -1727,7 +1727,7 @@ Once `/wf-init` has run, several decisions the developer made (testing, testing 
 | Release strategy (13) | Tag-based (`v*`) or push-to-main deploy trigger | Medium: changes how CD fires |
 | IDEs/CLIs (14) | Add/remove an active IDE: generates (satellite + commands + skills) or deletes everything related, downloading templates from the wizard's raw source | Real: creates or removes project files; requires explicit confirmation |
 
-**Note**: Option numbering in `/wf-settings` runs from 1 to 14 and is **fixed**: the menu always shows all 14 options and never renumbers them, because each number maps to its `### N:` section. Options that do not apply are shown as `n/a (<reason>)` (3–5 when testing is OFF, 7–10 when CI is OFF, 11 when CI is ON), and choosing one applies nothing. Option 1 maps to `wf-ladder`, option 2 to the testing infrastructure, and option 14 manages IDEs and CLIs. The `wf-conventional-pr` PR skill is always installed for every project and has no settings option.
+**Note**: Option numbering in `/wf-settings` runs from 1 to 14 and is **fixed**: the menu always shows all 14 options and never renumbers them, because each number maps to its `### N:` section. Options that do not apply are shown as `n/a (<reason>)` (3–5 when testing is OFF, 7–10 when CI is OFF, 11 when CI is ON), and choosing one applies nothing. Option 1 maps to `wf-ladder`, option 2 to the testing infrastructure, and option 14 manages IDEs and CLIs. The `wf-conventional-pr` PR skill and the `wf-context-ref` work-reference skill are always installed for every project and have no settings option.
 
 **Interaction pattern**: the command always shows the real state first (reading `.wizard-state.json` and `AGENTS.md` directly, never assuming what the developer remembers choosing), lets you choose one or several changes, applies and confirms each individually, and asks "anything else?" before closing with a consolidated commit, without `git push`, like the rest of this workflow.
 

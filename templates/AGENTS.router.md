@@ -110,11 +110,12 @@ bloating the context. They are NOT written in full here — they live in dedicat
 
 ### Project-local skills
 
-Use `wf-conventional-pr` for pull requests in this project. It is distinct from gentle-ai's global `branch-pr` skill, so both coexist.
+Use `wf-conventional-pr` for pull requests in this project. It is distinct from gentle-ai's global `branch-pr` skill, so both coexist. Use `wf-context-ref` to resolve the work reference (ticket, issue, or custom label) and propagate it to the session, branch, PR, commits, and memory. It extends `wf-conventional-pr` and does not replace it.
 
 | Skill | Universal path | IDE-specific paths |
 |---|---|---|
 | `wf-conventional-pr` | `.agents/skills/wf-conventional-pr/SKILL.md` | `.claude/skills/`, `.opencode/skills/`, `.cursor/skills/`, `.devin/skills/`, `.codex/skills/`, `.kiro/skills/`, `.gemini/skills/` (when those IDEs are active) |
+| `wf-context-ref` | `.agents/skills/wf-context-ref/SKILL.md` | `.claude/skills/`, `.opencode/skills/`, `.cursor/skills/`, `.devin/skills/`, `.codex/skills/`, `.kiro/skills/`, `.gemini/skills/` (when those IDEs are active) |
 
 <!-- The following HTML comment is mandatory and must remain as the LAST LINE of the
      file, as-is, with real values (read by /wf-settings and /wf-refresh by reading

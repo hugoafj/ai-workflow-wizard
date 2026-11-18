@@ -189,6 +189,16 @@ conventions, exactly-one `type:*` label, and optional issue linkage. If the temp
 fails, the build stops with an error naming the URL and the reason; no project is produced
 without the skill.
 
+### Step B4.6: `wf-context-ref` skill (always)
+
+Always fetch `templates/skills/wf-context-ref/SKILL.md` and write it to the same targets as
+`wf-conventional-pr` in Step B4.5 (`.agents/skills/wf-context-ref/SKILL.md` plus every active
+IDE's native skills path, with Windsurf also getting `.devin/skills/wf-context-ref/`).
+
+This skill is installed for every project, next to `wf-conventional-pr`. It extends that skill
+and does not replace it: both are installed and both stay. If the template fetch fails, the
+build stops with an error naming the URL and the reason, following the same rule as B4.5.
+
 ### Step B5 — Assemble AGENTS.md (thin router)
 
 **Implementation**: Use Python for robust template processing (handles file placeholders, conditionals, guide comment stripping, validation).
