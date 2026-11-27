@@ -88,7 +88,7 @@
       "environment": "jsdom",
       "ui": true,
       "e2e": "offer",
-      "unit_config": "vitest-react",
+      "unit_config": "vitest-next",
       "unit_config_by_runner": {},
       "setup_file": {"template": "setup.tmpl.md", "target": "src/test/setup.ts"},
       "packages": ["vitest", "@testing-library/react", "@testing-library/user-event", "@testing-library/jest-dom", "@testing-library/dom", "jsdom", "@vitest/ui", "@vitest/coverage-v8", "@vitejs/plugin-react"],
@@ -242,13 +242,14 @@
     }
   },
   "unit_configs": {
-    "vitest-react": {"template": "vitest.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "coverage_ratchet": "coverage-thresholds.ratchet.tmpl.md", "marker": "test: {\n", "indent": 4},
-    "vitest-vue": {"template": "vitest.vue.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "coverage_ratchet": "coverage-thresholds.ratchet.tmpl.md", "marker": "test: {\n", "indent": 4},
-    "vitest-frontend": {"template": "vitest.frontend.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "coverage_ratchet": "coverage-thresholds.ratchet.tmpl.md", "marker": "test: {\n", "indent": 4},
-    "vitest-frontend-vite": {"template": "vitest.frontend.vite.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "coverage_ratchet": "coverage-thresholds.ratchet.tmpl.md", "marker": "test: {\n", "indent": 8},
-    "vitest-frontend-vue-vite": {"template": "vitest.frontend.vue.vite.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "coverage_ratchet": "coverage-thresholds.ratchet.tmpl.md", "marker": "test: {\n", "indent": 8},
-    "vitest-frontend-vue": {"template": "vitest.frontend.vue.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "coverage_ratchet": "coverage-thresholds.ratchet.tmpl.md", "marker": "test: {\n", "indent": 4},
-    "vitest-node": {"template": "vitest.node.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "coverage_ratchet": "coverage-thresholds.ratchet.tmpl.md", "marker": "test: {\n", "indent": 4},
+    "vitest-react": {"template": "vitest.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "coverage_ratchet": "coverage-thresholds.ratchet.tmpl.md", "coverage_include": "['src/**/*.{js,jsx,ts,tsx}']", "marker": "test: {\n", "indent": 4},
+    "vitest-next": {"template": "vitest.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "coverage_ratchet": "coverage-thresholds.ratchet.tmpl.md", "coverage_include": "['{src,app,pages}/**/*.{js,jsx,ts,tsx}']", "marker": "test: {\n", "indent": 4},
+    "vitest-vue": {"template": "vitest.vue.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "coverage_ratchet": "coverage-thresholds.ratchet.tmpl.md", "coverage_include": "['src/**/*.{js,jsx,ts,tsx,vue}']", "marker": "test: {\n", "indent": 4},
+    "vitest-frontend": {"template": "vitest.frontend.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "coverage_ratchet": "coverage-thresholds.ratchet.tmpl.md", "coverage_include": "['{{frontend_root}}/**/*.{js,jsx,ts,tsx}']", "marker": "test: {\n", "indent": 4},
+    "vitest-frontend-vite": {"template": "vitest.frontend.vite.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "coverage_ratchet": "coverage-thresholds.ratchet.tmpl.md", "coverage_include": "['{{frontend_root}}/**/*.{js,jsx,ts,tsx}']", "marker": "test: {\n", "indent": 8},
+    "vitest-frontend-vue-vite": {"template": "vitest.frontend.vue.vite.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "coverage_ratchet": "coverage-thresholds.ratchet.tmpl.md", "coverage_include": "['{{frontend_root}}/**/*.{js,jsx,ts,tsx,vue}']", "marker": "test: {\n", "indent": 8},
+    "vitest-frontend-vue": {"template": "vitest.frontend.vue.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "coverage_ratchet": "coverage-thresholds.ratchet.tmpl.md", "coverage_include": "['{{frontend_root}}/**/*.{js,jsx,ts,tsx,vue}']", "marker": "test: {\n", "indent": 4},
+    "vitest-node": {"template": "vitest.node.config.tmpl.md", "target": "vitest.config.ts", "coverage": "coverage-thresholds.tmpl.md", "coverage_ratchet": "coverage-thresholds.ratchet.tmpl.md", "coverage_include": "['**/*.{js,ts}']", "marker": "test: {\n", "indent": 4},
     "jest-nest": {"template": "jest.config.nest.tmpl.md", "target": "jest.config.js", "coverage": "coverage-thresholds.jest.tmpl.md", "coverage_ratchet": "coverage-thresholds.ratchet.jest.tmpl.md", "marker": "module.exports = {\n", "indent": 2}
   }
 }
