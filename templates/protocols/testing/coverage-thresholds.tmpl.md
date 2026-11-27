@@ -6,6 +6,7 @@
 
 coverage: {
   provider: 'v8',
+  include: {{coverage_include}},
   thresholds: {
     lines: {{threshold}},
     functions: {{threshold}},

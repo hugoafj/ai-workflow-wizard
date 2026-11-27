@@ -237,6 +237,12 @@ def _inject_coverage(raw, state, cfg, spec, key="testing.coverage_threshold"):
         builder_core.base_url(raw, "templates/protocols/testing/" + rel))
     frag = builder_core.strip_prose_header(frag)
     frag = frag.replace("{{threshold}}", str(threshold))
+    if "{{coverage_include}}" in frag:
+        include = spec.get("coverage_include")
+        if not include:
+            raise ValueError("coverage_include missing for the %r unit config" % spec.get("target"))
+        root = (builder_core.get_state_value(state, "testing.frontend_root") or "resources/js").strip("/")
+        frag = frag.replace("{{coverage_include}}", include.replace("{{frontend_root}}", root))
     # Indent the fragment to sit inside the marked block (F11).
     frag = textwrap.indent(frag, " " * spec["indent"])
     return cfg.replace(spec["marker"], spec["marker"] + frag + "\n")

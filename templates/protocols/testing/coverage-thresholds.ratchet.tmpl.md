@@ -8,6 +8,7 @@
 
 coverage: {
   provider: 'v8',
+  include: {{coverage_include}},
   reporter: ['text', 'json-summary'],
   thresholds: {
     lines: {{threshold}},
