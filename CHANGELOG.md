@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.2-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.16.1-beta.1...v0.16.2-beta.1) (2026-11-27)
+
+
+### Bug Fixes
+
+* **wf-init:** scope coverage measurement to the source tree ([#211](https://github.com/hugoafj/ai-workflow-wizard/issues/211)) ([f75430b](https://github.com/hugoafj/ai-workflow-wizard/commit/f75430b565e599ec2f0552675a1a53e7c13e1277))
+
 ## [0.16.1-beta.1](https://github.com/hugoafj/ai-workflow-wizard/compare/v0.16.0-beta.1...v0.16.1-beta.1) (2026-11-18)
 
 
